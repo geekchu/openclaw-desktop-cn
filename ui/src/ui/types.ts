@@ -265,6 +265,27 @@ export type MSTeamsStatus = {
   lastProbeAt?: number | null;
 };
 
+export type FeishuProbe = {
+  ok: boolean;
+  status?: number | null;
+  error?: string | null;
+  elapsedMs?: number | null;
+  appId?: string | null;
+  botName?: string | null;
+};
+
+export type FeishuStatus = {
+  configured: boolean;
+  running: boolean;
+  lastStartAt?: number | null;
+  lastStopAt?: number | null;
+  lastError?: string | null;
+  domain?: string | null;
+  appId?: string | null;
+  probe?: FeishuProbe | null;
+  lastProbeAt?: number | null;
+};
+
 export type ConfigSnapshotIssue = {
   path: string;
   message: string;

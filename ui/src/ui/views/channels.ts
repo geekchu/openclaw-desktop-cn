@@ -4,6 +4,7 @@ import type {
   ChannelUiMetaEntry,
   ChannelsStatusSnapshot,
   DiscordStatus,
+  FeishuStatus,
   GoogleChatStatus,
   IMessageStatus,
   NostrProfile,
@@ -17,6 +18,7 @@ import type { ChannelKey, ChannelsChannelData, ChannelsProps } from "./channels.
 import { formatAgo } from "../format.ts";
 import { renderChannelConfigSection } from "./channels.config.ts";
 import { renderDiscordCard } from "./channels.discord.ts";
+import { renderFeishuCard } from "./channels.feishu.ts";
 import { renderGoogleChatCard } from "./channels.googlechat.ts";
 import { renderIMessageCard } from "./channels.imessage.ts";
 import { renderNostrCard } from "./channels.nostr.ts";
@@ -36,6 +38,7 @@ export function renderChannels(props: ChannelsProps) {
   const signal = (channels?.signal ?? null) as SignalStatus | null;
   const imessage = (channels?.imessage ?? null) as IMessageStatus | null;
   const nostr = (channels?.nostr ?? null) as NostrStatus | null;
+  const feishu = (channels?.feishu ?? null) as FeishuStatus | null;
   const channelOrder = resolveChannelOrder(props.snapshot);
   const orderedChannels = channelOrder
     .map((key, index) => ({
@@ -62,6 +65,7 @@ export function renderChannels(props: ChannelsProps) {
           signal,
           imessage,
           nostr,
+          feishu,
           channelAccounts: props.snapshot?.channelAccounts ?? null,
         }),
       )}
@@ -90,7 +94,7 @@ ${props.snapshot ? JSON.stringify(props.snapshot, null, 2) : "暂无快照。"}
 }
 
 // 只显示这些频道（硬编码，忽略网关返回的频道列表）
-const ALLOWED_CHANNELS: ChannelKey[] = ["imessage", "whatsapp", "telegram"];
+const ALLOWED_CHANNELS: ChannelKey[] = ["imessage", "whatsapp", "telegram", "feishu"];
 
 function resolveChannelOrder(snapshot: ChannelsStatusSnapshot | null): ChannelKey[] {
   // 直接返回固定列表，不使用网关返回的频道顺序
@@ -141,6 +145,13 @@ function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChan
       return renderIMessageCard({
         props,
         imessage: data.imessage,
+        accountCountLabel,
+      });
+    case "feishu":
+      return renderFeishuCard({
+        props,
+        feishu: data.feishu,
+        feishuAccounts: data.channelAccounts?.feishu ?? [],
         accountCountLabel,
       });
     case "nostr": {

@@ -29,6 +29,23 @@ function resolveCommand(command: string): string {
   return command;
 }
 
+/**
+ * Check if an error is a Windows spawn error that can be resolved by using shell mode.
+ * On Windows, spawning scripts discovered on PATH (e.g. lobster.cmd) can fail
+ * with EINVAL, and PATH discovery itself can fail with ENOENT when the binary
+ * is only available via PATHEXT/script wrappers.
+ */
+function isWindowsSpawnErrorThatCanUseShell(err: unknown): boolean {
+  if (process.platform !== "win32") {
+    return false;
+  }
+  if (!err || typeof err !== "object") {
+    return false;
+  }
+  const code = (err as { code?: unknown }).code;
+  return code === "EINVAL" || code === "ENOENT";
+}
+
 // Simple promise-wrapped execFile with optional verbosity logging.
 export async function runExec(
   command: string,
@@ -82,6 +99,22 @@ export async function runCommandWithTimeout(
   argv: string[],
   optionsOrTimeout: number | CommandOptions,
 ): Promise<SpawnResult> {
+  try {
+    return await runCommandWithTimeoutOnce(argv, optionsOrTimeout, false);
+  } catch (err) {
+    // On Windows, retry with shell mode if we get EINVAL or ENOENT
+    if (isWindowsSpawnErrorThatCanUseShell(err)) {
+      return await runCommandWithTimeoutOnce(argv, optionsOrTimeout, true);
+    }
+    throw err;
+  }
+}
+
+async function runCommandWithTimeoutOnce(
+  argv: string[],
+  optionsOrTimeout: number | CommandOptions,
+  useShell: boolean,
+): Promise<SpawnResult> {
   const options: CommandOptions =
     typeof optionsOrTimeout === "number" ? { timeoutMs: optionsOrTimeout } : optionsOrTimeout;
   const { timeoutMs, cwd, input, env } = options;
@@ -116,6 +149,8 @@ export async function runCommandWithTimeout(
     cwd,
     env: resolvedEnv,
     windowsVerbatimArguments,
+    shell: useShell,
+    windowsHide: useShell,
   });
   // Spawn with inherited stdin (TTY) so tools like `pi` stay interactive when needed.
   return await new Promise((resolve, reject) => {
