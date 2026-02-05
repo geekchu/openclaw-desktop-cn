@@ -46,29 +46,29 @@ export async function loadCronJobs(state: CronState) {
 export function buildCronSchedule(form: CronFormState) {
   if (form.scheduleKind === "at") {
     const ms = Date.parse(form.scheduleAt);
-    if (!Number.isFinite(ms)) throw new Error("Invalid run time.");
+    if (!Number.isFinite(ms)) throw new Error("无效的运行时间。");
     return { kind: "at" as const, atMs: ms };
   }
   if (form.scheduleKind === "every") {
     const amount = toNumber(form.everyAmount, 0);
-    if (amount <= 0) throw new Error("Invalid interval amount.");
+    if (amount <= 0) throw new Error("无效的间隔时间。");
     const unit = form.everyUnit;
     const mult = unit === "minutes" ? 60_000 : unit === "hours" ? 3_600_000 : 86_400_000;
     return { kind: "every" as const, everyMs: amount * mult };
   }
   const expr = form.cronExpr.trim();
-  if (!expr) throw new Error("Cron expression required.");
+  if (!expr) throw new Error("需要 Cron 表达式。");
   return { kind: "cron" as const, expr, tz: form.cronTz.trim() || undefined };
 }
 
 export function buildCronPayload(form: CronFormState) {
   if (form.payloadKind === "systemEvent") {
     const text = form.payloadText.trim();
-    if (!text) throw new Error("System event text required.");
+    if (!text) throw new Error("需要系统事件文本。");
     return { kind: "systemEvent" as const, text };
   }
   const message = form.payloadText.trim();
-  if (!message) throw new Error("Agent message required.");
+  if (!message) throw new Error("需要代理消息。");
   const payload: {
     kind: "agentTurn";
     message: string;
@@ -107,7 +107,7 @@ export async function addCronJob(state: CronState) {
           ? { postToMainPrefix: state.cronForm.postToMainPrefix.trim() }
           : undefined,
     };
-    if (!job.name) throw new Error("Name required.");
+    if (!job.name) throw new Error("需要名称。");
     await state.client.request("cron.add", job);
     state.cronForm = {
       ...state.cronForm,

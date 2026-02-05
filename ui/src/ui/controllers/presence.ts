@@ -20,10 +20,10 @@ export async function loadPresence(state: PresenceState) {
     const res = (await state.client.request("system-presence", {})) as PresenceEntry[] | undefined;
     if (Array.isArray(res)) {
       state.presenceEntries = res;
-      state.presenceStatus = res.length === 0 ? "No instances yet." : null;
+      state.presenceStatus = res.length === 0 ? "暂无实例。" : null;
     } else {
       state.presenceEntries = [];
-      state.presenceStatus = "No presence payload.";
+      state.presenceStatus = "无存在数据。";
     }
   } catch (err) {
     state.presenceError = String(err);

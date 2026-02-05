@@ -104,7 +104,7 @@ export async function saveConfig(state: ConfigState) {
         : state.configRaw;
     const baseHash = state.configSnapshot?.hash;
     if (!baseHash) {
-      state.lastError = "Config hash missing; reload and retry.";
+      state.lastError = "配置哈希缺失；请重新加载后重试。";
       return;
     }
     await state.client.request("config.set", { raw, baseHash });
@@ -128,7 +128,7 @@ export async function applyConfig(state: ConfigState) {
         : state.configRaw;
     const baseHash = state.configSnapshot?.hash;
     if (!baseHash) {
-      state.lastError = "Config hash missing; reload and retry.";
+      state.lastError = "配置哈希缺失；请重新加载后重试。";
       return;
     }
     await state.client.request("config.apply", {

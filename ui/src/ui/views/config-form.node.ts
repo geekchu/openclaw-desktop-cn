@@ -114,7 +114,7 @@ export function renderNode(params: {
   if (unsupported.has(key)) {
     return html`<div class="cfg-field cfg-field--error">
       <div class="cfg-field__label">${label}</div>
-      <div class="cfg-field__error">Unsupported schema node. Use Raw mode.</div>
+      <div class="cfg-field__error">不支持的架构节点。请使用原始模式。</div>
     </div>`;
   }
 
@@ -275,7 +275,7 @@ export function renderNode(params: {
   return html`
     <div class="cfg-field cfg-field--error">
       <div class="cfg-field__label">${label}</div>
-      <div class="cfg-field__error">Unsupported type: ${type}. Use Raw mode.</div>
+      <div class="cfg-field__error">不支持的类型: ${type}。请使用原始模式。</div>
     </div>
   `;
 }
@@ -298,7 +298,7 @@ function renderTextInput(params: {
   const isSensitive = hint?.sensitive ?? isSensitivePath(path);
   const placeholder =
     hint?.placeholder ??
-    (isSensitive ? "••••" : schema.default !== undefined ? `Default: ${schema.default}` : "");
+    (isSensitive ? "••••" : schema.default !== undefined ? `默认: ${schema.default}` : "");
   const displayValue = value ?? "";
 
   return html`
@@ -337,7 +337,7 @@ function renderTextInput(params: {
           <button
             type="button"
             class="cfg-input__reset"
-            title="Reset to default"
+            title="重置为默认值"
             ?disabled=${disabled}
             @click=${() => onPatch(path, schema.default)}
           >↺</button>
@@ -433,7 +433,7 @@ function renderSelect(params: {
           onPatch(path, val === unset ? undefined : options[Number(val)]);
         }}
       >
-        <option value=${unset}>Select...</option>
+        <option value=${unset}>选择...</option>
         ${options.map(
           (opt, idx) => html`
           <option value=${String(idx)}>${String(opt)}</option>
@@ -573,7 +573,7 @@ function renderArray(params: {
     return html`
       <div class="cfg-field cfg-field--error">
         <div class="cfg-field__label">${label}</div>
-        <div class="cfg-field__error">Unsupported array schema. Use Raw mode.</div>
+        <div class="cfg-field__error">不支持的数组架构。请使用原始模式。</div>
       </div>
     `;
   }
@@ -584,7 +584,7 @@ function renderArray(params: {
     <div class="cfg-array">
       <div class="cfg-array__header">
         ${showLabel ? html`<span class="cfg-array__label">${label}</span>` : nothing}
-        <span class="cfg-array__count">${arr.length} item${arr.length !== 1 ? "s" : ""}</span>
+        <span class="cfg-array__count">${arr.length} 项</span>
         <button
           type="button"
           class="cfg-array__add"
@@ -595,7 +595,7 @@ function renderArray(params: {
           }}
         >
           <span class="cfg-array__add-icon">${icons.plus}</span>
-          Add
+          添加
         </button>
       </div>
       ${help ? html`<div class="cfg-array__help">${help}</div>` : nothing}
@@ -603,7 +603,7 @@ function renderArray(params: {
       ${
         arr.length === 0
           ? html`
-              <div class="cfg-array__empty">No items yet. Click "Add" to create one.</div>
+              <div class="cfg-array__empty">暂无项目。点击"添加"创建一个。</div>
             `
           : html`
         <div class="cfg-array__items">
@@ -615,7 +615,7 @@ function renderArray(params: {
                 <button
                   type="button"
                   class="cfg-array__item-remove"
-                  title="Remove item"
+                  title="删除项目"
                   ?disabled=${disabled}
                   @click=${() => {
                     const next = [...arr];
@@ -665,7 +665,7 @@ function renderMapField(params: {
   return html`
     <div class="cfg-map">
       <div class="cfg-map__header">
-        <span class="cfg-map__label">Custom entries</span>
+        <span class="cfg-map__label">自定义条目</span>
         <button
           type="button"
           class="cfg-map__add"
@@ -683,14 +683,14 @@ function renderMapField(params: {
           }}
         >
           <span class="cfg-map__add-icon">${icons.plus}</span>
-          Add Entry
+          添加条目
         </button>
       </div>
 
       ${
         entries.length === 0
           ? html`
-              <div class="cfg-map__empty">No custom entries.</div>
+              <div class="cfg-map__empty">暂无自定义条目。</div>
             `
           : html`
         <div class="cfg-map__items">
@@ -703,7 +703,7 @@ function renderMapField(params: {
                   <input
                     type="text"
                     class="cfg-input cfg-input--sm"
-                    placeholder="Key"
+                    placeholder="键"
                     .value=${key}
                     ?disabled=${disabled}
                     @change=${(e: Event) => {
@@ -723,7 +723,7 @@ function renderMapField(params: {
                       ? html`
                         <textarea
                           class="cfg-textarea cfg-textarea--sm"
-                          placeholder="JSON value"
+                          placeholder="JSON 值"
                           rows="2"
                           .value=${fallback}
                           ?disabled=${disabled}
@@ -757,7 +757,7 @@ function renderMapField(params: {
                 <button
                   type="button"
                   class="cfg-map__item-remove"
-                  title="Remove entry"
+                  title="删除条目"
                   ?disabled=${disabled}
                   @click=${() => {
                     const next = { ...(value ?? {}) };

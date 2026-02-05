@@ -83,7 +83,7 @@ export async function loadExecApprovals(
   try {
     const rpc = resolveExecApprovalsRpc(target);
     if (!rpc) {
-      state.lastError = "Select a node before loading exec approvals.";
+      state.lastError = "请先选择一个节点再加载执行审批。";
       return;
     }
     const res = (await state.client.request(rpc.method, rpc.params)) as ExecApprovalsSnapshot;
@@ -115,13 +115,13 @@ export async function saveExecApprovals(
   try {
     const baseHash = state.execApprovalsSnapshot?.hash;
     if (!baseHash) {
-      state.lastError = "Exec approvals hash missing; reload and retry.";
+      state.lastError = "执行审批哈希缺失；请重新加载后重试。";
       return;
     }
     const file = state.execApprovalsForm ?? state.execApprovalsSnapshot?.file ?? {};
     const rpc = resolveExecApprovalsSaveRpc(target, { file, baseHash });
     if (!rpc) {
-      state.lastError = "Select a node before saving exec approvals.";
+      state.lastError = "请先选择一个节点再保存执行审批。";
       return;
     }
     await state.client.request(rpc.method, rpc.params);
