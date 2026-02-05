@@ -1,5 +1,5 @@
-import type { CronJob, GatewaySessionRow, PresenceEntry } from "./types";
-import { formatAgo, formatDurationMs, formatMs } from "./format";
+import type { CronJob, GatewaySessionRow, PresenceEntry } from "./types.ts";
+import { formatAgo, formatDurationMs, formatMs } from "./format.ts";
 
 export function formatPresenceSummary(entry: PresenceEntry): string {
   const host = entry.host ?? "未知";
@@ -15,22 +15,29 @@ export function formatPresenceAge(entry: PresenceEntry): string {
 }
 
 export function formatNextRun(ms?: number | null) {
-  if (!ms) return "无";
+  if (!ms) {
+    return "无";
+  }
   return `${formatMs(ms)} (${formatAgo(ms)})`;
 }
 
 export function formatSessionTokens(row: GatewaySessionRow) {
-  if (row.totalTokens == null) return "无";
+  if (row.totalTokens == null) {
+    return "无";
+  }
   const total = row.totalTokens ?? 0;
   const ctx = row.contextTokens ?? 0;
   return ctx ? `${total} / ${ctx}` : String(total);
 }
 
 export function formatEventPayload(payload: unknown): string {
-  if (payload == null) return "";
+  if (payload == null) {
+    return "";
+  }
   try {
     return JSON.stringify(payload, null, 2);
   } catch {
+    // oxlint-disable typescript/no-base-to-string
     return String(payload);
   }
 }
@@ -45,13 +52,29 @@ export function formatCronState(job: CronJob) {
 
 export function formatCronSchedule(job: CronJob) {
   const s = job.schedule;
-  if (s.kind === "at") return `定时 ${formatMs(s.atMs)}`;
-  if (s.kind === "every") return `每隔 ${formatDurationMs(s.everyMs)}`;
+  if (s.kind === "at") {
+    const atMs = Date.parse(s.at);
+    return Number.isFinite(atMs) ? `定时 ${formatMs(atMs)}` : `定时 ${s.at}`;
+  }
+  if (s.kind === "every") {
+    return `每隔 ${formatDurationMs(s.everyMs)}`;
+  }
   return `Cron ${s.expr}${s.tz ? ` (${s.tz})` : ""}`;
 }
 
 export function formatCronPayload(job: CronJob) {
   const p = job.payload;
-  if (p.kind === "systemEvent") return `系统: ${p.text}`;
-  return `代理: ${p.message}`;
+  if (p.kind === "systemEvent") {
+    return `系统: ${p.text}`;
+  }
+  const base = `代理: ${p.message}`;
+  const delivery = job.delivery;
+  if (delivery && delivery.mode !== "none") {
+    const target =
+      delivery.channel || delivery.to
+        ? ` (${delivery.channel ?? "上次"}${delivery.to ? ` -> ${delivery.to}` : ""})`
+        : "";
+    return `${base} · ${delivery.mode}${target}`;
+  }
+  return base;
 }

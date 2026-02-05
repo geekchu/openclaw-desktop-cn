@@ -12,19 +12,19 @@ import type {
   SlackStatus,
   TelegramStatus,
   WhatsAppStatus,
-} from "../types";
-import type { ChannelKey, ChannelsChannelData, ChannelsProps } from "./channels.types";
-import { formatAgo } from "../format";
-import { renderChannelConfigSection } from "./channels.config";
-import { renderDiscordCard } from "./channels.discord";
-import { renderGoogleChatCard } from "./channels.googlechat";
-import { renderIMessageCard } from "./channels.imessage";
-import { renderNostrCard } from "./channels.nostr";
-import { channelEnabled, renderChannelAccountCount } from "./channels.shared";
-import { renderSignalCard } from "./channels.signal";
-import { renderSlackCard } from "./channels.slack";
-import { renderTelegramCard } from "./channels.telegram";
-import { renderWhatsAppCard } from "./channels.whatsapp";
+} from "../types.ts";
+import type { ChannelKey, ChannelsChannelData, ChannelsProps } from "./channels.types.ts";
+import { formatAgo } from "../format.ts";
+import { renderChannelConfigSection } from "./channels.config.ts";
+import { renderDiscordCard } from "./channels.discord.ts";
+import { renderGoogleChatCard } from "./channels.googlechat.ts";
+import { renderIMessageCard } from "./channels.imessage.ts";
+import { renderNostrCard } from "./channels.nostr.ts";
+import { channelEnabled, renderChannelAccountCount } from "./channels.shared.ts";
+import { renderSignalCard } from "./channels.signal.ts";
+import { renderSlackCard } from "./channels.slack.ts";
+import { renderTelegramCard } from "./channels.telegram.ts";
+import { renderWhatsAppCard } from "./channels.whatsapp.ts";
 
 export function renderChannels(props: ChannelsProps) {
   const channels = props.snapshot?.channels as Record<string, unknown> | null;
@@ -43,8 +43,10 @@ export function renderChannels(props: ChannelsProps) {
       enabled: channelEnabled(key, props),
       order: index,
     }))
-    .sort((a, b) => {
-      if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+    .toSorted((a, b) => {
+      if (a.enabled !== b.enabled) {
+        return a.enabled ? -1 : 1;
+      }
       return a.order - b.order;
     });
 
@@ -90,7 +92,7 @@ ${props.snapshot ? JSON.stringify(props.snapshot, null, 2) : "暂无快照。"}
 // 只显示这些频道（硬编码，忽略网关返回的频道列表）
 const ALLOWED_CHANNELS: ChannelKey[] = ["imessage", "whatsapp", "telegram"];
 
-function resolveChannelOrder(_snapshot: ChannelsStatusSnapshot | null): ChannelKey[] {
+function resolveChannelOrder(snapshot: ChannelsStatusSnapshot | null): ChannelKey[] {
   // 直接返回固定列表，不使用网关返回的频道顺序
   return ALLOWED_CHANNELS;
 }
@@ -120,7 +122,7 @@ function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChan
     case "googlechat":
       return renderGoogleChatCard({
         props,
-        googlechat: data.googlechat,
+        googleChat: data.googlechat,
         accountCountLabel,
       });
     case "slack":
@@ -234,7 +236,9 @@ function renderGenericChannelCard(
 function resolveChannelMetaMap(
   snapshot: ChannelsStatusSnapshot | null,
 ): Record<string, ChannelUiMetaEntry> {
-  if (!snapshot?.channelMeta?.length) return {};
+  if (!snapshot?.channelMeta?.length) {
+    return {};
+  }
   return Object.fromEntries(snapshot.channelMeta.map((entry) => [entry.id, entry]));
 }
 
@@ -246,22 +250,34 @@ function resolveChannelLabel(snapshot: ChannelsStatusSnapshot | null, key: strin
 const RECENT_ACTIVITY_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
 function hasRecentActivity(account: ChannelAccountSnapshot): boolean {
-  if (!account.lastInboundAt) return false;
+  if (!account.lastInboundAt) {
+    return false;
+  }
   return Date.now() - account.lastInboundAt < RECENT_ACTIVITY_THRESHOLD_MS;
 }
 
 function deriveRunningStatus(account: ChannelAccountSnapshot): "是" | "否" | "活跃" {
-  if (account.running) return "是";
+  if (account.running) {
+    return "是";
+  }
   // If we have recent inbound activity, the channel is effectively running
-  if (hasRecentActivity(account)) return "活跃";
+  if (hasRecentActivity(account)) {
+    return "活跃";
+  }
   return "否";
 }
 
 function deriveConnectedStatus(account: ChannelAccountSnapshot): "是" | "否" | "活跃" | "无" {
-  if (account.connected === true) return "是";
-  if (account.connected === false) return "否";
+  if (account.connected === true) {
+    return "是";
+  }
+  if (account.connected === false) {
+    return "否";
+  }
   // If connected is null/undefined but we have recent activity, show as active
-  if (hasRecentActivity(account)) return "活跃";
+  if (hasRecentActivity(account)) {
+    return "活跃";
+  }
   return "无";
 }
 

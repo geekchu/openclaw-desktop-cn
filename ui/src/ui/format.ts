@@ -1,44 +1,69 @@
 import { stripReasoningTagsFromText } from "../../../src/shared/text/reasoning-tags.js";
 
 export function formatMs(ms?: number | null): string {
-  if (!ms && ms !== 0) return "无";
+  if (!ms && ms !== 0) {
+    return "无";
+  }
   return new Date(ms).toLocaleString();
 }
 
 export function formatAgo(ms?: number | null): string {
-  if (!ms && ms !== 0) return "无";
+  if (!ms && ms !== 0) {
+    return "无";
+  }
   const diff = Date.now() - ms;
-  if (diff < 0) return "刚刚";
-  const sec = Math.round(diff / 1000);
-  if (sec < 60) return `${sec}秒前`;
+  const absDiff = Math.abs(diff);
+  const suffix = diff < 0 ? "后" : "前";
+  const sec = Math.round(absDiff / 1000);
+  if (sec < 60) {
+    return diff < 0 ? "刚刚" : `${sec}秒前`;
+  }
   const min = Math.round(sec / 60);
-  if (min < 60) return `${min}分钟前`;
+  if (min < 60) {
+    return `${min}分钟${suffix}`;
+  }
   const hr = Math.round(min / 60);
-  if (hr < 48) return `${hr}小时前`;
+  if (hr < 48) {
+    return `${hr}小时${suffix}`;
+  }
   const day = Math.round(hr / 24);
-  return `${day}天前`;
+  return `${day}天${suffix}`;
 }
 
 export function formatDurationMs(ms?: number | null): string {
-  if (!ms && ms !== 0) return "无";
-  if (ms < 1000) return `${ms}毫秒`;
+  if (!ms && ms !== 0) {
+    return "无";
+  }
+  if (ms < 1000) {
+    return `${ms}毫秒`;
+  }
   const sec = Math.round(ms / 1000);
-  if (sec < 60) return `${sec}秒`;
+  if (sec < 60) {
+    return `${sec}秒`;
+  }
   const min = Math.round(sec / 60);
-  if (min < 60) return `${min}分钟`;
+  if (min < 60) {
+    return `${min}分钟`;
+  }
   const hr = Math.round(min / 60);
-  if (hr < 48) return `${hr}小时`;
+  if (hr < 48) {
+    return `${hr}小时`;
+  }
   const day = Math.round(hr / 24);
   return `${day}天`;
 }
 
 export function formatList(values?: Array<string | null | undefined>): string {
-  if (!values || values.length === 0) return "无";
+  if (!values || values.length === 0) {
+    return "无";
+  }
   return values.filter((v): v is string => Boolean(v && v.trim())).join(", ");
 }
 
 export function clampText(value: string, max = 120): string {
-  if (value.length <= max) return value;
+  if (value.length <= max) {
+    return value;
+  }
   return `${value.slice(0, Math.max(0, max - 1))}…`;
 }
 

@@ -124,6 +124,7 @@ const FIELD_LABELS: Record<string, string> = {
   "diagnostics.cacheTrace.includePrompt": "缓存追踪包含提示词",
   "diagnostics.cacheTrace.includeSystem": "缓存追踪包含系统信息",
   "agents.list.*.identity.avatar": "身份头像",
+  "agents.list.*.skills": "代理技能过滤",
   "gateway.remote.url": "远程网关 URL",
   "gateway.remote.sshTarget": "远程网关 SSH 目标",
   "gateway.remote.sshIdentity": "远程网关 SSH 身份",
