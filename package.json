@@ -164,7 +164,6 @@
     "@typescript/native-preview": "7.0.0-dev.20260202.1",
     "@vitest/coverage-v8": "^4.0.18",
     "lit": "^3.3.2",
-    "ollama": "^0.6.3",
     "oxfmt": "0.28.0",
     "oxlint": "^1.43.0",
     "oxlint-tsgolint": "^0.11.4",
