@@ -74,3 +74,9 @@ USER.md
 
 .claude/
 openclaw-manager
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/gateway-bundle/*
+!src-tauri/gateway-bundle/.gitkeep

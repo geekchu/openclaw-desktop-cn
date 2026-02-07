@@ -87,14 +87,19 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
     info!("[诊断] 开始运行系统诊断...");
     let mut results = Vec::new();
     
-    // 检查 OpenClaw 是否安装
+    // 检查 OpenClaw 是否安装（全局安装或 bundle 模式）
     info!("[诊断] 检查 OpenClaw 安装状态...");
-    let openclaw_installed = shell::get_openclaw_path().is_some();
-    info!("[诊断] OpenClaw 安装: {}", if openclaw_installed { "✓" } else { "✗" });
+    let has_global = shell::get_openclaw_path().is_some();
+    let has_bundle = shell::get_bundle_entry().is_some();
+    let openclaw_installed = has_global || has_bundle;
+    info!("[诊断] OpenClaw 安装: {} (global={}, bundle={})",
+        if openclaw_installed { "✓" } else { "✗" }, has_global, has_bundle);
     results.push(DiagnosticResult {
         name: "OpenClaw 安装".to_string(),
         passed: openclaw_installed,
-        message: if openclaw_installed {
+        message: if has_bundle && !has_global {
+            "OpenClaw 已安装 (内置模式)".to_string()
+        } else if openclaw_installed {
             "OpenClaw 已安装".to_string()
         } else {
             "OpenClaw 未安装".to_string()
@@ -139,22 +144,20 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
         },
     });
     
-    // 检查环境变量文件
+    // 检查环境变量文件（不存在则自动创建）
     let env_path = platform::get_env_file_path();
     let env_exists = std::path::Path::new(&env_path).exists();
+    if !env_exists {
+        // 确保配置目录存在，然后创建空 env 文件
+        let config_dir = platform::get_config_dir();
+        let _ = std::fs::create_dir_all(&config_dir);
+        let _ = std::fs::write(&env_path, "");
+    }
     results.push(DiagnosticResult {
         name: "环境变量".to_string(),
-        passed: env_exists,
-        message: if env_exists {
-            format!("环境变量文件存在: {}", env_path)
-        } else {
-            "环境变量文件不存在".to_string()
-        },
-        suggestion: if env_exists {
-            None
-        } else {
-            Some("请配置 AI API Key".to_string())
-        },
+        passed: true,
+        message: format!("环境变量文件: {}", env_path),
+        suggestion: None,
     });
     
     // 运行 openclaw doctor

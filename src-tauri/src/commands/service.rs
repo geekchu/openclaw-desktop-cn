@@ -57,19 +57,96 @@ fn check_port_listening(port: u16) -> Option<u32> {
     }
 }
 
+/// 获取进程的内存使用量 (MB) — Windows 使用 tasklist
+#[cfg(windows)]
+fn get_process_memory_mb(pid: u32) -> Option<f64> {
+    let mut cmd = Command::new("tasklist");
+    cmd.args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"]);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    let output = cmd.output().ok()?;
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // CSV 格式: "name","pid","session","session#","mem"
+        // mem 格式如 "123,456 K"
+        for line in stdout.lines() {
+            if line.contains(&pid.to_string()) {
+                let parts: Vec<&str> = line.split('"').collect();
+                // parts[9] 通常是内存值（第5个引号对的内容）
+                if parts.len() >= 10 {
+                    let mem_str = parts[9].replace(',', "").replace(" K", "").replace(" k", "").trim().to_string();
+                    if let Ok(kb) = mem_str.parse::<f64>() {
+                        return Some(kb / 1024.0);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(not(windows))]
+fn get_process_memory_mb(pid: u32) -> Option<f64> {
+    // ps -o rss= -p PID → KB
+    let output = Command::new("ps")
+        .args(["-o", "rss=", "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    if output.status.success() {
+        let kb: f64 = String::from_utf8_lossy(&output.stdout).trim().parse().ok()?;
+        Some(kb / 1024.0)
+    } else {
+        None
+    }
+}
+
+/// 获取进程的运行时间（秒）— Windows 使用 wmic
+#[cfg(windows)]
+fn get_process_uptime_seconds(pid: u32) -> Option<u64> {
+    let mut cmd = Command::new("powershell");
+    cmd.args(["-Command", &format!(
+        "(New-TimeSpan -Start (Get-Process -Id {} -ErrorAction SilentlyContinue).StartTime -End (Get-Date)).TotalSeconds",
+        pid
+    )]);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    let output = cmd.output().ok()?;
+    if output.status.success() {
+        let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        s.parse::<f64>().ok().map(|v| v as u64)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(windows))]
+fn get_process_uptime_seconds(pid: u32) -> Option<u64> {
+    // ps -o etimes= -p PID → elapsed seconds
+    let output = Command::new("ps")
+        .args(["-o", "etimes=", "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    if output.status.success() {
+        String::from_utf8_lossy(&output.stdout).trim().parse().ok()
+    } else {
+        None
+    }
+}
+
 /// 获取服务状态（简单版：直接检查端口占用）
 #[command]
 pub async fn get_service_status() -> Result<ServiceStatus, String> {
     // 简单直接：检查端口是否被占用
     let pid = check_port_listening(SERVICE_PORT);
     let running = pid.is_some();
-    
+
+    let memory_mb = pid.and_then(get_process_memory_mb);
+    let uptime_seconds = pid.and_then(get_process_uptime_seconds);
+
     Ok(ServiceStatus {
         running,
         pid,
         port: SERVICE_PORT,
-        uptime_seconds: None,
-        memory_mb: None,
+        uptime_seconds,
+        memory_mb,
         cpu_percent: None,
     })
 }
@@ -163,15 +240,59 @@ pub async fn restart_service() -> Result<String, String> {
     }
 }
 
-/// 获取日志
+/// 获取日志 — 直接读取 gateway 日志文件
 #[command]
 pub async fn get_logs(lines: Option<u32>) -> Result<Vec<String>, String> {
-    let n = lines.unwrap_or(100);
-    
-    match shell::run_openclaw(&["logs", "--lines", &n.to_string()]) {
-        Ok(output) => {
-            Ok(output.lines().map(|s| s.to_string()).collect())
+    let n = lines.unwrap_or(100) as usize;
+
+    // Gateway 写入的日志文件路径: \tmp\openclaw\openclaw-YYYY-MM-DD.log (Windows)
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+
+    #[cfg(windows)]
+    let log_path = format!("\\tmp\\openclaw\\openclaw-{}.log", today);
+    #[cfg(not(windows))]
+    let log_path = format!("/tmp/openclaw/openclaw-{}.log", today);
+
+    match std::fs::read_to_string(&log_path) {
+        Ok(content) => {
+            let all_lines: Vec<String> = content
+                .lines()
+                .filter_map(|line| {
+                    // 日志是 JSON 格式，提取可读信息
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+                        let time = v.get("time")
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        let level = v.get("_meta")
+                            .and_then(|m| m.get("logLevelName"))
+                            .and_then(|l| l.as_str())
+                            .unwrap_or("INFO");
+                        let msg = v.get("1")
+                            .and_then(|m| m.as_str())
+                            .or_else(|| v.get("0").and_then(|m| m.as_str()))
+                            .unwrap_or("");
+                        if msg.is_empty() {
+                            return None;
+                        }
+                        // 提取时间的 HH:MM:SS 部分
+                        let short_time = if time.len() >= 19 {
+                            &time[11..19]
+                        } else {
+                            time
+                        };
+                        Some(format!("[{}] [{}] {}", short_time, level, msg))
+                    } else {
+                        // 非 JSON 行，原样返回
+                        Some(line.to_string())
+                    }
+                })
+                .collect();
+            // 取最后 n 行
+            let start = if all_lines.len() > n { all_lines.len() - n } else { 0 };
+            Ok(all_lines[start..].to_vec())
         }
-        Err(e) => Err(format!("读取日志失败: {}", e))
+        Err(_) => {
+            Ok(vec!["暂无日志文件".to_string()])
+        }
     }
 }

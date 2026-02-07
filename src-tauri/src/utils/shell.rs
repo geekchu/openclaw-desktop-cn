@@ -495,7 +495,7 @@ fn get_windows_openclaw_paths() -> Vec<String> {
 
 /// 获取 gateway bundle 目录下的入口文件路径
 /// 返回 (bundle_dir, entry_point) 或 None
-fn get_bundle_entry() -> Option<(String, String)> {
+pub fn get_bundle_entry() -> Option<(String, String)> {
     if let Ok(bundle_dir) = std::env::var("OPENCLAW_GATEWAY_BUNDLE_DIR") {
         let entry = Path::new(&bundle_dir).join("openclaw.mjs");
         if entry.exists() {

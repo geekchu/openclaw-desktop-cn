@@ -443,6 +443,11 @@
   padding-bottom: 0;
 }
 
+.content--manager {
+  padding: 0;
+  overflow: hidden;
+}
+
 .content--chat > * + * {
   margin-top: 0;
 }

@@ -8,6 +8,7 @@ export const TAB_GROUPS = [
   },
   { label: "代理", tabs: ["agents", "skills", "nodes"] },
   { label: "设置", tabs: ["config", "debug", "logs"] },
+  { label: "控制", tabs: ["manager"] },
 ] as const;
 
 export type Tab =
@@ -22,7 +23,8 @@ export type Tab =
   | "chat"
   | "config"
   | "debug"
-  | "logs";
+  | "logs"
+  | "manager";
 
 const TAB_PATHS: Record<Tab, string> = {
   agents: "/agents",
@@ -37,6 +39,7 @@ const TAB_PATHS: Record<Tab, string> = {
   config: "/config",
   debug: "/debug",
   logs: "/logs",
+  manager: "/manager",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -146,6 +149,8 @@ export function iconForTab(tab: Tab): IconName {
       return "bug";
     case "logs":
       return "scrollText";
+    case "manager":
+      return "settings";
     default:
       return "folder";
   }
@@ -177,6 +182,8 @@ export function titleForTab(tab: Tab) {
       return "调试";
     case "logs":
       return "日志";
+    case "manager":
+      return "控制面板";
     default:
       return "控制";
   }
@@ -208,6 +215,8 @@ export function subtitleForTab(tab: Tab) {
       return "网关快照、事件和手动 RPC 调用。";
     case "logs":
       return "网关文件日志的实时跟踪。";
+    case "manager":
+      return "AI 配置、消息渠道、测试诊断与系统设置。";
     default:
       return "";
   }

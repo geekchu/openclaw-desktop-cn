@@ -98,10 +98,19 @@ fn main() {
     log::info!("OpenClaw Desktop 启动");
 
     tauri::Builder::default()
+        // 单实例插件 — 必须在所有其他插件之前注册
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // 第二个实例启动时，聚焦已有窗口
+            show_main_window(app);
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
         .setup(|app| {
             // 解析并设置 gateway bundle 目录
             let gateway_dir = resolve_gateway_bundle_dir(app);
@@ -213,6 +222,13 @@ fn main() {
                 restart_item,
             });
 
+            // 开机自启动时 --minimized 参数：隐藏窗口，仅保留托盘
+            if std::env::args().any(|a| a == "--minimized") {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
+
             // 异步启动 gateway + 等待就绪 + 通知前端
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -225,13 +241,17 @@ fn main() {
                     Ok(_) => {
                         let _ = handle.emit("gateway-status", "正在等待 Gateway 就绪...");
                         if gm.wait_for_ready(30) {
-                            // Gateway 就绪，通知前端跳转（URL 带 token 用于认证）
+                            // Gateway 就绪，直接导航 webview 到 gateway URL
                             let url = if let Some(token) = read_gateway_token() {
                                 format!("http://localhost:18789?token={}", token)
                             } else {
                                 "http://localhost:18789".to_string()
                             };
                             let _ = handle.emit("gateway-ready", url.as_str());
+                            // 直接在 Rust 端导航 webview（防止 splash JS 未加载时事件丢失）
+                            if let Some(window) = handle.get_webview_window("main") {
+                                let _ = window.navigate(url.parse().unwrap());
+                            }
                         } else {
                             let _ = handle.emit("gateway-status", "Gateway 启动超时");
                         }

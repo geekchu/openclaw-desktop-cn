@@ -94,6 +94,7 @@ export function renderApp(state: AppViewState) {
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
   const chatDisabledReason = state.connected ? null : "已断开与网关的连接。";
   const isChat = state.tab === "chat";
+  const isManager = state.tab === "manager";
   const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
@@ -193,21 +194,6 @@ export function renderApp(state: AppViewState) {
         })}
         <div class="nav-group nav-group--links">
           <div class="nav-label nav-label--static">
-            <span class="nav-label__text">管理</span>
-          </div>
-          <div class="nav-group__items">
-            <a
-              class="nav-item nav-item--external"
-              href="/manager/"
-              title="打开管理面板"
-            >
-              <span class="nav-item__icon" aria-hidden="true">${icons.settings}</span>
-              <span class="nav-item__text">管理面板</span>
-            </a>
-          </div>
-        </div>
-        <div class="nav-group nav-group--links">
-          <div class="nav-label nav-label--static">
             <span class="nav-label__text">资源</span>
           </div>
           <div class="nav-group__items">
@@ -224,8 +210,11 @@ export function renderApp(state: AppViewState) {
           </div>
         </div>
       </aside>
-      <main class="content ${isChat ? "content--chat" : ""}">
-        <section class="content-header">
+      <main class="content ${isChat ? "content--chat" : ""} ${isManager ? "content--manager" : ""}">
+        ${
+          isManager
+            ? nothing
+            : html`<section class="content-header">
           <div>
             <div class="page-title">${titleForTab(state.tab)}</div>
             <div class="page-sub">${subtitleForTab(state.tab)}</div>
@@ -234,7 +223,8 @@ export function renderApp(state: AppViewState) {
             ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
             ${isChat ? renderChatControls(state) : nothing}
           </div>
-        </section>
+        </section>`
+        }
 
         ${
           state.tab === "overview"
@@ -1095,6 +1085,12 @@ export function renderApp(state: AppViewState) {
               })
             : nothing
         }
+
+        <iframe
+          src="/manager/"
+          style="width:100%;height:100%;border:none;display:block;${state.tab === "manager" ? "" : "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;opacity:0;"}"
+          title="控制面板"
+        ></iframe>
       </main>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
