@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OpenClaw Desktop",
+  "version": "0.1.0",
+  "identifier": "com.openclaw.desktop",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "node ../scripts/prepare-gateway-bundle.js",
+    "frontendDist": "."
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "OpenClaw Desktop",
+        "label": "main",
+        "url": "splash.html",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "devtools": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "resources": {
+      "gateway-bundle": "gateway-bundle"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "OpenClaw AI 助手桌面客户端",
+    "longDescription": "OpenClaw Desktop 是 OpenClaw AI 助手的桌面客户端，自动管理 Gateway 服务并提供 Web UI。",
+    "copyright": "Copyright 2024 OpenClaw Team",
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "entitlements": null,
+      "exceptionDomain": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
+      "deb": {
+        "depends": []
+      }
+    }
+  }
+}

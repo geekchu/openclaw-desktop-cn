@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClaw Desktop</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        background: #0f0f0f;
+        color: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .container {
+        text-align: center;
+        animation: fadeIn 0.5s ease-out;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .logo {
+        font-size: 64px;
+        margin-bottom: 16px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+      }
+
+      .title {
+        font-size: 28px;
+        font-weight: 600;
+        color: #ffffff;
+        margin-bottom: 32px;
+        letter-spacing: 1px;
+      }
+
+      .spinner-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255, 255, 255, 0.15);
+        border-top-color: #e85d4a;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .status {
+        font-size: 14px;
+        color: #888;
+        transition:
+          color 0.3s,
+          opacity 0.3s;
+      }
+
+      .status.error {
+        color: #e85d4a;
+      }
+
+      .status.success {
+        color: #4ade80;
+      }
+
+      .retry-btn {
+        display: none;
+        margin-top: 20px;
+        padding: 8px 24px;
+        background: #e85d4a;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .retry-btn:hover {
+        background: #d44a38;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo">&#x1F99E;</div>
+      <div class="title">OpenClaw Desktop</div>
+      <div class="spinner-wrapper">
+        <div class="spinner" id="spinner"></div>
+        <div class="status" id="status">正在启动...</div>
+      </div>
+      <button class="retry-btn" id="retryBtn" onclick="location.reload()">重试</button>
+    </div>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const spinnerEl = document.getElementById("spinner");
+      const retryBtn = document.getElementById("retryBtn");
+
+      function setStatus(text, type) {
+        statusEl.textContent = text;
+        statusEl.className = "status" + (type ? " " + type : "");
+        if (type === "error") {
+          spinnerEl.style.display = "none";
+          retryBtn.style.display = "inline-block";
+        }
+      }
+
+      // Listen for Tauri events if available
+      if (window.__TAURI__) {
+        const { listen } = window.__TAURI__.event;
+
+        listen("gateway-status", function (event) {
+          setStatus(event.payload, "");
+        });
+
+        listen("gateway-ready", function (event) {
+          setStatus("Gateway 已就绪，正在加载...", "success");
+          setTimeout(function () {
+            window.location.href = event.payload;
+          }, 300);
+        });
+      } else {
+        // Fallback: poll gateway directly (dev mode or no Tauri runtime)
+        setStatus("正在等待 Gateway...", "");
+        var attempts = 0;
+        var maxAttempts = 60;
+        var pollTimer = setInterval(function () {
+          attempts++;
+          fetch("http://localhost:18789/", { mode: "no-cors" })
+            .then(function () {
+              clearInterval(pollTimer);
+              setStatus("Gateway 已就绪，正在加载...", "success");
+              setTimeout(function () {
+                window.location.href = "http://localhost:18789";
+              }, 300);
+            })
+            .catch(function () {
+              if (attempts >= maxAttempts) {
+                clearInterval(pollTimer);
+                setStatus("Gateway 启动超时，请检查配置", "error");
+              }
+            });
+        }, 1000);
+      }
+    </script>
+  </body>
+</html>

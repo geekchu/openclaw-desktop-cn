@@ -193,6 +193,21 @@ export function renderApp(state: AppViewState) {
         })}
         <div class="nav-group nav-group--links">
           <div class="nav-label nav-label--static">
+            <span class="nav-label__text">管理</span>
+          </div>
+          <div class="nav-group__items">
+            <a
+              class="nav-item nav-item--external"
+              href="/manager/"
+              title="打开管理面板"
+            >
+              <span class="nav-item__icon" aria-hidden="true">${icons.settings}</span>
+              <span class="nav-item__text">管理面板</span>
+            </a>
+          </div>
+        </div>
+        <div class="nav-group nav-group--links">
+          <div class="nav-label nav-label--static">
             <span class="nav-label__text">资源</span>
           </div>
           <div class="nav-group__items">
