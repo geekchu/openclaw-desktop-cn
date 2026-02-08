@@ -728,7 +728,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
         let mut cmd = Command::new(&node_path);
         cmd.arg(&entry_point);
-        cmd.args(["gateway", "--port", "18789"]);
+        cmd.args(["gateway", "--port", "18789", "--bind", "loopback"]);
         cmd.current_dir(&bundle_dir);
 
         for (key, value) in &user_env_vars {
@@ -769,11 +769,11 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
     let mut cmd = if openclaw_path.ends_with(".cmd") {
         let mut c = Command::new("cmd");
-        c.args(["/c", &openclaw_path, "gateway", "--port", "18789"]);
+        c.args(["/c", &openclaw_path, "gateway", "--port", "18789", "--bind", "loopback"]);
         c
     } else {
         let mut c = Command::new(&openclaw_path);
-        c.args(["gateway", "--port", "18789"]);
+        c.args(["gateway", "--port", "18789", "--bind", "loopback"]);
         c
     };
 

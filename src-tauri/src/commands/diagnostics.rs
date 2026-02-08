@@ -643,7 +643,7 @@ echo "步骤 2/3: 重启 Gateway 使插件生效..."
 openclaw gateway stop 2>/dev/null || true
 sleep 2
 # 启动 gateway 服务
-openclaw gateway start 2>/dev/null || openclaw gateway --port 18789 &
+openclaw gateway start 2>/dev/null || openclaw gateway --port 18789 --bind loopback &
 sleep 3
 echo "✅ Gateway 已重启"
 echo ""
