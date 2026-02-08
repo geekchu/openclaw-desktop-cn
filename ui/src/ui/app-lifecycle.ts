@@ -17,6 +17,7 @@ import {
   syncTabWithLocation,
   syncThemeWithSettings,
 } from "./app-settings.ts";
+import { tabFromPath } from "./navigation.ts";
 
 type LifecycleHost = {
   basePath: string;
@@ -30,7 +31,9 @@ type LifecycleHost = {
   logsAtBottom: boolean;
   logsEntries: unknown[];
   popStateHandler: () => void;
+  messageHandler: ((event: MessageEvent) => void) | null;
   topbarObserver: ResizeObserver | null;
+  setTab: (tab: Tab) => void;
 };
 
 export function handleConnected(host: LifecycleHost) {
@@ -40,6 +43,28 @@ export function handleConnected(host: LifecycleHost) {
   syncThemeWithSettings(host as unknown as Parameters<typeof syncThemeWithSettings>[0]);
   attachThemeListener(host as unknown as Parameters<typeof attachThemeListener>[0]);
   window.addEventListener("popstate", host.popStateHandler);
+
+  // Listen for navigation messages from embedded iframes (e.g. Manager "back to console")
+  host.messageHandler = (event: MessageEvent) => {
+    // Origin validation: allow same-origin, localhost, and Tauri sandbox ("null")
+    const origin = event.origin;
+    if (
+      origin !== window.location.origin &&
+      origin !== "null" &&
+      !/^https?:\/\/localhost(:\d+)?$/.test(origin) &&
+      !/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)
+    ) {
+      return;
+    }
+    const data = event.data;
+    if (data && typeof data === "object" && data.type === "openclaw:navigate") {
+      const tab = typeof data.tab === "string" ? tabFromPath(`/${data.tab}`, host.basePath) : null;
+      if (tab) {
+        host.setTab(tab);
+      }
+    }
+  };
+  window.addEventListener("message", host.messageHandler);
   connectGateway(host as unknown as Parameters<typeof connectGateway>[0]);
   startNodesPolling(host as unknown as Parameters<typeof startNodesPolling>[0]);
   if (host.tab === "logs") {
@@ -56,6 +81,10 @@ export function handleFirstUpdated(host: LifecycleHost) {
 
 export function handleDisconnected(host: LifecycleHost) {
   window.removeEventListener("popstate", host.popStateHandler);
+  if (host.messageHandler) {
+    window.removeEventListener("message", host.messageHandler);
+    host.messageHandler = null;
+  }
   stopNodesPolling(host as unknown as Parameters<typeof stopNodesPolling>[0]);
   stopLogsPolling(host as unknown as Parameters<typeof stopLogsPolling>[0]);
   stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);

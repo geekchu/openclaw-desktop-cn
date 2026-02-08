@@ -289,7 +289,10 @@ export function applyResolvedTheme(host: SettingsHost, resolved: ResolvedTheme) 
   root.style.colorScheme = resolved;
   // Broadcast theme to embedded iframes (e.g. Manager control panel)
   for (const frame of Array.from(document.querySelectorAll("iframe"))) {
-    frame.contentWindow?.postMessage({ type: "openclaw:theme", theme: resolved }, "*");
+    frame.contentWindow?.postMessage(
+      { type: "openclaw:theme", theme: resolved },
+      window.location.origin,
+    );
   }
 }
 
