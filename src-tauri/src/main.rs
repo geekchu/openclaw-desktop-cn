@@ -1,4 +1,5 @@
 // 防止 Windows 系统显示控制台窗口
+// 防止 Windows 系统显示控制台窗口
 #![cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
@@ -95,7 +96,7 @@ fn main() {
         env_logger::Env::default().default_filter_or("info")
     ).init();
 
-    log::info!("OpenClaw Desktop 启动");
+    log::info!("OpenClaw桌面版 启动");
 
     tauri::Builder::default()
         // 单实例插件 — 必须在所有其他插件之前注册
@@ -111,6 +112,21 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
         ))
+        // 允许 webview 导航到 localhost（默认只允许 tauri:// 协议）
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry, ()>::new("navigation-guard")
+                .on_navigation(|_window, url| {
+                    let host = url.host_str().unwrap_or("");
+                    let allowed = url.scheme() == "tauri"
+                        || host == "localhost"
+                        || host == "127.0.0.1";
+                    if !allowed {
+                        log::warn!("[Navigation] 阻止导航到: {}", url);
+                    }
+                    allowed
+                })
+                .build(),
+        )
         .setup(|app| {
             // 解析并设置 gateway bundle 目录
             let gateway_dir = resolve_gateway_bundle_dir(app);
@@ -160,7 +176,7 @@ fn main() {
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().cloned().expect("应用图标缺失"))
                 .menu(&menu)
-                .tooltip("OpenClaw Desktop")
+                .tooltip("OpenClaw桌面版")
                 .on_menu_event(|app, event| {
                     match event.id().as_ref() {
                         "open" => {
@@ -234,6 +250,16 @@ fn main() {
             std::thread::spawn(move || {
                 let gm = handle.state::<gateway::GatewayManager>();
 
+                // 确保 config 中 token 已写入（供 session_gateway_token() 和 webview 读取）
+                match tokio::runtime::Runtime::new() {
+                    Ok(rt) => {
+                        if let Err(e) = rt.block_on(config::get_or_create_gateway_token()) {
+                            log::warn!("[Main] 预初始化 gateway token 失败: {}", e);
+                        }
+                    }
+                    Err(e) => log::warn!("[Main] 创建 tokio runtime 失败: {}", e),
+                }
+
                 // 发送状态：正在启动
                 let _ = handle.emit("gateway-status", "正在启动 Gateway...");
 
@@ -248,12 +274,13 @@ fn main() {
                                 "http://localhost:18789".to_string()
                             };
                             let _ = handle.emit("gateway-ready", url.as_str());
-                            // 直接在 Rust 端导航 webview（防止 splash JS 未加载时事件丢失）
+                            // 使用 Tauri navigate API（绕过 webview 安全策略限制）
                             if let Some(window) = handle.get_webview_window("main") {
                                 let _ = window.navigate(url.parse().unwrap());
                             }
                         } else {
                             let _ = handle.emit("gateway-status", "Gateway 启动超时");
+                            gateway::send_startup_timeout_notification(&handle);
                         }
                     }
                     Err(e) => {

@@ -2549,6 +2549,7 @@ dependencies = [
  "env_logger",
  "log",
  "objc",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "tauri",

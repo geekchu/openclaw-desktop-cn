@@ -50,6 +50,25 @@ pub async fn get_config() -> Result<Value, String> {
 #[command]
 pub async fn save_config(config: Value) -> Result<String, String> {
     info!("[保存配置] 保存 openclaw.json 配置...");
+
+    // 验证：必须是 JSON Object
+    if !config.is_object() {
+        return Err("配置格式无效：必须是 JSON 对象".to_string());
+    }
+
+    // 已知顶级 key (未知 key 仅 warn，不拒绝，保持扩展性)
+    let known_keys: &[&str] = &[
+        "gateway", "agents", "models", "channels", "plugins",
+        "meta", "hooks", "security", "notifications", "web", "tools",
+    ];
+    if let Some(obj) = config.as_object() {
+        for key in obj.keys() {
+            if !known_keys.contains(&key.as_str()) {
+                warn!("[保存配置] 未知顶级 key: {}", key);
+            }
+        }
+    }
+
     debug!(
         "[保存配置] 配置内容: {}",
         serde_json::to_string_pretty(&config).unwrap_or_default()
@@ -87,9 +106,22 @@ pub async fn get_env_value(key: String) -> Result<Option<String>, String> {
 #[command]
 pub async fn save_env_value(key: String, value: String) -> Result<String, String> {
     info!("[保存环境变量] 保存环境变量: {}", key);
+
+    // key 验证：只允许大写字母开头，字母数字下划线
+    if !key.chars().next().map(|c| c.is_ascii_uppercase()).unwrap_or(false)
+        || !key.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+    {
+        return Err("环境变量名无效：必须以大写字母开头，仅允许大写字母、数字和下划线".to_string());
+    }
+
+    // value 验证：拒绝换行符和控制字符
+    if value.chars().any(|c| c == '\n' || c == '\r' || (c.is_control() && c != '\t')) {
+        return Err("环境变量值无效：不允许包含换行符或控制字符".to_string());
+    }
+
     let env_path = platform::get_env_file_path();
     debug!("[保存环境变量] 环境文件路径: {}", env_path);
-    
+
     match file::set_env_value(&env_path, &key, &value) {
         Ok(_) => {
             info!("[保存环境变量] ✓ 环境变量 {} 保存成功", key);
@@ -104,22 +136,11 @@ pub async fn save_env_value(key: String, value: String) -> Result<String, String
 
 // ============ Gateway Token 命令 ============
 
-/// 生成随机 token
+/// 生成加密安全的随机 token (64 字符 hex)
 fn generate_token() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    
-    // 使用时间戳和随机数生成 token
-    let random_part: u64 = (timestamp as u64) ^ 0x5DEECE66Du64;
-    format!("{:016x}{:016x}{:016x}", 
-        random_part, 
-        random_part.wrapping_mul(0x5DEECE66Du64),
-        timestamp as u64
-    )
+    use rand::Rng;
+    let bytes: [u8; 32] = rand::thread_rng().gen();
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 /// 获取或生成 Gateway Token

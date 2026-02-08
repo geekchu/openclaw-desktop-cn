@@ -1,6 +1,6 @@
 use std::process::{Command, Output};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use crate::utils::platform;
 use crate::utils::file;
@@ -242,9 +242,59 @@ pub fn spawn_background(script: &str) -> io::Result<()> {
     Ok(())
 }
 
+/// 获取当前平台的 node-runtime 子目录名
+fn get_node_platform_dir() -> &'static str {
+    if cfg!(target_os = "windows") && cfg!(target_arch = "x86_64") {
+        "win-x64"
+    } else if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
+        "darwin-arm64"
+    } else if cfg!(target_os = "macos") && cfg!(target_arch = "x86_64") {
+        "darwin-x64"
+    } else {
+        "unknown"
+    }
+}
+
+/// 获取内置 Node.js 路径
+/// 生产模式: <resource_dir>/node-runtime/<platform>/node[.exe]
+/// 开发模式: <CARGO_MANIFEST_DIR>/../src-tauri/node-runtime/<platform>/node[.exe]
+fn get_bundled_node_path() -> Option<String> {
+    let bundle_dir = std::env::var("OPENCLAW_GATEWAY_BUNDLE_DIR").ok()?;
+
+    let node_runtime_dir = if cfg!(debug_assertions) {
+        // 开发模式: bundle_dir 是项目根目录，node-runtime 在 src-tauri/ 下
+        PathBuf::from(&bundle_dir)
+            .join("src-tauri")
+            .join("node-runtime")
+    } else {
+        // 生产模式: bundle_dir 是 <resource_dir>/gateway-bundle，同级的 node-runtime
+        PathBuf::from(&bundle_dir)
+            .parent()?
+            .join("node-runtime")
+    };
+
+    let platform_dir = get_node_platform_dir();
+    let node_binary = if cfg!(windows) { "node.exe" } else { "bin/node" };
+    let node_path = node_runtime_dir.join(platform_dir).join(node_binary);
+
+    if node_path.exists() {
+        info!("[Shell] 使用内置 Node.js: {}", node_path.display());
+        Some(node_path.to_string_lossy().to_string())
+    } else {
+        debug!("[Shell] 内置 Node.js 不存在: {}", node_path.display());
+        None
+    }
+}
+
 /// 获取 Node.js 可执行文件路径
 /// 检测多个可能的安装路径，因为 GUI 应用不继承用户 shell 的 PATH
 pub fn get_node_path() -> Option<String> {
+    // 1. 优先使用内置 Node.js
+    if let Some(bundled) = get_bundled_node_path() {
+        return Some(bundled);
+    }
+
+    // 2. 回退到系统 Node.js
     if platform::is_windows() {
         // 先尝试 where node
         if let Ok(output) = run_cmd_output("where node") {
@@ -526,7 +576,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
         cmd.arg(&entry_point);
         cmd.args(args);
         cmd.current_dir(&bundle_dir);
-        cmd.env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN);
+        cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
         cmd.env("PATH", &extended_path);
         for (key, value) in &user_env_vars {
             cmd.env(key, value);
@@ -563,7 +613,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
         cmd_args.extend(args);
         let mut cmd = Command::new("cmd");
         cmd.args(&cmd_args)
-            .env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN)
+            .env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
             .env("PATH", &extended_path);
         for (key, value) in &user_env_vars {
             cmd.env(key, value);
@@ -576,7 +626,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     } else {
         let mut cmd = Command::new(&openclaw_path);
         cmd.args(args)
-            .env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN)
+            .env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
             .env("PATH", &extended_path);
         for (key, value) in &user_env_vars {
             cmd.env(key, value);
@@ -606,8 +656,25 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     }
 }
 
-/// 默认的 Gateway Token
-pub const DEFAULT_GATEWAY_TOKEN: &str = "openclaw-manager-local-token";
+/// 获取当前会话的 gateway token (懒初始化，进程生命周期内不变)
+/// 优先读 config 中已有 token，否则生成随机 token
+pub fn session_gateway_token() -> &'static str {
+    use std::sync::OnceLock;
+    static TOKEN: OnceLock<String> = OnceLock::new();
+    TOKEN.get_or_init(|| {
+        // 尝试从 config 读取
+        if let Some(token) = crate::read_gateway_token() {
+            info!("[Shell] session_gateway_token: 使用 config 中的 token");
+            return token;
+        }
+        // 回退：生成随机 token
+        use rand::Rng;
+        let bytes: [u8; 32] = rand::thread_rng().gen();
+        let token: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        info!("[Shell] session_gateway_token: 生成随机 token");
+        token
+    })
+}
 
 /// 从 ~/.openclaw/env 文件读取所有环境变量
 /// 与 shell 脚本 `source ~/.openclaw/env` 行为一致
@@ -668,7 +735,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
             cmd.env(key, value);
         }
         cmd.env("PATH", &extended_path);
-        cmd.env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN);
+        cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
 
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -714,7 +781,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         cmd.env(key, value);
     }
     cmd.env("PATH", &extended_path);
-    cmd.env("OPENCLAW_GATEWAY_TOKEN", DEFAULT_GATEWAY_TOKEN);
+    cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
 
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
