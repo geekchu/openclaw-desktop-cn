@@ -66,8 +66,10 @@ pub fn read_env_value(env_file: &str, key: &str) -> Option<String> {
 pub fn set_env_value(env_file: &str, key: &str, value: &str) -> io::Result<()> {
     let content = read_file(env_file).unwrap_or_default();
     let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-    
-    let new_line = format!("export {}=\"{}\"", key, value);
+
+    // defense-in-depth: 转义反斜杠和双引号
+    let escaped_value = value.replace('\\', "\\\\").replace('"', "\\\"");
+    let new_line = format!("export {}=\"{}\"", key, escaped_value);
     let mut found = false;
     
     for line in &mut lines {
