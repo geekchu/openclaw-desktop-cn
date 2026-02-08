@@ -1,4 +1,4 @@
-use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
+use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, DockerStatus, SystemInfo};
 use crate::utils::{platform, shell};
 use tauri::command;
 use log::{info, warn, error, debug};
@@ -732,5 +732,31 @@ read -p "按回车键关闭..."
             Ok("已在新终端窗口中启动 WhatsApp 登录，请查看弹出的终端窗口并扫描二维码".to_string())
         }
         _ => Err(format!("不支持 {} 的登录向导", channel_type)),
+    }
+}
+
+/// 检查 Docker 是否可用
+#[command]
+pub async fn check_docker_available() -> Result<DockerStatus, String> {
+    info!("[Docker] 检查 Docker 可用性...");
+
+    match shell::run_command_output("docker", &["version", "--format", "{{.Server.Version}}"]) {
+        Ok(version) => {
+            let version = version.trim().to_string();
+            info!("[Docker] Docker 可用, 版本: {}", version);
+            Ok(DockerStatus {
+                available: true,
+                version: Some(version),
+                error: None,
+            })
+        }
+        Err(e) => {
+            info!("[Docker] Docker 不可用: {}", e);
+            Ok(DockerStatus {
+                available: false,
+                version: None,
+                error: Some("Docker 未安装或未运行".to_string()),
+            })
+        }
     }
 }

@@ -341,6 +341,7 @@ fn main() {
             diagnostics::test_channel,
             diagnostics::get_system_info,
             diagnostics::start_channel_login,
+            diagnostics::check_docker_available,
             // 安装器
             installer::check_environment,
             installer::install_nodejs,

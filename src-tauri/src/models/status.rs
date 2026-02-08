@@ -91,3 +91,14 @@ pub struct ChannelTestResult {
     /// 错误信息
     pub error: Option<String>,
 }
+
+/// Docker 可用性状态
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DockerStatus {
+    /// Docker 是否可用
+    pub available: bool,
+    /// Docker 版本号 (如 "27.3.1")
+    pub version: Option<String>,
+    /// 错误信息
+    pub error: Option<String>,
+}
