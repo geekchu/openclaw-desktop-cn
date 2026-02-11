@@ -80,3 +80,8 @@ src-tauri/target/
 src-tauri/gen/schemas/
 src-tauri/gateway-bundle/*
 !src-tauri/gateway-bundle/.gitkeep
+src-tauri/node-runtime/*
+!src-tauri/node-runtime/.gitkeep
+src-tauri/frontend/
+nul
+src-tauri/nul
