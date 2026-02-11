@@ -326,7 +326,7 @@ async function createTerminalInstance(container: HTMLElement) {
   const fitAddon = new FitAddon();
   const term = new Terminal({
     cursorBlink: true,
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 1.2,
     fontFamily:
       "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace",
