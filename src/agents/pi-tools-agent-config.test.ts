@@ -508,6 +508,7 @@ describe("Agent-specific tool filtering", () => {
       sessionKey: "agent:main:main",
       workspaceDir: "/tmp/test-main",
       agentDir: "/tmp/agent-main",
+      exec: { security: "full" },
     });
     const execTool = tools.find((tool) => tool.name === "exec");
     expect(execTool).toBeDefined();

@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 test("process send-keys encodes Enter for pty sessions", async () => {
-  const execTool = createExecTool();
+  const execTool = createExecTool({ security: "full" });
   const processTool = createProcessTool();
   const result = await execTool.execute("toolcall", {
     command:
@@ -44,7 +44,7 @@ test("process send-keys encodes Enter for pty sessions", async () => {
 });
 
 test("process submit sends Enter for pty sessions", async () => {
-  const execTool = createExecTool();
+  const execTool = createExecTool({ security: "full" });
   const processTool = createProcessTool();
   const result = await execTool.execute("toolcall", {
     command:
