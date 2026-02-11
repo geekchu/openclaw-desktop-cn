@@ -337,7 +337,11 @@ export function syncTabWithLocation(host: SettingsHost, replace: boolean) {
   if (typeof window === "undefined") {
     return;
   }
-  const resolved = tabFromPath(window.location.pathname, host.basePath) ?? "chat";
+  let resolved = tabFromPath(window.location.pathname, host.basePath) ?? "chat";
+  // When embedded in an iframe, the "manager" tab is suppressed — fall back to overview.
+  if (resolved === "manager" && window.self !== window.top) {
+    resolved = "overview";
+  }
   setTabFromRoute(host, resolved);
   syncUrlWithTab(host, resolved, replace);
 }
@@ -346,9 +350,12 @@ export function onPopState(host: SettingsHost) {
   if (typeof window === "undefined") {
     return;
   }
-  const resolved = tabFromPath(window.location.pathname, host.basePath);
+  let resolved = tabFromPath(window.location.pathname, host.basePath);
   if (!resolved) {
     return;
+  }
+  if (resolved === "manager" && window.self !== window.top) {
+    resolved = "overview";
   }
 
   const url = new URL(window.location.href);

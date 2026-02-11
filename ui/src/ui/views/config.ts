@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import type { ConfigUiHints } from "../types.ts";
 import { hintForPath, humanize, schemaType, type JsonSchema } from "./config-form.shared.ts";
 import { analyzeConfigSchema, renderConfigForm, SECTION_META } from "./config-form.ts";
+import { renderSecuritySection } from "./config-security.ts";
 
 export type ConfigProps = {
   raw: string;
@@ -72,6 +73,11 @@ const sidebarIcons = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
       <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+  `,
+  security: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
     </svg>
   `,
   channels: html`
@@ -465,6 +471,15 @@ export function renderConfig(props: ConfigProps) {
 
   const allSections = [...availableSections, ...extraSections];
 
+  // Ensure "security" always appears (virtual section for tools.exec.* settings)
+  if (!allSections.some((s) => s.key === "security")) {
+    const def = SECTIONS.find((s) => s.key === "security");
+    if (def) {
+      const idx = allSections.findIndex((s) => s.key === "tools");
+      allSections.splice(idx >= 0 ? idx + 1 : allSections.length, 0, def);
+    }
+  }
+
   const activeSectionSchema =
     props.activeSection && analysis.schema && schemaType(analysis.schema) === "object"
       ? analysis.schema.properties?.[props.activeSection]
@@ -610,9 +625,7 @@ export function renderConfig(props: ConfigProps) {
                 ? html`
                   <span class="config-changes-badge"
                     >${
-                      props.formMode === "raw"
-                        ? "未保存的更改"
-                        : `${diff.length} 个未保存的更改`
+                      props.formMode === "raw" ? "未保存的更改" : `${diff.length} 个未保存的更改`
                     }</span
                   >
                 `
@@ -756,17 +769,23 @@ export function renderConfig(props: ConfigProps) {
                           <span>加载架构中…</span>
                         </div>
                       `
-                    : renderConfigForm({
-                        schema: analysis.schema,
-                        uiHints: props.uiHints,
-                        value: props.formValue,
-                        disabled: props.loading || !props.formValue,
-                        unsupportedPaths: analysis.unsupportedPaths,
-                        onPatch: props.onFormPatch,
-                        searchQuery: props.searchQuery,
-                        activeSection: props.activeSection,
-                        activeSubsection: effectiveSubsection,
-                      })
+                    : props.activeSection === "security"
+                      ? renderSecuritySection({
+                          formValue: props.formValue,
+                          disabled: props.loading || !props.formValue,
+                          onPatch: props.onFormPatch,
+                        })
+                      : renderConfigForm({
+                          schema: analysis.schema,
+                          uiHints: props.uiHints,
+                          value: props.formValue,
+                          disabled: props.loading || !props.formValue,
+                          unsupportedPaths: analysis.unsupportedPaths,
+                          onPatch: props.onFormPatch,
+                          searchQuery: props.searchQuery,
+                          activeSection: props.activeSection,
+                          activeSubsection: effectiveSubsection,
+                        })
                 }
                 ${
                   formUnsafe

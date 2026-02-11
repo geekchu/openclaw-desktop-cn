@@ -68,9 +68,13 @@ import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
+import { renderTerminal } from "./views/terminal.ts";
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
+
+let _managerLoaded = false;
+const _isInIframe = window.self !== window.top;
 
 function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
   const list = state.agentsList?.agents ?? [];
@@ -95,6 +99,7 @@ export function renderApp(state: AppViewState) {
   const chatDisabledReason = state.connected ? null : "已断开与网关的连接。";
   const isChat = state.tab === "chat";
   const isManager = state.tab === "manager";
+  const isTerminal = state.tab === "terminal";
   const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
@@ -166,10 +171,11 @@ export function renderApp(state: AppViewState) {
         </div>
       </header>
       <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
-        ${TAB_GROUPS.map((group) => {
-          const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
-          const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
-          return html`
+        ${(_isInIframe ? TAB_GROUPS.filter((g) => !g.tabs.includes("manager")) : TAB_GROUPS).map(
+          (group) => {
+            const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
+            const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
+            return html`
             <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
               <button
                 class="nav-label"
@@ -191,7 +197,8 @@ export function renderApp(state: AppViewState) {
               </div>
             </div>
           `;
-        })}
+          },
+        )}
         <div class="nav-group nav-group--links">
           <div class="nav-label nav-label--static">
             <span class="nav-label__text">资源</span>
@@ -210,11 +217,8 @@ export function renderApp(state: AppViewState) {
           </div>
         </div>
       </aside>
-      <main class="content ${isChat ? "content--chat" : ""} ${isManager ? "content--manager" : ""}">
-        ${
-          isManager
-            ? nothing
-            : html`<section class="content-header">
+      <main class="content ${isChat ? "content--chat" : ""} ${isManager ? "content--manager" : ""} ${isTerminal ? "content--terminal" : ""}">
+        <section class="content-header">
           <div>
             <div class="page-title">${titleForTab(state.tab)}</div>
             <div class="page-sub">${subtitleForTab(state.tab)}</div>
@@ -223,8 +227,7 @@ export function renderApp(state: AppViewState) {
             ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
             ${isChat ? renderChatControls(state) : nothing}
           </div>
-        </section>`
-        }
+        </section>
 
         ${
           state.tab === "overview"
@@ -1086,11 +1089,65 @@ export function renderApp(state: AppViewState) {
             : nothing
         }
 
-        <iframe
-          src="/manager/"
-          style="width:100%;height:100%;border:none;display:block;${state.tab === "manager" ? "" : "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;opacity:0;"}"
-          title="控制面板"
-        ></iframe>
+        ${renderTerminal({
+          active: isTerminal,
+          gatewayUrl: state.gatewayUrl ?? "",
+        })}
+
+
+        ${
+          _isInIframe
+            ? nothing
+            : html`
+        <div class="manager-container" style="${state.tab === "manager" ? "" : "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;opacity:0;"}">
+          ${
+            _managerLoaded
+              ? nothing
+              : html`
+                  <div
+                    class="manager-loading"
+                    style="
+                      position: absolute;
+                      inset: 0;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      background: var(--bg, #1a1a2e);
+                      z-index: 1;
+                    "
+                  >
+                    <div style="text-align: center">
+                      <div
+                        class="spinner"
+                        style="
+                          width: 32px;
+                          height: 32px;
+                          border: 3px solid rgba(255, 255, 255, 0.1);
+                          border-top-color: var(--accent, #e74c5e);
+                          border-radius: 50%;
+                          animation: spin 0.8s linear infinite;
+                          margin: 0 auto 12px;
+                        "
+                      ></div>
+                      <div style="color: var(--text-muted, #888); font-size: 13px">正在加载控制面板...</div>
+                    </div>
+                  </div>
+                `
+          }
+          <iframe
+            src="/manager/"
+            style="width:100%;height:100%;border:none;display:block;"
+            title="控制面板"
+            @load=${(e: Event) => {
+              _managerLoaded = true;
+              const container = (e.target as HTMLElement)?.parentElement;
+              const loading = container?.querySelector(".manager-loading") as HTMLElement | null;
+              if (loading) loading.remove();
+            }}
+          ></iframe>
+        </div>
+        `
+        }
       </main>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}

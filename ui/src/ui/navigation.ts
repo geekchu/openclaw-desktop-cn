@@ -7,8 +7,8 @@ export const TAB_GROUPS = [
     tabs: ["overview", "channels", "instances", "sessions", "cron"],
   },
   { label: "代理", tabs: ["agents", "skills", "nodes"] },
-  { label: "设置", tabs: ["config", "debug", "logs"] },
-  { label: "控制", tabs: ["manager"] },
+  { label: "设置", tabs: ["manager", "config", "debug", "logs"] },
+  { label: "工具", tabs: ["terminal"] },
 ] as const;
 
 export type Tab =
@@ -24,7 +24,8 @@ export type Tab =
   | "config"
   | "debug"
   | "logs"
-  | "manager";
+  | "manager"
+  | "terminal";
 
 const TAB_PATHS: Record<Tab, string> = {
   agents: "/agents",
@@ -40,6 +41,7 @@ const TAB_PATHS: Record<Tab, string> = {
   debug: "/debug",
   logs: "/logs",
   manager: "/manager",
+  terminal: "/terminal",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -151,6 +153,8 @@ export function iconForTab(tab: Tab): IconName {
       return "scrollText";
     case "manager":
       return "settings";
+    case "terminal":
+      return "terminal";
     default:
       return "folder";
   }
@@ -184,6 +188,8 @@ export function titleForTab(tab: Tab) {
       return "日志";
     case "manager":
       return "控制面板";
+    case "terminal":
+      return "终端";
     default:
       return "控制";
   }
@@ -217,6 +223,8 @@ export function subtitleForTab(tab: Tab) {
       return "网关文件日志的实时跟踪。";
     case "manager":
       return "AI 配置、消息渠道、测试诊断与系统设置。";
+    case "terminal":
+      return "内嵌命令行终端，运行 openclaw 命令。";
     default:
       return "";
   }
