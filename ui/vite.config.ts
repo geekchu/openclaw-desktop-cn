@@ -29,7 +29,7 @@ export default defineConfig(() => {
     },
     build: {
       outDir: path.resolve(here, "../dist/control-ui"),
-      emptyOutDir: true,
+      emptyOutDir: false,
       sourcemap: true,
     },
     server: {

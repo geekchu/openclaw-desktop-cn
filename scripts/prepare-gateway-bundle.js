@@ -31,12 +31,31 @@ function run(cmd, opts = {}) {
 function copyIfExists(src, dest) {
   if (existsSync(src)) {
     console.log(`[bundle] 复制 ${src} → ${dest}`);
-    cpSync(src, dest, { recursive: true });
+    if (process.platform === "win32") {
+      // cpSync triggers V8 heap corruption on Windows with pnpm symlink trees;
+      // robocopy handles junctions/symlinks correctly, exit codes 0-7 = success.
+      // /XD node_modules: skip node_modules to avoid circular pnpm symlinks
+      mkdirSync(dest, { recursive: true });
+      try {
+        execSync(`robocopy "${src}" "${dest}" /E /NFL /NDL /NJH /NJS /NP /XD node_modules`, {
+          stdio: "inherit",
+        });
+      } catch (err) {
+        // robocopy exit codes: 0-7 = success (bitmask), >=8 = error
+        if (err.status >= 8) throw err;
+      }
+    } else {
+      cpSync(src, dest, { recursive: true });
+    }
     return true;
   }
   console.log(`[bundle] 跳过（不存在）: ${src}`);
   return false;
 }
+
+// Step 0: 下载 Node.js 运行环境
+console.log("\n[bundle] === Step 0: 准备 Node.js 运行环境 ===");
+run("node scripts/download-node.js");
 
 // Step 1: 编译 TypeScript
 console.log("\n[bundle] === Step 1: 编译 TypeScript ===");
