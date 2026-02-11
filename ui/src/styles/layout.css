@@ -438,14 +438,200 @@
 .content--chat {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 0;
   overflow: hidden;
   padding-bottom: 0;
 }
 
 .content--manager {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 0;
+  overflow: hidden;
+}
+
+.content--manager > * + * {
+  margin-top: 0;
+}
+
+.content--manager .content-header {
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+/* Manager tab: embedded in normal layout */
+
+.content--terminal {
+  display: flex;
+  flex-direction: column;
   padding: 0;
   overflow: hidden;
+}
+
+.content--terminal .content-header {
+  padding: 16px 24px 8px;
+  margin: 0;
+}
+
+.content--terminal > * + * {
+  margin-top: 0;
+}
+
+.terminal-page {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+}
+
+.terminal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 36px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+}
+
+.terminal-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #484f58;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.terminal-status__dot--ok {
+  background: #3fb950;
+  box-shadow: 0 0 4px rgba(63, 185, 80, 0.4);
+}
+
+.terminal-status__dot--exited {
+  background: #d29922;
+}
+
+.terminal-status__dot--error {
+  background: #f85149;
+  box-shadow: 0 0 4px rgba(248, 81, 73, 0.4);
+}
+
+.terminal-status__label {
+  font-size: 11px;
+  color: #8b949e;
+  font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, monospace;
+  letter-spacing: 0.02em;
+}
+
+.terminal-toolbar__actions {
+  display: flex;
+  gap: 2px;
+}
+
+.terminal-toolbar__btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #8b949e;
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.terminal-toolbar__btn:hover {
+  background: #21262d;
+  color: #c9d1d9;
+}
+
+.terminal-toolbar__btn:active {
+  background: #282e36;
+}
+
+.terminal-toolbar__btn--restart:hover {
+  color: #d29922;
+}
+
+.terminal-toolbar__btn svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.terminal-container {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  padding: 2px 0 0 4px;
+}
+
+.terminal-container .xterm {
+  height: 100%;
+  width: 100%;
+}
+
+/* xterm 滚动条：保持可见 + 深色主题 */
+.terminal-container .xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 5px;
+  border: 2px solid #0d1117;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+.terminal-container .xterm-viewport {
+  scrollbar-gutter: stable;
+}
+
+/* 禁止 xterm v6 overlay 滚动条自动淡出 */
+.terminal-container .xterm .xterm-scrollable-element > .invisible,
+.terminal-container .xterm .xterm-scrollable-element > .invisible.fade {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.manager-container {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .content--chat > * + * {
@@ -504,6 +690,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  margin-bottom: 0;
+  padding: 4px 8px 0;
 }
 
 .content--chat .content-header > div:first-child {
