@@ -60,6 +60,7 @@ pub async fn save_config(config: Value) -> Result<String, String> {
     let known_keys: &[&str] = &[
         "gateway", "agents", "models", "channels", "plugins",
         "meta", "hooks", "security", "notifications", "web", "tools",
+        "auth", "commands", "messages", "wizard",
     ];
     if let Some(obj) = config.as_object() {
         for key in obj.keys() {
@@ -173,9 +174,8 @@ pub async fn get_or_create_gateway_token() -> Result<String, String> {
         config["gateway"]["auth"] = json!({});
     }
     
-    // 设置 token 和 mode
+    // 设置 token
     config["gateway"]["auth"]["token"] = json!(new_token);
-    config["gateway"]["auth"]["mode"] = json!("token");
     config["gateway"]["mode"] = json!("local");
     
     // 保存配置
@@ -1167,4 +1167,119 @@ pub async fn install_feishu_plugin() -> Result<String, String> {
             Err(format!("安装飞书插件失败: {}\n\n请手动执行: openclaw plugins install @m1heng-clawd/feishu", e))
         }
     }
+}
+
+/// 获取桌面端专用配置（~/.openclaw/desktop.json）
+#[command]
+pub async fn get_desktop_config() -> Result<Value, String> {
+    let config_dir = platform::get_config_dir();
+    let path = format!("{}/desktop.json", config_dir);
+
+    if !file::file_exists(&path) {
+        return Ok(json!({}));
+    }
+
+    let content = file::read_file(&path)
+        .map_err(|e| format!("读取桌面配置失败: {}", e))?;
+    serde_json::from_str(&content)
+        .map_err(|e| format!("解析桌面配置失败: {}", e))
+}
+
+/// 保存桌面端专用配置（合并写入 ~/.openclaw/desktop.json）
+#[command]
+pub async fn save_desktop_config(config: Value) -> Result<(), String> {
+    let config_dir = platform::get_config_dir();
+    let path = format!("{}/desktop.json", config_dir);
+
+    // 读取现有配置
+    let mut existing: Value = if file::file_exists(&path) {
+        let content = file::read_file(&path).unwrap_or_default();
+        serde_json::from_str(&content).unwrap_or(json!({}))
+    } else {
+        json!({})
+    };
+
+    // 合并新值
+    if let (Some(existing_obj), Some(new_obj)) = (existing.as_object_mut(), config.as_object()) {
+        for (k, v) in new_obj {
+            existing_obj.insert(k.clone(), v.clone());
+        }
+    }
+
+    let content = serde_json::to_string_pretty(&existing)
+        .map_err(|e| format!("序列化桌面配置失败: {}", e))?;
+    file::write_file(&path, &content)
+        .map_err(|e| format!("写入桌面配置失败: {}", e))?;
+
+    info!("[Config] 桌面配置已保存: {}", path);
+    Ok(())
+}
+
+/// 打开配置目录
+#[command]
+pub async fn open_config_dir() -> Result<(), String> {
+    let config_dir = platform::get_config_dir();
+    info!("[Config] 打开配置目录: {}", config_dir);
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&config_dir)
+            .spawn()
+            .map_err(|e| format!("打开目录失败: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&config_dir)
+            .spawn()
+            .map_err(|e| format!("打开目录失败: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&config_dir)
+            .spawn()
+            .map_err(|e| format!("打开目录失败: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// 打开系统目录选择对话框，返回选中的目录路径
+#[command]
+pub async fn pick_folder() -> Result<Option<String>, String> {
+    let folder = rfd::FileDialog::new()
+        .set_title("选择允许访问的目录")
+        .pick_folder();
+
+    Ok(folder.map(|p| p.to_string_lossy().to_string()))
+}
+
+/// 检查开机自启是否启用
+#[command]
+pub async fn autostart_is_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    manager.is_enabled().map_err(|e| format!("检查自启状态失败: {}", e))
+}
+
+/// 启用开机自启
+#[command]
+pub async fn autostart_enable(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    manager.enable().map_err(|e| format!("启用自启失败: {}", e))?;
+    info!("[Config] 已启用开机自启");
+    Ok(())
+}
+
+/// 禁用开机自启
+#[command]
+pub async fn autostart_disable(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    manager.disable().map_err(|e| format!("禁用自启失败: {}", e))?;
+    info!("[Config] 已禁用开机自启");
+    Ok(())
 }

@@ -6,6 +6,7 @@ use log::{info, warn, error};
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::Manager;
+use tauri_plugin_notification::NotificationExt;
 
 use crate::utils::shell;
 use crate::TrayState;
@@ -76,37 +77,49 @@ impl GatewayManager {
         let addr = format!("127.0.0.1:{}", self.port);
         TcpStream::connect_timeout(
             &addr.parse().unwrap(),
-            Duration::from_millis(500),
+            Duration::from_millis(200),
         ).is_ok()
     }
 
     /// 轮询等待 gateway 就绪，最多等待 timeout_secs 秒
+    /// 使用 200ms 间隔快速轮询，尽早检测到 gateway 启动
     pub fn wait_for_ready(&self, timeout_secs: u64) -> bool {
-        for i in 1..=timeout_secs {
+        let poll_interval = Duration::from_millis(200);
+        let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
+        let mut last_child_check = std::time::Instant::now();
+
+        loop {
             if self.is_ready() {
-                info!("[Gateway] gateway 已就绪 ({}秒)", i);
+                let elapsed = std::time::Instant::now().duration_since(deadline - Duration::from_secs(timeout_secs));
+                info!("[Gateway] gateway 已就绪 ({:.1}秒)", elapsed.as_secs_f64());
                 return true;
             }
 
-            // 检查子进程是否意外退出
-            let mut guard = self.child.lock().unwrap();
-            if let Some(ref mut child) = *guard {
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        error!("[Gateway] gateway 进程意外退出, 退出码: {:?}", status.code());
-                        return false;
-                    }
-                    Ok(None) => {} // 仍在运行
-                    Err(e) => {
-                        warn!("[Gateway] 检查进程状态失败: {}", e);
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+
+            // 每秒检查一次子进程是否意外退出（不必每次 poll 都检查）
+            if last_child_check.elapsed() >= Duration::from_secs(1) {
+                last_child_check = std::time::Instant::now();
+                let mut guard = self.child.lock().unwrap();
+                if let Some(ref mut child) = *guard {
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            error!("[Gateway] gateway 进程意外退出, 退出码: {:?}", status.code());
+                            return false;
+                        }
+                        Ok(None) => {} // 仍在运行
+                        Err(e) => {
+                            warn!("[Gateway] 检查进程状态失败: {}", e);
+                        }
                     }
                 }
+                drop(guard);
             }
-            drop(guard);
 
-            std::thread::sleep(Duration::from_secs(1));
+            std::thread::sleep(poll_interval);
         }
-        false
     }
 
     /// 检查子进程是否仍在运行
@@ -122,6 +135,20 @@ impl GatewayManager {
             false
         }
     }
+}
+
+/// 发送系统桌面通知
+fn send_notification(handle: &AppHandle, body: &str) {
+    let _ = handle.notification()
+        .builder()
+        .title("OpenClaw桌面版")
+        .body(body)
+        .show();
+}
+
+/// 首次启动超时通知（供 main.rs 调用）
+pub fn send_startup_timeout_notification(handle: &AppHandle) {
+    send_notification(handle, "Gateway 启动超时，请检查 Node.js 环境");
 }
 
 /// 更新托盘菜单项，反映 gateway 当前状态
@@ -148,6 +175,7 @@ pub fn health_check_loop(handle: &AppHandle) {
     let max_consecutive_failures = 3;
     let backoff_interval = Duration::from_secs(60);
     let mut consecutive_failures: u32 = 0;
+    let mut navigated = false;
 
     loop {
         let wait = if consecutive_failures >= max_consecutive_failures {
@@ -162,6 +190,19 @@ pub fn health_check_loop(handle: &AppHandle) {
         if gm.is_ready() {
             consecutive_failures = 0;
             update_tray_status(handle, true);
+            // 如果还没 navigate 过（初始启动超时后 gateway 才就绪），立即跳转
+            if !navigated {
+                navigated = true;
+                info!("[Gateway] 健康检查发现 gateway 已就绪，执行延迟导航");
+                let url = match crate::read_gateway_token() {
+                    Some(token) => format!("http://localhost:{}?token={}", gm.port, token),
+                    None => format!("http://localhost:{}", gm.port),
+                };
+                let _ = handle.emit("gateway-ready", url.as_str());
+                if let Some(window) = handle.get_webview_window("main") {
+                    let _ = window.navigate(url.parse().unwrap());
+                }
+            }
             continue; // 正常运行
         }
 
@@ -186,6 +227,7 @@ pub fn health_check_loop(handle: &AppHandle) {
                     info!("[Gateway] 自动重启成功");
                     consecutive_failures = 0;
                     update_tray_status(handle, true);
+                    send_notification(handle, "Gateway 已自动重启");
                     // 重新读取 token 以确保认证正常
                     let url = match crate::read_gateway_token() {
                         Some(token) => format!("http://localhost:{}?token={}", gm.port, token),
@@ -206,6 +248,7 @@ pub fn health_check_loop(handle: &AppHandle) {
                 if consecutive_failures >= max_consecutive_failures {
                     let _ = handle.emit("gateway-status",
                         "Gateway 启动失败，已进入低频重试模式");
+                    send_notification(handle, "Gateway 启动失败，已进入低频重试模式");
                 } else {
                     let _ = handle.emit("gateway-status", format!("重启失败: {}", e).as_str());
                 }

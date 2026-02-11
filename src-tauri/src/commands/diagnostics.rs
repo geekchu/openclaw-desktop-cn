@@ -163,10 +163,13 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
     // 运行 openclaw doctor
     if openclaw_installed {
         let doctor_result = shell::run_openclaw(&["doctor"]);
+        let doctor_output = doctor_result
+            .map(|s| strip_ansi_codes(&s))
+            .unwrap_or_else(|e| strip_ansi_codes(&e));
         results.push(DiagnosticResult {
             name: "OpenClaw Doctor".to_string(),
-            passed: doctor_result.is_ok() && !doctor_result.as_ref().unwrap().contains("invalid"),
-            message: doctor_result.unwrap_or_else(|e| e),
+            passed: !doctor_output.contains("invalid"),
+            message: doctor_output,
             suggestion: None,
         });
     }
@@ -192,8 +195,8 @@ pub async fn test_ai_connection() -> Result<AITestResult, String> {
     match result {
         Ok(output) => {
             debug!("[AI测试] 原始输出: {}", output);
-            // 过滤掉警告信息
-            let filtered: String = output
+            // 去除 ANSI 代码 + 过滤警告信息
+            let filtered: String = strip_ansi_codes(&output)
                 .lines()
                 .filter(|l: &&str| !l.contains("ExperimentalWarning"))
                 .collect::<Vec<&str>>()
@@ -301,9 +304,10 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
     match &status_result {
         Ok(output) => {
             info!("[渠道测试] status 命令执行成功");
-            
+            let clean_output = strip_ansi_codes(output);
+
             // 尝试从文本输出解析状态
-            if let Some((enabled, configured, linked, status_msg)) = parse_channel_status_text(output, &channel_type) {
+            if let Some((enabled, configured, linked, status_msg)) = parse_channel_status_text(&clean_output, &channel_type) {
                 debug_info = format!("enabled={}, configured={}, linked={}", enabled, configured, linked);
                 info!("[渠道测试] {} 状态: {}", channel_type, debug_info);
                 
@@ -328,7 +332,7 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                 };
             } else {
                 // 尝试 JSON 解析（作为备选）
-                if let Some(json_str) = extract_json_from_output(output) {
+                if let Some(json_str) = extract_json_from_output(&clean_output) {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
                         if let Some(channels) = json.get("channels").and_then(|c| c.as_object()) {
                             if let Some(ch) = channels.get(&channel_lower) {

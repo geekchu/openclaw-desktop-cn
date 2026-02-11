@@ -10,7 +10,7 @@ mod gateway;
 mod models;
 mod utils;
 
-use commands::{config, diagnostics, installer, process, service};
+use commands::{config, diagnostics, installer, process, service, terminal};
 use std::path::PathBuf;
 use tauri::Emitter;
 use tauri::Manager;
@@ -136,6 +136,9 @@ fn main() {
             // 创建 GatewayManager 并存储到 app state
             let gm = gateway::GatewayManager::new(18789);
             app.manage(gm);
+
+            // 创建终端状态管理
+            app.manage(terminal::TerminalState::new());
 
             // ── 系统托盘 ──
             let status_item = MenuItem::with_id(
@@ -266,7 +269,7 @@ fn main() {
                 match gm.start() {
                     Ok(_) => {
                         let _ = handle.emit("gateway-status", "正在等待 Gateway 就绪...");
-                        if gm.wait_for_ready(30) {
+                        if gm.wait_for_ready(120) {
                             // Gateway 就绪，直接导航 webview 到 gateway URL
                             let url = if let Some(token) = read_gateway_token() {
                                 format!("http://localhost:18789?token={}", token)
@@ -324,6 +327,9 @@ fn main() {
             // Gateway Token
             config::get_or_create_gateway_token,
             config::get_dashboard_url,
+            // 桌面端配置
+            config::get_desktop_config,
+            config::save_desktop_config,
             // AI 配置管理
             config::get_official_providers,
             config::get_ai_config,
@@ -335,6 +341,13 @@ fn main() {
             // 飞书插件管理
             config::check_feishu_plugin,
             config::install_feishu_plugin,
+            // 目录操作
+            config::open_config_dir,
+            config::pick_folder,
+            // 开机自启
+            config::autostart_is_enabled,
+            config::autostart_enable,
+            config::autostart_disable,
             // 诊断测试
             diagnostics::run_doctor,
             diagnostics::test_ai_connection,
@@ -352,6 +365,11 @@ fn main() {
             // 版本更新
             installer::check_openclaw_update,
             installer::update_openclaw,
+            // 内嵌终端
+            terminal::terminal_create,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_destroy,
         ])
         .build(tauri::generate_context!())
         .expect("构建 Tauri 应用失败")

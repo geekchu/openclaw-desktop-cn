@@ -1,6 +1,7 @@
 use crate::models::ServiceStatus;
 use crate::utils::shell;
-use tauri::command;
+use crate::gateway::GatewayManager;
+use tauri::{command, AppHandle, Emitter, Manager};
 use std::process::Command;
 use log::{info, debug};
 
@@ -220,23 +221,31 @@ pub async fn stop_service() -> Result<String, String> {
     }
 }
 
-/// 重启服务
+/// 重启服务 — 通过 GatewayManager 管理子进程
 #[command]
-pub async fn restart_service() -> Result<String, String> {
+pub async fn restart_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 重启服务...");
-    
-    let _ = shell::run_openclaw(&["gateway", "restart"]);
-    std::thread::sleep(std::time::Duration::from_secs(2));
-    
-    let status = get_service_status().await?;
-    if status.running {
-        info!("[服务] ✓ 重启成功, PID: {:?}", status.pid);
-        Ok(format!("服务已重启，PID: {:?}", status.pid))
+
+    let gm = app.state::<GatewayManager>();
+    gm.stop();
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    gm.start().map_err(|e| format!("重启 Gateway 失败: {}", e))?;
+
+    if gm.wait_for_ready(15) {
+        // 重启成功，通知前端重新导航
+        let url = match crate::read_gateway_token() {
+            Some(token) => format!("http://localhost:{}?token={}", 18789, token),
+            None => format!("http://localhost:{}", 18789),
+        };
+        let _ = app.emit("gateway-ready", url.as_str());
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.navigate(url.parse().unwrap());
+        }
+        info!("[服务] ✓ 重启成功");
+        Ok("服务已重启".to_string())
     } else {
-        // 手动停止再启动
-        let _ = stop_service().await;
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        start_service().await
+        Err("Gateway 重启超时（15秒）".to_string())
     }
 }
 

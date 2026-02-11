@@ -3,8 +3,14 @@
   "identifier": "default",
   "description": "OpenClaw桌面版 默认权限配置",
   "windows": ["main"],
+  "remote": {
+    "urls": ["http://localhost:*", "http://127.0.0.1:*"]
+  },
   "permissions": [
     "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:event:allow-emit-to",
     "shell:allow-open",
     "process:default",
     "notification:default",
