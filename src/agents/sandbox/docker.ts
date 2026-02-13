@@ -9,6 +9,100 @@ import { resolveSandboxAgentId, resolveSandboxScopeKey, slugifySessionKey } from
 
 const HOT_CONTAINER_WINDOW_MS = 5 * 60 * 1000;
 
+/** Sentinel string embedded in errors so the UI can detect Docker-not-installed. */
+export const DOCKER_NOT_INSTALLED_MARKER = "[DOCKER_NOT_INSTALLED]";
+
+/** Track whether we've already attempted to auto-start Docker this process. */
+let dockerAutoStartAttempted = false;
+
+async function isDockerInstalled(): Promise<boolean> {
+  try {
+    const result = await execDocker(["--version"], { allowFailure: true });
+    return result.code === 0;
+  } catch {
+    // spawn ENOENT — docker binary not found
+    return false;
+  }
+}
+
+async function isDockerDaemonReady(): Promise<boolean> {
+  try {
+    const result = await execDocker(["version", "--format", "{{.Server.Version}}"], {
+      allowFailure: true,
+    });
+    return result.code === 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Sentinel string embedded in errors so the UI can detect Docker-not-running. */
+export const DOCKER_NOT_RUNNING_MARKER = "[DOCKER_NOT_RUNNING]";
+
+function launchDockerDesktop(): boolean {
+  if (process.platform === "win32") {
+    // On Windows, Docker Desktop may be installed anywhere — don't guess the path.
+    // Return false so the caller surfaces a user-facing prompt instead.
+    return false;
+  } else if (process.platform === "darwin") {
+    const child = spawn("open", ["-a", "Docker"], {
+      stdio: "ignore",
+      detached: true,
+    });
+    child.unref();
+    return true;
+  } else {
+    const child = spawn("systemctl", ["--user", "start", "docker-desktop"], {
+      stdio: "ignore",
+      detached: true,
+    });
+    child.unref();
+    return true;
+  }
+}
+
+async function ensureDockerDaemon(): Promise<void> {
+  if (await isDockerDaemonReady()) return;
+
+  // Check if Docker CLI is installed at all
+  if (!(await isDockerInstalled())) {
+    throw new Error(
+      `${DOCKER_NOT_INSTALLED_MARKER} Docker 未安装。目录访问限制功能需要 Docker 来创建隔离的沙盒环境。请先安装 Docker Desktop。`,
+    );
+  }
+
+  // Docker installed but daemon not running — try auto-start (non-Windows only)
+  if (dockerAutoStartAttempted) return;
+  dockerAutoStartAttempted = true;
+
+  const launched = launchDockerDesktop();
+  if (!launched) {
+    // On Windows we can't reliably auto-start — surface a user-facing prompt
+    dockerAutoStartAttempted = false;
+    throw new Error(
+      `${DOCKER_NOT_RUNNING_MARKER} Docker 已安装但未运行。请手动启动 Docker Desktop 后重试。`,
+    );
+  }
+
+  defaultRuntime.log("Docker daemon not running; attempting to start Docker Desktop...");
+
+  const maxWaitMs = 30_000;
+  const interval = 2_000;
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise((r) => setTimeout(r, interval));
+    if (await isDockerDaemonReady()) {
+      defaultRuntime.log("Docker Desktop started successfully.");
+      return;
+    }
+  }
+  // Reset flag so next attempt can retry
+  dockerAutoStartAttempted = false;
+  throw new Error(
+    `${DOCKER_NOT_RUNNING_MARKER} Docker Desktop 已安装但未能在 30 秒内启动。请手动启动 Docker Desktop 后重试。`,
+  );
+}
+
 export function execDocker(args: string[], opts?: { allowFailure?: boolean }) {
   return new Promise<{ stdout: string; stderr: string; code: number }>((resolve, reject) => {
     const child = spawn("docker", args, {
@@ -21,6 +115,13 @@ export function execDocker(args: string[], opts?: { allowFailure?: boolean }) {
     });
     child.stderr?.on("data", (chunk) => {
       stderr += chunk.toString();
+    });
+    child.on("error", (err) => {
+      if (opts?.allowFailure) {
+        resolve({ stdout, stderr: err.message, code: 1 });
+      } else {
+        reject(err);
+      }
     });
     child.on("close", (code) => {
       const exitCode = code ?? 0;
@@ -64,6 +165,7 @@ async function dockerImageExists(image: string) {
 }
 
 export async function ensureDockerImage(image: string) {
+  await ensureDockerDaemon();
   const exists = await dockerImageExists(image);
   if (exists) {
     return;
@@ -279,6 +381,7 @@ export async function ensureSandboxContainer(params: {
   agentWorkspaceDir: string;
   cfg: SandboxConfig;
 }) {
+  await ensureDockerDaemon();
   const scopeKey = resolveSandboxScopeKey(params.cfg.scope, params.sessionKey);
   const slug = params.cfg.scope === "shared" ? "shared" : slugifySessionKey(scopeKey);
   const name = `${params.cfg.docker.containerPrefix}${slug}`;

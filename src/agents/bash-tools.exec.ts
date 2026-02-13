@@ -418,6 +418,29 @@ function emitExecSystemEvent(text: string, opts: { sessionKey?: string; contextK
   requestHeartbeatNow({ reason: "exec-event" });
 }
 
+/**
+ * Inject exec result into the session transcript and broadcast to the UI.
+ * Uses chat.inject which writes to the .jsonl transcript file and broadcasts
+ * a chat "final" event, causing the webchat UI to reload history immediately.
+ */
+function notifyExecResultToChat(summary: string, sessionKey: string | undefined) {
+  const key = sessionKey?.trim();
+  if (!key) {
+    return;
+  }
+  callGatewayTool(
+    "chat.inject",
+    { timeoutMs: 5_000 },
+    {
+      sessionKey: key,
+      message: summary,
+      label: "命令执行结果",
+    },
+  ).catch(() => {
+    // Best-effort: if inject fails, the system event / heartbeat path is the fallback.
+  });
+}
+
 async function runExecProcess(opts: {
   command: string;
   workdir: string;
@@ -1454,6 +1477,7 @@ export function createExecTool(
               ? `Exec finished (gateway id=${approvalId}, session=${run.session.id}, ${exitLabel})\n${output}`
               : `Exec finished (gateway id=${approvalId}, session=${run.session.id}, ${exitLabel})`;
             emitExecSystemEvent(summary, { sessionKey: notifySessionKey, contextKey });
+            notifyExecResultToChat(summary, notifySessionKey);
           })();
 
           return {
