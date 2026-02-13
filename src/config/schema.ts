@@ -735,32 +735,6 @@ function mergeObjectSchema(base: JsonSchemaObject, extension: JsonSchemaObject):
   return merged;
 }
 
-export type ConfigSchemaResponse = {
-  schema: ConfigSchema;
-  uiHints: ConfigUiHints;
-  version: string;
-  generatedAt: string;
-};
-
-export type PluginUiMetadata = {
-  id: string;
-  name?: string;
-  description?: string;
-  configUiHints?: Record<
-    string,
-    Pick<ConfigUiHint, "label" | "help" | "advanced" | "sensitive" | "placeholder">
-  >;
-  configSchema?: JsonSchemaNode;
-};
-
-export type ChannelUiMetadata = {
-  id: string;
-  label?: string;
-  description?: string;
-  configSchema?: JsonSchemaNode;
-  configUiHints?: Record<string, ConfigUiHint>;
-};
-
 function applyPluginHints(hints: ConfigUiHints, plugins: PluginUiMetadata[]): ConfigUiHints {
   const next: ConfigUiHints = { ...hints };
   for (const plugin of plugins) {
