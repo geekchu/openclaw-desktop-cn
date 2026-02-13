@@ -382,15 +382,18 @@ function maybeNotifyOnExit(session: ProcessSession, status: "completed" | "faile
     return;
   }
   session.exitNotified = true;
+  const exitCode = session.exitSignal ? null : (session.exitCode ?? 0);
   const exitLabel = session.exitSignal
-    ? `signal ${session.exitSignal}`
-    : `code ${session.exitCode ?? 0}`;
+    ? `信号 ${session.exitSignal}`
+    : exitCode === 0
+      ? "成功"
+      : `失败 (退出码 ${exitCode})`;
   const output = normalizeNotifyOutput(
     tail(session.tail || session.aggregated || "", DEFAULT_NOTIFY_TAIL_CHARS),
   );
   const summary = output
-    ? `Exec ${status} (${session.id.slice(0, 8)}, ${exitLabel}) :: ${output}`
-    : `Exec ${status} (${session.id.slice(0, 8)}, ${exitLabel})`;
+    ? `命令: ${session.command}\n结果: ${exitLabel}\n输出:\n${output}`
+    : `命令: ${session.command}\n结果: ${exitLabel}\n(命令已完成，无输出)`;
   enqueueSystemEvent(summary, { sessionKey });
   requestHeartbeatNow({ reason: `exec:${session.id}:exit` });
 }
@@ -1244,8 +1247,8 @@ export function createExecTool(
               {
                 type: "text",
                 text:
-                  `${warningText}Approval required (id ${approvalSlug}). ` +
-                  "Approve to run; updates will arrive after completion.",
+                  `${warningText}命令需要审批 (id ${approvalSlug})。` +
+                  "请等待用户审批，命令完成后结果会自动返回。",
               },
             ],
             details: {
@@ -1472,10 +1475,15 @@ export function createExecTool(
             const output = normalizeNotifyOutput(
               tail(outcome.aggregated || "", DEFAULT_NOTIFY_TAIL_CHARS),
             );
-            const exitLabel = outcome.timedOut ? "timeout" : `code ${outcome.exitCode ?? "?"}`;
+            const exitCode = outcome.exitCode ?? 0;
+            const exitLabel = outcome.timedOut
+              ? "超时"
+              : exitCode === 0
+                ? "成功"
+                : `失败 (退出码 ${exitCode})`;
             const summary = output
-              ? `Exec finished (gateway id=${approvalId}, session=${run.session.id}, ${exitLabel})\n${output}`
-              : `Exec finished (gateway id=${approvalId}, session=${run.session.id}, ${exitLabel})`;
+              ? `命令: ${commandText}\n结果: ${exitLabel}\n输出:\n${output}`
+              : `命令: ${commandText}\n结果: ${exitLabel}\n(命令已完成，无输出)`;
             emitExecSystemEvent(summary, { sessionKey: notifySessionKey, contextKey });
             notifyExecResultToChat(summary, notifySessionKey);
           })();
@@ -1485,8 +1493,8 @@ export function createExecTool(
               {
                 type: "text",
                 text:
-                  `${warningText}Approval required (id ${approvalSlug}). ` +
-                  "Approve to run; updates will arrive after completion.",
+                  `${warningText}命令需要审批 (id ${approvalSlug})。` +
+                  "请等待用户审批，命令完成后结果会自动返回。",
               },
             ],
             details: {
