@@ -111,8 +111,6 @@ import { computeSandboxConfigHash } from "./config-hash.js";
 import { DEFAULT_SANDBOX_IMAGE, SANDBOX_AGENT_WORKSPACE_MOUNT } from "./constants.js";
 import { readRegistry, updateRegistry } from "./registry.js";
 import { resolveSandboxAgentId, resolveSandboxScopeKey, slugifySessionKey } from "./shared.js";
-import type { SandboxConfig, SandboxWorkspaceAccess } from "./types.js";
-import type { SandboxDockerConfig } from "./types.docker.js";
 
 const HOT_CONTAINER_WINDOW_MS = 5 * 60 * 1000;
 
