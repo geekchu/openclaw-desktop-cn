@@ -1,4 +1,8 @@
+import { formatDurationHuman } from "../../../src/infra/format-time/format-duration.ts";
+import { formatRelativeTimestamp } from "../../../src/infra/format-time/format-relative.ts";
 import { stripReasoningTagsFromText } from "../../../src/shared/text/reasoning-tags.js";
+
+export { formatRelativeTimestamp, formatDurationHuman };
 
 export function formatMs(ms?: number | null): string {
   if (!ms && ms !== 0) {

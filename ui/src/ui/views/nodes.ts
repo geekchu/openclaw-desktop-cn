@@ -10,7 +10,7 @@ import type {
   ExecApprovalsFile,
   ExecApprovalsSnapshot,
 } from "../controllers/exec-approvals.ts";
-import { clampText, formatAgo, formatList } from "../format.ts";
+import { clampText, formatRelativeTimestamp, formatList } from "../format.ts";
 
 export type NodesProps = {
   loading: boolean;

@@ -1,5 +1,5 @@
 import type { CronJob, GatewaySessionRow, PresenceEntry } from "./types.ts";
-import { formatAgo, formatDurationMs, formatMs } from "./format.ts";
+import { formatRelativeTimestamp, formatDurationHuman, formatMs } from "./format.ts";
 
 export function formatPresenceSummary(entry: PresenceEntry): string {
   const host = entry.host ?? "未知";
@@ -18,7 +18,7 @@ export function formatNextRun(ms?: number | null) {
   if (!ms) {
     return "无";
   }
-  return `${formatMs(ms)} (${formatAgo(ms)})`;
+  return `${formatMs(ms)} (${formatRelativeTimestamp(ms)})`;
 }
 
 export function formatSessionTokens(row: GatewaySessionRow) {
