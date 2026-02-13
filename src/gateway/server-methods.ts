@@ -73,7 +73,9 @@ const READ_METHODS = new Set([
   "node.list",
   "node.describe",
   "chat.history",
+  "config.get",
   "docker.check",
+  "talk.config",
 ]);
 const WRITE_METHODS = new Set([
   "send",
