@@ -5,8 +5,6 @@ import type { SandboxFsBridge } from "../../sandbox/fs-bridge.js";
 import { resolveUserPath } from "../../../utils.js";
 import { loadWebMedia } from "../../../web/media.js";
 import { sanitizeImageBlocks } from "../../tool-images.js";
-import { loadWebMedia } from "../../../web/media.js";
-import { resolveUserPath } from "../../../utils.js";
 import { log } from "../logger.js";
 
 /**
