@@ -122,3 +122,11 @@
   border-top: 1px solid var(--border);
   margin: 1em 0;
 }
+
+.chat-text :where(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 8px 0;
+  display: block;
+}
