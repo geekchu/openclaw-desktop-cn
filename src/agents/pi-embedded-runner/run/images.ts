@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { SandboxFsBridge } from "../../sandbox/fs-bridge.js";
 import { sanitizeImageBlocks } from "../../tool-images.js";
+import { loadWebMedia } from "../../../web/media.js";
+import { resolveUserPath } from "../../../utils.js";
 import { log } from "../logger.js";
 
 /**
@@ -255,6 +257,30 @@ export function modelSupportsImages(model: { input?: string[] }): boolean {
  * 2. Later references to "the image" or "that picture" will work since it's in context
  * 3. Injecting duplicates would waste tokens and potentially hit size limits
  */
+function extractTextFromMessage(message: unknown): string {
+  if (!message || typeof message !== "object") {
+    return "";
+  }
+  const content = (message as { content?: unknown }).content;
+  if (typeof content === "string") {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  const textParts: string[] = [];
+  for (const part of content) {
+    if (!part || typeof part !== "object") {
+      continue;
+    }
+    const record = part as Record<string, unknown>;
+    if (record.type === "text" && typeof record.text === "string") {
+      textParts.push(record.text);
+    }
+  }
+  return textParts.join("\n").trim();
+}
+
 function detectImagesFromHistory(messages: unknown[]): DetectedImageRef[] {
   const allRefs: DetectedImageRef[] = [];
   const seen = new Set<string>();
