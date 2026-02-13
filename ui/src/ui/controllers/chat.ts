@@ -27,6 +27,13 @@ export type ChatEventPayload = {
   errorMessage?: string;
 };
 
+const DOCKER_MARKERS = ["[DOCKER_NOT_INSTALLED]", "[DOCKER_NOT_RUNNING]"] as const;
+
+function containsDockerError(payload: ChatEventPayload): boolean {
+  const haystack = JSON.stringify(payload);
+  return DOCKER_MARKERS.some((m) => haystack.includes(m));
+}
+
 export async function loadChatHistory(state: ChatState) {
   if (!state.client || !state.connected) {
     return;
@@ -168,21 +175,30 @@ export async function abortChatRun(state: ChatState): Promise<boolean> {
   }
 }
 
-export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
+export type ChatEventResult = {
+  state: "delta" | "final" | "aborted" | "error" | null;
+  dockerError?: boolean;
+};
+
+export function handleChatEvent(state: ChatState, payload?: ChatEventPayload): ChatEventResult {
   if (!payload) {
-    return null;
+    return { state: null };
   }
+
+  // Check for Docker errors BEFORE session key filtering so we never miss them.
+  const dockerError = containsDockerError(payload);
+
   if (payload.sessionKey !== state.sessionKey) {
-    return null;
+    return { state: null, dockerError };
   }
 
   // Final from another run (e.g. sub-agent announce): refresh history to show new message.
   // See https://github.com/openclaw/openclaw/issues/1909
   if (payload.runId && state.chatRunId && payload.runId !== state.chatRunId) {
     if (payload.state === "final") {
-      return "final";
+      return { state: "final", dockerError };
     }
-    return null;
+    return { state: null, dockerError };
   }
 
   if (payload.state === "delta") {
@@ -197,6 +213,11 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    // Immediately append the final assistant message so the UI updates
+    // without waiting for the async loadChatHistory() round-trip.
+    if (payload.message) {
+      state.chatMessages = [...state.chatMessages, payload.message];
+    }
   } else if (payload.state === "aborted") {
     state.chatStream = null;
     state.chatRunId = null;
@@ -207,5 +228,5 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     state.chatStreamStartedAt = null;
     state.lastError = payload.errorMessage ?? "chat error";
   }
-  return payload.state;
+  return { state: payload.state, dockerError };
 }

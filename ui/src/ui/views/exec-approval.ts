@@ -22,10 +22,28 @@ function renderMetaRow(label: string, value?: string | null) {
   return html`<div class="exec-approval-meta-row"><span>${label}</span><span>${value}</span></div>`;
 }
 
+export function renderExecApprovalToast(state: AppViewState) {
+  const toast = state.execApprovalToast;
+  if (!toast) {
+    return nothing;
+  }
+  return html`
+    <div class="exec-approval-toast exec-approval-toast--${toast.kind}">
+      <span class="exec-approval-toast-message">${toast.message}</span>
+      <button
+        class="exec-approval-toast-close"
+        @click=${() => {
+          state.execApprovalToast = null;
+        }}
+      >&times;</button>
+    </div>
+  `;
+}
+
 export function renderExecApprovalPrompt(state: AppViewState) {
   const active = state.execApprovalQueue[0];
   if (!active) {
-    return nothing;
+    return renderExecApprovalToast(state);
   }
   const request = active.request;
   const remainingMs = active.expiresAtMs - Date.now();
@@ -85,5 +103,6 @@ export function renderExecApprovalPrompt(state: AppViewState) {
         </div>
       </div>
     </div>
+    ${renderExecApprovalToast(state)}
   `;
 }

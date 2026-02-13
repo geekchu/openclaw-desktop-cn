@@ -28,6 +28,9 @@ import { loadNodes } from "./controllers/nodes.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { GatewayBrowserClient } from "./gateway.ts";
 
+/** Pending chat-history reload timers so we can cancel them on new final events. */
+let chatFinalReloadTimers: ReturnType<typeof setTimeout>[] = [];
+
 type GatewayHost = {
   settings: UiSettings;
   password: string;
@@ -54,6 +57,8 @@ type GatewayHost = {
   refreshSessionsAfterChat: Set<string>;
   execApprovalQueue: ExecApprovalRequest[];
   execApprovalError: string | null;
+  showExecApprovalToast: (decision: string, command: string) => void;
+  securityShowDockerDialog: boolean;
 };
 
 type SessionDefaultsSnapshot = {
@@ -178,6 +183,16 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     host.eventLog = host.eventLogBuffer;
   }
 
+  // Detect Docker errors in ANY event type (agent, chat, etc.)
+  // so we never miss the marker regardless of how the error propagates.
+  if (evt.payload) {
+    const raw = JSON.stringify(evt.payload);
+    if (raw.includes("[DOCKER_NOT_INSTALLED]") || raw.includes("[DOCKER_NOT_RUNNING]")) {
+      console.warn("[gateway] Docker error detected in event:", evt.event);
+      host.securityShowDockerDialog = true;
+    }
+  }
+
   if (evt.event === "agent") {
     if (host.onboarding) {
       return;
@@ -197,7 +212,16 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         payload.sessionKey,
       );
     }
-    const state = handleChatEvent(host as unknown as OpenClawApp, payload);
+
+    const result = handleChatEvent(host as unknown as OpenClawApp, payload);
+    const state = result.state;
+
+    // Show Docker dialog when a Docker error is detected in the chat event,
+    // regardless of session key / runId matching (checked before filters).
+    if (result.dockerError) {
+      host.securityShowDockerDialog = true;
+    }
+
     if (state === "final" || state === "error" || state === "aborted") {
       resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
       void flushChatQueueForEvent(host as unknown as Parameters<typeof flushChatQueueForEvent>[0]);
@@ -212,7 +236,23 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       }
     }
     if (state === "final") {
-      void loadChatHistory(host as unknown as OpenClawApp);
+      // The agent writes its transcript .jsonl file asynchronously AFTER the
+      // "final" event is broadcast (can be 5+ seconds later for exec-approval
+      // flows).  Schedule multiple reloads to catch the write whenever it lands.
+      // Cancel any pending timers from a previous final event to avoid
+      // redundant loadChatHistory calls piling up.
+      for (const t of chatFinalReloadTimers) clearTimeout(t);
+      chatFinalReloadTimers = [];
+      const app = host as unknown as OpenClawApp;
+      const delays = [500, 1500, 3000, 5000, 8000, 12000];
+      void loadChatHistory(app);
+      for (const delay of delays) {
+        chatFinalReloadTimers.push(
+          window.setTimeout(() => {
+            void loadChatHistory(app);
+          }, delay),
+        );
+      }
     }
     return;
   }
@@ -251,7 +291,12 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   if (evt.event === "exec.approval.resolved") {
     const resolved = parseExecApprovalResolved(evt.payload);
     if (resolved) {
+      // Find the matching request before removing, so we can show the command in the toast.
+      const match = host.execApprovalQueue.find((entry) => entry.id === resolved.id);
       host.execApprovalQueue = removeExecApproval(host.execApprovalQueue, resolved.id);
+      if (resolved.decision && match) {
+        host.showExecApprovalToast(resolved.decision, match.request.command);
+      }
     }
   }
 }
