@@ -77,6 +77,7 @@ import {
 } from "./app-tool-stream.ts";
 import { resolveInjectedAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
+import { updateConfigFormValue } from "./controllers/config.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 
@@ -157,6 +158,8 @@ export class OpenClawApp extends LitElement {
   @state() execApprovalQueue: ExecApprovalRequest[] = [];
   @state() execApprovalBusy = false;
   @state() execApprovalError: string | null = null;
+  @state() execApprovalToast: { message: string; kind: "success" | "denied" | "info" } | null =
+    null;
   @state() pendingGatewayUrl: string | null = null;
 
   @state() configLoading = false;
@@ -180,6 +183,9 @@ export class OpenClawApp extends LitElement {
   @state() configSearchQuery = "";
   @state() configActiveSection: string | null = null;
   @state() configActiveSubsection: string | null = null;
+  @state() securityDockerAvailable: boolean | null = null;
+  @state() securityDockerChecking = false;
+  @state() securityShowDockerDialog = false;
 
   @state() channelsLoading = false;
   @state() channelsSnapshot: ChannelsStatusSnapshot | null = null;
@@ -453,11 +459,41 @@ export class OpenClawApp extends LitElement {
         decision,
       });
       this.execApprovalQueue = this.execApprovalQueue.filter((entry) => entry.id !== active.id);
+      this.showExecApprovalToast(decision, active.request.command);
     } catch (err) {
       this.execApprovalError = `执行审批失败: ${String(err)}`;
     } finally {
       this.execApprovalBusy = false;
     }
+  }
+
+  private _execApprovalToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  showExecApprovalToast(decision: string, command: string) {
+    const short = command.length > 40 ? command.slice(0, 40) + "…" : command;
+    let message: string;
+    let kind: "success" | "denied" | "info";
+    if (decision === "allow-once") {
+      message = `已允许执行: ${short}`;
+      kind = "success";
+    } else if (decision === "allow-always") {
+      message = `已允许并加入白名单: ${short}`;
+      kind = "success";
+    } else if (decision === "deny") {
+      message = `已拒绝执行: ${short}`;
+      kind = "denied";
+    } else {
+      message = `审批已处理: ${short}`;
+      kind = "info";
+    }
+    if (this._execApprovalToastTimer) {
+      clearTimeout(this._execApprovalToastTimer);
+    }
+    this.execApprovalToast = { message, kind };
+    this._execApprovalToastTimer = setTimeout(() => {
+      this.execApprovalToast = null;
+      this._execApprovalToastTimer = null;
+    }, 4000);
   }
 
   handleGatewayUrlConfirm() {
@@ -508,6 +544,87 @@ export class OpenClawApp extends LitElement {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
     this.splitRatio = newRatio;
     this.applySettings({ ...this.settings, splitRatio: newRatio });
+  }
+
+  // Security settings: Docker detection and directory access handlers
+  async handleCheckDocker() {
+    if (this.securityDockerChecking || !this.client || !this.connected) return;
+    this.securityDockerChecking = true;
+    try {
+      const res = await this.client.request<{
+        available: boolean;
+        installed?: boolean;
+        autoStarted?: boolean;
+      }>("docker.check", {});
+      this.securityDockerAvailable = res?.available ?? false;
+      if (!this.securityDockerAvailable) {
+        // Docker not available — show dialog prompting user to install/start
+        this.securityShowDockerDialog = true;
+      }
+    } catch {
+      this.securityDockerAvailable = false;
+    } finally {
+      this.securityDockerChecking = false;
+    }
+  }
+
+  handleDismissDockerDialog() {
+    this.securityShowDockerDialog = false;
+  }
+
+  async handleAddDirectory(hostPath: string, containerPath: string, mode: "ro" | "rw") {
+    const form = this.configForm;
+    if (!form) return;
+
+    const currentBinds = (
+      (
+        (form.agents as Record<string, unknown> | undefined)?.defaults as
+          | Record<string, unknown>
+          | undefined
+      )?.sandbox as Record<string, unknown> | undefined
+    )?.docker as Record<string, unknown> | undefined;
+    const binds = Array.isArray(currentBinds?.binds) ? [...(currentBinds.binds as string[])] : [];
+
+    // Adding the first directory: check Docker availability first
+    if (binds.length === 0) {
+      await this.handleCheckDocker();
+      if (!this.securityDockerAvailable) {
+        this.securityShowDockerDialog = true;
+        return;
+      }
+    }
+
+    binds.push(`${hostPath}:${containerPath}:${mode}`);
+    updateConfigFormValue(this, ["agents", "defaults", "sandbox", "docker", "binds"], binds);
+
+    // Enable sandbox mode when directories are added
+    updateConfigFormValue(this, ["agents", "defaults", "sandbox", "mode"], "all");
+    updateConfigFormValue(this, ["agents", "defaults", "sandbox", "scope"], "session");
+    updateConfigFormValue(this, ["tools", "exec", "host"], "sandbox");
+  }
+
+  handleRemoveDirectory(index: number) {
+    const form = this.configForm;
+    if (!form) return;
+
+    const currentBinds = (
+      (
+        (form.agents as Record<string, unknown> | undefined)?.defaults as
+          | Record<string, unknown>
+          | undefined
+      )?.sandbox as Record<string, unknown> | undefined
+    )?.docker as Record<string, unknown> | undefined;
+    const binds = Array.isArray(currentBinds?.binds) ? [...(currentBinds.binds as string[])] : [];
+
+    if (index < 0 || index >= binds.length) return;
+    binds.splice(index, 1);
+    updateConfigFormValue(this, ["agents", "defaults", "sandbox", "docker", "binds"], binds);
+
+    // If no binds left, auto-disable sandbox
+    if (binds.length === 0) {
+      updateConfigFormValue(this, ["agents", "defaults", "sandbox", "mode"], "off");
+      updateConfigFormValue(this, ["tools", "exec", "host"], "gateway");
+    }
   }
 
   render() {

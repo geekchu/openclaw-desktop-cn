@@ -70,6 +70,68 @@ import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
 import { renderTerminal } from "./views/terminal.ts";
 
+function renderDockerDialog(state: AppViewState) {
+  if (!state.securityShowDockerDialog) return nothing;
+  return html`
+    <div class="security-dialog-overlay" role="dialog" aria-live="polite">
+      <div class="security-dialog-card">
+        <div class="security-dialog-header">
+          <span class="security-dialog-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </span>
+          <div class="security-dialog-title">需要 Docker Desktop</div>
+        </div>
+        <div class="security-dialog-body">
+          <p>目录访问限制功能需要 Docker 来创建隔离的沙盒环境。</p>
+          <p style="margin-top: 8px;">请确认以下事项：</p>
+          <ul style="margin: 8px 0 0 18px; line-height: 1.8;">
+            <li>已安装 <strong>Docker Desktop</strong></li>
+            <li>Docker Desktop 已启动并完成初始化（系统托盘出现 Docker 图标）</li>
+          </ul>
+          <p style="margin-top: 12px;">
+            如果尚未安装，请点击下方链接下载安装。
+          </p>
+        </div>
+        <div class="security-dialog-links">
+          <a
+            href="https://www.docker.com/products/docker-desktop/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="security-dialog-link"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            下载 Docker Desktop
+          </a>
+          <a
+            href="https://docs.docker.com/get-docker/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="security-dialog-link secondary"
+          >
+            查看安装文档
+          </a>
+        </div>
+        <div class="security-dialog-actions">
+          <button
+            class="btn"
+            @click=${() => (state as unknown as OpenClawApp).handleDismissDockerDialog()}
+          >
+            我知道了
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
 
@@ -1022,6 +1084,7 @@ export function renderApp(state: AppViewState) {
                 searchQuery: (state as unknown as OpenClawApp).configSearchQuery,
                 activeSection: (state as unknown as OpenClawApp).configActiveSection,
                 activeSubsection: (state as unknown as OpenClawApp).configActiveSubsection,
+                dockerChecking: (state as unknown as OpenClawApp).securityDockerChecking,
                 onRawChange: (next) => {
                   state.configRaw = next;
                 },
@@ -1040,6 +1103,14 @@ export function renderApp(state: AppViewState) {
                 onSave: () => saveConfig(state as unknown as OpenClawApp),
                 onApply: () => applyConfig(state as unknown as OpenClawApp),
                 onUpdate: () => runUpdate(state as unknown as OpenClawApp),
+                onAddDirectory: (hostPath, containerPath, mode) =>
+                  (state as unknown as OpenClawApp).handleAddDirectory(
+                    hostPath,
+                    containerPath,
+                    mode,
+                  ),
+                onRemoveDirectory: (index) =>
+                  (state as unknown as OpenClawApp).handleRemoveDirectory(index),
               })
             : nothing
         }
@@ -1151,6 +1222,7 @@ export function renderApp(state: AppViewState) {
       </main>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
+      ${renderDockerDialog(state)}
     </div>
   `;
 }
