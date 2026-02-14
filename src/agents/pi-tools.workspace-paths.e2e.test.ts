@@ -33,7 +33,7 @@ describe("workspace path resolution", () => {
 
         const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(otherDir);
         try {
-          const tools = createOpenClawCodingTools({ workspaceDir, exec: { security: "full" } });
+          const tools = createOpenClawCodingTools({ workspaceDir });
           const readTool = tools.find((tool) => tool.name === "read");
           expect(readTool).toBeDefined();
 
@@ -54,7 +54,7 @@ describe("workspace path resolution", () => {
 
         const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(otherDir);
         try {
-          const tools = createOpenClawCodingTools({ workspaceDir, exec: { security: "full" } });
+          const tools = createOpenClawCodingTools({ workspaceDir });
           const writeTool = tools.find((tool) => tool.name === "write");
           expect(writeTool).toBeDefined();
 
@@ -80,7 +80,7 @@ describe("workspace path resolution", () => {
 
         const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(otherDir);
         try {
-          const tools = createOpenClawCodingTools({ workspaceDir, exec: { security: "full" } });
+          const tools = createOpenClawCodingTools({ workspaceDir });
           const editTool = tools.find((tool) => tool.name === "edit");
           expect(editTool).toBeDefined();
 
@@ -101,7 +101,10 @@ describe("workspace path resolution", () => {
 
   it("defaults exec cwd to workspaceDir when workdir is omitted", async () => {
     await withTempDir("openclaw-ws-", async (workspaceDir) => {
-      const tools = createOpenClawCodingTools({ workspaceDir, exec: { security: "full" } });
+      const tools = createOpenClawCodingTools({
+        workspaceDir,
+        exec: { host: "gateway", ask: "off", security: "full" },
+      });
       const execTool = tools.find((tool) => tool.name === "exec");
       expect(execTool).toBeDefined();
 
@@ -124,7 +127,10 @@ describe("workspace path resolution", () => {
   it("lets exec workdir override the workspace default", async () => {
     await withTempDir("openclaw-ws-", async (workspaceDir) => {
       await withTempDir("openclaw-override-", async (overrideDir) => {
-        const tools = createOpenClawCodingTools({ workspaceDir, exec: { security: "full" } });
+        const tools = createOpenClawCodingTools({
+          workspaceDir,
+          exec: { host: "gateway", ask: "off", security: "full" },
+        });
         const execTool = tools.find((tool) => tool.name === "exec");
         expect(execTool).toBeDefined();
 
@@ -179,11 +185,7 @@ describe("sandboxed workspace paths", () => {
         await fs.writeFile(path.join(sandboxDir, testFile), "sandbox read", "utf8");
         await fs.writeFile(path.join(workspaceDir, testFile), "workspace read", "utf8");
 
-        const tools = createOpenClawCodingTools({
-          workspaceDir,
-          sandbox,
-          exec: { security: "full" },
-        });
+        const tools = createOpenClawCodingTools({ workspaceDir, sandbox });
         const readTool = tools.find((tool) => tool.name === "read");
         const writeTool = tools.find((tool) => tool.name === "write");
         const editTool = tools.find((tool) => tool.name === "edit");

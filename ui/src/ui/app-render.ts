@@ -1,8 +1,8 @@
 import { html, nothing } from "lit";
 import type { AppViewState } from "./app-view-state.ts";
-import type { UsageState } from "./controllers/usage.ts";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { refreshChatAvatar } from "./app-chat.ts";
+import { renderUsageTab } from "./app-render-usage-tab.ts";
 import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers.ts";
 import { loadAgentFileContent, loadAgentFiles, saveAgentFile } from "./controllers/agent-files.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
@@ -50,18 +50,8 @@ import {
   updateSkillEdit,
   updateSkillEnabled,
 } from "./controllers/skills.ts";
-import { loadUsage, loadSessionTimeSeries, loadSessionLogs } from "./controllers/usage.ts";
 import { icons } from "./icons.ts";
 import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
-
-// Module-scope debounce for usage date changes (avoids type-unsafe hacks on state object)
-let usageDateDebounceTimeout: number | null = null;
-const debouncedLoadUsage = (state: UsageState) => {
-  if (usageDateDebounceTimeout) {
-    clearTimeout(usageDateDebounceTimeout);
-  }
-  usageDateDebounceTimeout = window.setTimeout(() => void loadUsage(state), 400);
-};
 import { renderAgents } from "./views/agents.ts";
 import { renderChannels } from "./views/channels.ts";
 import { renderChat } from "./views/chat.ts";
@@ -76,75 +66,9 @@ import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
-import { renderTerminal } from "./views/terminal.ts";
-
-function renderDockerDialog(state: AppViewState) {
-  if (!state.securityShowDockerDialog) return nothing;
-  return html`
-    <div class="security-dialog-overlay" role="dialog" aria-live="polite">
-      <div class="security-dialog-card">
-        <div class="security-dialog-header">
-          <span class="security-dialog-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-          </span>
-          <div class="security-dialog-title">需要 Docker Desktop</div>
-        </div>
-        <div class="security-dialog-body">
-          <p>目录访问限制功能需要 Docker 来创建隔离的沙盒环境。</p>
-          <p style="margin-top: 8px;">请确认以下事项：</p>
-          <ul style="margin: 8px 0 0 18px; line-height: 1.8;">
-            <li>已安装 <strong>Docker Desktop</strong></li>
-            <li>Docker Desktop 已启动并完成初始化（系统托盘出现 Docker 图标）</li>
-          </ul>
-          <p style="margin-top: 12px;">
-            如果尚未安装，请点击下方链接下载安装。
-          </p>
-        </div>
-        <div class="security-dialog-links">
-          <a
-            href="https://www.docker.com/products/docker-desktop/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="security-dialog-link"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px;">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-            下载 Docker Desktop
-          </a>
-          <a
-            href="https://docs.docker.com/get-docker/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="security-dialog-link secondary"
-          >
-            查看安装文档
-          </a>
-        </div>
-        <div class="security-dialog-actions">
-          <button
-            class="btn"
-            @click=${() => (state as unknown as OpenClawApp).handleDismissDockerDialog()}
-          >
-            我知道了
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-}
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
-
-let _managerLoaded = false;
-const _isInIframe = window.self !== window.top;
 
 function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
   const list = state.agentsList?.agents ?? [];
@@ -166,10 +90,8 @@ export function renderApp(state: AppViewState) {
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
-  const chatDisabledReason = state.connected ? null : "已断开与网关的连接。";
+  const chatDisabledReason = state.connected ? null : "Disconnected from gateway.";
   const isChat = state.tab === "chat";
-  const isManager = state.tab === "manager";
-  const isTerminal = state.tab === "terminal";
   const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
@@ -194,8 +116,8 @@ export function renderApp(state: AppViewState) {
                 ...state.settings,
                 navCollapsed: !state.settings.navCollapsed,
               })}
-            title="${state.settings.navCollapsed ? "展开侧边栏" : "收起侧边栏"}"
-            aria-label="${state.settings.navCollapsed ? "展开侧边栏" : "收起侧边栏"}"
+            title="${state.settings.navCollapsed ? "Expand sidebar" : "Collapse sidebar"}"
+            aria-label="${state.settings.navCollapsed ? "Expand sidebar" : "Collapse sidebar"}"
           >
             <span class="nav-collapse-toggle__icon">${icons.menu}</span>
           </button>
@@ -205,25 +127,24 @@ export function renderApp(state: AppViewState) {
             </div>
             <div class="brand-text">
               <div class="brand-title">OPENCLAW</div>
-              <div class="brand-sub">网关控制面板</div>
+              <div class="brand-sub">Gateway Dashboard</div>
             </div>
           </div>
         </div>
         <div class="topbar-status">
           <div class="pill">
             <span class="statusDot ${state.connected ? "ok" : ""}"></span>
-            <span>健康</span>
-            <span class="mono">${state.connected ? "正常" : "离线"}</span>
+            <span>Health</span>
+            <span class="mono">${state.connected ? "OK" : "Offline"}</span>
           </div>
           ${renderThemeToggle(state)}
         </div>
       </header>
       <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
-        ${(_isInIframe ? TAB_GROUPS.filter((g) => !g.tabs.includes("manager")) : TAB_GROUPS).map(
-          (group) => {
-            const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
-            const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
-            return html`
+        ${TAB_GROUPS.map((group) => {
+          const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
+          const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
+          return html`
             <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
               <button
                 class="nav-label"
@@ -245,11 +166,10 @@ export function renderApp(state: AppViewState) {
               </div>
             </div>
           `;
-          },
-        )}
+        })}
         <div class="nav-group nav-group--links">
           <div class="nav-label nav-label--static">
-            <span class="nav-label__text">资源</span>
+            <span class="nav-label__text">Resources</span>
           </div>
           <div class="nav-group__items">
             <a
@@ -257,15 +177,15 @@ export function renderApp(state: AppViewState) {
               href="https://docs.openclaw.ai"
               target="_blank"
               rel="noreferrer"
-              title="文档 (在新标签页打开)"
+              title="Docs (opens in new tab)"
             >
               <span class="nav-item__icon" aria-hidden="true">${icons.book}</span>
-              <span class="nav-item__text">文档</span>
+              <span class="nav-item__text">Docs</span>
             </a>
           </div>
         </div>
       </aside>
-      <main class="content ${isChat ? "content--chat" : ""} ${isManager ? "content--manager" : ""} ${isTerminal ? "content--terminal" : ""}">
+      <main class="content ${isChat ? "content--chat" : ""}">
         <section class="content-header">
           <div>
             ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}
@@ -384,268 +304,7 @@ export function renderApp(state: AppViewState) {
             : nothing
         }
 
-        ${
-          state.tab === "usage"
-            ? renderUsage({
-                loading: state.usageLoading,
-                error: state.usageError,
-                startDate: state.usageStartDate,
-                endDate: state.usageEndDate,
-                sessions: state.usageResult?.sessions ?? [],
-                sessionsLimitReached: (state.usageResult?.sessions?.length ?? 0) >= 1000,
-                totals: state.usageResult?.totals ?? null,
-                aggregates: state.usageResult?.aggregates ?? null,
-                costDaily: state.usageCostSummary?.daily ?? [],
-                selectedSessions: state.usageSelectedSessions,
-                selectedDays: state.usageSelectedDays,
-                selectedHours: state.usageSelectedHours,
-                chartMode: state.usageChartMode,
-                dailyChartMode: state.usageDailyChartMode,
-                timeSeriesMode: state.usageTimeSeriesMode,
-                timeSeriesBreakdownMode: state.usageTimeSeriesBreakdownMode,
-                timeSeries: state.usageTimeSeries,
-                timeSeriesLoading: state.usageTimeSeriesLoading,
-                sessionLogs: state.usageSessionLogs,
-                sessionLogsLoading: state.usageSessionLogsLoading,
-                sessionLogsExpanded: state.usageSessionLogsExpanded,
-                logFilterRoles: state.usageLogFilterRoles,
-                logFilterTools: state.usageLogFilterTools,
-                logFilterHasTools: state.usageLogFilterHasTools,
-                logFilterQuery: state.usageLogFilterQuery,
-                query: state.usageQuery,
-                queryDraft: state.usageQueryDraft,
-                sessionSort: state.usageSessionSort,
-                sessionSortDir: state.usageSessionSortDir,
-                recentSessions: state.usageRecentSessions,
-                sessionsTab: state.usageSessionsTab,
-                visibleColumns:
-                  state.usageVisibleColumns as import("./views/usage.ts").UsageColumnId[],
-                timeZone: state.usageTimeZone,
-                contextExpanded: state.usageContextExpanded,
-                headerPinned: state.usageHeaderPinned,
-                onStartDateChange: (date) => {
-                  state.usageStartDate = date;
-                  state.usageSelectedDays = [];
-                  state.usageSelectedHours = [];
-                  state.usageSelectedSessions = [];
-                  debouncedLoadUsage(state);
-                },
-                onEndDateChange: (date) => {
-                  state.usageEndDate = date;
-                  state.usageSelectedDays = [];
-                  state.usageSelectedHours = [];
-                  state.usageSelectedSessions = [];
-                  debouncedLoadUsage(state);
-                },
-                onRefresh: () => loadUsage(state),
-                onTimeZoneChange: (zone) => {
-                  state.usageTimeZone = zone;
-                },
-                onToggleContextExpanded: () => {
-                  state.usageContextExpanded = !state.usageContextExpanded;
-                },
-                onToggleSessionLogsExpanded: () => {
-                  state.usageSessionLogsExpanded = !state.usageSessionLogsExpanded;
-                },
-                onLogFilterRolesChange: (next) => {
-                  state.usageLogFilterRoles = next;
-                },
-                onLogFilterToolsChange: (next) => {
-                  state.usageLogFilterTools = next;
-                },
-                onLogFilterHasToolsChange: (next) => {
-                  state.usageLogFilterHasTools = next;
-                },
-                onLogFilterQueryChange: (next) => {
-                  state.usageLogFilterQuery = next;
-                },
-                onLogFilterClear: () => {
-                  state.usageLogFilterRoles = [];
-                  state.usageLogFilterTools = [];
-                  state.usageLogFilterHasTools = false;
-                  state.usageLogFilterQuery = "";
-                },
-                onToggleHeaderPinned: () => {
-                  state.usageHeaderPinned = !state.usageHeaderPinned;
-                },
-                onSelectHour: (hour, shiftKey) => {
-                  if (shiftKey && state.usageSelectedHours.length > 0) {
-                    const allHours = Array.from({ length: 24 }, (_, i) => i);
-                    const lastSelected =
-                      state.usageSelectedHours[state.usageSelectedHours.length - 1];
-                    const lastIdx = allHours.indexOf(lastSelected);
-                    const thisIdx = allHours.indexOf(hour);
-                    if (lastIdx !== -1 && thisIdx !== -1) {
-                      const [start, end] =
-                        lastIdx < thisIdx ? [lastIdx, thisIdx] : [thisIdx, lastIdx];
-                      const range = allHours.slice(start, end + 1);
-                      state.usageSelectedHours = [
-                        ...new Set([...state.usageSelectedHours, ...range]),
-                      ];
-                    }
-                  } else {
-                    if (state.usageSelectedHours.includes(hour)) {
-                      state.usageSelectedHours = state.usageSelectedHours.filter((h) => h !== hour);
-                    } else {
-                      state.usageSelectedHours = [...state.usageSelectedHours, hour];
-                    }
-                  }
-                },
-                onQueryDraftChange: (query) => {
-                  state.usageQueryDraft = query;
-                  if (state.usageQueryDebounceTimer) {
-                    window.clearTimeout(state.usageQueryDebounceTimer);
-                  }
-                  state.usageQueryDebounceTimer = window.setTimeout(() => {
-                    state.usageQuery = state.usageQueryDraft;
-                    state.usageQueryDebounceTimer = null;
-                  }, 250);
-                },
-                onApplyQuery: () => {
-                  if (state.usageQueryDebounceTimer) {
-                    window.clearTimeout(state.usageQueryDebounceTimer);
-                    state.usageQueryDebounceTimer = null;
-                  }
-                  state.usageQuery = state.usageQueryDraft;
-                },
-                onClearQuery: () => {
-                  if (state.usageQueryDebounceTimer) {
-                    window.clearTimeout(state.usageQueryDebounceTimer);
-                    state.usageQueryDebounceTimer = null;
-                  }
-                  state.usageQueryDraft = "";
-                  state.usageQuery = "";
-                },
-                onSessionSortChange: (sort) => {
-                  state.usageSessionSort = sort;
-                },
-                onSessionSortDirChange: (dir) => {
-                  state.usageSessionSortDir = dir;
-                },
-                onSessionsTabChange: (tab) => {
-                  state.usageSessionsTab = tab;
-                },
-                onToggleColumn: (column) => {
-                  if (state.usageVisibleColumns.includes(column)) {
-                    state.usageVisibleColumns = state.usageVisibleColumns.filter(
-                      (entry) => entry !== column,
-                    );
-                  } else {
-                    state.usageVisibleColumns = [...state.usageVisibleColumns, column];
-                  }
-                },
-                onSelectSession: (key, shiftKey) => {
-                  state.usageTimeSeries = null;
-                  state.usageSessionLogs = null;
-                  state.usageRecentSessions = [
-                    key,
-                    ...state.usageRecentSessions.filter((entry) => entry !== key),
-                  ].slice(0, 8);
-
-                  if (shiftKey && state.usageSelectedSessions.length > 0) {
-                    // Shift-click: select range from last selected to this session
-                    // Sort sessions same way as displayed (by tokens or cost descending)
-                    const isTokenMode = state.usageChartMode === "tokens";
-                    const sortedSessions = [...(state.usageResult?.sessions ?? [])].toSorted(
-                      (a, b) => {
-                        const valA = isTokenMode
-                          ? (a.usage?.totalTokens ?? 0)
-                          : (a.usage?.totalCost ?? 0);
-                        const valB = isTokenMode
-                          ? (b.usage?.totalTokens ?? 0)
-                          : (b.usage?.totalCost ?? 0);
-                        return valB - valA;
-                      },
-                    );
-                    const allKeys = sortedSessions.map((s) => s.key);
-                    const lastSelected =
-                      state.usageSelectedSessions[state.usageSelectedSessions.length - 1];
-                    const lastIdx = allKeys.indexOf(lastSelected);
-                    const thisIdx = allKeys.indexOf(key);
-                    if (lastIdx !== -1 && thisIdx !== -1) {
-                      const [start, end] =
-                        lastIdx < thisIdx ? [lastIdx, thisIdx] : [thisIdx, lastIdx];
-                      const range = allKeys.slice(start, end + 1);
-                      const newSelection = [...new Set([...state.usageSelectedSessions, ...range])];
-                      state.usageSelectedSessions = newSelection;
-                    }
-                  } else {
-                    // Regular click: focus a single session (so details always open).
-                    // Click the focused session again to clear selection.
-                    if (
-                      state.usageSelectedSessions.length === 1 &&
-                      state.usageSelectedSessions[0] === key
-                    ) {
-                      state.usageSelectedSessions = [];
-                    } else {
-                      state.usageSelectedSessions = [key];
-                    }
-                  }
-
-                  // Load timeseries/logs only if exactly one session selected
-                  if (state.usageSelectedSessions.length === 1) {
-                    void loadSessionTimeSeries(state, state.usageSelectedSessions[0]);
-                    void loadSessionLogs(state, state.usageSelectedSessions[0]);
-                  }
-                },
-                onSelectDay: (day, shiftKey) => {
-                  if (shiftKey && state.usageSelectedDays.length > 0) {
-                    // Shift-click: select range from last selected to this day
-                    const allDays = (state.usageCostSummary?.daily ?? []).map((d) => d.date);
-                    const lastSelected =
-                      state.usageSelectedDays[state.usageSelectedDays.length - 1];
-                    const lastIdx = allDays.indexOf(lastSelected);
-                    const thisIdx = allDays.indexOf(day);
-                    if (lastIdx !== -1 && thisIdx !== -1) {
-                      const [start, end] =
-                        lastIdx < thisIdx ? [lastIdx, thisIdx] : [thisIdx, lastIdx];
-                      const range = allDays.slice(start, end + 1);
-                      // Merge with existing selection
-                      const newSelection = [...new Set([...state.usageSelectedDays, ...range])];
-                      state.usageSelectedDays = newSelection;
-                    }
-                  } else {
-                    // Regular click: toggle single day
-                    if (state.usageSelectedDays.includes(day)) {
-                      state.usageSelectedDays = state.usageSelectedDays.filter((d) => d !== day);
-                    } else {
-                      state.usageSelectedDays = [day];
-                    }
-                  }
-                },
-                onChartModeChange: (mode) => {
-                  state.usageChartMode = mode;
-                },
-                onDailyChartModeChange: (mode) => {
-                  state.usageDailyChartMode = mode;
-                },
-                onTimeSeriesModeChange: (mode) => {
-                  state.usageTimeSeriesMode = mode;
-                },
-                onTimeSeriesBreakdownChange: (mode) => {
-                  state.usageTimeSeriesBreakdownMode = mode;
-                },
-                onClearDays: () => {
-                  state.usageSelectedDays = [];
-                },
-                onClearHours: () => {
-                  state.usageSelectedHours = [];
-                },
-                onClearSessions: () => {
-                  state.usageSelectedSessions = [];
-                  state.usageTimeSeries = null;
-                  state.usageSessionLogs = null;
-                },
-                onClearFilters: () => {
-                  state.usageSelectedDays = [];
-                  state.usageSelectedHours = [];
-                  state.usageSelectedSessions = [];
-                  state.usageTimeSeries = null;
-                  state.usageSessionLogs = null;
-                },
-              })
-            : nothing
-        }
+        ${renderUsageTab(state)}
 
         ${
           state.tab === "cron"
@@ -1218,10 +877,9 @@ export function renderApp(state: AppViewState) {
                 formMode: state.configFormMode,
                 formValue: state.configForm,
                 originalValue: state.configFormOriginal,
-                searchQuery: (state as unknown as OpenClawApp).configSearchQuery,
-                activeSection: (state as unknown as OpenClawApp).configActiveSection,
-                activeSubsection: (state as unknown as OpenClawApp).configActiveSubsection,
-                dockerChecking: (state as unknown as OpenClawApp).securityDockerChecking,
+                searchQuery: state.configSearchQuery,
+                activeSection: state.configActiveSection,
+                activeSubsection: state.configActiveSubsection,
                 onRawChange: (next) => {
                   state.configRaw = next;
                 },
@@ -1232,20 +890,11 @@ export function renderApp(state: AppViewState) {
                   state.configActiveSection = section;
                   state.configActiveSubsection = null;
                 },
-                onSubsectionChange: (section) =>
-                  ((state as unknown as OpenClawApp).configActiveSubsection = section),
-                onReload: () => loadConfig(state as unknown as OpenClawApp),
-                onSave: () => saveConfig(state as unknown as OpenClawApp),
-                onApply: () => applyConfig(state as unknown as OpenClawApp),
-                onUpdate: () => runUpdate(state as unknown as OpenClawApp),
-                onAddDirectory: (hostPath, containerPath, mode) =>
-                  (state as unknown as OpenClawApp).handleAddDirectory(
-                    hostPath,
-                    containerPath,
-                    mode,
-                  ),
-                onRemoveDirectory: (index) =>
-                  (state as unknown as OpenClawApp).handleRemoveDirectory(index),
+                onSubsectionChange: (section) => (state.configActiveSubsection = section),
+                onReload: () => loadConfig(state),
+                onSave: () => saveConfig(state),
+                onApply: () => applyConfig(state),
+                onUpdate: () => runUpdate(state),
               })
             : nothing
         }
@@ -1293,70 +942,9 @@ export function renderApp(state: AppViewState) {
               })
             : nothing
         }
-
-        ${renderTerminal({
-          active: isTerminal,
-          gatewayUrl: state.gatewayUrl ?? "",
-        })}
-
-
-        ${
-          _isInIframe
-            ? nothing
-            : html`
-        <div class="manager-container" style="${state.tab === "manager" ? "" : "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;opacity:0;"}">
-          ${
-            _managerLoaded
-              ? nothing
-              : html`
-                  <div
-                    class="manager-loading"
-                    style="
-                      position: absolute;
-                      inset: 0;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      background: var(--bg, #1a1a2e);
-                      z-index: 1;
-                    "
-                  >
-                    <div style="text-align: center">
-                      <div
-                        class="spinner"
-                        style="
-                          width: 32px;
-                          height: 32px;
-                          border: 3px solid rgba(255, 255, 255, 0.1);
-                          border-top-color: var(--accent, #e74c5e);
-                          border-radius: 50%;
-                          animation: spin 0.8s linear infinite;
-                          margin: 0 auto 12px;
-                        "
-                      ></div>
-                      <div style="color: var(--text-muted, #888); font-size: 13px">正在加载控制面板...</div>
-                    </div>
-                  </div>
-                `
-          }
-          <iframe
-            src="/manager/"
-            style="width:100%;height:100%;border:none;display:block;"
-            title="控制面板"
-            @load=${(e: Event) => {
-              _managerLoaded = true;
-              const container = (e.target as HTMLElement)?.parentElement;
-              const loading = container?.querySelector(".manager-loading") as HTMLElement | null;
-              if (loading) loading.remove();
-            }}
-          ></iframe>
-        </div>
-        `
-        }
       </main>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
-      ${renderDockerDialog(state)}
     </div>
   `;
 }

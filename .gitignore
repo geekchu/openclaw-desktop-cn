@@ -91,3 +91,10 @@ src-tauri/node-runtime/*
 src-tauri/frontend/
 nul
 src-tauri/nul
+
+# Agent credentials and memory (NEVER COMMIT)
+/memory/
+.agent/*.json
+!.agent/workflows/
+/local/
+package-lock.json
