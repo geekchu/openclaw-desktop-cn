@@ -739,28 +739,82 @@ read -p "按回车键关闭..."
     }
 }
 
-/// 检查 Docker 是否可用
+/// 在 Windows 上查找 docker 可执行文件的完整路径
+/// Docker Desktop 默认安装在 Program Files，但不一定在系统 PATH 中
+#[cfg(windows)]
+fn find_docker_exe() -> String {
+    use std::path::PathBuf;
+
+    // 1. 先尝试常见安装路径
+    let candidates = [
+        r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
+        r"C:\Program Files\Docker\Docker\resources\docker.exe",
+    ];
+
+    for path in &candidates {
+        if PathBuf::from(path).exists() {
+            debug!("[Docker] 在 {} 找到 docker", path);
+            return path.to_string();
+        }
+    }
+
+    // 2. 检查用户目录
+    if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        let user_path = format!(r"{}\AppData\Local\Docker\cli-plugins\docker.exe", userprofile);
+        if PathBuf::from(&user_path).exists() {
+            debug!("[Docker] 在 {} 找到 docker", user_path);
+            return user_path;
+        }
+        let user_path2 = format!(r"{}\.docker\bin\docker.exe", userprofile);
+        if PathBuf::from(&user_path2).exists() {
+            debug!("[Docker] 在 {} 找到 docker", user_path2);
+            return user_path2;
+        }
+    }
+
+    // 3. 回退到裸 "docker"（依赖系统 PATH）
+    debug!("[Docker] 未在常见路径找到 docker，将尝试系统 PATH");
+    "docker".to_string()
+}
+
+#[cfg(not(windows))]
+fn find_docker_exe() -> String {
+    "docker".to_string()
+}
+
+/// 检查 Docker 是否可用（已安装 + 守护进程运行中）
 #[command]
 pub async fn check_docker_available() -> Result<DockerStatus, String> {
     info!("[Docker] 检查 Docker 可用性...");
 
-    match shell::run_command_output("docker", &["version", "--format", "{{.Server.Version}}"]) {
+    let docker = find_docker_exe();
+
+    // Step 1: 检查 docker CLI 是否已安装（docker --version）
+    let installed = match shell::run_command_output(&docker, &["--version"]) {
         Ok(version) => {
-            let version = version.trim().to_string();
-            info!("[Docker] Docker 可用, 版本: {}", version);
-            Ok(DockerStatus {
-                available: true,
-                version: Some(version),
-                error: None,
-            })
+            info!("[Docker] Docker CLI 已安装: {}", version.trim());
+            true
         }
         Err(e) => {
-            info!("[Docker] Docker 不可用: {}", e);
-            Ok(DockerStatus {
-                available: false,
-                version: None,
-                error: Some("Docker 未安装或未运行".to_string()),
-            })
+            info!("[Docker] Docker CLI 未安装或无法执行: {}", e);
+            return Ok(DockerStatus {
+                installed: false,
+                running: false,
+            });
         }
-    }
+    };
+
+    // Step 2: 检查 Docker 守护进程是否正在运行（docker info）
+    let running = match shell::run_command_output(&docker, &["info", "--format", "{{.ServerVersion}}"]) {
+        Ok(info) => {
+            info!("[Docker] Docker 守护进程运行中, 版本: {}", info.trim());
+            true
+        }
+        Err(e) => {
+            info!("[Docker] Docker 守护进程未运行: {}", e);
+            false
+        }
+    };
+
+    Ok(DockerStatus { installed, running })
 }
