@@ -35,6 +35,10 @@ type DiscordUser = Parameters<typeof formatDiscordUserTag>[0];
 
 type AgentComponentInteraction = ButtonInteraction | StringSelectMenuInteraction;
 
+type ComponentInteractionContext = NonNullable<
+  Awaited<ReturnType<typeof resolveComponentInteractionContext>>
+>;
+
 type DiscordChannelContext = {
   channelName: string | undefined;
   channelSlug: string;
@@ -201,6 +205,40 @@ async function ensureGuildComponentMemberAllowed(params: {
   return false;
 }
 
+async function ensureAgentComponentInteractionAllowed(params: {
+  ctx: AgentComponentContext;
+  interaction: AgentComponentInteraction;
+  channelId: string;
+  rawGuildId: string | undefined;
+  memberRoleIds: string[];
+  user: DiscordUser;
+  replyOpts: { ephemeral?: boolean };
+  componentLabel: string;
+  unauthorizedReply: string;
+}): Promise<{ parentId: string | undefined } | null> {
+  const guildInfo = resolveDiscordGuildEntry({
+    guild: params.interaction.guild ?? undefined,
+    guildEntries: params.ctx.guildEntries,
+  });
+  const channelCtx = resolveDiscordChannelContext(params.interaction);
+  const memberAllowed = await ensureGuildComponentMemberAllowed({
+    interaction: params.interaction,
+    guildInfo,
+    channelId: params.channelId,
+    rawGuildId: params.rawGuildId,
+    channelCtx,
+    memberRoleIds: params.memberRoleIds,
+    user: params.user,
+    replyOpts: params.replyOpts,
+    componentLabel: params.componentLabel,
+    unauthorizedReply: params.unauthorizedReply,
+  });
+  if (!memberAllowed) {
+    return null;
+  }
+  return { parentId: channelCtx.parentId };
+}
+
 export type AgentComponentContext = {
   cfg: OpenClawConfig;
   accountId: string;
@@ -349,6 +387,34 @@ async function ensureDmComponentAuthorized(params: {
   return false;
 }
 
+async function resolveInteractionContextWithDmAuth(params: {
+  ctx: AgentComponentContext;
+  interaction: AgentComponentInteraction;
+  label: string;
+  componentLabel: string;
+}): Promise<ComponentInteractionContext | null> {
+  const interactionCtx = await resolveComponentInteractionContext({
+    interaction: params.interaction,
+    label: params.label,
+  });
+  if (!interactionCtx) {
+    return null;
+  }
+  if (interactionCtx.isDirectMessage) {
+    const authorized = await ensureDmComponentAuthorized({
+      ctx: params.ctx,
+      interaction: params.interaction,
+      user: interactionCtx.user,
+      componentLabel: params.componentLabel,
+      replyOpts: interactionCtx.replyOpts,
+    });
+    if (!authorized) {
+      return null;
+    }
+  }
+  return interactionCtx;
+}
+
 export class AgentComponentButton extends Button {
   label = AGENT_BUTTON_KEY;
   customId = `${AGENT_BUTTON_KEY}:seed=1`;
@@ -378,9 +444,11 @@ export class AgentComponentButton extends Button {
 
     const { componentId } = parsed;
 
-    const interactionCtx = await resolveComponentInteractionContext({
+    const interactionCtx = await resolveInteractionContextWithDmAuth({
+      ctx: this.ctx,
       interaction,
       label: "agent button",
+      componentLabel: "button",
     });
     if (!interactionCtx) {
       return;
@@ -396,42 +464,23 @@ export class AgentComponentButton extends Button {
       memberRoleIds,
     } = interactionCtx;
 
-    if (isDirectMessage) {
-      const authorized = await ensureDmComponentAuthorized({
-        ctx: this.ctx,
-        interaction,
-        user,
-        componentLabel: "button",
-        replyOpts,
-      });
-      if (!authorized) {
-        return;
-      }
-    }
-
-    // P2 FIX: Check user allowlist before processing component interaction
-    // This prevents unauthorized users from injecting system events
-    const guildInfo = resolveDiscordGuildEntry({
-      guild: interaction.guild ?? undefined,
-      guildEntries: this.ctx.guildEntries,
-    });
-    const channelCtx = resolveDiscordChannelContext(interaction);
-    const { parentId } = channelCtx;
-    const memberAllowed = await ensureGuildComponentMemberAllowed({
+    // Check user allowlist before processing component interaction
+    // This prevents unauthorized users from injecting system events.
+    const allowed = await ensureAgentComponentInteractionAllowed({
+      ctx: this.ctx,
       interaction,
-      guildInfo,
       channelId,
       rawGuildId,
-      channelCtx,
       memberRoleIds,
       user,
       replyOpts,
       componentLabel: "button",
       unauthorizedReply: "You are not authorized to use this button.",
     });
-    if (!memberAllowed) {
+    if (!allowed) {
       return;
     }
+    const { parentId } = allowed;
 
     // Resolve route with full context (guildId, proper peer kind, parentPeer)
     const route = resolveAgentRoute({
@@ -496,9 +545,11 @@ export class AgentSelectMenu extends StringSelectMenu {
 
     const { componentId } = parsed;
 
-    const interactionCtx = await resolveComponentInteractionContext({
+    const interactionCtx = await resolveInteractionContextWithDmAuth({
+      ctx: this.ctx,
       interaction,
       label: "agent select",
+      componentLabel: "select menu",
     });
     if (!interactionCtx) {
       return;
@@ -514,41 +565,22 @@ export class AgentSelectMenu extends StringSelectMenu {
       memberRoleIds,
     } = interactionCtx;
 
-    if (isDirectMessage) {
-      const authorized = await ensureDmComponentAuthorized({
-        ctx: this.ctx,
-        interaction,
-        user,
-        componentLabel: "select menu",
-        replyOpts,
-      });
-      if (!authorized) {
-        return;
-      }
-    }
-
-    // Check user allowlist before processing component interaction
-    const guildInfo = resolveDiscordGuildEntry({
-      guild: interaction.guild ?? undefined,
-      guildEntries: this.ctx.guildEntries,
-    });
-    const channelCtx = resolveDiscordChannelContext(interaction);
-    const { parentId } = channelCtx;
-    const memberAllowed = await ensureGuildComponentMemberAllowed({
+    // Check user allowlist before processing component interaction.
+    const allowed = await ensureAgentComponentInteractionAllowed({
+      ctx: this.ctx,
       interaction,
-      guildInfo,
       channelId,
       rawGuildId,
-      channelCtx,
       memberRoleIds,
       user,
       replyOpts,
       componentLabel: "select",
       unauthorizedReply: "You are not authorized to use this select menu.",
     });
-    if (!memberAllowed) {
+    if (!allowed) {
       return;
     }
+    const { parentId } = allowed;
 
     // Extract selected values
     const values = interaction.values ?? [];
