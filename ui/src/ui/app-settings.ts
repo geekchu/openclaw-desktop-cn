@@ -34,6 +34,30 @@ import { saveSettings, type UiSettings } from "./storage.ts";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition.ts";
 import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme.ts";
 
+/**
+ * Detect if we are running inside a desktop WebView (Tauri + WebView2).
+ *
+ * In desktop mode, URL sync (pushState/replaceState) is skipped because
+ * WebView2 treats pathname changes as real navigation requests.
+ */
+let _isDesktopWebView = false;
+if (typeof window !== "undefined") {
+  const params = new URLSearchParams(window.location.search);
+  _isDesktopWebView =
+    params.get("desktop") === "1" ||
+    Boolean((window as Record<string, unknown>).__TAURI__) ||
+    Boolean((window as Record<string, unknown>).__TAURI_INTERNALS__);
+
+  if (!_isDesktopWebView) {
+    const ua = navigator.userAgent;
+    const isEdgeWebView = ua.includes("Edg/") && !ua.includes("Electron");
+    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (isEdgeWebView && isLocalhost) {
+      _isDesktopWebView = true;
+    }
+  }
+}
+
 type SettingsHost = {
   settings: UiSettings;
   password?: string;
@@ -385,6 +409,9 @@ export function syncUrlWithTab(host: SettingsHost, tab: Tab, replace: boolean) {
   if (typeof window === "undefined") {
     return;
   }
+  if (_isDesktopWebView) {
+    return;
+  }
   const targetPath = normalizePath(pathForTab(tab, host.basePath));
   const currentPath = normalizePath(window.location.pathname);
   const url = new URL(window.location.href);
@@ -408,6 +435,9 @@ export function syncUrlWithTab(host: SettingsHost, tab: Tab, replace: boolean) {
 
 export function syncUrlWithSessionKey(host: SettingsHost, sessionKey: string, replace: boolean) {
   if (typeof window === "undefined") {
+    return;
+  }
+  if (_isDesktopWebView) {
     return;
   }
   const url = new URL(window.location.href);

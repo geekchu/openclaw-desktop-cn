@@ -9,17 +9,15 @@ import { syncUrlWithSessionKey } from "./app-settings.ts";
 import { OpenClawApp } from "./app.ts";
 import { ChatState, loadChatHistory } from "./controllers/chat.ts";
 import { icons } from "./icons.ts";
-import { iconForTab, pathForTab, titleForTab, type Tab } from "./navigation.ts";
+import { iconForTab, titleForTab, type Tab } from "./navigation.ts";
 
 export function renderTab(state: AppViewState, tab: Tab) {
-  const href = pathForTab(tab, state.basePath);
   return html`
-    <a
-      href=${href}
+    <button
+      type="button"
       class="nav-item ${state.tab === tab ? "active" : ""}"
       @click=${(event: MouseEvent) => {
         if (
-          event.defaultPrevented ||
           event.button !== 0 ||
           event.metaKey ||
           event.ctrlKey ||
@@ -28,14 +26,13 @@ export function renderTab(state: AppViewState, tab: Tab) {
         ) {
           return;
         }
-        event.preventDefault();
         state.setTab(tab);
       }}
       title=${titleForTab(tab)}
     >
       <span class="nav-item__icon" aria-hidden="true">${icons[iconForTab(tab)]}</span>
       <span class="nav-item__text">${titleForTab(tab)}</span>
-    </a>
+    </button>
   `;
 }
 

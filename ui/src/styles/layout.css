@@ -64,7 +64,7 @@
   padding-top: 0;
 }
 
-.shell--chat-focus .content > * + * {
+.shell--chat-focus .content>*+* {
   margin-top: 0;
 }
 
@@ -200,7 +200,8 @@
   overflow-x: hidden;
   padding: 16px 12px;
   background: var(--bg);
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: none;
+  /* Firefox */
   transition:
     width var(--shell-focus-duration) var(--shell-focus-ease),
     padding var(--shell-focus-duration) var(--shell-focus-ease),
@@ -209,7 +210,8 @@
 }
 
 .nav::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
+  display: none;
+  /* Chrome/Safari */
 }
 
 .shell--chat-focus .nav {
@@ -367,6 +369,14 @@
     color var(--duration-fast) ease;
 }
 
+/* Reset for button-based nav items */
+button.nav-item {
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  letter-spacing: inherit;
+}
+
 .nav-item__icon {
   width: 16px;
   height: 16px;
@@ -427,7 +437,7 @@
   overflow-x: hidden;
 }
 
-.content > * + * {
+.content>*+* {
   margin-top: 24px;
 }
 
@@ -450,7 +460,7 @@
   overflow: hidden;
 }
 
-.content--manager > * + * {
+.content--manager>*+* {
   margin-top: 0;
 }
 
@@ -473,7 +483,7 @@
   margin: 0;
 }
 
-.content--terminal > * + * {
+.content--terminal>*+* {
   margin-top: 0;
 }
 
@@ -621,8 +631,8 @@
 }
 
 /* 禁止 xterm v6 overlay 滚动条自动淡出 */
-.terminal-container .xterm .xterm-scrollable-element > .invisible,
-.terminal-container .xterm .xterm-scrollable-element > .invisible.fade {
+.terminal-container .xterm .xterm-scrollable-element>.invisible,
+.terminal-container .xterm .xterm-scrollable-element>.invisible.fade {
   opacity: 1 !important;
   pointer-events: auto !important;
 }
@@ -634,7 +644,23 @@
   min-height: 0;
 }
 
-.content--chat > * + * {
+.content--manager {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.content--manager .content-header {
+  padding: 16px 24px 8px;
+  margin: 0;
+}
+
+.content--manager>*+* {
+  margin-top: 0;
+}
+
+.content--chat>*+* {
   margin-top: 0;
 }
 
@@ -694,7 +720,7 @@
   padding: 4px 8px 0;
 }
 
-.content--chat .content-header > div:first-child {
+.content--chat .content-header>div:first-child {
   text-align: left;
 }
 
