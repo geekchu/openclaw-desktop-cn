@@ -8,6 +8,7 @@ const shared = {
   env,
   fixedExtension: false,
   platform: "node" as const,
+  outputOptions: { strictExecutionOrder: true },
 };
 
 export default defineConfig([

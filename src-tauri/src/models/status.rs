@@ -92,11 +92,3 @@ pub struct ChannelTestResult {
     pub error: Option<String>,
 }
 
-/// Docker 可用性状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DockerStatus {
-    /// Docker CLI 是否已安装
-    pub installed: bool,
-    /// Docker 守护进程是否正在运行
-    pub running: bool,
-}

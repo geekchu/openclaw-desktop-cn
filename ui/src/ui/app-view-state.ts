@@ -106,9 +106,6 @@ export type AppViewState = {
   configForm: Record<string, unknown> | null;
   configFormOriginal: Record<string, unknown> | null;
   configFormMode: "form" | "raw";
-  securityDockerAvailable: boolean | null;
-  securityDockerChecking: boolean;
-  securityShowDockerDialog: boolean;
   channelsLoading: boolean;
   channelsSnapshot: ChannelsStatusSnapshot | null;
   channelsError: string | null;

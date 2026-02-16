@@ -30,12 +30,13 @@ pub struct TrayState {
 /// - 生产模式：使用 Tauri resource_dir 下的 gateway-bundle/
 #[allow(unused_variables)]
 fn resolve_gateway_bundle_dir(app: &tauri::App) -> PathBuf {
-    // 开发模式：使用 Cargo manifest dir 的父目录（即项目根目录）
+    // 开发模式：使用项目根目录（CARGO_MANIFEST_DIR 的父目录）
+    // 项目根目录包含完整的 node_modules、extensions 依赖和 docs/ 模板
     #[cfg(debug_assertions)]
     {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let project_root = PathBuf::from(manifest_dir).parent().unwrap().to_path_buf();
-        log::info!("[Main] 开发模式 - gateway 目录: {}", project_root.display());
+        log::info!("[Main] 开发模式 - gateway 目录（项目根）: {}", project_root.display());
         return project_root;
     }
 
@@ -354,7 +355,6 @@ fn main() {
             diagnostics::test_channel,
             diagnostics::get_system_info,
             diagnostics::start_channel_login,
-            diagnostics::check_docker_available,
             // 安装器
             installer::check_environment,
             installer::install_nodejs,

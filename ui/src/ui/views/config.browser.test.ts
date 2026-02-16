@@ -35,9 +35,6 @@ describe("config view", () => {
     onApply: vi.fn(),
     onUpdate: vi.fn(),
     onSubsectionChange: vi.fn(),
-    dockerChecking: false,
-    onAddDirectory: vi.fn(),
-    onRemoveDirectory: vi.fn(),
   });
 
   it("allows save when form is unsafe", () => {

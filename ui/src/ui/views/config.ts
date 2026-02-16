@@ -23,8 +23,6 @@ export type ConfigProps = {
   searchQuery: string;
   activeSection: string | null;
   activeSubsection: string | null;
-  // Security section state
-  dockerChecking: boolean;
   onRawChange: (next: string) => void;
   onFormModeChange: (mode: "form" | "raw") => void;
   onFormPatch: (path: Array<string | number>, value: unknown) => void;
@@ -35,8 +33,6 @@ export type ConfigProps = {
   onSave: () => void;
   onApply: () => void;
   onUpdate: () => void;
-  onAddDirectory: (hostPath: string, containerPath: string, mode: "ro" | "rw") => void;
-  onRemoveDirectory: (index: number) => void;
 };
 
 // SVG Icons for sidebar (Lucide-style)
@@ -777,10 +773,7 @@ export function renderConfig(props: ConfigProps) {
                       ? renderSecuritySection({
                           formValue: props.formValue,
                           disabled: props.loading || !props.formValue,
-                          dockerChecking: props.dockerChecking,
                           onPatch: props.onFormPatch,
-                          onAddDirectory: props.onAddDirectory,
-                          onRemoveDirectory: props.onRemoveDirectory,
                         })
                       : renderConfigForm({
                           schema: analysis.schema,

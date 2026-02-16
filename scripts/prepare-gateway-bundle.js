@@ -15,7 +15,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -95,6 +95,12 @@ copyIfExists(join(projectRoot, "skills"), join(bundleDir, "skills"));
 // 复制 extensions/ 目录
 copyIfExists(join(projectRoot, "extensions"), join(bundleDir, "extensions"));
 
+// 复制 docs/reference/templates/ 目录（workspace 模板，如 AGENTS.md）
+copyIfExists(
+  join(projectRoot, "docs", "reference", "templates"),
+  join(bundleDir, "docs", "reference", "templates"),
+);
+
 // 创建精简的 package.json（只保留 dependencies）
 const rootPkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf-8"));
 const bundlePkg = {
@@ -110,6 +116,23 @@ console.log("[bundle] 创建 package.json（仅 dependencies）");
 // Step 5: 安装依赖（平铺模式，不使用 pnpm 符号链接）
 console.log("\n[bundle] === Step 5: 安装生产依赖 ===");
 run("npm install --omit=dev --install-strategy=hoisted --ignore-scripts", { cwd: bundleDir });
+
+// Step 6: 安装 extension 依赖
+console.log("\n[bundle] === Step 6: 安装 extension 依赖 ===");
+const extDir = join(bundleDir, "extensions");
+if (existsSync(extDir)) {
+  for (const name of readdirSync(extDir)) {
+    const extPkgPath = join(extDir, name, "package.json");
+    if (!existsSync(extPkgPath)) continue;
+    const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
+    const deps = extPkg.dependencies;
+    if (!deps || Object.keys(deps).length === 0) continue;
+    console.log(`[bundle] 安装 extension/${name} 依赖 (${Object.keys(deps).length} 个包)`);
+    run("npm install --omit=dev --install-strategy=hoisted --ignore-scripts", {
+      cwd: join(extDir, name),
+    });
+  }
+}
 
 console.log("\n[bundle] === 完成 ===");
 console.log(`[bundle] Gateway bundle 已创建: ${bundleDir}`);

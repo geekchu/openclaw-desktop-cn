@@ -58,7 +58,6 @@ type GatewayHost = {
   execApprovalQueue: ExecApprovalRequest[];
   execApprovalError: string | null;
   showExecApprovalToast: (decision: string, command: string) => void;
-  securityShowDockerDialog: boolean;
 };
 
 type SessionDefaultsSnapshot = {
@@ -199,16 +198,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     host.eventLog = host.eventLogBuffer;
   }
 
-  // Detect Docker errors in ANY event type (agent, chat, etc.)
-  // so we never miss the marker regardless of how the error propagates.
-  if (evt.payload) {
-    const raw = JSON.stringify(evt.payload);
-    if (raw.includes("[DOCKER_NOT_INSTALLED]") || raw.includes("[DOCKER_NOT_RUNNING]")) {
-      console.warn("[gateway] Docker error detected in event:", evt.event);
-      host.securityShowDockerDialog = true;
-    }
-  }
-
   if (evt.event === "agent") {
     if (host.onboarding) {
       return;
@@ -231,12 +220,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
 
     const result = handleChatEvent(host as unknown as OpenClawApp, payload);
     const state = result.state;
-
-    // Show Docker dialog when a Docker error is detected in the chat event,
-    // regardless of session key / runId matching (checked before filters).
-    if (result.dockerError) {
-      host.securityShowDockerDialog = true;
-    }
 
     if (state === "final" || state === "error" || state === "aborted") {
       resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);

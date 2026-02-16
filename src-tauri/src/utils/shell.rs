@@ -740,7 +740,17 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
 
-        info!("[Shell] 启动 gateway 进程...");
+        // OPENCLAW_GATEWAY_LOG_DIR handling
+        if let Ok(log_dir) = std::env::var("OPENCLAW_GATEWAY_LOG_DIR") {
+             if let Ok(std_out_file) = std::fs::File::create(std::path::Path::new(&log_dir).join("gateway.stdout.log")) {
+                cmd.stdout(std_out_file);
+             }
+             if let Ok(std_err_file) = std::fs::File::create(std::path::Path::new(&log_dir).join("gateway.stderr.log")) {
+                cmd.stderr(std_err_file);
+             }
+        }
+
+        info!("[Shell] 启动 gateway 进程: {:?}", cmd);
         return match cmd.spawn() {
             Ok(child) => {
                 info!("[Shell] Gateway 进程已启动, PID: {}", child.id());
