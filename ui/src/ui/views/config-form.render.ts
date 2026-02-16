@@ -2,7 +2,7 @@ import { html, nothing } from "lit";
 import type { ConfigUiHints } from "../types.ts";
 import { icons } from "../icons.ts";
 import { renderNode } from "./config-form.node.ts";
-import { hintForPath, humanize, schemaType, type JsonSchema } from "./config-form.shared.ts";
+import { hintForPath, humanize, resolveHelp, resolveLabel, schemaType, type JsonSchema } from "./config-form.shared.ts";
 
 export type ConfigFormProps = {
   schema: JsonSchema | null;
@@ -637,8 +637,8 @@ export function renderConfigForm(props: ConfigFormProps) {
           ? (() => {
               const { sectionKey, subsectionKey, schema: node } = subsectionContext;
               const hint = hintForPath([sectionKey, subsectionKey], props.uiHints);
-              const label = hint?.label ?? node.title ?? humanize(subsectionKey);
-              const description = hint?.help ?? node.description ?? "";
+              const label = resolveLabel(subsectionKey, node.title, hint?.label);
+              const description = resolveHelp(hint?.help, node.description) ?? "";
               const sectionValue = value[sectionKey];
               const scopedValue =
                 sectionValue && typeof sectionValue === "object"
@@ -675,8 +675,8 @@ export function renderConfigForm(props: ConfigFormProps) {
             })()
           : filteredEntries.map(([key, node]) => {
               const meta = SECTION_META[key] ?? {
-                label: key.charAt(0).toUpperCase() + key.slice(1),
-                description: node.description ?? "",
+                label: humanize(key),
+                description: resolveHelp(undefined, node.description) ?? "",
               };
 
               return html`

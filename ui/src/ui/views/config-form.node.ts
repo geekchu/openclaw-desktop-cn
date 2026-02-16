@@ -3,8 +3,9 @@ import type { ConfigUiHints } from "../types.ts";
 import {
   defaultValue,
   hintForPath,
-  humanize,
   pathKey,
+  resolveHelp,
+  resolveLabel,
   schemaType,
   type JsonSchema,
 } from "./config-form.shared.ts";
@@ -108,8 +109,8 @@ export function renderNode(params: {
   const showLabel = params.showLabel ?? true;
   const type = schemaType(schema);
   const hint = hintForPath(path, hints);
-  const label = hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
-  const help = hint?.help ?? schema.description;
+  const label = resolveLabel(String(path.at(-1)), schema.title, hint?.label);
+  const help = resolveHelp(hint?.help, schema.description);
   const key = pathKey(path);
 
   if (unsupported.has(key)) {
@@ -304,8 +305,8 @@ function renderTextInput(params: {
   const { schema, value, path, hints, disabled, onPatch, inputType } = params;
   const showLabel = params.showLabel ?? true;
   const hint = hintForPath(path, hints);
-  const label = hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
-  const help = hint?.help ?? schema.description;
+  const label = resolveLabel(String(path.at(-1)), schema.title, hint?.label);
+  const help = resolveHelp(hint?.help, schema.description);
   const isSensitive =
     (hint?.sensitive ?? false) && !/^\$\{[^}]*\}$/.test(String(value ?? "").trim());
   const placeholder =
@@ -380,8 +381,8 @@ function renderNumberInput(params: {
   const { schema, value, path, hints, disabled, onPatch } = params;
   const showLabel = params.showLabel ?? true;
   const hint = hintForPath(path, hints);
-  const label = hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
-  const help = hint?.help ?? schema.description;
+  const label = resolveLabel(String(path.at(-1)), schema.title, hint?.label);
+  const help = resolveHelp(hint?.help, schema.description);
   const displayValue = value ?? schema.default ?? "";
   const numValue = typeof displayValue === "number" ? displayValue : 0;
 
@@ -431,8 +432,8 @@ function renderSelect(params: {
   const { schema, value, path, hints, disabled, options, onPatch } = params;
   const showLabel = params.showLabel ?? true;
   const hint = hintForPath(path, hints);
-  const label = hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
-  const help = hint?.help ?? schema.description;
+  const label = resolveLabel(String(path.at(-1)), schema.title, hint?.label);
+  const help = resolveHelp(hint?.help, schema.description);
   const resolvedValue = value ?? schema.default;
   const currentIndex = options.findIndex(
     (opt) => opt === resolvedValue || String(opt) === String(resolvedValue),
@@ -475,8 +476,8 @@ function renderObject(params: {
 }): TemplateResult {
   const { schema, value, path, hints, unsupported, disabled, onPatch } = params;
   const hint = hintForPath(path, hints);
-  const label = hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
-  const help = hint?.help ?? schema.description;
+  const label = resolveLabel(String(path.at(-1)), schema.title, hint?.label);
+  const help = resolveHelp(hint?.help, schema.description);
 
   const fallback = value ?? schema.default;
   const obj =
@@ -585,8 +586,8 @@ function renderArray(params: {
   const { schema, value, path, hints, unsupported, disabled, onPatch } = params;
   const showLabel = params.showLabel ?? true;
   const hint = hintForPath(path, hints);
-  const label = hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
-  const help = hint?.help ?? schema.description;
+  const label = resolveLabel(String(path.at(-1)), schema.title, hint?.label);
+  const help = resolveHelp(hint?.help, schema.description);
 
   const itemsSchema = Array.isArray(schema.items) ? schema.items[0] : schema.items;
   if (!itemsSchema) {

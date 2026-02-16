@@ -1,8 +1,7 @@
 import { html, nothing } from "lit";
 import type { ConfigUiHints } from "../types.ts";
-import { hintForPath, humanize, schemaType, type JsonSchema } from "./config-form.shared.ts";
+import { hintForPath, humanize, resolveHelp, resolveLabel, schemaType, type JsonSchema } from "./config-form.shared.ts";
 import { analyzeConfigSchema, renderConfigForm, SECTION_META } from "./config-form.ts";
-import { renderSecuritySection } from "./config-security.ts";
 
 export type ConfigProps = {
   raw: string;
@@ -73,11 +72,6 @@ const sidebarIcons = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
       <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-    </svg>
-  `,
-  security: html`
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
     </svg>
   `,
   channels: html`
@@ -282,72 +276,7 @@ const SECTIONS: Array<{ key: string; label: string }> = [
   { key: "tools", label: "工具" },
   { key: "gateway", label: "网关" },
   { key: "wizard", label: "设置向导" },
-  { key: "meta", label: "元数据" },
-  { key: "diagnostics", label: "诊断" },
-  { key: "logging", label: "日志" },
-  { key: "browser", label: "浏览器" },
-  { key: "ui", label: "界面" },
-  { key: "models", label: "模型" },
-  { key: "bindings", label: "绑定" },
-  { key: "broadcast", label: "广播" },
-  { key: "audio", label: "音频" },
-  { key: "session", label: "会话" },
-  { key: "cron", label: "定时任务" },
-  { key: "web", label: "Web" },
-  { key: "discovery", label: "发现" },
-  { key: "canvasHost", label: "画布主机" },
-  { key: "talk", label: "语音" },
-  { key: "plugins", label: "插件" },
-  { key: "routing", label: "路由" },
-  { key: "allowlist", label: "白名单" },
-  { key: "pairing", label: "配对" },
-  { key: "presence", label: "在线状态" },
-  { key: "memory", label: "记忆" },
-  { key: "mcp", label: "MCP" },
-  { key: "telemetry", label: "遥测" },
-  { key: "security", label: "安全" },
-  { key: "network", label: "网络" },
-  { key: "storage", label: "存储" },
-  { key: "cache", label: "缓存" },
-  { key: "limits", label: "限制" },
-  { key: "notifications", label: "通知" },
-  { key: "integrations", label: "集成" },
-  { key: "experimental", label: "实验性" },
-  { key: "advanced", label: "高级" },
-  { key: "developer", label: "开发者" },
-  { key: "debug", label: "调试" },
-  { key: "performance", label: "性能" },
-  { key: "controlUi", label: "控制界面" },
-  { key: "server", label: "服务器" },
-  { key: "client", label: "客户端" },
-  { key: "connection", label: "连接" },
-  { key: "proxy", label: "代理服务器" },
-  { key: "api", label: "API" },
-  { key: "webhooks", label: "Webhooks" },
-  { key: "events", label: "事件" },
-  { key: "triggers", label: "触发器" },
-  { key: "actions", label: "动作" },
-  { key: "filters", label: "过滤器" },
-  { key: "rules", label: "规则" },
-  { key: "policies", label: "策略" },
-  { key: "permissions", label: "权限" },
-  { key: "roles", label: "角色" },
-  { key: "users", label: "用户" },
-  { key: "groups", label: "群组" },
-  { key: "logs", label: "日志" },
-  { key: "history", label: "历史" },
-  { key: "activity", label: "活动" },
-  { key: "monitoring", label: "监控" },
-  { key: "alerts", label: "警报" },
-  { key: "health", label: "健康" },
-  { key: "status", label: "状态" },
-  { key: "info", label: "信息" },
 ];
-
-// 中文标签映射表
-const SECTION_LABELS: Record<string, string> = Object.fromEntries(
-  SECTIONS.map((s) => [s.key, s.label]),
-);
 
 type SubsectionEntry = {
   key: string;
@@ -390,8 +319,8 @@ function resolveSubsections(params: {
   }
   const entries = Object.entries(schema.properties).map(([subKey, node]) => {
     const hint = hintForPath([key, subKey], uiHints);
-    const label = hint?.label ?? node.title ?? humanize(subKey);
-    const description = hint?.help ?? node.description ?? "";
+    const label = resolveLabel(subKey, node.title, hint?.label);
+    const description = resolveHelp(hint?.help, node.description) ?? "";
     const order = hint?.order ?? 50;
     return { key: subKey, label, description, order };
   });
@@ -467,18 +396,9 @@ export function renderConfig(props: ConfigProps) {
   const knownKeys = new Set(SECTIONS.map((s) => s.key));
   const extraSections = Object.keys(schemaProps)
     .filter((k) => !knownKeys.has(k))
-    .map((k) => ({ key: k, label: SECTION_LABELS[k] ?? SECTION_META[k]?.label ?? k }));
+    .map((k) => ({ key: k, label: resolveSectionMeta(k, schemaProps[k]).label }));
 
   const allSections = [...availableSections, ...extraSections];
-
-  // Ensure "security" always appears (virtual section for tools.exec.* settings)
-  if (!allSections.some((s) => s.key === "security")) {
-    const def = SECTIONS.find((s) => s.key === "security");
-    if (def) {
-      const idx = allSections.findIndex((s) => s.key === "tools");
-      allSections.splice(idx >= 0 ? idx + 1 : allSections.length, 0, def);
-    }
-  }
 
   const activeSectionSchema =
     props.activeSection && analysis.schema && schemaType(analysis.schema) === "object"
@@ -769,23 +689,17 @@ export function renderConfig(props: ConfigProps) {
                           <span>加载架构中…</span>
                         </div>
                       `
-                    : props.activeSection === "security"
-                      ? renderSecuritySection({
-                          formValue: props.formValue,
-                          disabled: props.loading || !props.formValue,
-                          onPatch: props.onFormPatch,
-                        })
-                      : renderConfigForm({
-                          schema: analysis.schema,
-                          uiHints: props.uiHints,
-                          value: props.formValue,
-                          disabled: props.loading || !props.formValue,
-                          unsupportedPaths: analysis.unsupportedPaths,
-                          onPatch: props.onFormPatch,
-                          searchQuery: props.searchQuery,
-                          activeSection: props.activeSection,
-                          activeSubsection: effectiveSubsection,
-                        })
+                    : renderConfigForm({
+                        schema: analysis.schema,
+                        uiHints: props.uiHints,
+                        value: props.formValue,
+                        disabled: props.loading || !props.formValue,
+                        unsupportedPaths: analysis.unsupportedPaths,
+                        onPatch: props.onFormPatch,
+                        searchQuery: props.searchQuery,
+                        activeSection: props.activeSection,
+                        activeSubsection: effectiveSubsection,
+                      })
                 }
                 ${
                   formUnsafe

@@ -1661,3 +1661,39 @@ export function humanize(raw: string) {
     .replace(/\s+/g, " ")
     .replace(/^./, (m) => m.toUpperCase());
 }
+
+/** 检查 FIELD_TRANSLATIONS 中是否存在翻译 */
+export function hasTranslation(raw: string): boolean {
+  return Boolean(FIELD_TRANSLATIONS[raw] || FIELD_TRANSLATIONS[raw.toLowerCase()]);
+}
+
+/**
+ * 解析字段标签，优先使用中文翻译。
+ * 优先级: hint.label > FIELD_TRANSLATIONS > schema.title > humanize(key)
+ */
+export function resolveLabel(
+  key: string,
+  schemaTitle: string | undefined,
+  hintLabel: string | undefined,
+): string {
+  if (hintLabel) return hintLabel;
+  if (hasTranslation(key)) return humanize(key);
+  if (schemaTitle) return schemaTitle;
+  return humanize(key);
+}
+
+// CJK 字符范围检测
+const CJK_REGEX = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/;
+
+/**
+ * 解析帮助文本，过滤掉纯英文的 schema.description。
+ * 如果有 hint.help（中文），使用它；否则仅当 schema.description 包含中文时才显示。
+ */
+export function resolveHelp(
+  hintHelp: string | undefined,
+  schemaDescription: string | undefined,
+): string | undefined {
+  if (hintHelp) return hintHelp;
+  if (schemaDescription && CJK_REGEX.test(schemaDescription)) return schemaDescription;
+  return undefined;
+}

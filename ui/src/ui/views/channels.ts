@@ -93,12 +93,14 @@ ${props.snapshot ? JSON.stringify(props.snapshot, null, 2) : "暂无快照。"}
   `;
 }
 
-// 只显示这些频道（硬编码，忽略网关返回的频道列表）
-const ALLOWED_CHANNELS: ChannelKey[] = ["imessage", "whatsapp", "telegram", "feishu"];
-
 function resolveChannelOrder(snapshot: ChannelsStatusSnapshot | null): ChannelKey[] {
-  // 直接返回固定列表，不使用网关返回的频道顺序
-  return ALLOWED_CHANNELS;
+  if (snapshot?.channelMeta?.length) {
+    return snapshot.channelMeta.map((entry) => entry.id);
+  }
+  if (snapshot?.channelOrder?.length) {
+    return snapshot.channelOrder;
+  }
+  return ["whatsapp", "telegram", "discord", "googlechat", "slack", "signal", "imessage", "nostr", "feishu"];
 }
 
 function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChannelData) {

@@ -74,16 +74,16 @@ function renderFilterChips(
       ((selectedSession.label || selectedSession.key).length > 20 ? "…" : "")
     : selectedSessions.length === 1
       ? selectedSessions[0].slice(0, 8) + "…"
-      : `${selectedSessions.length} sessions`;
+      : `${selectedSessions.length} 个会话`;
   const sessionsFullName = selectedSession
     ? selectedSession.label || selectedSession.key
     : selectedSessions.length === 1
       ? selectedSessions[0]
       : selectedSessions.join(", ");
 
-  const daysLabel = selectedDays.length === 1 ? selectedDays[0] : `${selectedDays.length} days`;
+  const daysLabel = selectedDays.length === 1 ? selectedDays[0] : `${selectedDays.length} 天`;
   const hoursLabel =
-    selectedHours.length === 1 ? `${selectedHours[0]}:00` : `${selectedHours.length} hours`;
+    selectedHours.length === 1 ? `${selectedHours[0]}:00` : `${selectedHours.length} 小时`;
 
   return html`
     <div class="active-filters">
@@ -91,8 +91,8 @@ function renderFilterChips(
         selectedDays.length > 0
           ? html`
             <div class="filter-chip">
-              <span class="filter-chip-label">Days: ${daysLabel}</span>
-              <button class="filter-chip-remove" @click=${onClearDays} title="Remove filter">×</button>
+              <span class="filter-chip-label">天数: ${daysLabel}</span>
+              <button class="filter-chip-remove" @click=${onClearDays} title="移除筛选">×</button>
             </div>
           `
           : nothing
@@ -101,8 +101,8 @@ function renderFilterChips(
         selectedHours.length > 0
           ? html`
             <div class="filter-chip">
-              <span class="filter-chip-label">Hours: ${hoursLabel}</span>
-              <button class="filter-chip-remove" @click=${onClearHours} title="Remove filter">×</button>
+              <span class="filter-chip-label">小时: ${hoursLabel}</span>
+              <button class="filter-chip-remove" @click=${onClearHours} title="移除筛选">×</button>
             </div>
           `
           : nothing
@@ -111,8 +111,8 @@ function renderFilterChips(
         selectedSessions.length > 0
           ? html`
             <div class="filter-chip" title="${sessionsFullName}">
-              <span class="filter-chip-label">Session: ${sessionsLabel}</span>
-              <button class="filter-chip-remove" @click=${onClearSessions} title="Remove filter">×</button>
+              <span class="filter-chip-label">会话: ${sessionsLabel}</span>
+              <button class="filter-chip-remove" @click=${onClearSessions} title="移除筛选">×</button>
             </div>
           `
           : nothing
@@ -121,7 +121,7 @@ function renderFilterChips(
         (selectedDays.length > 0 || selectedHours.length > 0) && selectedSessions.length > 0
           ? html`
             <button class="btn btn-sm filter-clear-btn" @click=${onClearFilters}>
-              Clear All
+              全部清除
             </button>
           `
           : nothing
@@ -141,8 +141,8 @@ function renderDailyChartCompact(
   if (!daily.length) {
     return html`
       <div class="daily-chart-compact">
-        <div class="sessions-panel-title">Daily Usage</div>
-        <div class="muted" style="padding: 20px; text-align: center">No data</div>
+        <div class="sessions-panel-title">每日用量</div>
+        <div class="muted" style="padding: 20px; text-align: center">暂无数据</div>
       </div>
     `;
   }
@@ -163,16 +163,16 @@ function renderDailyChartCompact(
             class="toggle-btn ${dailyChartMode === "total" ? "active" : ""}"
             @click=${() => onDailyChartModeChange("total")}
           >
-            Total
+            总计
           </button>
           <button
             class="toggle-btn ${dailyChartMode === "by-type" ? "active" : ""}"
             @click=${() => onDailyChartModeChange("by-type")}
           >
-            By Type
+            按类型
           </button>
         </div>
-        <div class="card-title">Daily ${isTokenMode ? "Token" : "Cost"} Usage</div>
+        <div class="card-title">每日${isTokenMode ? "令牌" : "费用"}用量</div>
       </div>
       <div class="daily-chart">
         <div class="daily-chart-bars" style="--bar-max-width: ${barMaxWidth}px">
@@ -204,16 +204,16 @@ function renderDailyChartCompact(
               dailyChartMode === "by-type"
                 ? isTokenMode
                   ? [
-                      `Output ${formatTokens(d.output)}`,
-                      `Input ${formatTokens(d.input)}`,
-                      `Cache write ${formatTokens(d.cacheWrite)}`,
-                      `Cache read ${formatTokens(d.cacheRead)}`,
+                      `输出 ${formatTokens(d.output)}`,
+                      `输入 ${formatTokens(d.input)}`,
+                      `缓存写入 ${formatTokens(d.cacheWrite)}`,
+                      `缓存读取 ${formatTokens(d.cacheRead)}`,
                     ]
                   : [
-                      `Output ${formatCost(d.outputCost ?? 0)}`,
-                      `Input ${formatCost(d.inputCost ?? 0)}`,
-                      `Cache write ${formatCost(d.cacheWriteCost ?? 0)}`,
-                      `Cache read ${formatCost(d.cacheReadCost ?? 0)}`,
+                      `输出 ${formatCost(d.outputCost ?? 0)}`,
+                      `输入 ${formatCost(d.inputCost ?? 0)}`,
+                      `缓存写入 ${formatCost(d.cacheWriteCost ?? 0)}`,
+                      `缓存读取 ${formatCost(d.cacheReadCost ?? 0)}`,
                     ]
                 : [];
             const totalLabel = isTokenMode ? formatTokens(d.totalTokens) : formatCost(d.totalCost);
@@ -250,7 +250,7 @@ function renderDailyChartCompact(
                 <div class="daily-bar-label" style="${labelStyle}">${shortLabel}</div>
                 <div class="daily-bar-tooltip">
                   <strong>${formatFullDate(d.date)}</strong><br />
-                  ${formatTokens(d.totalTokens)} tokens<br />
+                  ${formatTokens(d.totalTokens)} 令牌<br />
                   ${formatCost(d.totalCost)}
                   ${
                     breakdownLines.length
@@ -280,25 +280,25 @@ function renderCostBreakdownCompact(totals: UsageTotals, mode: "tokens" | "cost"
 
   return html`
     <div class="cost-breakdown cost-breakdown-compact">
-      <div class="cost-breakdown-header">${isTokenMode ? "Tokens" : "Cost"} by Type</div>
+      <div class="cost-breakdown-header">按类型统计${isTokenMode ? "令牌" : "费用"}</div>
       <div class="cost-breakdown-bar">
         <div class="cost-segment output" style="width: ${(isTokenMode ? tokenPcts.output : breakdown.output.pct).toFixed(1)}%"
-          title="Output: ${isTokenMode ? formatTokens(totals.output) : formatCost(breakdown.output.cost)}"></div>
+          title="输出: ${isTokenMode ? formatTokens(totals.output) : formatCost(breakdown.output.cost)}"></div>
         <div class="cost-segment input" style="width: ${(isTokenMode ? tokenPcts.input : breakdown.input.pct).toFixed(1)}%"
-          title="Input: ${isTokenMode ? formatTokens(totals.input) : formatCost(breakdown.input.cost)}"></div>
+          title="输入: ${isTokenMode ? formatTokens(totals.input) : formatCost(breakdown.input.cost)}"></div>
         <div class="cost-segment cache-write" style="width: ${(isTokenMode ? tokenPcts.cacheWrite : breakdown.cacheWrite.pct).toFixed(1)}%"
-          title="Cache Write: ${isTokenMode ? formatTokens(totals.cacheWrite) : formatCost(breakdown.cacheWrite.cost)}"></div>
+          title="缓存写入: ${isTokenMode ? formatTokens(totals.cacheWrite) : formatCost(breakdown.cacheWrite.cost)}"></div>
         <div class="cost-segment cache-read" style="width: ${(isTokenMode ? tokenPcts.cacheRead : breakdown.cacheRead.pct).toFixed(1)}%"
-          title="Cache Read: ${isTokenMode ? formatTokens(totals.cacheRead) : formatCost(breakdown.cacheRead.cost)}"></div>
+          title="缓存读取: ${isTokenMode ? formatTokens(totals.cacheRead) : formatCost(breakdown.cacheRead.cost)}"></div>
       </div>
       <div class="cost-breakdown-legend">
-        <span class="legend-item"><span class="legend-dot output"></span>Output ${isTokenMode ? formatTokens(totals.output) : formatCost(breakdown.output.cost)}</span>
-        <span class="legend-item"><span class="legend-dot input"></span>Input ${isTokenMode ? formatTokens(totals.input) : formatCost(breakdown.input.cost)}</span>
-        <span class="legend-item"><span class="legend-dot cache-write"></span>Cache Write ${isTokenMode ? formatTokens(totals.cacheWrite) : formatCost(breakdown.cacheWrite.cost)}</span>
-        <span class="legend-item"><span class="legend-dot cache-read"></span>Cache Read ${isTokenMode ? formatTokens(totals.cacheRead) : formatCost(breakdown.cacheRead.cost)}</span>
+        <span class="legend-item"><span class="legend-dot output"></span>输出 ${isTokenMode ? formatTokens(totals.output) : formatCost(breakdown.output.cost)}</span>
+        <span class="legend-item"><span class="legend-dot input"></span>输入 ${isTokenMode ? formatTokens(totals.input) : formatCost(breakdown.input.cost)}</span>
+        <span class="legend-item"><span class="legend-dot cache-write"></span>缓存写入 ${isTokenMode ? formatTokens(totals.cacheWrite) : formatCost(breakdown.cacheWrite.cost)}</span>
+        <span class="legend-item"><span class="legend-dot cache-read"></span>缓存读取 ${isTokenMode ? formatTokens(totals.cacheRead) : formatCost(breakdown.cacheRead.cost)}</span>
       </div>
       <div class="cost-breakdown-total">
-        Total: ${isTokenMode ? formatTokens(totals.totalTokens) : formatCost(totals.totalCost)}
+        合计: ${isTokenMode ? formatTokens(totals.totalTokens) : formatCost(totals.totalCost)}
       </div>
     </div>
   `;
@@ -387,23 +387,23 @@ function renderUsageInsights(
   const errorRatePct = stats.errorRate * 100;
   const throughputLabel =
     stats.throughputTokensPerMin !== undefined
-      ? `${formatTokens(Math.round(stats.throughputTokensPerMin))} tok/min`
+      ? `${formatTokens(Math.round(stats.throughputTokensPerMin))} 令牌/分钟`
       : "—";
   const throughputCostLabel =
     stats.throughputCostPerMin !== undefined
-      ? `${formatCost(stats.throughputCostPerMin, 4)} / min`
+      ? `${formatCost(stats.throughputCostPerMin, 4)} / 分钟`
       : "—";
   const avgDurationLabel =
     stats.durationCount > 0
       ? (formatDurationCompact(stats.avgDurationMs, { spaced: true }) ?? "—")
       : "—";
-  const cacheHint = "Cache hit rate = cache read / (input + cache read). Higher is better.";
-  const errorHint = "Error rate = errors / total messages. Lower is better.";
-  const throughputHint = "Throughput shows tokens per minute over active time. Higher is better.";
-  const tokensHint = "Average tokens per message in this range.";
+  const cacheHint = "缓存命中率 = 缓存读取 / (输入 + 缓存读取)。越高越好。";
+  const errorHint = "错误率 = 错误数 / 总消息数。越低越好。";
+  const throughputHint = "吞吐量显示活跃时间内每分钟的令牌数。越高越好。";
+  const tokensHint = "该范围内每条消息的平均令牌数。";
   const costHint = showCostHint
-    ? "Average cost per message when providers report costs. Cost data is missing for some or all sessions in this range."
-    : "Average cost per message when providers report costs.";
+    ? "供应商报告费用时每条消息的平均成本。此范围内部分或全部会话缺少费用数据。"
+    : "供应商报告费用时每条消息的平均成本。";
 
   const errorDays = aggregates.daily
     .filter((day) => day.messages > 0 && day.errors > 0)
@@ -412,7 +412,7 @@ function renderUsageInsights(
       return {
         label: formatDayLabel(day.date),
         value: `${(rate * 100).toFixed(2)}%`,
-        sub: `${day.errors} errors · ${day.messages} msgs · ${formatTokens(day.tokens)}`,
+        sub: `${day.errors} 个错误 · ${day.messages} 条消息 · ${formatTokens(day.tokens)}`,
         rate,
       };
     })
@@ -421,19 +421,19 @@ function renderUsageInsights(
     .map(({ rate: _rate, ...rest }) => rest);
 
   const topModels = aggregates.byModel.slice(0, 5).map((entry) => ({
-    label: entry.model ?? "unknown",
+    label: entry.model ?? "未知",
     value: formatCost(entry.totals.totalCost),
-    sub: `${formatTokens(entry.totals.totalTokens)} · ${entry.count} msgs`,
+    sub: `${formatTokens(entry.totals.totalTokens)} · ${entry.count} 条消息`,
   }));
   const topProviders = aggregates.byProvider.slice(0, 5).map((entry) => ({
-    label: entry.provider ?? "unknown",
+    label: entry.provider ?? "未知",
     value: formatCost(entry.totals.totalCost),
-    sub: `${formatTokens(entry.totals.totalTokens)} · ${entry.count} msgs`,
+    sub: `${formatTokens(entry.totals.totalTokens)} · ${entry.count} 条消息`,
   }));
   const topTools = aggregates.tools.tools.slice(0, 6).map((tool) => ({
     label: tool.name,
     value: `${tool.count}`,
-    sub: "calls",
+    sub: "次调用",
   }));
   const topAgents = aggregates.byAgent.slice(0, 5).map((entry) => ({
     label: entry.agentId,
@@ -448,61 +448,61 @@ function renderUsageInsights(
 
   return html`
     <section class="card" style="margin-top: 16px;">
-      <div class="card-title">Usage Overview</div>
+      <div class="card-title">用量概览</div>
       <div class="usage-summary-grid">
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Messages
-            <span class="usage-summary-hint" title="Total user + assistant messages in range.">?</span>
+            消息
+            <span class="usage-summary-hint" title="范围内的用户和助手消息总数。">?</span>
           </div>
           <div class="usage-summary-value">${aggregates.messages.total}</div>
           <div class="usage-summary-sub">
-            ${aggregates.messages.user} user · ${aggregates.messages.assistant} assistant
+            ${aggregates.messages.user} 用户 · ${aggregates.messages.assistant} 助手
           </div>
         </div>
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Tool Calls
-            <span class="usage-summary-hint" title="Total tool call count across sessions.">?</span>
+            工具调用
+            <span class="usage-summary-hint" title="所有会话中的工具调用总数。">?</span>
           </div>
           <div class="usage-summary-value">${aggregates.tools.totalCalls}</div>
-          <div class="usage-summary-sub">${aggregates.tools.uniqueTools} tools used</div>
+          <div class="usage-summary-sub">${aggregates.tools.uniqueTools} 个工具被使用</div>
         </div>
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Errors
-            <span class="usage-summary-hint" title="Total message/tool errors in range.">?</span>
+            错误
+            <span class="usage-summary-hint" title="范围内的消息/工具错误总数。">?</span>
           </div>
           <div class="usage-summary-value">${aggregates.messages.errors}</div>
-          <div class="usage-summary-sub">${aggregates.messages.toolResults} tool results</div>
+          <div class="usage-summary-sub">${aggregates.messages.toolResults} 个工具结果</div>
         </div>
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Avg Tokens / Msg
+            平均令牌 / 消息
             <span class="usage-summary-hint" title=${tokensHint}>?</span>
           </div>
           <div class="usage-summary-value">${formatTokens(avgTokens)}</div>
-          <div class="usage-summary-sub">Across ${aggregates.messages.total || 0} messages</div>
+          <div class="usage-summary-sub">共 ${aggregates.messages.total || 0} 条消息</div>
         </div>
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Avg Cost / Msg
+            平均成本 / 消息
             <span class="usage-summary-hint" title=${costHint}>?</span>
           </div>
           <div class="usage-summary-value">${formatCost(avgCost, 4)}</div>
-          <div class="usage-summary-sub">${formatCost(totals.totalCost)} total</div>
+          <div class="usage-summary-sub">合计 ${formatCost(totals.totalCost)}</div>
         </div>
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Sessions
-            <span class="usage-summary-hint" title="Distinct sessions in the range.">?</span>
+            会话
+            <span class="usage-summary-hint" title="范围内的不同会话数。">?</span>
           </div>
           <div class="usage-summary-value">${sessionCount}</div>
-          <div class="usage-summary-sub">of ${totalSessions} in range</div>
+          <div class="usage-summary-sub">范围内共 ${totalSessions} 个</div>
         </div>
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Throughput
+            吞吐量
             <span class="usage-summary-hint" title=${throughputHint}>?</span>
           </div>
           <div class="usage-summary-value">${throughputLabel}</div>
@@ -510,33 +510,33 @@ function renderUsageInsights(
         </div>
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Error Rate
+            错误率
             <span class="usage-summary-hint" title=${errorHint}>?</span>
           </div>
           <div class="usage-summary-value ${errorRatePct > 5 ? "bad" : errorRatePct > 1 ? "warn" : "good"}">${errorRatePct.toFixed(2)}%</div>
           <div class="usage-summary-sub">
-            ${aggregates.messages.errors} errors · ${avgDurationLabel} avg session
+            ${aggregates.messages.errors} 个错误 · 平均会话 ${avgDurationLabel}
           </div>
         </div>
         <div class="usage-summary-card">
           <div class="usage-summary-title">
-            Cache Hit Rate
+            缓存命中率
             <span class="usage-summary-hint" title=${cacheHint}>?</span>
           </div>
           <div class="usage-summary-value ${cacheHitRate > 0.6 ? "good" : cacheHitRate > 0.3 ? "warn" : "bad"}">${cacheHitLabel}</div>
           <div class="usage-summary-sub">
-            ${formatTokens(totals.cacheRead)} cached · ${formatTokens(cacheBase)} prompt
+            ${formatTokens(totals.cacheRead)} 已缓存 · ${formatTokens(cacheBase)} 提示
           </div>
         </div>
       </div>
       <div class="usage-insights-grid">
-        ${renderInsightList("Top Models", topModels, "No model data")}
-        ${renderInsightList("Top Providers", topProviders, "No provider data")}
-        ${renderInsightList("Top Tools", topTools, "No tool calls")}
-        ${renderInsightList("Top Agents", topAgents, "No agent data")}
-        ${renderInsightList("Top Channels", topChannels, "No channel data")}
-        ${renderPeakErrorList("Peak Error Days", errorDays, "No error data")}
-        ${renderPeakErrorList("Peak Error Hours", errorHours, "No error data")}
+        ${renderInsightList("热门模型", topModels, "暂无模型数据")}
+        ${renderInsightList("热门供应商", topProviders, "暂无供应商数据")}
+        ${renderInsightList("热门工具", topTools, "暂无工具调用")}
+        ${renderInsightList("热门代理", topAgents, "暂无代理数据")}
+        ${renderInsightList("热门渠道", topChannels, "暂无渠道数据")}
+        ${renderPeakErrorList("错误高峰日", errorDays, "暂无错误数据")}
+        ${renderPeakErrorList("错误高峰时段", errorHours, "暂无错误数据")}
       </div>
     </section>
   `;
@@ -580,28 +580,28 @@ function renderSessionsCard(
   const buildSessionMeta = (s: UsageSessionEntry): string[] => {
     const parts: string[] = [];
     if (showColumn("channel") && s.channel) {
-      parts.push(`channel:${s.channel}`);
+      parts.push(`渠道:${s.channel}`);
     }
     if (showColumn("agent") && s.agentId) {
-      parts.push(`agent:${s.agentId}`);
+      parts.push(`代理:${s.agentId}`);
     }
     if (showColumn("provider") && (s.modelProvider || s.providerOverride)) {
-      parts.push(`provider:${s.modelProvider ?? s.providerOverride}`);
+      parts.push(`供应商:${s.modelProvider ?? s.providerOverride}`);
     }
     if (showColumn("model") && s.model) {
-      parts.push(`model:${s.model}`);
+      parts.push(`模型:${s.model}`);
     }
     if (showColumn("messages") && s.usage?.messageCounts) {
-      parts.push(`msgs:${s.usage.messageCounts.total}`);
+      parts.push(`消息:${s.usage.messageCounts.total}`);
     }
     if (showColumn("tools") && s.usage?.toolUsage) {
-      parts.push(`tools:${s.usage.toolUsage.totalCalls}`);
+      parts.push(`工具:${s.usage.toolUsage.totalCalls}`);
     }
     if (showColumn("errors") && s.usage?.messageCounts) {
-      parts.push(`errors:${s.usage.messageCounts.errors}`);
+      parts.push(`错误:${s.usage.messageCounts.errors}`);
     }
     if (showColumn("duration") && s.usage?.durationMs) {
-      parts.push(`dur:${formatDurationCompact(s.usage.durationMs, { spaced: true }) ?? "—"}`);
+      parts.push(`时长:${formatDurationCompact(s.usage.durationMs, { spaced: true }) ?? "—"}`);
     }
     return parts;
   };
@@ -660,46 +660,46 @@ function renderSessionsCard(
   return html`
     <div class="card sessions-card">
       <div class="sessions-card-header">
-        <div class="card-title">Sessions</div>
+        <div class="card-title">会话</div>
         <div class="sessions-card-count">
-          ${sessions.length} shown${totalSessions !== sessions.length ? ` · ${totalSessions} total` : ""}
+          已显示 ${sessions.length}${totalSessions !== sessions.length ? ` · 共 ${totalSessions}` : ""}
         </div>
       </div>
       <div class="sessions-card-meta">
         <div class="sessions-card-stats">
-          <span>${isTokenMode ? formatTokens(avgValue) : formatCost(avgValue)} avg</span>
-          <span>${totalErrors} errors</span>
+          <span>${isTokenMode ? formatTokens(avgValue) : formatCost(avgValue)} 平均</span>
+          <span>${totalErrors} 错误</span>
         </div>
         <div class="chart-toggle small">
           <button
             class="toggle-btn ${sessionsTab === "all" ? "active" : ""}"
             @click=${() => onSessionsTabChange("all")}
           >
-            All
+            全部
           </button>
           <button
             class="toggle-btn ${sessionsTab === "recent" ? "active" : ""}"
             @click=${() => onSessionsTabChange("recent")}
           >
-            Recently viewed
+            最近查看
           </button>
         </div>
         <label class="sessions-sort">
-          <span>Sort</span>
+          <span>排序</span>
           <select
             @change=${(e: Event) => onSessionSortChange((e.target as HTMLSelectElement).value as typeof sessionSort)}
           >
-            <option value="cost" ?selected=${sessionSort === "cost"}>Cost</option>
-            <option value="errors" ?selected=${sessionSort === "errors"}>Errors</option>
-            <option value="messages" ?selected=${sessionSort === "messages"}>Messages</option>
-            <option value="recent" ?selected=${sessionSort === "recent"}>Recent</option>
-            <option value="tokens" ?selected=${sessionSort === "tokens"}>Tokens</option>
+            <option value="cost" ?selected=${sessionSort === "cost"}>费用</option>
+            <option value="errors" ?selected=${sessionSort === "errors"}>错误</option>
+            <option value="messages" ?selected=${sessionSort === "messages"}>消息</option>
+            <option value="recent" ?selected=${sessionSort === "recent"}>最近</option>
+            <option value="tokens" ?selected=${sessionSort === "tokens"}>令牌</option>
           </select>
         </label>
         <button
           class="btn btn-sm sessions-action-btn icon"
           @click=${() => onSessionSortDirChange(sessionSortDir === "desc" ? "asc" : "desc")}
-          title=${sessionSortDir === "desc" ? "Descending" : "Ascending"}
+          title=${sessionSortDir === "desc" ? "降序" : "升序"}
         >
           ${sessionSortDir === "desc" ? "↓" : "↑"}
         </button>
@@ -707,7 +707,7 @@ function renderSessionsCard(
           selectedCount > 0
             ? html`
                 <button class="btn btn-sm sessions-action-btn sessions-clear-btn" @click=${onClearSessions}>
-                  Clear Selection
+                  清除选择
                 </button>
               `
             : nothing
@@ -717,7 +717,7 @@ function renderSessionsCard(
         sessionsTab === "recent"
           ? recentEntries.length === 0
             ? html`
-                <div class="muted" style="padding: 20px; text-align: center">No recent sessions</div>
+                <div class="muted" style="padding: 20px; text-align: center">暂无最近会话</div>
               `
             : html`
                 <div class="session-bars" style="max-height: 220px; margin-top: 6px;">
@@ -740,7 +740,7 @@ function renderSessionsCard(
                         <div class="session-bar-actions">
                           <button
                             class="session-copy-btn"
-                            title="Copy session name"
+                            title="复制会话名称"
                             @click=${(e: MouseEvent) => {
                               e.stopPropagation();
                               void copySessionName(s);
@@ -757,7 +757,7 @@ function renderSessionsCard(
               `
           : sessions.length === 0
             ? html`
-                <div class="muted" style="padding: 20px; text-align: center">No sessions in range</div>
+                <div class="muted" style="padding: 20px; text-align: center">范围内暂无会话</div>
               `
             : html`
                 <div class="session-bars">
@@ -781,20 +781,20 @@ function renderSessionsCard(
                         <div class="session-bar-actions">
                           <button
                             class="session-copy-btn"
-                            title="Copy session name"
+                            title="复制会话名称"
                             @click=${(e: MouseEvent) => {
                               e.stopPropagation();
                               void copySessionName(s);
                             }}
                           >
-                            Copy
+                            复制
                           </button>
                           <div class="session-bar-value">${isTokenMode ? formatTokens(value) : formatCost(value)}</div>
                         </div>
                       </div>
                     `;
                   })}
-                  ${sessions.length > 50 ? html`<div class="muted" style="padding: 8px; text-align: center; font-size: 11px;">+${sessions.length - 50} more</div>` : nothing}
+                  ${sessions.length > 50 ? html`<div class="muted" style="padding: 8px; text-align: center; font-size: 11px;">+${sessions.length - 50} 更多</div>` : nothing}
                 </div>
               `
       }
@@ -802,7 +802,7 @@ function renderSessionsCard(
         selectedCount > 1
           ? html`
               <div style="margin-top: 10px;">
-                <div class="sessions-card-count">Selected (${selectedCount})</div>
+                <div class="sessions-card-count">已选择 (${selectedCount})</div>
                 <div class="session-bars" style="max-height: 160px; margin-top: 6px;">
                   ${selectedEntries.map((s) => {
                     const value = getSessionValue(s);
@@ -822,13 +822,13 @@ function renderSessionsCard(
                         <div class="session-bar-actions">
                           <button
                             class="session-copy-btn"
-                            title="Copy session name"
+                            title="复制会话名称"
                             @click=${(e: MouseEvent) => {
                               e.stopPropagation();
                               void copySessionName(s);
                             }}
                           >
-                            Copy
+                            复制
                           </button>
                           <div class="session-bar-value">${isTokenMode ? formatTokens(value) : formatCost(value)}</div>
                         </div>
