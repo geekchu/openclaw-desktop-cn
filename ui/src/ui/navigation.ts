@@ -7,7 +7,7 @@ export const TAB_GROUPS = [
     tabs: ["overview", "channels", "instances", "sessions", "cron"],
   },
   { label: "代理", tabs: ["agents", "skills", "nodes"] },
-  { label: "设置", tabs: ["manager", "config", "debug", "logs"] },
+  { label: "设置", tabs: ["config", "debug", "logs"] },
   { label: "工具", tabs: ["terminal"] },
 ] as const;
 
@@ -25,7 +25,6 @@ export type Tab =
   | "config"
   | "debug"
   | "logs"
-  | "manager"
   | "terminal";
 
 const TAB_PATHS: Record<Tab, string> = {
@@ -42,7 +41,6 @@ const TAB_PATHS: Record<Tab, string> = {
   config: "/config",
   debug: "/debug",
   logs: "/logs",
-  manager: "/manager",
   terminal: "/terminal",
 };
 
@@ -155,8 +153,7 @@ export function iconForTab(tab: Tab): IconName {
       return "bug";
     case "logs":
       return "scrollText";
-    case "manager":
-      return "settings";
+
     case "terminal":
       return "terminal";
     default:
@@ -190,8 +187,7 @@ export function titleForTab(tab: Tab) {
       return "调试";
     case "logs":
       return "日志";
-    case "manager":
-      return "控制面板";
+
     case "terminal":
       return "终端";
     default:
@@ -225,8 +221,7 @@ export function subtitleForTab(tab: Tab) {
       return "网关快照、事件和手动 RPC 调用。";
     case "logs":
       return "网关文件日志的实时跟踪。";
-    case "manager":
-      return "AI 配置、消息渠道、测试诊断与系统设置。";
+
     case "terminal":
       return "内嵌命令行终端，运行 openclaw 命令。";
     default:

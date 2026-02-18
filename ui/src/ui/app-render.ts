@@ -1,4 +1,4 @@
-import { html, nothing } from "lit";
+import { html, nothing, LitElement } from "lit";
 import type { AppViewState } from "./app-view-state.ts";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { refreshChatAvatar } from "./app-chat.ts";
@@ -62,9 +62,10 @@ import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
-import { renderManager } from "./views/manager.ts";
+
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
+import { saveOnestopConfig } from "./views/config-onestop.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
 import { renderTerminal } from "./views/terminal.ts";
@@ -188,7 +189,7 @@ export function renderApp(state: AppViewState) {
           </div>
         </div>
       </aside>
-      <main class="content ${isChat ? "content--chat" : ""} ${state.tab === "terminal" ? "content--terminal" : ""} ${state.tab === "manager" ? "content--manager" : ""}">
+      <main class="content ${isChat ? "content--chat" : ""} ${state.tab === "terminal" ? "content--terminal" : ""}">
         <section class="content-header">
           <div>
             ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}
@@ -898,6 +899,29 @@ export function renderApp(state: AppViewState) {
                 onSave: () => saveConfig(state),
                 onApply: () => applyConfig(state),
                 onUpdate: () => runUpdate(state),
+                onestop: {
+                  apiKey: state.onestopApiKey,
+                  selectedModel: state.onestopSelectedModel,
+                  showApiKey: state.onestopShowApiKey,
+                  activeCategory: state.onestopActiveCategory,
+                  saving: state.onestopSaving,
+                  onApiKeyChange: (value) => { state.onestopApiKey = value; },
+                  onModelSelect: (modelId) => { state.onestopSelectedModel = modelId; },
+                  onToggleShowApiKey: () => { state.onestopShowApiKey = !state.onestopShowApiKey; },
+                  onCategoryChange: (cat) => { state.onestopActiveCategory = cat; },
+                  onSave: async () => {
+                    state.onestopSaving = true;
+                    try {
+                      await saveOnestopConfig(state.onestopApiKey, state.onestopSelectedModel);
+                    } catch (e) {
+                      console.error("一站式保存失败:", e);
+                    } finally {
+                      state.onestopSaving = false;
+                    }
+                  },
+                  onNavigateToCustom: () => { state.configActiveSection = null; },
+                  requestUpdate: () => { (state as unknown as LitElement).requestUpdate(); },
+                },
               })
             : nothing
         }
@@ -955,7 +979,7 @@ export function renderApp(state: AppViewState) {
             : nothing
         }
 
-        ${renderManager({ active: state.tab === "manager" })}
+
       </main>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}

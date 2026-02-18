@@ -106,6 +106,15 @@ export type AppViewState = {
   configForm: Record<string, unknown> | null;
   configFormOriginal: Record<string, unknown> | null;
   configFormMode: "form" | "raw";
+  // One-Stop AI Access state
+  onestopApiKey: string;
+  onestopSelectedModel: string;
+  onestopShowApiKey: boolean;
+  onestopActiveCategory: string;
+  onestopSaving: boolean;
+  configSearchQuery: string;
+  configActiveSection: string | null;
+  configActiveSubsection: string | null;
   channelsLoading: boolean;
   channelsSnapshot: ChannelsStatusSnapshot | null;
   channelsError: string | null;

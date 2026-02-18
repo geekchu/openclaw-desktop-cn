@@ -1,4 +1,4 @@
-import { html, nothing } from "lit";
+﻿import { html, nothing } from "lit";
 import type { ConfigUiHints } from "../types.ts";
 import { icons } from "../icons.ts";
 import { renderNode } from "./config-form.node.ts";
@@ -243,6 +243,10 @@ const sectionIcons = {
 
 // Section metadata
 export const SECTION_META: Record<string, { label: string; description: string }> = {
+  onestop: {
+    label: "AI大模型接入",
+    description: "一站式接入全球AI大模型，支持自定义配置",
+  },
   env: {
     label: "环境变量",
     description: "传递给网关进程的环境变量",
@@ -266,7 +270,7 @@ export const SECTION_META: Record<string, { label: string; description: string }
   logging: { label: "日志", description: "日志级别和输出配置" },
   browser: { label: "浏览器", description: "浏览器自动化设置" },
   ui: { label: "界面", description: "用户界面偏好设置" },
-  models: { label: "模型", description: "AI 模型配置和提供商" },
+  models: { label: "自定义配置接入", description: "手动配置 AI 模型提供商和密钥（高级用户）" },
   bindings: { label: "绑定", description: "快捷键绑定" },
   broadcast: { label: "广播", description: "广播和通知设置" },
   audio: { label: "音频", description: "音频输入/输出设置" },

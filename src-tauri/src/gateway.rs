@@ -10,6 +10,9 @@ use tauri_plugin_notification::NotificationExt;
 
 use crate::utils::shell;
 use crate::TrayState;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 
 /// Gateway 进程管理器
 /// 负责启动、停止、健康检查 openclaw gateway 子进程
@@ -256,3 +259,4 @@ pub fn health_check_loop(handle: &AppHandle) {
         }
     }
 }
+

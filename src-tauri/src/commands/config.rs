@@ -363,7 +363,7 @@ pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
             id: "minimax".to_string(),
             name: "MiniMax".to_string(),
             icon: "🟡".to_string(),
-            default_base_url: Some("https://api.minimax.io/anthropic".to_string()),
+            default_base_url: Some("https://api.minimaxi.com/anthropic".to_string()),
             api_type: "anthropic-messages".to_string(),
             requires_api_key: true,
             docs_url: Some("https://docs.openclaw.ai/providers/minimax".to_string()),

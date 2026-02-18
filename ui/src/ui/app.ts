@@ -182,8 +182,15 @@ export class OpenClawApp extends LitElement {
   @state() configFormDirty = false;
   @state() configFormMode: "form" | "raw" = "form";
   @state() configSearchQuery = "";
-  @state() configActiveSection: string | null = null;
+  @state() configActiveSection: string | null = "onestop";
   @state() configActiveSubsection: string | null = null;
+
+  // One-Stop AI Access state
+  @state() onestopApiKey = "";
+  @state() onestopSelectedModel = "";
+  @state() onestopShowApiKey = false;
+  @state() onestopActiveCategory = "all";
+  @state() onestopSaving = false;
 
   @state() channelsLoading = false;
   @state() channelsSnapshot: ChannelsStatusSnapshot | null = null;
