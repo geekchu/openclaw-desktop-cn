@@ -151,20 +151,18 @@ export class CustomProvidersView extends LitElement {
     // this.addLog("开始加载数据...");
     
     try {
-      // this.addLog("调用 get_official_providers...");
-      // Wrap with 5s timeout race
       const officialPromise = invoke<OfficialProvider[]>("get_official_providers");
-      const timeoutPromise = new Promise<never>((_, reject) => 
+      const timeout1 = new Promise<never>((_, reject) => 
          setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000)
       );
       
-      this.officialProviders = await Promise.race([officialPromise, timeoutPromise]);
+      this.officialProviders = await Promise.race([officialPromise, timeout1]);
       
-      // this.addLog(`获取到 ${this.officialProviders.length} 个官方供应商`);
-
-      // this.addLog("调用 get_ai_config...");
       const configPromise = invoke<AIConfigOverview>("get_ai_config");
-      this.aiConfig = await Promise.race([configPromise, timeoutPromise]);
+      const timeout2 = new Promise<never>((_, reject) => 
+         setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000)
+      );
+      this.aiConfig = await Promise.race([configPromise, timeout2]);
       
       // this.addLog("配置加载完成");
       
@@ -218,6 +216,7 @@ export class CustomProvidersView extends LitElement {
       await this.loadData();
     } catch (e) {
       this.error = "删除供应商失败: " + String(e);
+    } finally {
       this.deleting = false;
     }
   }
@@ -316,8 +315,8 @@ export class CustomProvidersView extends LitElement {
           name: suggested?.name || existingModel?.name || modelId,
           api: this.formApiType,
           input: ["text", "image"],
-          contextWindow: suggested?.context_window || existingModel?.context_window || 200000,
-          maxTokens: suggested?.max_tokens || existingModel?.max_tokens || 8192,
+          contextWindow: suggested?.context_window ?? existingModel?.context_window ?? 200000,
+          maxTokens: suggested?.max_tokens ?? existingModel?.max_tokens ?? 8192,
           reasoning: false,
           cost: null,
         };

@@ -363,9 +363,40 @@ async function createTerminalInstance(container: HTMLElement) {
 
   observeResize(container);
 
+  // ── 命令拦截：禁止 openclaw update ──
+  let _lineBuffer = "";
+  const BLOCKED_CMD_RE = /^\s*openclaw\s+update\b/i;
+
   term.onData((data: string) => {
     if (_sessionId) {
-      invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      // 检测 Enter 键
+      if (data === "\r" || data === "\n") {
+        if (BLOCKED_CMD_RE.test(_lineBuffer)) {
+          // 阻止执行，打印警告
+          term.write("\r\n\x1b[33m⚠ 桌面版不支持 openclaw update 命令，请通过应用内更新。\x1b[0m\r\n");
+          // 发送 Ctrl+C 取消当前行，然后发送一个新行让 shell 重新显示提示符
+          invoke("terminal_write", { id: _sessionId, data: "\x03" }).catch(() => {});
+          _lineBuffer = "";
+          return;
+        }
+        _lineBuffer = "";
+        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      } else if (data === "\x7f" || data === "\b") {
+        // Backspace
+        _lineBuffer = _lineBuffer.slice(0, -1);
+        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      } else if (data === "\x03" || data === "\x15") {
+        // Ctrl+C or Ctrl+U: clear line buffer
+        _lineBuffer = "";
+        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      } else if (data.charCodeAt(0) >= 32 || data === "\t") {
+        // Printable characters and tab
+        _lineBuffer += data;
+        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      } else {
+        // Other control sequences (arrows, etc.) — pass through
+        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      }
     } else {
       void attachSession();
     }

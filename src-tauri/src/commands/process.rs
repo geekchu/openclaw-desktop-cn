@@ -3,6 +3,8 @@ use tauri::command;
 use log::{info, debug};
 
 /// 检查 OpenClaw 是否已安装
+/// 生产模式：仅检查 bundle 模式（内置 Node.js + openclaw.mjs）
+/// 开发模式：bundle 优先，回退到全局 openclaw
 #[command]
 pub async fn check_openclaw_installed() -> Result<bool, String> {
     info!("[进程检查] 检查 OpenClaw 是否可用...");
@@ -20,9 +22,15 @@ pub async fn check_openclaw_installed() -> Result<bool, String> {
         return Ok(true);
     }
 
-    // 回退到全局 openclaw 检查
+    // 生产模式：不回退到全局 openclaw，打包应用必须自包含
+    if !cfg!(debug_assertions) {
+        info!("[进程检查] 生产模式下 bundle 不可用 (bundle_ok={}, node_ok={})", bundle_ok, node_ok);
+        return Ok(false);
+    }
+
+    // 开发模式：回退到全局 openclaw 检查
     let installed = shell::get_openclaw_path().is_some();
-    info!("[进程检查] OpenClaw 安装状态: {}", if installed { "已安装" } else { "未安装" });
+    info!("[进程检查] [开发模式] OpenClaw 安装状态: {}", if installed { "已安装" } else { "未安装" });
     Ok(installed)
 }
 
@@ -79,15 +87,21 @@ pub async fn check_port_in_use(port: u16) -> Result<bool, String> {
 }
 
 /// 获取 Node.js 版本
+/// 优先使用内置 Node.js，生产模式不回退到系统 node
 #[command]
 pub async fn get_node_version() -> Result<Option<String>, String> {
     info!("[进程检查] 获取 Node.js 版本...");
-    if !shell::command_exists("node") {
-        info!("[进程检查] Node.js 未安装");
-        return Ok(None);
-    }
     
-    match shell::run_command_output("node", &["--version"]) {
+    // 使用 get_node_path() 获取 Node.js 路径（生产模式仅返回内置版本）
+    let node_path = match shell::get_node_path() {
+        Some(p) => p,
+        None => {
+            info!("[进程检查] Node.js 不可用");
+            return Ok(None);
+        }
+    };
+    
+    match shell::run_command_output(&node_path, &["--version"]) {
         Ok(version) => {
             info!("[进程检查] Node.js 版本: {}", version);
             Ok(Some(version))

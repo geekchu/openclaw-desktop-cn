@@ -92,8 +92,20 @@ pub async fn check_environment() -> Result<EnvironmentStatus, String> {
 }
 
 /// 获取 Node.js 版本
-/// 检测多个可能的安装路径，因为 GUI 应用不继承用户 shell 的 PATH
+/// 优先检查内置 Node.js（生产模式），然后检查系统安装路径
 fn get_node_version() -> Option<String> {
+    // 1. 优先使用 shell::get_node_path()（包含 bundled Node.js 检测）
+    if let Some(node_path) = shell::get_node_path() {
+        if let Ok(output) = shell::run_command_output(&node_path, &["--version"]) {
+            let version = output.trim().to_string();
+            if !version.is_empty() && version.starts_with('v') {
+                info!("[环境检查] 通过 get_node_path 找到 Node.js: {} ({})", version, node_path);
+                return Some(version);
+            }
+        }
+    }
+
+    // 2. 回退到系统路径检测（用于开发模式或 bundled 不可用时）
     if platform::is_windows() {
         // Windows: 先尝试直接调用（如果 PATH 已更新）
         if let Ok(v) = shell::run_cmd_output("node --version") {

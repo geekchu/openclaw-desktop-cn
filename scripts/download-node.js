@@ -49,6 +49,14 @@ const PLATFORMS = {
     archiveName: `node-${NODE_VERSION}-darwin-arm64`,
     archiveExt: "tar.gz",
   },
+  "linux-x64": {
+    archiveName: `node-${NODE_VERSION}-linux-x64`,
+    archiveExt: "tar.xz",
+  },
+  "linux-arm64": {
+    archiveName: `node-${NODE_VERSION}-linux-arm64`,
+    archiveExt: "tar.xz",
+  },
 };
 
 function getCurrentPlatform() {
@@ -58,6 +66,8 @@ function getCurrentPlatform() {
   if (platform === "win32" && arch === "x64") return "win-x64";
   if (platform === "darwin" && arch === "x64") return "darwin-x64";
   if (platform === "darwin" && arch === "arm64") return "darwin-arm64";
+  if (platform === "linux" && arch === "x64") return "linux-x64";
+  if (platform === "linux" && arch === "arm64") return "linux-arm64";
 
   console.warn(`[download-node] 当前平台 ${platform}-${arch} 不在支持列表中`);
   return null;
@@ -145,10 +155,14 @@ async function downloadAndExtractPlatform(platformKey) {
       `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`,
       { stdio: "inherit" },
     );
+  } else if (config.archiveExt === "tar.xz") {
+    console.log(`[download-node] 解压 (tar.xz) ${archivePath}`);
+    execSync(`tar -xJf "${archivePath}" -C "${tempDir}"`, { stdio: "inherit" });
   } else {
     console.log(`[download-node] 解压 (tar.gz) ${archivePath}`);
     execSync(`tar -xzf "${archivePath}" -C "${tempDir}"`, { stdio: "inherit" });
   }
+
 
   // 解压后有一层目录（如 node-v24.13.0-win-x64/），需要提取内层
   const innerDirName = findFirstSubdir(tempDir);

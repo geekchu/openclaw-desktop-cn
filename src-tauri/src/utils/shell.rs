@@ -250,6 +250,10 @@ fn get_node_platform_dir() -> &'static str {
         "darwin-arm64"
     } else if cfg!(target_os = "macos") && cfg!(target_arch = "x86_64") {
         "darwin-x64"
+    } else if cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") {
+        "linux-x64"
+    } else if cfg!(target_os = "linux") && cfg!(target_arch = "aarch64") {
+        "linux-arm64"
     } else {
         "unknown"
     }
@@ -287,20 +291,27 @@ fn get_bundled_node_path() -> Option<String> {
 }
 
 /// 获取 Node.js 可执行文件路径
-/// 检测多个可能的安装路径，因为 GUI 应用不继承用户 shell 的 PATH
+/// 生产模式：仅使用内置 Node.js，不回退到系统安装版本
+/// 开发模式：内置优先，回退到系统 Node.js
 pub fn get_node_path() -> Option<String> {
     // 1. 优先使用内置 Node.js
     if let Some(bundled) = get_bundled_node_path() {
         return Some(bundled);
     }
 
-    // 2. 回退到系统 Node.js
+    // 生产模式：不回退到系统 Node.js，打包应用必须自包含
+    if !cfg!(debug_assertions) {
+        warn!("[Shell] 生产模式下内置 Node.js 不可用，不回退到系统版本");
+        return None;
+    }
+
+    // 开发模式：回退到系统 Node.js
     if platform::is_windows() {
         // 先尝试 where node
         if let Ok(output) = run_cmd_output("where node") {
             let path = output.lines().next().unwrap_or("").trim().to_string();
             if !path.is_empty() && std::path::Path::new(&path).exists() {
-                info!("[Shell] 通过 where 找到 Node.js: {}", path);
+                info!("[Shell] [开发模式] 通过 where 找到 Node.js: {}", path);
                 return Some(path);
             }
         }
@@ -308,7 +319,7 @@ pub fn get_node_path() -> Option<String> {
         let possible_paths = get_windows_node_paths();
         for path in possible_paths {
             if std::path::Path::new(&path).exists() {
-                info!("[Shell] 在 {} 找到 Node.js", path);
+                info!("[Shell] [开发模式] 在 {} 找到 Node.js", path);
                 return Some(path);
             }
         }
@@ -317,7 +328,7 @@ pub fn get_node_path() -> Option<String> {
         if let Ok(output) = run_command_output("which", &["node"]) {
             let path = output.trim().to_string();
             if !path.is_empty() && std::path::Path::new(&path).exists() {
-                info!("[Shell] 通过 which 找到 Node.js: {}", path);
+                info!("[Shell] [开发模式] 通过 which 找到 Node.js: {}", path);
                 return Some(path);
             }
         }
@@ -325,14 +336,14 @@ pub fn get_node_path() -> Option<String> {
         let possible_paths = get_unix_node_paths();
         for path in possible_paths {
             if std::path::Path::new(&path).exists() {
-                info!("[Shell] 在 {} 找到 Node.js", path);
+                info!("[Shell] [开发模式] 在 {} 找到 Node.js", path);
                 return Some(path);
             }
         }
         // 最后尝试通过用户 shell 查找
         if let Ok(path) = run_bash_output("source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; which node 2>/dev/null") {
             if !path.is_empty() && std::path::Path::new(&path).exists() {
-                info!("[Shell] 通过用户 shell 找到 Node.js: {}", path);
+                info!("[Shell] [开发模式] 通过用户 shell 找到 Node.js: {}", path);
                 return Some(path);
             }
         }
@@ -600,13 +611,19 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
         };
     }
 
-    // 回退：使用全局 openclaw 命令
+    // 生产模式：不回退到全局 openclaw，打包应用必须自包含
+    if !cfg!(debug_assertions) {
+        warn!("[Shell] 生产模式下 bundle 模式不可用（Node.js 或 entry 缺失），不回退到全局 openclaw");
+        return Err("内置 openclaw 不可用，请重新安装应用".to_string());
+    }
+
+    // 开发模式：回退到全局 openclaw 命令
     let openclaw_path = get_openclaw_path().ok_or_else(|| {
         warn!("[Shell] 找不到 openclaw（bundle 和全局都不可用）");
         "找不到 openclaw，请确保项目已构建（pnpm build）且 Node.js 已安装".to_string()
     })?;
 
-    debug!("[Shell] 回退到全局 openclaw: {}", openclaw_path);
+    debug!("[Shell] [开发模式] 回退到全局 openclaw: {}", openclaw_path);
 
     let output = if openclaw_path.ends_with(".cmd") {
         let mut cmd_args = vec!["/c", &openclaw_path];
@@ -766,7 +783,16 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         };
     }
 
-    // 回退：使用全局 openclaw 命令
+    // 生产模式：不回退到全局 openclaw，打包应用必须自包含
+    if !cfg!(debug_assertions) {
+        warn!("[Shell] 生产模式下 bundle 模式不可用（Node.js 或 entry 缺失），不回退到全局 openclaw");
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "内置 openclaw 不可用，请重新安装应用"
+        ));
+    }
+
+    // 开发模式：回退到全局 openclaw 命令
     let openclaw_path = get_openclaw_path().ok_or_else(|| {
         warn!("[Shell] 找不到 openclaw（bundle 和全局都不可用）");
         io::Error::new(
@@ -775,7 +801,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         )
     })?;
 
-    info!("[Shell] 回退到全局 openclaw: {}", openclaw_path);
+    info!("[Shell] [开发模式] 回退到全局 openclaw: {}", openclaw_path);
 
     let mut cmd = if openclaw_path.ends_with(".cmd") {
         let mut c = Command::new("cmd");
@@ -796,7 +822,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    info!("[Shell] 启动 gateway 进程...");
+    info!("[Shell] [开发模式] 启动 gateway 进程...");
     match cmd.spawn() {
         Ok(child) => {
             info!("[Shell] Gateway 进程已启动, PID: {}", child.id());

@@ -33,6 +33,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "resources": {
       "gateway-bundle": "gateway-bundle",
@@ -66,6 +67,14 @@
       "deb": {
         "depends": []
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUyRTM0NDE2OENBMEI3M0IKUldRN3Q2Q01Ga1RqVWhLek1PZUN2QXk0a0FBWXFhU2JVNlQxSXhNUlJwUkVGVHI2U242VWlmMCsK",
+      "endpoints": [
+        "https://api.openclawcn.net/update/latest.json"
+      ]
     }
   }
 }

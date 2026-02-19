@@ -678,7 +678,20 @@ pub async fn save_provider(
     // 保存 Provider 配置
     config["models"]["providers"][&provider_name] = provider_config;
 
-    // 将模型添加到 agents.defaults.models
+    // 清理旧模型条目：删除该 provider 下所有旧的 full_id，防止编辑时移除模型后僵尸条目残留
+    if let Some(defaults_models) = config["agents"]["defaults"]["models"].as_object_mut() {
+        let prefix = format!("{}/", provider_name);
+        let old_keys: Vec<String> = defaults_models
+            .keys()
+            .filter(|k| k.starts_with(&prefix))
+            .cloned()
+            .collect();
+        for key in old_keys {
+            defaults_models.remove(&key);
+        }
+    }
+
+    // 将当前选中的模型添加到 agents.defaults.models
     for model in &models {
         let full_id = format!("{}/{}", provider_name, model.id);
         config["agents"]["defaults"]["models"][&full_id] = json!({});

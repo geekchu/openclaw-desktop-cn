@@ -6,6 +6,7 @@
  */
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { checkForUpdate, downloadAndInstallUpdate } from "./updater.js";
 
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
 declare global {
@@ -61,6 +62,18 @@ export class SystemSettingsView extends LitElement {
   @state() private userName = "主人";
   @state() private timezone = "Asia/Shanghai";
   @state() private autoStart = false;
+  @state() private autoStartBusy = false;
+
+  /* ── update states ── */
+  @state() private updateChecking = false;
+  @state() private updateAvailable = false;
+  @state() private updateVersion = "";
+  @state() private updateNotes = "";
+  @state() private updateDownloading = false;
+  @state() private updateProgress = 0;
+  @state() private updateError = "";
+  @state() private updateDone = false;
+  private _updateRid: number | null = null;
 
   /* ── lifecycle ── */
   override connectedCallback() {
@@ -96,21 +109,27 @@ export class SystemSettingsView extends LitElement {
   private _securityTimer?: ReturnType<typeof setTimeout>;
   private _askTimer?: ReturnType<typeof setTimeout>;
   private _profileTimer?: ReturnType<typeof setTimeout>;
+  private _saveQueue: Promise<void> = Promise.resolve();
 
-  private async _saveField(path: string[], key: string, value: unknown) {
-    try {
-      const cfg = (await invoke<Record<string, unknown>>("get_config")) ?? {};
-      ensurePath(cfg, path);
-      (getNestedValue(cfg, path) as Record<string, unknown>)[key] = value;
-      await invoke("save_config", { config: cfg });
-      this.needsRestart = true;
-    } catch (e) { console.error("保存失败:", e); }
+  private _saveField(path: string[], key: string, value: unknown) {
+    // 串行化：每次 _saveField 排队执行，避免并发 read-modify-write 竞态
+    this._saveQueue = this._saveQueue.then(async () => {
+      try {
+        const cfg = (await invoke<Record<string, unknown>>("get_config")) ?? {};
+        ensurePath(cfg, path);
+        (getNestedValue(cfg, path) as Record<string, unknown>)[key] = value;
+        await invoke("save_config", { config: cfg });
+        this.needsRestart = true;
+      } catch (e) { console.error("保存失败:", e); }
+    });
   }
 
   private _handleSecurityChange(mode: typeof this.execSecurity) {
     if (mode === this.execSecurity) return;
     this.execSecurity = mode;
     clearTimeout(this._securityTimer);
+    // 切换到非 allowlist 模式时，取消待执行的 ask 保存定时器
+    if (mode !== "allowlist") clearTimeout(this._askTimer);
     this._securityTimer = setTimeout(() => this._saveField(["tools", "exec"], "security", mode), 300);
   }
   private _handleAskChange(mode: typeof this.execAsk) {
@@ -143,10 +162,13 @@ export class SystemSettingsView extends LitElement {
   }
 
   private async _toggleAutoStart() {
+    if (this.autoStartBusy) return;
+    this.autoStartBusy = true;
     try {
       if (this.autoStart) { await invoke("autostart_disable"); this.autoStart = false; }
       else { await invoke("autostart_enable"); this.autoStart = true; }
     } catch (e) { console.error("切换开机自启失败:", e); }
+    finally { this.autoStartBusy = false; }
   }
 
   private async _openConfigDir() {
@@ -575,6 +597,50 @@ export class SystemSettingsView extends LitElement {
       height: 14px;
       border-width: 1.5px;
     }
+
+    /* ── update card ── */
+    .update-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0 4px;
+    }
+    .update-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .update-progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .update-progress-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--mg-border, rgba(255,255,255,0.08));
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .update-progress-fill {
+      height: 100%;
+      background: var(--info, #3b82f6);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+    .update-progress-pct {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--mg-text-secondary, #8b949e);
+      min-width: 36px;
+      text-align: right;
+    }
+    .update-error {
+      font-size: 13px;
+      color: var(--danger, #f85149);
+      margin-top: 6px;
+    }
   `;
 
   /* ── SVG icons ── */
@@ -620,6 +686,7 @@ export class SystemSettingsView extends LitElement {
         ${this._renderSecurityCard()}
         ${this._renderIdentityCard()}
         ${this._renderAdvancedCard()}
+        ${this._renderUpdateCard()}
       </div>
     `;
   }
@@ -790,7 +857,7 @@ export class SystemSettingsView extends LitElement {
             </div>
           </div>
           <label class="switch">
-            <input type="checkbox" .checked=${this.autoStart} @change=${this._toggleAutoStart} />
+            <input type="checkbox" .checked=${this.autoStart} ?disabled=${this.autoStartBusy} @change=${this._toggleAutoStart} />
             <span class="switch-track"></span>
           </label>
         </div>
@@ -806,5 +873,102 @@ export class SystemSettingsView extends LitElement {
           <span class="chevron">${this._chevronRight}</span>
         </button>
       </div>`;
+  }
+
+  /* ── Update card ── */
+
+  private async _handleCheckUpdate() {
+    this.updateChecking = true;
+    this.updateError = "";
+    this.updateAvailable = false;
+    this.updateDone = false;
+    this._updateRid = null;
+    try {
+      const result = await checkForUpdate();
+      if (result) {
+        this.updateAvailable = true;
+        this.updateVersion = result.version;
+        this.updateNotes = result.body;
+        this._updateRid = result.rid;
+      } else {
+        this.updateDone = true; // 已是最新
+      }
+    } catch (e: any) {
+      this.updateError = String(e?.message || e);
+    } finally {
+      this.updateChecking = false;
+    }
+  }
+
+  private async _handleDownloadUpdate() {
+    if (this._updateRid == null) {
+      this.updateError = "无法下载：更新信息缺失，请重新检查";
+      return;
+    }
+    this.updateDownloading = true;
+    this.updateProgress = 0;
+    this.updateError = "";
+    try {
+      await downloadAndInstallUpdate(this._updateRid, (percent) => {
+        this.updateProgress = percent;
+      });
+      // downloadAndInstallUpdate 内部会调用 restart
+    } catch (e: any) {
+      this.updateError = String(e?.message || e);
+      this.updateDownloading = false;
+    }
+  }
+
+  private _renderUpdateCard() {
+    return html`
+      <div class="card">
+        <div class="card-title">
+          <div class="card-title-icon blue">${this._updateIcon}</div>
+          <div>
+            <div class="title-text">软件更新</div>
+            <div class="title-sub">检查并安装最新版本</div>
+          </div>
+        </div>
+
+        ${this.updateDownloading ? html`
+          <div class="update-row">
+            <div class="update-info">
+              <div class="toggle-text-primary">正在下载 v${this.updateVersion}...</div>
+              <div class="update-progress-wrap">
+                <div class="update-progress-bar">
+                  <div class="update-progress-fill" style="width:${this.updateProgress}%"></div>
+                </div>
+                <span class="update-progress-pct">${this.updateProgress}%</span>
+              </div>
+            </div>
+          </div>
+        ` : this.updateAvailable ? html`
+          <div class="update-row">
+            <div class="update-info">
+              <div class="toggle-text-primary">🎉 发现新版本 v${this.updateVersion}</div>
+              ${this.updateNotes ? html`<div class="toggle-text-secondary">${this.updateNotes}</div>` : nothing}
+              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
+            </div>
+            <button class="btn-primary" @click=${this._handleDownloadUpdate}>下载并安装</button>
+          </div>
+        ` : html`
+          <div class="update-row">
+            <div class="update-info">
+              ${this.updateDone
+                ? html`<div class="toggle-text-primary">✅ 当前已是最新版本</div>`
+                : html`<div class="toggle-text-primary">点击按钮检查是否有新版本可用</div>`
+              }
+              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
+            </div>
+            <button class="btn-primary" ?disabled=${this.updateChecking} @click=${this._handleCheckUpdate}>
+              ${this.updateChecking ? html`<span class="spinner spinner-sm"></span> 检查中…` : "检查更新"}
+            </button>
+          </div>
+        `}
+      </div>`;
+  }
+
+  private get _updateIcon() {
+    return html`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
   }
 }

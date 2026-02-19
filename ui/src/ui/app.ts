@@ -1,4 +1,5 @@
 import { LitElement } from "lit";
+import { initAutoUpdater } from "./views/updater.ts";
 import { customElement, state } from "lit/decorators.js";
 import type { EventLogEntry } from "./app-events.ts";
 import type { AppViewState } from "./app-view-state.ts";
@@ -361,6 +362,7 @@ export class OpenClawApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
+    initAutoUpdater();
   }
 
   protected firstUpdated() {

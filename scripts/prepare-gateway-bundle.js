@@ -69,6 +69,20 @@ run("pnpm ui:build");
 console.log("\n[bundle] === Step 2.5: 编译 Manager UI ===");
 run("pnpm manager:build");
 
+// Step 2.6: 确保 splash.html 在 frontend 目录中
+// Tauri 生产构建仅嵌入 frontendDist（./frontend）中的文件，
+// 而 splash.html 源文件在 src-tauri/ 根目录，需要复制到 frontend/ 中
+console.log("\n[bundle] === Step 2.6: 复制 splash.html 到 frontend ===");
+const splashSrc = join(projectRoot, "src-tauri", "splash.html");
+const frontendDir = join(projectRoot, "src-tauri", "frontend");
+if (existsSync(splashSrc)) {
+  mkdirSync(frontendDir, { recursive: true });
+  cpSync(splashSrc, join(frontendDir, "splash.html"));
+  console.log("[bundle] 已复制 splash.html → frontend/splash.html");
+} else {
+  console.warn("[bundle] 警告: splash.html 不存在，跳过");
+}
+
 // Step 3: 清理并创建 bundle 目录
 console.log("\n[bundle] === Step 3: 创建 gateway-bundle ===");
 if (existsSync(bundleDir)) {

@@ -111,8 +111,11 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
         },
     });
     
-    // 检查 Node.js
-    let node_check = shell::run_command_output("node", &["--version"]);
+    // 检查 Node.js（使用 get_node_path 以在生产模式下使用内置版本）
+    let node_check = match shell::get_node_path() {
+        Some(node_path) => shell::run_command_output(&node_path, &["--version"]),
+        None => Err("未安装".to_string()),
+    };
     results.push(DiagnosticResult {
         name: "Node.js".to_string(),
         passed: node_check.is_ok(),
@@ -552,14 +555,17 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
         "unknown".to_string()
     };
     
-    let openclaw_installed = shell::get_openclaw_path().is_some();
+    let has_bundle = shell::get_bundle_entry().is_some() && shell::get_node_path().is_some();
+    let has_global = shell::get_openclaw_path().is_some();
+    let openclaw_installed = has_bundle || has_global;
     let openclaw_version = if openclaw_installed {
         shell::run_openclaw(&["--version"]).ok()
     } else {
         None
     };
     
-    let node_version = shell::run_command_output("node", &["--version"]).ok();
+    let node_version = shell::get_node_path()
+        .and_then(|p| shell::run_command_output(&p, &["--version"]).ok());
     
     Ok(SystemInfo {
         os,
@@ -738,4 +744,3 @@ read -p "按回车键关闭..."
         _ => Err(format!("不支持 {} 的登录向导", channel_type)),
     }
 }
-

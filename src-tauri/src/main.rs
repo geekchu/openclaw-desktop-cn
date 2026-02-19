@@ -129,6 +129,9 @@ fn main() {
                 .build(),
         )
         .setup(|app| {
+            // 自动更新插件
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+
             // 解析并设置 gateway bundle 目录
             let gateway_dir = resolve_gateway_bundle_dir(app);
             std::env::set_var("OPENCLAW_GATEWAY_BUNDLE_DIR", gateway_dir.to_str().unwrap_or("."));

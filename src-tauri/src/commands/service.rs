@@ -164,13 +164,21 @@ pub async fn start_service() -> Result<String, String> {
         return Err("服务已在运行中".to_string());
     }
     
-    // 检查 openclaw 命令是否存在
-    let openclaw_path = shell::get_openclaw_path();
-    if openclaw_path.is_none() {
-        info!("[服务] 找不到 openclaw 命令");
-        return Err("找不到 openclaw 命令，请先通过 npm install -g openclaw 安装".to_string());
+    // 检查 openclaw 是否可用（bundle 模式或全局命令）
+    let bundle_ok = shell::get_bundle_entry().is_some() && shell::get_node_path().is_some();
+    if !bundle_ok {
+        if cfg!(debug_assertions) {
+            // 开发模式：回退检查全局 openclaw
+            if shell::get_openclaw_path().is_none() {
+                info!("[服务] [开发模式] 找不到 openclaw 命令");
+                return Err("找不到 openclaw 命令，请确保项目已构建（pnpm build）且 Node.js 已安装".to_string());
+            }
+        } else {
+            // 生产模式：不回退，提示重新安装
+            info!("[服务] 生产模式下 bundle 不可用");
+            return Err("内置 openclaw 不可用，请重新安装应用".to_string());
+        }
     }
-    info!("[服务] openclaw 路径: {:?}", openclaw_path);
     
     // 直接后台启动 gateway（不等待 doctor，避免阻塞）
     info!("[服务] 后台启动 gateway...");
@@ -254,11 +262,16 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
 pub async fn get_logs(lines: Option<u32>) -> Result<Vec<String>, String> {
     let n = lines.unwrap_or(100) as usize;
 
-    // Gateway 写入的日志文件路径: \tmp\openclaw\openclaw-YYYY-MM-DD.log (Windows)
+    // Gateway 写入的日志文件路径:
+    //   POSIX: /tmp/openclaw/openclaw-YYYY-MM-DD.log
+    //   Windows: %TEMP%/openclaw/openclaw-YYYY-MM-DD.log (与 Node.js os.tmpdir() 一致)
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
 
     #[cfg(windows)]
-    let log_path = format!("\\tmp\\openclaw\\openclaw-{}.log", today);
+    let log_path = {
+        let tmp = std::env::temp_dir();
+        format!("{}\\openclaw\\openclaw-{}.log", tmp.display(), today)
+    };
     #[cfg(not(windows))]
     let log_path = format!("/tmp/openclaw/openclaw-{}.log", today);
 
