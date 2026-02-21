@@ -1,0 +1,24 @@
+[35m[plugins][39m [31mmatrix failed to load from F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\matrix\index.ts: Error: Cannot find module '@vector-im/matrix-bot-sdk'[39m
+[31mRequire stack:[39m
+[31m- F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\matrix\src\matrix\client\config.ts[39m
+[35m[plugins][39m [31mnostr failed to load from F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\nostr\index.ts: Error: Cannot find module 'nostr-tools'[39m
+[31mRequire stack:[39m
+[31m- F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\nostr\src\nostr-bus.ts[39m
+[35m[plugins][39m [31mtlon failed to load from F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\tlon\index.ts: Error: Cannot find module '@urbit/aura'[39m
+[31mRequire stack:[39m
+[31m- F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\tlon\src\urbit\send.ts[39m
+[35m[plugins][39m [31mtwitch failed to load from F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\twitch\index.ts: Error: Cannot find module '@twurple/auth'[39m
+[31mRequire stack:[39m
+[31m- F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\twitch\src\twitch-client.ts[39m
+[90m2026-02-15T17:04:16.695Z[39m [36m[gateway][39m [31m[plugins] failed to load plugin: Error: Cannot find module '@vector-im/matrix-bot-sdk'[39m
+[31mRequire stack:[39m
+[31m- F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\matrix\src\matrix\client\config.ts (plugin=matrix, source=F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\matrix\index.ts)[39m
+[90m2026-02-15T17:04:16.698Z[39m [36m[gateway][39m [31m[plugins] failed to load plugin: Error: Cannot find module 'nostr-tools'[39m
+[31mRequire stack:[39m
+[31m- F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\nostr\src\nostr-bus.ts (plugin=nostr, source=F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\nostr\index.ts)[39m
+[90m2026-02-15T17:04:16.702Z[39m [36m[gateway][39m [31m[plugins] failed to load plugin: Error: Cannot find module '@urbit/aura'[39m
+[31mRequire stack:[39m
+[31m- F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\tlon\src\urbit\send.ts (plugin=tlon, source=F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\tlon\index.ts)[39m
+[90m2026-02-15T17:04:16.705Z[39m [36m[gateway][39m [31m[plugins] failed to load plugin: Error: Cannot find module '@twurple/auth'[39m
+[31mRequire stack:[39m
+[31m- F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\twitch\src\twitch-client.ts (plugin=twitch, source=F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\twitch\index.ts)[39m

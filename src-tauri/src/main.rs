@@ -273,7 +273,7 @@ fn main() {
                 match gm.start() {
                     Ok(_) => {
                         let _ = handle.emit("gateway-status", "正在等待 Gateway 就绪...");
-                        if gm.wait_for_ready(120) {
+                        if gm.wait_for_ready(300) {
                             // Gateway 就绪，直接导航 webview 到 gateway URL
                             let url = if let Some(token) = read_gateway_token() {
                                 format!("http://localhost:18789?token={}", token)

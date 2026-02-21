@@ -765,6 +765,10 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
              if let Ok(std_err_file) = std::fs::File::create(std::path::Path::new(&log_dir).join("gateway.stderr.log")) {
                 cmd.stderr(std_err_file);
              }
+        } else {
+             // 避免 Node.js 写入失效的控制台句柄时触发 `EBADF` 或 `stdout is not a tty` 崩溃
+             cmd.stdout(std::process::Stdio::null());
+             cmd.stderr(std::process::Stdio::null());
         }
 
         info!("[Shell] 启动 gateway 进程: {:?}", cmd);
@@ -821,6 +825,10 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
+
+    // 避免 Node.js 在无控制台的情况下尝试打印导致崩溃
+    cmd.stdout(std::process::Stdio::null());
+    cmd.stderr(std::process::Stdio::null());
 
     info!("[Shell] [开发模式] 启动 gateway 进程...");
     match cmd.spawn() {

@@ -1,0 +1,34 @@
+[90m2026-02-15T17:04:16.720Z[39m [35m[canvas][39m [36mhost mounted at http://127.0.0.1:18789/__openclaw__/canvas/ (root C:\Users\Administrator\.openclaw\canvas)[39m
+[90m2026-02-15T17:04:16.824Z[39m [36m[heartbeat][39m [36mstarted[39m
+[90m2026-02-15T17:04:16.832Z[39m [36m[gateway][39m [36magent model: minimax/MiniMax-M2.1[39m
+[90m2026-02-15T17:04:16.835Z[39m [36m[gateway][39m [36mlistening on ws://127.0.0.1:18789 (PID 33928)[39m
+[90m2026-02-15T17:04:16.838Z[39m [36m[gateway][39m [36mlistening on ws://[::1]:18789[39m
+[90m2026-02-15T17:04:16.841Z[39m [36m[gateway][39m [36mlog file: \tmp\openclaw\openclaw-2026-02-16.log[39m
+[90m2026-02-15T17:04:16.902Z[39m [35m[browser/service][39m [36mBrowser control service ready (profiles=2)[39m
+2026-02-15T17:04:16.957Z [voice-call] Webhook server listening on http://127.0.0.1:3334/voice/webhook
+[90m2026-02-15T17:04:16.963Z[39m [35m[plugins][39m [36m[voice-call] Runtime initialized[39m
+[90m2026-02-15T17:04:16.967Z[39m [35m[plugins][39m [36m[voice-call] Webhook URL: http://127.0.0.1:3334/voice/webhook[39m
+[90m2026-02-15T17:04:17.225Z[39m [36m[ws][39m [36mwebchat connected conn=910e66dc-f527-488d-a644-c72c8457a3ed remote=::1 client=openclaw-control-ui webchat vdev[39m
+[90m2026-02-15T17:04:28.325Z[39m [36m[ws][39m [36mwebchat disconnected code=1001 reason=n/a conn=910e66dc-f527-488d-a644-c72c8457a3ed[39m
+[90m2026-02-15T17:04:28.431Z[39m [36m[ws][39m [36mwebchat connected conn=e75aadb0-e5ea-47d9-98b0-9b06adb1b3f1 remote=::1 client=openclaw-control-ui webchat vdev[39m
+[90m2026-02-15T17:04:29.643Z[39m [36m[ws][39m [36m⇄ res ✓ channels.status 79ms conn=e75aadb0…b3f1 id=2144d210…1e41[39m
+[90m2026-02-15T17:04:30.425Z[39m [36m[ws][39m [36m⇄ res ✓ channels.status 126ms conn=e75aadb0…b3f1 id=0c858fda…019d[39m
+[90m2026-02-15T17:04:31.551Z[39m [36m[ws][39m [36m⇄ res ✓ sessions.list 50ms conn=e75aadb0…b3f1 id=d393c65a…4e7f[39m
+[90m2026-02-15T17:04:32.228Z[39m [36m[ws][39m [36m⇄ res ✓ channels.status 113ms conn=e75aadb0…b3f1 id=bf47fb97…2e63[39m
+[90m2026-02-15T17:04:33.136Z[39m [36m[ws][39m [36m⇄ res ✓ chat.history 64ms conn=e75aadb0…b3f1 id=195f6366…265b[39m
+[90m2026-02-15T17:04:37.313Z[39m [36m[ws][39m [36m⇄ res ✓ config.schema 75ms conn=e75aadb0…b3f1 id=2bf65419…9ec5[39m
+[90m2026-02-15T17:04:56.691Z[39m [36m[ws][39m [36m⇄ res ✓ status 70ms conn=e75aadb0…b3f1 id=006bed9f…6ae0[39m
+[90m2026-02-15T17:04:59.423Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 719ms conn=e75aadb0…b3f1 id=0064a4cb…c71a[39m
+[90m2026-02-15T17:05:03.065Z[39m [36m[ws][39m [36m⇄ res ✓ config.schema 50ms conn=e75aadb0…b3f1 id=7a7280d1…3de0[39m
+[90m2026-02-15T17:05:05.265Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 755ms conn=e75aadb0…b3f1 id=06e117f0…8d8b[39m
+[90m2026-02-15T17:05:06.558Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 678ms conn=e75aadb0…b3f1 id=9a0c60f0…cdf7[39m
+[90m2026-02-15T17:05:06.626Z[39m [36m[ws][39m [36m⇄ res ✓ config.get 63ms conn=e75aadb0…b3f1 id=10635748…9df9[39m
+[90m2026-02-15T17:05:07.012Z[39m [36m[ws][39m [36m⇄ res ✓ config.schema 56ms conn=e75aadb0…b3f1 id=223b1af3…2d5d[39m
+[90m2026-02-15T17:05:07.685Z[39m [36m[ws][39m [36m⇄ res ✓ status 58ms conn=e75aadb0…b3f1 id=12d10f19…a364[39m
+[90m2026-02-15T17:05:58.529Z[39m [36m[ws][39m [36m⇄ res ✓ channels.status 63ms conn=e75aadb0…b3f1 id=ad89c38b…d995[39m
+[90m2026-02-15T17:05:59.156Z[39m [36m[ws][39m [36m⇄ res ✓ channels.status 79ms conn=e75aadb0…b3f1 id=a7d08d16…a17c[39m
+[90m2026-02-15T17:06:01.221Z[39m [36m[ws][39m [36m⇄ res ✓ channels.status 55ms conn=e75aadb0…b3f1 id=42eb1049…4d78[39m
+[90m2026-02-15T17:06:02.846Z[39m [36m[ws][39m [36m⇄ res ✓ skills.status 666ms conn=e75aadb0…b3f1 id=3e7a0af6…20f6[39m
+[90m2026-02-15T17:06:03.441Z[39m [36m[ws][39m [36m⇄ res ✓ config.schema 57ms conn=e75aadb0…b3f1 id=b851f679…08e5[39m
+[90m2026-02-15T17:06:04.714Z[39m [36m[ws][39m [36m⇄ res ✓ status 66ms conn=e75aadb0…b3f1 id=3296d2c3…de74[39m
+[90m2026-02-15T17:17:31.176Z[39m [36m[ws][39m [36mwebchat disconnected code=1001 reason=n/a conn=e75aadb0-e5ea-47d9-98b0-9b06adb1b3f1[39m

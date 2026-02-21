@@ -215,5 +215,3 @@ Tauri 调试版本启动 gateway 时，加载的是
 src-tauri/target/debug/gateway-bundle/dist/ 中的代码，不是 项目根目录的 
 dist/。之前所有的重新编译和修复都只更新了 
 dist/，但 Tauri 二进制文件从未读取过那个目录。
-
-openclaw-manager是一个独立的react应用，需要单独构建

@@ -67,7 +67,7 @@ run("pnpm ui:build");
 
 // Step 2.5: 编译 Manager UI
 console.log("\n[bundle] === Step 2.5: 编译 Manager UI ===");
-run("pnpm manager:build");
+// run("pnpm manager:build");
 
 // Step 2.6: 确保 splash.html 在 frontend 目录中
 // Tauri 生产构建仅嵌入 frontendDist（./frontend）中的文件，
@@ -141,6 +141,27 @@ if (existsSync(extDir)) {
     const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
     const deps = extPkg.dependencies;
     if (!deps || Object.keys(deps).length === 0) continue;
+    
+    // Strip workspace:* dependencies which are either already bundled or unresolvable by npm
+    let modified = false;
+    for (const key of Object.keys(deps)) {
+      if (deps[key].startsWith("workspace:")) {
+        delete deps[key];
+        modified = true;
+      }
+    }
+    if (extPkg.devDependencies) {
+      for (const key of Object.keys(extPkg.devDependencies)) {
+        if (extPkg.devDependencies[key].startsWith("workspace:")) {
+          delete extPkg.devDependencies[key];
+          modified = true;
+        }
+      }
+    }
+    if (modified) {
+      writeFileSync(extPkgPath, JSON.stringify(extPkg, null, 2));
+    }
+
     console.log(`[bundle] 安装 extension/${name} 依赖 (${Object.keys(deps).length} 个包)`);
     run("npm install --omit=dev --install-strategy=hoisted --ignore-scripts", {
       cwd: join(extDir, name),

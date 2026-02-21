@@ -199,7 +199,17 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
     // 启动读取线程
     spawn_reader_thread(app.clone(), id.clone(), reader);
 
-    // 启动退出检测线程
+    // 先将会话插入 state，避免退出检测线程启动时找不到会话
+    {
+        let mut sessions = state.sessions.lock().unwrap();
+        sessions.insert(id.clone(), TerminalSession {
+            writer,
+            master: pair.master,
+            child,
+        });
+    }
+
+    // 启动退出检测线程（会话已存在于 state 中）
     let app_exit = app.clone();
     let id_exit = id.clone();
     std::thread::spawn(move || {
@@ -232,13 +242,6 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
                 break; // 会话已被销毁
             }
         }
-    });
-
-    let mut sessions = state.sessions.lock().unwrap();
-    sessions.insert(id.clone(), TerminalSession {
-        writer,
-        master: pair.master,
-        child,
     });
 
     info!("[Terminal] 终端会话 {} 已创建", id);
