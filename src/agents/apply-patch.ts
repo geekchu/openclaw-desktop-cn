@@ -69,6 +69,8 @@ type ApplyPatchOptions = {
   sandbox?: SandboxApplyPatchConfig;
   /** Restrict patch paths to the workspace root (cwd). Default: true. Set false to opt out. */
   workspaceOnly?: boolean;
+  /** Additional allowed directories for applying updates when workspaceOnly is true */
+  allowedDirs?: string[];
   signal?: AbortSignal;
 };
 
@@ -79,11 +81,12 @@ const applyPatchSchema = Type.Object({
 });
 
 export function createApplyPatchTool(
-  options: { cwd?: string; sandbox?: SandboxApplyPatchConfig; workspaceOnly?: boolean } = {},
+  options: { cwd?: string; sandbox?: SandboxApplyPatchConfig; workspaceOnly?: boolean; allowedDirs?: string[] } = {},
 ): AgentTool<typeof applyPatchSchema, ApplyPatchToolDetails> {
   const cwd = options.cwd ?? process.cwd();
   const sandbox = options.sandbox;
   const workspaceOnly = options.workspaceOnly !== false;
+  const allowedDirs = options.allowedDirs;
 
   return {
     name: "apply_patch",
@@ -107,6 +110,7 @@ export function createApplyPatchTool(
         cwd,
         sandbox,
         workspaceOnly,
+        allowedDirs,
         signal,
       });
 
@@ -274,6 +278,7 @@ async function resolvePatchPath(
           filePath,
           cwd: options.cwd,
           root: options.cwd,
+          allowPaths: options.allowedDirs,
           allowFinalSymlink: purpose === "unlink",
         })
       ).resolved

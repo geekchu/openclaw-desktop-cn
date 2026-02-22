@@ -211,6 +211,11 @@ export type FsToolsConfig = {
    * Default: false (unrestricted, matches legacy behavior).
    */
   workspaceOnly?: boolean;
+  /**
+   * Additional absolute directories the agent is allowed to access
+   * when workspaceOnly is true.
+   */
+  allowedDirs?: string[];
 };
 
 export type AgentToolsConfig = {

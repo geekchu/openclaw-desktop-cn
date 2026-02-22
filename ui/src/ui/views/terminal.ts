@@ -363,39 +363,38 @@ async function createTerminalInstance(container: HTMLElement) {
 
   observeResize(container);
 
-  // ── 命令拦截：禁止 openclaw update ──
+  // ── 命令拦截：禁止自毁/自更新命令 ──
   let _lineBuffer = "";
-  const BLOCKED_CMD_RE = /^\s*openclaw\s+update\b/i;
+  const BLOCKED_CMD_RE = /^\s*openclaw\s+(update|uninstall)\b/i;
 
   term.onData((data: string) => {
     if (_sessionId) {
-      // 检测 Enter 键
-      if (data === "\r" || data === "\n") {
-        if (BLOCKED_CMD_RE.test(_lineBuffer)) {
-          // 阻止执行，打印警告
-          term.write("\r\n\x1b[33m⚠ 桌面版不支持 openclaw update 命令，请通过应用内更新。\x1b[0m\r\n");
-          // 发送 Ctrl+C 取消当前行，然后发送一个新行让 shell 重新显示提示符
-          invoke("terminal_write", { id: _sessionId, data: "\x03" }).catch(() => {});
+      // 粘贴多行文本时 data 可能包含内嵌的换行符，
+      // 需要逐段拆分检查以防绕过拦截。
+      const parts = data.split(/(\r\n|\r|\n)/);
+      for (const part of parts) {
+        if (part === "\r" || part === "\n" || part === "\r\n") {
+          if (BLOCKED_CMD_RE.test(_lineBuffer)) {
+            term.write("\r\n\x1b[33m⚠ 桌面版不支持该命令，请通过应用内操作。\x1b[0m\r\n");
+            invoke("terminal_write", { id: _sessionId, data: "\x03" }).catch(() => {});
+            _lineBuffer = "";
+            continue;
+          }
           _lineBuffer = "";
-          return;
+          invoke("terminal_write", { id: _sessionId, data: part }).catch(() => {});
+        } else if (part === "\x7f" || part === "\b") {
+          _lineBuffer = _lineBuffer.slice(0, -1);
+          invoke("terminal_write", { id: _sessionId, data: part }).catch(() => {});
+        } else if (part === "\x03" || part === "\x15") {
+          _lineBuffer = "";
+          invoke("terminal_write", { id: _sessionId, data: part }).catch(() => {});
+        } else if (part.length > 0) {
+          // Printable characters, tabs, or control sequences (arrows, etc.)
+          if (part.charCodeAt(0) >= 32 || part === "\t") {
+            _lineBuffer += part;
+          }
+          invoke("terminal_write", { id: _sessionId, data: part }).catch(() => {});
         }
-        _lineBuffer = "";
-        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
-      } else if (data === "\x7f" || data === "\b") {
-        // Backspace
-        _lineBuffer = _lineBuffer.slice(0, -1);
-        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
-      } else if (data === "\x03" || data === "\x15") {
-        // Ctrl+C or Ctrl+U: clear line buffer
-        _lineBuffer = "";
-        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
-      } else if (data.charCodeAt(0) >= 32 || data === "\t") {
-        // Printable characters and tab
-        _lineBuffer += data;
-        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
-      } else {
-        // Other control sequences (arrows, etc.) — pass through
-        invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
       }
     } else {
       void attachSession();

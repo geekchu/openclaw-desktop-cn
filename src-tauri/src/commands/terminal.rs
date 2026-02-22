@@ -45,7 +45,7 @@ impl Drop for TerminalState {
 fn get_shell() -> (&'static str, Vec<&'static str>) {
     #[cfg(target_os = "windows")]
     {
-        ("cmd.exe", vec![])
+        ("powershell.exe", vec!["-NoLogo"])
     }
     #[cfg(not(target_os = "windows"))]
     {

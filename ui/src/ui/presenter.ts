@@ -57,7 +57,7 @@ export function formatCronSchedule(job: CronJob) {
     return Number.isFinite(atMs) ? `定时 ${formatMs(atMs)}` : `定时 ${s.at}`;
   }
   if (s.kind === "every") {
-    return `每隔 ${formatDurationMs(s.everyMs)}`;
+    return `每隔 ${formatDurationHuman(s.everyMs)}`;
   }
   return `Cron ${s.expr}${s.tz ? ` (${s.tz})` : ""}`;
 }

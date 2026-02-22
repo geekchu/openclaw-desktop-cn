@@ -35,6 +35,7 @@ describe("config view", () => {
     onApply: vi.fn(),
     onUpdate: vi.fn(),
     onSubsectionChange: vi.fn(),
+    onestop: {} as any,
   });
 
   it("allows save when form is unsafe", () => {

@@ -24,15 +24,6 @@ pub struct EnvironmentStatus {
     pub os: String,
 }
 
-/// 安装进度
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InstallProgress {
-    pub step: String,
-    pub progress: u8,
-    pub message: String,
-    pub error: Option<String>,
-}
-
 /// 安装结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstallResult {
@@ -1014,63 +1005,6 @@ pub async fn check_openclaw_update() -> Result<UpdateInfo, String> {
         latest_version: None,
         error: None,
     })
-}
-
-/// 获取 npm registry 上的最新版本
-fn get_latest_openclaw_version() -> Option<String> {
-    // 使用 npm view 获取最新版本
-    let result = if platform::is_windows() {
-        shell::run_cmd_output("npm view openclaw version")
-    } else {
-        shell::run_bash_output("npm view openclaw version 2>/dev/null")
-    };
-    
-    match result {
-        Ok(version) => {
-            let v = version.trim().to_string();
-            if v.is_empty() {
-                None
-            } else {
-                Some(v)
-            }
-        }
-        Err(e) => {
-            warn!("[版本检查] 获取最新版本失败: {}", e);
-            None
-        }
-    }
-}
-
-/// 比较版本号，返回是否有更新可用
-/// current: 当前版本 (如 "1.0.0" 或 "v1.0.0")
-/// latest: 最新版本 (如 "1.0.1")
-fn compare_versions(current: &str, latest: &str) -> bool {
-    // 移除可能的 'v' 前缀和空白
-    let current = current.trim().trim_start_matches('v');
-    let latest = latest.trim().trim_start_matches('v');
-    
-    // 分割版本号
-    let current_parts: Vec<u32> = current
-        .split('.')
-        .filter_map(|s| s.parse().ok())
-        .collect();
-    let latest_parts: Vec<u32> = latest
-        .split('.')
-        .filter_map(|s| s.parse().ok())
-        .collect();
-    
-    // 比较每个部分
-    for i in 0..3 {
-        let c = current_parts.get(i).unwrap_or(&0);
-        let l = latest_parts.get(i).unwrap_or(&0);
-        if l > c {
-            return true;
-        } else if l < c {
-            return false;
-        }
-    }
-    
-    false
 }
 
 /// 更新 OpenClaw（桌面版禁用自动更新）

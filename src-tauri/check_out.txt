@@ -1,0 +1,14 @@
+    Checking openclaw-desktop v0.1.0 (F:\openclaw-desktop-cn\src-tauri)
+error[E0425]: cannot find type `ModelConfig` in this scope
+   --> src\commands\config.rs:577:17
+    |
+577 |     models: Vec<ModelConfig>,
+    |                 ^^^^^^^^^^^ not found in this scope
+    |
+help: you might be missing a type parameter
+    |
+572 | pub async fn save_provider<ModelConfig>(
+    |                           +++++++++++++
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `openclaw-desktop` (bin "openclaw-desktop") due to 1 previous error

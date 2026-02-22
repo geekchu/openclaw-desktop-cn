@@ -1,5 +1,4 @@
 // 防止 Windows 系统显示控制台窗口
-// 防止 Windows 系统显示控制台窗口
 #![cfg_attr(
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"

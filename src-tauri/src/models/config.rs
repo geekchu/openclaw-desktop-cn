@@ -1,92 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// OpenClaw 完整配置 - 对应 openclaw.json 结构
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct OpenClawConfig {
-    /// Agent 配置
-    #[serde(default)]
-    pub agents: AgentsConfig,
-    /// 模型配置
-    #[serde(default)]
-    pub models: ModelsConfig,
-    /// 网关配置
-    #[serde(default)]
-    pub gateway: GatewayConfig,
-    /// 渠道配置
-    #[serde(default)]
-    pub channels: HashMap<String, serde_json::Value>,
-    /// 插件配置
-    #[serde(default)]
-    pub plugins: PluginsConfig,
-    /// 元数据
-    #[serde(default)]
-    pub meta: MetaConfig,
-}
-
-/// Agent 配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AgentsConfig {
-    /// 默认配置
-    #[serde(default)]
-    pub defaults: AgentDefaults,
-}
-
-/// Agent 默认配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AgentDefaults {
-    /// 模型配置
-    #[serde(default)]
-    pub model: AgentModelConfig,
-    /// 可用模型列表 (provider/model -> {})
-    #[serde(default)]
-    pub models: HashMap<String, serde_json::Value>,
-    /// 压缩配置
-    #[serde(default)]
-    pub compaction: Option<serde_json::Value>,
-    /// 上下文裁剪
-    #[serde(rename = "contextPruning", default)]
-    pub context_pruning: Option<serde_json::Value>,
-    /// 心跳配置
-    #[serde(default)]
-    pub heartbeat: Option<serde_json::Value>,
-    /// 最大并发数
-    #[serde(rename = "maxConcurrent", default)]
-    pub max_concurrent: Option<u32>,
-    /// 子代理配置
-    #[serde(default)]
-    pub subagents: Option<serde_json::Value>,
-}
-
-/// Agent 模型配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AgentModelConfig {
-    /// 主模型 (格式: provider/model-id)
-    #[serde(default)]
-    pub primary: Option<String>,
-}
-
-/// 模型配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ModelsConfig {
-    /// Provider 配置映射
-    #[serde(default)]
-    pub providers: HashMap<String, ProviderConfig>,
-}
-
-/// Provider 配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProviderConfig {
-    /// API 地址
-    #[serde(rename = "baseUrl")]
-    pub base_url: String,
-    /// API Key
-    #[serde(rename = "apiKey")]
-    pub api_key: Option<String>,
-    /// 模型列表
-    #[serde(default)]
-    pub models: Vec<ModelConfig>,
-}
+// ============ 前端交互与 API 用数据结构 ============
 
 /// 模型配置详情
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -126,46 +41,6 @@ pub struct ModelCostConfig {
     pub cache_read: f64,
     #[serde(rename = "cacheWrite", default)]
     pub cache_write: f64,
-}
-
-/// 网关配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GatewayConfig {
-    /// 模式：local 或 cloud
-    #[serde(default)]
-    pub mode: Option<String>,
-    /// 认证配置
-    #[serde(default)]
-    pub auth: Option<GatewayAuthConfig>,
-}
-
-/// 网关认证配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GatewayAuthConfig {
-    #[serde(default)]
-    pub mode: Option<String>,
-    #[serde(default)]
-    pub token: Option<String>,
-}
-
-/// 插件配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PluginsConfig {
-    #[serde(default)]
-    pub allow: Vec<String>,
-    #[serde(default)]
-    pub entries: HashMap<String, serde_json::Value>,
-    #[serde(default)]
-    pub installs: HashMap<String, serde_json::Value>,
-}
-
-/// 元数据配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MetaConfig {
-    #[serde(rename = "lastTouchedAt", default)]
-    pub last_touched_at: Option<String>,
-    #[serde(rename = "lastTouchedVersion", default)]
-    pub last_touched_version: Option<String>,
 }
 
 // ============ 前端展示用数据结构 ============
@@ -296,11 +171,4 @@ pub struct ChannelConfig {
     pub enabled: bool,
     /// 配置详情
     pub config: HashMap<String, serde_json::Value>,
-}
-
-/// 环境变量配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnvConfig {
-    pub key: String,
-    pub value: String,
 }

@@ -1,4 +1,4 @@
-import { LitElement } from "lit";
+import { LitElement, html } from "lit";
 import { initAutoUpdater } from "./views/updater.ts";
 import { customElement, state } from "lit/decorators.js";
 import type { EventLogEntry } from "./app-events.ts";
@@ -57,6 +57,7 @@ import {
   handleUpdated,
 } from "./app-lifecycle.ts";
 import { renderApp } from "./app-render.ts";
+import "./views/config-channels.ts";
 import {
   exportLogs as exportLogsInternal,
   handleChatScroll as handleChatScrollInternal,

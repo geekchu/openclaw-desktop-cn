@@ -1,0 +1,1066 @@
+import { LitElement, html, css, nothing } from "lit";
+import { customElement, state } from "lit/decorators.js";
+
+/* ── tiny Tauri invoke helper ─────────────────────────────── */
+const tauri = (window as any).__TAURI__;
+async function invoke<T = any>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (tauri?.core?.invoke) {
+    return tauri.core.invoke(cmd, args);
+  }
+  throw new Error("Tauri invoke not available");
+}
+
+interface FeishuPluginStatus {
+  installed: boolean;
+  version: string | null;
+  plugin_name: string | null;
+}
+
+interface ChannelConfig {
+  id: string;
+  channel_type: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+}
+
+interface ChannelField {
+  key: string;
+  label: string;
+  type: 'text' | 'password' | 'select';
+  placeholder?: string;
+  options?: { value: string; label: string }[];
+  required?: boolean;
+}
+
+const channelIcons = {
+  telegram: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`,
+  discord: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg>`,
+  slack: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="3" height="8" x="13" y="2" rx="1.5"/><path d="M19 8.5V10h1.5A1.5 1.5 0 1 0 19 8.5"/><rect width="3" height="8" x="8" y="14" rx="1.5"/><path d="M5 15.5V14H3.5A1.5 1.5 0 1 0 5 15.5"/><rect width="8" height="3" x="14" y="13" rx="1.5"/><path d="M15.5 19H14v1.5a1.5 1.5 0 1 0 1.5-1.5"/><rect width="8" height="3" x="2" y="8" rx="1.5"/><path d="M8.5 5H10V3.5A1.5 1.5 0 1 0 8.5 5"/></svg>`,
+  feishu: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>`,
+  imessage: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>`,
+  whatsapp: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>`,
+  wechat: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`,
+  dingtalk: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
+  default: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
+};
+
+const iconChevronRight = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
+const iconCheck = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+const iconCheckCircle = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
+const iconXCircle = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`;
+const iconPackage = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`;
+const iconDownload = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`;
+const iconAlertTriangle = html`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+const iconQrCode = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>`;
+const iconPlay = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+const iconTrash2 = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+const iconLoader2 = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
+
+const channelInfo: Record<
+  string,
+  { 
+    name: string; 
+    icon: any; 
+    theme: string;
+    fields: ChannelField[];
+    helpText?: string;
+  }
+> = {
+  telegram: {
+    name: 'Telegram',
+    icon: channelIcons.telegram,
+    theme: 'blue',
+    fields: [
+      { key: 'botToken', label: 'Bot Token', type: 'password', placeholder: '从 @BotFather 获取', required: true },
+      { key: 'userId', label: 'User ID', type: 'text', placeholder: '你的 Telegram User ID', required: true },
+      { key: 'dmPolicy', label: '私聊策略', type: 'select', options: [
+        { value: 'pairing', label: '配对模式' },
+        { value: 'open', label: '开放模式' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+      { key: 'groupPolicy', label: '群组策略', type: 'select', options: [
+        { value: 'allowlist', label: '白名单' },
+        { value: 'open', label: '开放' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+    ],
+    helpText: '推荐搜索 @BotFather 发送 /newbot 获取 Token',
+  },
+  discord: {
+    name: 'Discord',
+    icon: channelIcons.discord,
+    theme: 'blue',
+    fields: [
+      { key: 'botToken', label: 'Bot Token', type: 'password', placeholder: 'Discord Bot Token', required: true },
+      { key: 'testChannelId', label: '测试 Channel ID', type: 'text', placeholder: '用于发送测试消息的频道 ID (可选)' },
+      { key: 'dmPolicy', label: '私聊策略', type: 'select', options: [
+        { value: 'pairing', label: '配对模式' },
+        { value: 'open', label: '开放模式' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+    ],
+    helpText: '从 Discord Developer Portal 获取',
+  },
+  slack: {
+    name: 'Slack',
+    icon: channelIcons.slack,
+    theme: 'purple',
+    fields: [
+      { key: 'botToken', label: 'Bot Token', type: 'password', placeholder: 'xoxb-...', required: true },
+      { key: 'appToken', label: 'App Token', type: 'password', placeholder: 'xapp-...' },
+      { key: 'testChannelId', label: '测试 Channel ID', type: 'text', placeholder: '可选' },
+    ],
+    helpText: '从 Slack API 后台获取',
+  },
+  feishu: {
+    name: '飞书',
+    icon: channelIcons.feishu,
+    theme: 'blue',
+    fields: [
+      { key: 'appId', label: 'App ID', type: 'text', placeholder: '飞书应用 App ID', required: true },
+      { key: 'appSecret', label: 'App Secret', type: 'password', placeholder: '飞书应用 App Secret', required: true },
+      { key: 'testChatId', label: '测试 Chat ID', type: 'text', placeholder: '用于发送测试消息的群聊/用户 ID (可选)' },
+      { key: 'connectionMode', label: '连接模式', type: 'select', options: [
+        { value: 'websocket', label: 'WebSocket (推荐)' },
+        { value: 'webhook', label: 'Webhook' },
+      ]},
+      { key: 'domain', label: '部署区域', type: 'select', options: [
+        { value: 'feishu', label: '国内 (feishu.cn)' },
+        { value: 'lark', label: '海外 (larksuite.com)' },
+      ]},
+      { key: 'requireMention', label: '需要 @提及', type: 'select', options: [
+        { value: 'true', label: '是' },
+        { value: 'false', label: '否' },
+      ]},
+    ],
+    helpText: '需要安装并启用开放平台的机器人能力',
+  },
+  imessage: {
+    name: 'iMessage',
+    icon: channelIcons.imessage,
+    theme: 'green',
+    fields: [
+      { key: 'dmPolicy', label: '私聊策略', type: 'select', options: [
+        { value: 'pairing', label: '配对模式' },
+        { value: 'open', label: '开放模式' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+      { key: 'groupPolicy', label: '群组策略', type: 'select', options: [
+        { value: 'allowlist', label: '白名单' },
+        { value: 'open', label: '开放' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+    ],
+    helpText: '仅支持 macOS',
+  },
+  whatsapp: {
+    name: 'WhatsApp',
+    icon: channelIcons.whatsapp,
+    theme: 'green',
+    fields: [
+      { key: 'dmPolicy', label: '私聊策略', type: 'select', options: [
+        { value: 'pairing', label: '配对模式' },
+        { value: 'open', label: '开放模式' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+      { key: 'groupPolicy', label: '群组策略', type: 'select', options: [
+        { value: 'allowlist', label: '白名单' },
+        { value: 'open', label: '开放' },
+        { value: 'disabled', label: '禁用' },
+      ]},
+    ],
+    helpText: '登录成功后支持发送和接收',
+  },
+  wechat: {
+    name: '微信',
+    icon: channelIcons.wechat,
+    theme: 'green',
+    fields: [
+      { key: 'appId', label: 'App ID', type: 'text', placeholder: '微信开放平台 App ID' },
+      { key: 'appSecret', label: 'App Secret', type: 'password', placeholder: '微信开放平台 App Secret' },
+    ],
+    helpText: '微信公众号/企业微信',
+  },
+  dingtalk: {
+    name: '钉钉',
+    icon: channelIcons.dingtalk,
+    theme: 'blue',
+    fields: [
+      { key: 'appKey', label: 'App Key', type: 'text', placeholder: '钉钉应用 App Key' },
+      { key: 'appSecret', label: 'App Secret', type: 'password', placeholder: '钉钉应用 App Secret' },
+    ],
+    helpText: '钉钉机器人凭据',
+  },
+};
+
+interface TestResult {
+  success: boolean;
+  message: string;
+  error: string | null;
+}
+
+@customElement("openclaw-config-channels")
+export class OpenClawConfigChannels extends LitElement {
+  /* ───────────────────────────────────────────────
+     CSS — matches the native App Visual Setup
+     ─────────────────────────────────────────────── */
+  static override styles = css`
+    :host {
+      display: flex;
+      flex-direction: row;
+      height: 100%;
+      color: var(--text, #e4e4e7);
+      background: var(--bg, #09090b);
+      font-family: var(--font-body, 'Space Grotesk', system-ui, sans-serif);
+      overflow: hidden;
+    }
+
+    /* ── layout ── */
+    .sidebar {
+      width: 280px;
+      border-right: 1px solid var(--border, #27272a);
+      overflow-y: auto;
+      background: var(--bg-elevated, #1a1d25);
+    }
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      /* Remove forced background so it uses host's background */
+    }
+    .content-inner {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0;
+    }
+
+    /* ── sidebar items ── */
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border, #27272a);
+    }
+    .sidebar-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted, #71717a);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .channel-list {
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      gap: 4px;
+    }
+    .channel-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+    .channel-item:hover {
+      background: var(--bg-hover, #262a35);
+    }
+    .channel-item.active {
+      background: var(--bg-hover, #262a35);
+      border-color: var(--border, #27272a);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .channel-item-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card, #181b22);
+      border: 1px solid var(--border, #27272a);
+      flex-shrink: 0;
+    }
+    .channel-item-icon svg {
+      width: 16px;
+      height: 16px;
+    }
+    .channel-item.active .channel-item-icon {
+      background: var(--card, #181b22);
+    }
+    .channel-item-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .channel-item-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-strong, #fafafa);
+    }
+    .channel-item-status {
+      font-size: 12px;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .status-ok { color: var(--success, #22c55e); }
+    .status-none { color: var(--muted, #71717a); }
+
+    /* ── card / content (matches system settings styling) ── */
+    .card {
+      background: var(--bg-elevated, #1a1d25);
+      border: 1px solid var(--border, #27272a);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border, #27272a);
+    }
+    .card-title-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .card-title-icon.amber { background: rgba(245, 158, 11, 0.15); color: var(--warn, #f59e0b); }
+    .card-title-icon.blue  { background: rgba(59, 130, 246, 0.15); color: var(--info, #3b82f6); }
+    .card-title-icon.green { background: rgba(34, 197, 94, 0.15); color: var(--success, #22c55e); }
+    .card-title-icon.purple{ background: rgba(168, 85, 247, 0.15); color: var(--purple-400, #c084fc); }
+    .card-title-icon svg { width: 22px; height: 22px; }
+    .title-text {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-strong, #fafafa);
+    }
+    .title-sub {
+      font-size: 13px;
+      color: var(--muted, #71717a);
+      margin-top: 4px;
+    }
+
+    /* ── form fields ── */
+    .field {
+      margin-bottom: 20px;
+    }
+    .field-label {
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted, #71717a);
+      margin-bottom: 8px;
+      gap: 6px;
+    }
+    .label-req { color: var(--accent, #ff5c5c); }
+    .label-ok { color: var(--success, #22c55e); }
+    
+    .input-base {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border, #27272a);
+      background: var(--bg-elevated, #1a1d25);
+      color: var(--text, #e4e4e7);
+      font-size: 14px;
+      outline: none;
+      box-sizing: border-box;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      font-family: inherit;
+    }
+    .input-base::placeholder {
+      color: var(--muted, #71717a);
+    }
+    .input-base:focus {
+      border-color: var(--accent, #ff5c5c);
+      box-shadow: 0 0 0 2px var(--panel, #12141a), 0 0 0 4px var(--ring, #ff5c5c);
+    }
+    select.input-base {
+      appearance: none;
+      cursor: pointer;
+    }
+    
+    .input-wrapper {
+      position: relative;
+    }
+    .input-icon-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted, #71717a);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s;
+    }
+    .input-icon-btn:hover {
+      color: var(--text, #e4e4e7);
+    }
+    
+    /* ── specific blocks ── */
+    .notice {
+      padding: 16px;
+      border-radius: 10px;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+    }
+    .notice.info {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: rgba(59, 130, 246, 0.2);
+    }
+    .notice.success {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.2);
+    }
+    .notice-icon { flex-shrink: 0; padding-top: 2px; }
+    .notice.info .notice-icon svg { color: var(--info, #3b82f6); }
+    .notice.success .notice-icon svg { color: var(--success, #22c55e); }
+    .notice.warn .notice-icon svg { color: var(--warn, #f59e0b); }
+    .notice-title { font-size: 14px; font-weight: 500; color: var(--text-strong, #fafafa); margin-bottom: 4px; }
+    .notice-desc { font-size: 12px; color: var(--muted, #71717a); line-height: 1.5; }
+
+    /* ── actions ── */
+    .actions-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border, #27272a);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      height: 38px;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .btn-primary {
+      background: var(--text-strong, #ffffff);
+      color: var(--bg, #000000);
+    }
+    .btn-primary:not(:disabled):hover {
+      background: #e4e4e7;
+    }
+    
+    .btn-secondary {
+      background: var(--bg-hover, #262a35);
+      color: var(--text, #e4e4e7);
+      border-color: var(--border, #27272a);
+    }
+    .btn-secondary:not(:disabled):hover {
+      background: var(--border, #27272a);
+    }
+    
+    .btn-danger {
+      background: transparent;
+      color: var(--accent, #ff5c5c);
+      border-color: transparent;
+    }
+    .btn-danger:not(:disabled):hover {
+      background: rgba(255, 92, 92, 0.1);
+    }
+    
+    .btn-sm { padding: 6px 12px; font-size: 12px; height: 32px; }
+
+    .animate-spin { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    .test-result {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      display: flex;
+      gap: 12px;
+      animation: fadeIn 0.2s;
+    }
+    .test-result.ok { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); }
+    .test-result.err { background: rgba(255, 92, 92, 0.1); border: 1px solid rgba(255, 92, 92, 0.2); }
+    .test-result-title { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+    .test-result.ok .test-result-title { color: var(--success, #22c55e); }
+    .test-result.err .test-result-title { color: var(--accent, #ff5c5c); }
+    .test-result-desc { font-size: 13px; color: var(--text, #e4e4e7); word-break: break-all; margin-top: 4px; }
+    .test-result-err { font-size: 12px; color: var(--accent, #ff5c5c); font-family: monospace; white-space: pre-wrap; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; }
+    .empty-state { text-align: center; color: var(--muted, #71717a); padding: 60px 20px; }
+  `;
+
+  @state() private channels: ChannelConfig[] = [];
+  @state() private loading = true;
+  @state() private selectedChannel: string | null = null;
+  @state() private configForm: Record<string, string> = {};
+  @state() private saving = false;
+  @state() private testing = false;
+  @state() private testResult: TestResult | null = null;
+  @state() private loginLoading = false;
+  @state() private clearing = false;
+  @state() private showClearConfirm = false;
+
+  @state() private feishuPluginStatus: FeishuPluginStatus | null = null;
+  @state() private feishuPluginLoading = false;
+  @state() private feishuPluginInstalling = false;
+
+  @state() private visiblePasswords = new Set<string>();
+
+  private _whatsappPollTimer: ReturnType<typeof setInterval> | null = null;
+  private _whatsappTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+  override async connectedCallback() {
+    super.connectedCallback();
+    await this.init();
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._whatsappPollTimer) {
+      clearInterval(this._whatsappPollTimer);
+      this._whatsappPollTimer = null;
+    }
+    if (this._whatsappTimeoutTimer) {
+      clearTimeout(this._whatsappTimeoutTimer);
+      this._whatsappTimeoutTimer = null;
+    }
+  }
+
+  private async fetchChannels() {
+    try {
+      const result: ChannelConfig[] = await invoke('get_channels_config');
+      this.channels = result;
+      return result;
+    } catch (e) {
+      console.error('获取渠道配置失败:', e);
+      return [];
+    }
+  }
+
+  private async init() {
+    this.loading = true;
+    try {
+      const result = await this.fetchChannels();
+      const configured = result.find((c) => c.enabled);
+      if (configured) {
+        this.handleChannelSelect(configured.id, result);
+      } else if (result.length > 0) {
+        this.handleChannelSelect(result[0].id, result);
+      }
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  private togglePasswordVisibility(fieldKey: string) {
+    const next = new Set(this.visiblePasswords);
+    if (next.has(fieldKey)) {
+      next.delete(fieldKey);
+    } else {
+      next.add(fieldKey);
+    }
+    this.visiblePasswords = next;
+  }
+
+  private async checkFeishuPlugin() {
+    this.feishuPluginLoading = true;
+    try {
+      const status: FeishuPluginStatus = await invoke('check_feishu_plugin');
+      this.feishuPluginStatus = status;
+    } catch (e) {
+      console.error('检查飞书插件失败:', e);
+      this.feishuPluginStatus = { installed: false, version: null, plugin_name: null };
+    } finally {
+      this.feishuPluginLoading = false;
+    }
+  }
+
+  private async handleInstallFeishuPlugin() {
+    this.feishuPluginInstalling = true;
+    try {
+      const result: string = await invoke('install_feishu_plugin');
+      alert(result);
+      await this.checkFeishuPlugin();
+    } catch (e) {
+      alert('安装失败: ' + e);
+    } finally {
+      this.feishuPluginInstalling = false;
+    }
+  }
+
+  private handleShowClearConfirm() {
+    if (!this.selectedChannel) return;
+    this.showClearConfirm = true;
+  }
+
+  private async handleClearConfig() {
+    if (!this.selectedChannel) return;
+    
+    const channel = this.channels.find((c) => c.id === this.selectedChannel);
+    const channelName = channel ? channelInfo[channel.channel_type]?.name || channel.channel_type : this.selectedChannel;
+    
+    this.showClearConfirm = false;
+    this.clearing = true;
+    try {
+      await invoke('clear_channel_config', { channelId: this.selectedChannel });
+      this.configForm = {};
+      await this.fetchChannels();
+      this.testResult = {
+        success: true,
+        message: channelName + ' 配置已清空',
+        error: null,
+      };
+    } catch (e) {
+      this.testResult = {
+        success: false,
+        message: '清空失败',
+        error: String(e),
+      };
+    } finally {
+      this.clearing = false;
+    }
+  }
+
+  private async handleQuickTest() {
+    if (!this.selectedChannel) return;
+    
+    this.testing = true;
+    this.testResult = null;
+    
+    try {
+      const result: {
+        success: boolean;
+        channel: string;
+        message: string;
+        error: string | null;
+      } = await invoke('test_channel', { channelType: this.selectedChannel });
+      
+      this.testResult = {
+        success: result.success,
+        message: result.message,
+        error: result.error,
+      };
+    } catch (e) {
+      this.testResult = {
+        success: false,
+        message: '测试失败',
+        error: String(e),
+      };
+    } finally {
+      this.testing = false;
+    }
+  }
+
+  private async handleWhatsAppLogin() {
+    this.loginLoading = true;
+    // 清理之前的轮询定时器
+    if (this._whatsappPollTimer) {
+      clearInterval(this._whatsappPollTimer);
+      this._whatsappPollTimer = null;
+    }
+    if (this._whatsappTimeoutTimer) {
+      clearTimeout(this._whatsappTimeoutTimer);
+      this._whatsappTimeoutTimer = null;
+    }
+    try {
+      await invoke('start_channel_login', { channelType: 'whatsapp' });
+      
+      this._whatsappPollTimer = setInterval(async () => {
+        try {
+          const result: {
+            success: boolean;
+            message: string;
+          } = await invoke('test_channel', { channelType: 'whatsapp' });
+          
+          if (result.success) {
+            if (this._whatsappPollTimer) {
+              clearInterval(this._whatsappPollTimer);
+              this._whatsappPollTimer = null;
+            }
+            if (this._whatsappTimeoutTimer) {
+              clearTimeout(this._whatsappTimeoutTimer);
+              this._whatsappTimeoutTimer = null;
+            }
+            this.loginLoading = false;
+            await this.fetchChannels();
+            this.testResult = {
+              success: true,
+              message: 'WhatsApp 登录成功！',
+              error: null,
+            };
+          }
+        } catch {
+          // 继续轮询
+        }
+      }, 3000);
+      
+      this._whatsappTimeoutTimer = setTimeout(() => {
+        if (this._whatsappPollTimer) {
+          clearInterval(this._whatsappPollTimer);
+          this._whatsappPollTimer = null;
+        }
+        this._whatsappTimeoutTimer = null;
+        this.loginLoading = false;
+      }, 60000);
+      
+      alert('请在弹出的终端窗口中扫描二维码完成登录\n\n登录成功后界面会自动更新');
+    } catch (e) {
+      alert('启动登录失败: ' + e);
+      this.loginLoading = false;
+    }
+  }
+
+  private handleChannelSelect(channelId: string, channelList?: ChannelConfig[]) {
+    this.selectedChannel = channelId;
+    this.testResult = null;
+    
+    const list = channelList || this.channels;
+    const channel = list.find((c) => c.id === channelId);
+    
+    if (channel) {
+      const form: Record<string, string> = {};
+      
+      // Initialize all fields from channelInfo to ensure empty states are captured
+      const info = channelInfo[channel.channel_type];
+      if (info && info.fields) {
+        info.fields.forEach(f => {
+          form[f.key] = '';
+        });
+      }
+
+      // Merge actual config
+      if (channel.config) {
+        Object.entries(channel.config).forEach(([key, value]) => {
+          if (typeof value === 'boolean') {
+            form[key] = value ? 'true' : 'false';
+          } else if (value !== null && value !== undefined) {
+            form[key] = String(value);
+          }
+        });
+      }
+      this.configForm = form;
+      
+      if (channel.channel_type === 'feishu') {
+        this.checkFeishuPlugin();
+      }
+    } else {
+      this.configForm = {};
+    }
+  }
+
+  private async handleSave() {
+    if (!this.selectedChannel) return;
+    
+    const channel = this.channels.find((c) => c.id === this.selectedChannel);
+    if (!channel) return;
+    
+    this.saving = true;
+    try {
+      const config: Record<string, unknown> = {};
+      Object.entries(this.configForm).forEach(([key, value]) => {
+        if (value === 'true') {
+          config[key] = true;
+        } else if (value === 'false') {
+          config[key] = false;
+        } else if (value.trim() !== '') {
+          config[key] = value.trim();
+        }
+      });
+      
+      await invoke('save_channel_config', {
+        channel: {
+          ...channel,
+          config,
+        },
+      });
+      
+      await this.fetchChannels();
+      this.testResult = {
+        success: true,
+        message: '保存配置成功',
+        error: null,
+      };
+    } catch (e) {
+      console.error('保存失败:', e);
+      this.testResult = { success: false, message: '保存配置失败', error: String(e) };
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  private hasValidConfig(channel: ChannelConfig) {
+    const info = channelInfo[channel.channel_type];
+    if (!info) return channel.enabled;
+    const requiredFields = info.fields.filter((f) => f.required);
+    if (requiredFields.length === 0) return channel.enabled;
+    return requiredFields.every((field) => {
+      const value = channel.config[field.key];
+      return value !== undefined && value !== null && String(value).trim() !== '';
+    });
+  }
+
+  private handleTextInput(e: Event, key: string) {
+    const v = (e.target as HTMLInputElement).value;
+    this.configForm = { ...this.configForm, [key]: v };
+  }
+
+  private handleSelectChange(e: Event, key: string) {
+    const v = (e.target as HTMLSelectElement).value;
+    this.configForm = { ...this.configForm, [key]: v };
+  }
+
+  override render() {
+    if (this.loading) {
+      return html`
+        <div class="empty-state" style="margin-top: 200px;">
+          ${iconLoader2}
+          <div style="margin-top: 12px;">加载中...</div>
+        </div>
+      `;
+    }
+
+    const currentChannel = this.channels.find((c) => c.id === this.selectedChannel);
+    const currentInfo = currentChannel ? channelInfo[currentChannel.channel_type] || channelInfo.default : null;
+
+    return html`
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title">平台列表</div>
+        </div>
+        <div class="channel-list">
+          ${this.channels.map((channel) => {
+            const info = channelInfo[channel.channel_type] || channelInfo.default;
+            const isSelected = this.selectedChannel === channel.id;
+            const isConfigured = this.hasValidConfig(channel);
+            return html`
+              <button
+                class="channel-item ${isSelected ? 'active' : ''}"
+                @click=${() => this.handleChannelSelect(channel.id)}
+              >
+                <div class="channel-item-icon">
+                  ${info.icon}
+                </div>
+                <div class="channel-item-info">
+                  <div class="channel-item-name">${info.name || channel.channel_type}</div>
+                  <div class="channel-item-status ${isConfigured ? 'status-ok' : 'status-none'}">
+                    ${isConfigured ? html`${iconCheck} 已配置` : html`未配置`}
+                  </div>
+                </div>
+              </button>
+            `;
+          })}
+        </div>
+      </div>
+
+      <!-- Main Config Panel -->
+      <div class="content">
+        <div class="content-inner">
+          ${currentChannel && currentInfo ? html`
+            <div class="card">
+              <div class="card-title">
+                <div class="card-title-icon ${currentInfo.theme || 'gray'}">
+                  ${currentInfo.icon}
+                </div>
+                <div>
+                  <div class="title-text">${currentInfo.name} 配置</div>
+                  ${currentInfo.helpText ? html`<div class="title-sub">${currentInfo.helpText}</div>` : nothing}
+                </div>
+              </div>
+
+              <!-- Feishu specific plugins check -->
+              ${currentChannel.channel_type === 'feishu' ? html`
+                <div class="notice ${this.feishuPluginStatus?.installed ? 'success' : 'warn'}">
+                  <div class="notice-icon">
+                    ${this.feishuPluginLoading ? iconLoader2 : (this.feishuPluginStatus?.installed ? iconCheckCircle : iconAlertTriangle)}
+                  </div>
+                  <div style="flex: 1;">
+                    <div class="notice-title">
+                      ${this.feishuPluginLoading ? '检查状态中...' : (this.feishuPluginStatus?.installed ? '飞书插件已安装' : '需要安装飞书插件')}
+                    </div>
+                    <div class="notice-desc">
+                      ${this.feishuPluginStatus?.installed 
+                        ? (this.feishuPluginStatus.plugin_name || '@m1heng-clawd/feishu') + (this.feishuPluginStatus.version ? ` v${this.feishuPluginStatus.version}` : '') 
+                        : '无法独立收发消息，必须先在终端安装 @m1heng-clawd/feishu 插件。'}
+                    </div>
+                    ${!this.feishuPluginStatus?.installed ? html`
+                      <div class="btn-group" style="margin-top: 12px;">
+                        <button class="btn btn-secondary btn-sm" @click=${this.handleInstallFeishuPlugin} ?disabled=${this.feishuPluginInstalling}>
+                          ${this.feishuPluginInstalling ? iconLoader2 : iconDownload} 自动安装
+                        </button>
+                        <button class="btn btn-secondary btn-sm" @click=${this.checkFeishuPlugin} ?disabled=${this.feishuPluginLoading}>刷新状态</button>
+                      </div>
+                    ` : nothing}
+                  </div>
+                </div>
+              ` : nothing}
+
+              <!-- Config form fields -->
+              <div class="fields-container">
+                ${currentInfo.fields?.map((field: ChannelField) => html`
+                  <div class="field">
+                    <label class="field-label">
+                      ${field.label}
+                      ${field.required ? html`<span class="label-req">*</span>` : nothing}
+                      ${this.configForm[field.key] ? html`<span class="label-ok" style="margin-left: auto;">${iconCheck}</span>` : nothing}
+                    </label>
+                    
+                    ${field.type === 'select' ? html`
+                      <select
+                        .value=${this.configForm[field.key] || ''}
+                        @change=${(e: Event) => this.handleSelectChange(e, field.key)}
+                        class="input-base"
+                      >
+                        <option value="">请选择...</option>
+                        ${field.options?.map(opt => html`<option value="${opt.value}">${opt.label}</option>`)}
+                      </select>
+                    ` : field.type === 'password' ? html`
+                      <div class="input-wrapper">
+                        <input
+                          type=${this.visiblePasswords.has(field.key) ? 'text' : 'password'}
+                          .value=${this.configForm[field.key] || ''}
+                          @input=${(e: Event) => this.handleTextInput(e, field.key)}
+                          placeholder="${field.placeholder || ''}"
+                          class="input-base"
+                          style="padding-right: 36px;"
+                        />
+                        <button
+                          type="button"
+                          @click=${() => this.togglePasswordVisibility(field.key)}
+                          class="input-icon-btn"
+                          title="${this.visiblePasswords.has(field.key) ? '隐藏' : '显示'}"
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            ${this.visiblePasswords.has(field.key) 
+                              ? html`<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>`
+                              : html`<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>`
+                            }
+                          </svg>
+                        </button>
+                      </div>
+                    ` : html`
+                      <input
+                        type="${field.type}"
+                        .value=${this.configForm[field.key] || ''}
+                        @input=${(e: Event) => this.handleTextInput(e, field.key)}
+                        placeholder="${field.placeholder || ''}"
+                        class="input-base"
+                      />
+                    `}
+                  </div>
+                `)}
+              </div>
+
+              <!-- WhatsApp specific actions -->
+              ${currentChannel.channel_type === 'whatsapp' ? html`
+                <div class="notice">
+                  <div class="notice-icon">
+                    ${iconQrCode}
+                  </div>
+                  <div style="flex: 1;">
+                    <div class="notice-title">WhatsApp 扫码登录</div>
+                    <div class="notice-desc">登录时会弹出控制台二维码。连接终端或者运行 CLI \`openclaw channels login --channel whatsapp\`</div>
+                    <div class="btn-group" style="margin-top: 12px; display: flex; gap: 8px;">
+                      <button class="btn btn-secondary btn-sm" @click=${this.handleWhatsAppLogin} ?disabled=${this.loginLoading}>
+                        ${this.loginLoading ? iconLoader2 : iconQrCode} 启动扫码
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ` : nothing}
+
+              <!-- Form Actions Bar -->
+              <div class="actions-bar">
+                <button
+                  class="btn btn-primary"
+                  @click=${this.handleSave}
+                  ?disabled=${this.saving}
+                >
+                  ${this.saving ? iconLoader2 : iconCheck}
+                  保存设置
+                </button>
+                
+                <button
+                  class="btn btn-secondary"
+                  @click=${this.handleQuickTest}
+                  ?disabled=${this.testing}
+                >
+                  ${this.testing ? iconLoader2 : iconPlay}
+                  快速测试
+                </button>
+                
+                <div style="flex:1;"></div>
+
+                ${!this.showClearConfirm ? html`
+                  <button
+                    class="btn btn-danger"
+                    @click=${this.handleShowClearConfirm}
+                    ?disabled=${this.clearing}
+                  >
+                    ${this.clearing ? iconLoader2 : iconTrash2} 清空配置
+                  </button>
+                ` : html`
+                  <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                    <span style="color: var(--accent, #ff5c5c);">确定清空？</span>
+                    <button class="btn btn-danger btn-sm" style="background: rgba(255, 92, 92, 0.2);" @click=${this.handleClearConfig}>确定</button>
+                    <button class="btn btn-secondary btn-sm" @click=${() => (this.showClearConfirm = false)}>取消</button>
+                  </div>
+                `}
+              </div>
+
+              <!-- Test / Action Result block -->
+              ${this.testResult ? html`
+                <div class="test-result ${this.testResult.success ? 'ok' : 'err'}">
+                  <div>${this.testResult.success ? iconCheckCircle : iconXCircle}</div>
+                  <div style="flex: 1">
+                    <div class="test-result-title">${this.testResult.message}</div>
+                    ${this.testResult.error ? html`<div class="test-result-err">${this.testResult.error}</div>` : nothing}
+                  </div>
+                </div>
+              ` : nothing}
+
+            </div>
+          ` : html`
+            <div class="empty-state">
+              请选择平台频道进行配置
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "openclaw-config-channels": OpenClawConfigChannels;
+  }
+}

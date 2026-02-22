@@ -51,12 +51,12 @@ export class SystemSettingsView extends LitElement {
   @state() private loading = true;
   @state() private saving = false;
   @state() private saveStatus: "idle" | "success" | "error" = "idle";
-  @state() private needsRestart = false;
-  @state() private restarting = false;
 
   @state() private execSecurity: "allowlist" | "deny" | "full" = "allowlist";
   @state() private execAsk: "off" | "on-miss" | "always" = "on-miss";
   @state() private toolProfile: "minimal" | "coding" | "messaging" | "full" = "full";
+  @state() private fsWorkspaceOnly = false;
+  @state() private fsAllowedDirs: string[] = [];
 
   @state() private botName = "Clawd";
   @state() private userName = "主人";
@@ -91,6 +91,10 @@ export class SystemSettingsView extends LitElement {
       if (askMode === "off" || askMode === "on-miss" || askMode === "always") this.execAsk = askMode;
       const profile = getNestedValue(cfg, ["tools", "profile"]);
       if (profile === "minimal" || profile === "coding" || profile === "messaging" || profile === "full") this.toolProfile = profile;
+      const fsMode = getNestedValue(cfg, ["tools", "fs", "workspaceOnly"]);
+      if (typeof fsMode === "boolean") this.fsWorkspaceOnly = fsMode;
+      const fsDirs = getNestedValue(cfg, ["tools", "fs", "allowedDirs"]);
+      if (Array.isArray(fsDirs)) this.fsAllowedDirs = fsDirs.filter((f) => typeof f === "string");
       try {
         const desktop = (await invoke<Record<string, unknown>>("get_desktop_config")) ?? {};
         const ident = desktop.identity as Record<string, unknown> | undefined;
@@ -119,7 +123,6 @@ export class SystemSettingsView extends LitElement {
         ensurePath(cfg, path);
         (getNestedValue(cfg, path) as Record<string, unknown>)[key] = value;
         await invoke("save_config", { config: cfg });
-        this.needsRestart = true;
       } catch (e) { console.error("保存失败:", e); }
     });
   }
@@ -143,6 +146,44 @@ export class SystemSettingsView extends LitElement {
     this.toolProfile = profile;
     clearTimeout(this._profileTimer);
     this._profileTimer = setTimeout(() => this._saveField(["tools"], "profile", profile), 300);
+  }
+  private _fsTimer?: ReturnType<typeof setTimeout>;
+  private _handleFsChange(workspaceOnly: boolean) {
+    if (workspaceOnly === this.fsWorkspaceOnly) return;
+    this.fsWorkspaceOnly = workspaceOnly;
+    clearTimeout(this._fsTimer);
+    this._fsTimer = setTimeout(() => this._saveField(["tools", "fs"], "workspaceOnly", workspaceOnly), 300);
+  }
+
+  private async _handleAddAllowedDir() {
+    try {
+      const folder = await invoke<string | null>("pick_folder");
+      if (folder) {
+        // 避免重复添加相同的路径
+        if (!this.fsAllowedDirs.includes(folder)) {
+          this.fsAllowedDirs = [...this.fsAllowedDirs, folder];
+          this._triggerDirsSave();
+        }
+      }
+    } catch (e) {
+      console.error("选择目录失败:", e);
+    }
+  }
+
+  private _handleRemoveAllowedDir(index: number) {
+    const next = [...this.fsAllowedDirs];
+    next.splice(index, 1);
+    this.fsAllowedDirs = next;
+    this._triggerDirsSave();
+  }
+
+  private _dirsTimer?: ReturnType<typeof setTimeout>;
+  private _triggerDirsSave() {
+    clearTimeout(this._dirsTimer);
+    this._dirsTimer = setTimeout(() => {
+      const valid = this.fsAllowedDirs.map(d => d.trim()).filter(d => d.length > 0);
+      this._saveField(["tools", "fs"], "allowedDirs", valid);
+    }, 500);
   }
 
   private async _handleSaveIdentity() {
@@ -173,14 +214,6 @@ export class SystemSettingsView extends LitElement {
 
   private async _openConfigDir() {
     try { await invoke("open_config_dir"); } catch (e) { console.error("打开目录失败:", e); }
-  }
-
-  private async _handleRestartGateway() {
-    if (this.restarting) return;
-    this.restarting = true;
-    try { await invoke<string>("restart_service"); this.needsRestart = false; }
-    catch (e) { console.error("重启失败:", e); }
-    finally { this.restarting = false; }
   }
 
   /* ───────────────────────────────────────────────
@@ -530,48 +563,6 @@ export class SystemSettingsView extends LitElement {
     .save-msg.ok { color: #4ade80; }
     .save-msg.err { color: #f87171; }
 
-    /* ── restart banner ── */
-    .restart-banner {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px;
-      border-radius: 12px;
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      margin-bottom: 16px;
-    }
-    .restart-banner-icon { font-size: 18px; flex-shrink: 0; }
-    .restart-banner-text { flex: 1; }
-    .restart-banner-title {
-      font-size: 14px;
-      font-weight: 500;
-      color: #f87171;
-    }
-    .restart-banner-desc {
-      font-size: 12px;
-      color: var(--muted, #71717a);
-      margin-top: 2px;
-    }
-    .btn-danger {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      border-radius: 10px;
-      border: none;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      background: #ef4444;
-      color: white;
-      transition: opacity 0.15s;
-      white-space: nowrap;
-      font-family: inherit;
-    }
-    .btn-danger:hover { opacity: 0.9; }
-    .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
-
     /* ── loading ── */
     .loading {
       display: flex;
@@ -608,7 +599,7 @@ export class SystemSettingsView extends LitElement {
     }
     .update-info {
       flex: 1;
-      min-width: 0;
+      padding-right: 16px;
     }
     .update-progress-wrap {
       display: flex;
@@ -682,7 +673,6 @@ export class SystemSettingsView extends LitElement {
     return html`
       ${this._renderHeader()}
       <div class="content">
-        ${this.needsRestart ? this._renderRestartBanner() : nothing}
         ${this._renderSecurityCard()}
         ${this._renderIdentityCard()}
         ${this._renderAdvancedCard()}
@@ -699,20 +689,6 @@ export class SystemSettingsView extends LitElement {
           <div class="header-title">系统设置</div>
           <div class="header-sub">配置身份、安全和系统选项</div>
         </div>
-      </div>`;
-  }
-
-  private _renderRestartBanner() {
-    return html`
-      <div class="restart-banner">
-        <span class="restart-banner-icon">⚠️</span>
-        <div class="restart-banner-text">
-          <div class="restart-banner-title">设置已变更，需重启 Gateway 生效</div>
-          <div class="restart-banner-desc">安全相关设置在下次启动时加载</div>
-        </div>
-        <button class="btn-danger" ?disabled=${this.restarting} @click=${this._handleRestartGateway}>
-          ${this.restarting ? html`<span class="spinner spinner-sm"></span> 重启中…` : "🔄 重启 Gateway"}
-        </button>
       </div>`;
   }
 
@@ -785,6 +761,69 @@ export class SystemSettingsView extends LitElement {
             </button>
           </div>
         </div>
+
+        <div class="section">
+          <label class="section-label">
+            文件访问控制
+            <span class="section-hint">&nbsp;— 限制 AI 可访问的文件目录范围</span>
+          </label>
+
+          <div class="toggle-row">
+            <div class="toggle-row-info">
+              <div class="toggle-row-icon">📁</div>
+              <div>
+                <div class="toggle-text-primary">限制文件访问</div>
+                <div class="toggle-text-secondary">开启后 AI 仅能访问工作区及下方指定的目录</div>
+              </div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" .checked=${this.fsWorkspaceOnly} @change=${(e: Event) => this._handleFsChange((e.target as HTMLInputElement).checked)} />
+              <span class="switch-track"></span>
+            </label>
+          </div>
+
+          ${this.fsWorkspaceOnly ? html`
+            <div style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="font-size: 12px; color: var(--muted, #71717a); font-weight: 500;">允许访问的额外目录</div>
+                <button class="opt" style="padding: 4px 10px; font-size: 11px; white-space: nowrap; border-radius: 12px;" @click=${this._handleAddAllowedDir}>+ 添加目录</button>
+              </div>
+              ${this.fsAllowedDirs.length === 0 ? html`
+                <div style="font-size: 12px; color: var(--muted, #71717a); text-align: center; padding: 12px 0; border: 1px dashed var(--border, #27272a); border-radius: 8px; opacity: 0.7;">
+                  AI 当前仅能访问工作区目录
+                </div>
+              ` : html`
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                  ${this.fsAllowedDirs.map((dir, idx) => html`
+                    <span style="
+                      display: inline-flex; align-items: center; gap: 5px;
+                      padding: 5px 8px 5px 10px;
+                      background: var(--card, #181b22);
+                      border: 1px solid var(--border, #27272a);
+                      border-radius: 20px; font-size: 12px;
+                      color: var(--text, #e4e4e7);
+                      max-width: 300px; cursor: default;
+                    " title=${dir}>
+                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85;">📂 ${dir}</span>
+                      <button @click=${() => this._handleRemoveAllowedDir(idx)}
+                        style="
+                          display: inline-flex; align-items: center; justify-content: center;
+                          width: 16px; height: 16px; border-radius: 50%;
+                          background: transparent; border: none;
+                          color: var(--muted, #71717a); cursor: pointer;
+                          font-size: 10px; line-height: 1; padding: 0;
+                          flex-shrink: 0;
+                        "
+                        title="移除目录"
+                      >✕</button>
+                    </span>
+                  `)}
+                </div>
+              `}
+            </div>
+          ` : nothing}
+        </div>
+
       </div>`;
   }
 

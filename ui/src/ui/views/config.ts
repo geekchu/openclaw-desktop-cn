@@ -268,12 +268,12 @@ const sidebarIcons = {
 
 // Section definitions
 // Virtual sections that are always visible (not tied to schema)
-const VIRTUAL_SECTIONS = new Set(["onestop", "channels_config", "system_settings"]);
+const VIRTUAL_SECTIONS = new Set(["onestop", "system_settings", "channels_config"]);
 
 const SECTIONS: Array<{ key: string; label: string }> = [
   { key: "onestop", label: "AI大模型接入" },
-  { key: "channels_config", label: "消息配置" },
   { key: "system_settings", label: "系统设置" },
+  { key: "channels_config", label: "消息配置" },
   { key: "env", label: "环境" },
   { key: "update", label: "更新" },
   { key: "agents", label: "代理" },
@@ -412,9 +412,9 @@ export function renderConfig(props: ConfigProps) {
 
   const allSections = [...availableSections, ...extraSections];
   const isOnestop = props.activeSection === "onestop";
-  const isChannelsConfig = props.activeSection === "channels_config";
   const isSystemSettings = props.activeSection === "system_settings";
-  const isVirtualSection = isOnestop || isChannelsConfig || isSystemSettings;
+  const isChannelsConfig = props.activeSection === "channels_config";
+  const isVirtualSection = isOnestop || isSystemSettings || isChannelsConfig;
 
   const activeSectionSchema =
     props.activeSection && analysis.schema && schemaType(analysis.schema) === "object"
@@ -562,16 +562,12 @@ export function renderConfig(props: ConfigProps) {
       <main class="config-main">
         ${isVirtualSection
           ? html`
-            <div style="${isOnestop ? 'padding: 20px 24px; overflow-y: auto; flex: 1' : 'display: flex; flex-direction: column; height: 100%;'}">
+            <div style="${isOnestop || isChannelsConfig ? 'padding: 20px 24px; overflow-y: auto; flex: 1' : 'display: flex; flex-direction: column; height: 100%;'}">
               ${isOnestop
                 ? renderOnestop(props.onestop)
                 : isChannelsConfig
-                  ? html`<iframe
-                      src="/manager/index.html?embed=channels"
-                      style="flex: 1; width: 100%; border: none;"
-                      title="消息配置"
-                    ></iframe>`
-                : html`<openclaw-system-settings></openclaw-system-settings>`
+                  ? html`<openclaw-config-channels></openclaw-config-channels>`
+                  : html`<openclaw-system-settings></openclaw-system-settings>`
               }
             </div>
           `

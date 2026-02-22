@@ -1,0 +1,24 @@
+warning: unused import: `ModelCostConfig`
+ --> src\commands\config.rs:3:18
+  |
+3 | ...g, ModelCostConfig, O...
+  |       ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `send_test_message` is never used
+   --> src\commands\diagnostics.rs:494:14
+    |
+494 | ...fn send_test_message(ch...
+    |       ^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `InstallProgress` is never constructed
+  --> src\commands\installer.rs:29:12
+   |
+29 | ...ct InstallProgress {
+   |       ^^^^^^^^^^^^^^^
+
+warning: `openclaw-desktop` (bin "openclaw-desktop") generated 3 warnings (run `cargo fix --bin "openclaw-desktop" -p openclaw-desktop` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.47s

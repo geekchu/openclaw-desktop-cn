@@ -49,7 +49,7 @@ export function renderWhatsAppCard(params: {
         <div>
           <span class="label">认证时长</span>
           <span>
-            ${whatsapp?.authAgeMs != null ? formatDuration(whatsapp.authAgeMs) : "无"}
+            ${whatsapp?.authAgeMs != null ? formatDurationHuman(whatsapp.authAgeMs) : "无"}
           </span>
         </div>
       </div>

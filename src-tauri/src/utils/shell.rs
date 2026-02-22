@@ -213,34 +213,6 @@ pub fn run_powershell_output(script: &str) -> Result<String, String> {
     }
 }
 
-/// 跨平台执行脚本命令
-/// Windows 上使用 cmd.exe（避免 PowerShell 执行策略问题）
-pub fn run_script_output(script: &str) -> Result<String, String> {
-    if platform::is_windows() {
-        run_cmd_output(script)
-    } else {
-        run_bash_output(script)
-    }
-}
-
-/// 后台执行命令（不等待结果）
-pub fn spawn_background(script: &str) -> io::Result<()> {
-    if platform::is_windows() {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/c", script]);
-        
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        
-        cmd.spawn()?;
-    } else {
-        Command::new("bash")
-            .arg("-c")
-            .arg(script)
-            .spawn()?;
-    }
-    Ok(())
-}
 
 /// 获取当前平台的 node-runtime 子目录名
 fn get_node_platform_dir() -> &'static str {

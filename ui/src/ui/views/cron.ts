@@ -3,7 +3,7 @@ import type { ChannelUiMetaEntry, CronJob, CronRunLogEntry, CronStatus } from ".
 import type { CronFormState } from "../ui-types.ts";
 import { formatRelativeTimestamp, formatMs } from "../format.ts";
 import { pathForTab } from "../navigation.ts";
-import { formatCronSchedule, formatNextRun } from "../presenter.ts";
+import { formatCronSchedule, formatNextRun, formatCronPayload } from "../presenter.ts";
 
 export type CronProps = {
   basePath: string;

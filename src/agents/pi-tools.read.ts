@@ -291,7 +291,61 @@ export function wrapToolParamNormalization(
   };
 }
 
-export function wrapToolWorkspaceRootGuard(tool: AnyAgentTool, root: string): AnyAgentTool {
+import path from "node:path";
+
+function assertDirectPathAccess(
+  filePath: string,
+  cwd: string,
+  workspaceRoot: string,
+  allowedDirs?: string[],
+  denyDirs?: string[],
+): void {
+  // Windows paths are case-insensitive; normalize for comparison
+  const isWin = process.platform === "win32";
+  const norm = (p: string) => isWin ? p.toLowerCase() : p;
+
+  let finalAbsPath: string;
+  if (path.isAbsolute(filePath)) {
+    finalAbsPath = path.normalize(filePath);
+  } else {
+    finalAbsPath = path.resolve(cwd, filePath);
+  }
+
+  // Deny list takes precedence — unconditionally block access to protected dirs
+  if (denyDirs && denyDirs.length > 0) {
+    for (const denied of denyDirs) {
+      const rel = path.relative(norm(path.resolve(denied)), norm(finalAbsPath));
+      if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+        throw new Error(
+          `Permission denied: '${filePath}' is inside a protected OpenClaw directory and cannot be modified.`,
+        );
+      }
+    }
+  }
+
+  const allowedRoots = [path.resolve(workspaceRoot)];
+  if (allowedDirs && allowedDirs.length > 0) {
+    for (const dir of allowedDirs) {
+      allowedRoots.push(path.resolve(dir));
+    }
+  }
+
+  for (const root of allowedRoots) {
+    const relative = path.relative(norm(root), norm(finalAbsPath));
+    if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
+      return;
+    }
+  }
+
+  throw new Error(`Permission denied: You do not have permission to access '${filePath}'. Path is outside the workspace and not in any manually allowed directories.`);
+}
+
+export function wrapToolWorkspaceRootGuard(
+  tool: AnyAgentTool,
+  root: string,
+  allowPaths?: string[],
+  denyPaths?: string[],
+): AnyAgentTool {
   return {
     ...tool,
     execute: async (toolCallId, args, signal, onUpdate) => {
@@ -299,11 +353,89 @@ export function wrapToolWorkspaceRootGuard(tool: AnyAgentTool, root: string): An
       const record =
         normalized ??
         (args && typeof args === "object" ? (args as Record<string, unknown>) : undefined);
-      const filePath = record?.path;
-      if (typeof filePath === "string" && filePath.trim()) {
-        await assertSandboxPath({ filePath, cwd: root, root });
+      
+      // Some tools like `ls` might use `dir` or `path` depending on schema. We check both.
+      const targetPath = record?.path ?? record?.dir ?? record?.file_path ?? record?.dir_path;
+      
+      if (typeof targetPath === "string" && targetPath.trim()) {
+        assertDirectPathAccess(targetPath, root, root, allowPaths, denyPaths);
       }
       return tool.execute(toolCallId, normalized ?? args, signal, onUpdate);
+    },
+  };
+}
+
+/**
+ * Extract absolute file paths from a shell command string.
+ * Catches patterns like:
+ * - Windows: C:\path, D:\path, "C:\path with spaces"
+ * - Unix: /absolute/path
+ * Does NOT catch relative paths (those resolve against cwd which is the workspace root).
+ */
+function extractAbsolutePathsFromCommand(command: string): string[] {
+  const paths: string[] = [];
+  
+  // Windows absolute paths: drive letter followed by :\ or :/
+  // Match both quoted and unquoted paths
+  const winPathRegex = /[A-Za-z]:[\\/][^\s;|&><"'`]*|"([A-Za-z]:[\\/][^"]*)"|'([A-Za-z]:[\\/][^']*)'/g;
+  let match: RegExpExecArray | null;
+  while ((match = winPathRegex.exec(command)) !== null) {
+    const p = match[1] ?? match[2] ?? match[0];
+    if (p) paths.push(p);
+  }
+  
+  // Unix absolute paths: starting with /
+  const unixPathRegex = /(?:^|\s|[;|&>=])(\/{1,2}[^\s;|&><"'`]+)|"(\/[^"]*)"|'(\/[^']*)'/g;
+  while ((match = unixPathRegex.exec(command)) !== null) {
+    const p = match[1] ?? match[2] ?? match[3];
+    if (p) paths.push(p);
+  }
+  
+  return paths;
+}
+
+/**
+ * Wrap the exec tool to enforce directory access restrictions.
+ * When workspaceOnly is enabled, this guard:
+ * 1. Validates the `workdir` parameter against allowed directories
+ * 2. Scans the `command` string for absolute paths and rejects commands
+ *    that reference paths outside the workspace or allowed directories
+ */
+export function wrapExecToolPathGuard(
+  tool: AnyAgentTool,
+  workspaceRoot: string,
+  allowedDirs?: string[],
+  denyDirs?: string[],
+): AnyAgentTool {
+  return {
+    ...tool,
+    execute: async (toolCallId, args, signal, onUpdate) => {
+      const params = args as Record<string, unknown> | undefined;
+      
+      // 1. Check workdir parameter
+      const workdir = params?.workdir;
+      if (typeof workdir === "string" && workdir.trim()) {
+        assertDirectPathAccess(workdir, workspaceRoot, workspaceRoot, allowedDirs, denyDirs);
+      }
+      
+      // 2. Scan command string for absolute paths
+      const command = params?.command;
+      if (typeof command === "string" && command.trim()) {
+        const absolutePaths = extractAbsolutePathsFromCommand(command);
+        for (const absPath of absolutePaths) {
+          try {
+            assertDirectPathAccess(absPath, workspaceRoot, workspaceRoot, allowedDirs, denyDirs);
+          } catch {
+            throw new Error(
+              `Permission denied: The command references path '${absPath}' which is outside the workspace and allowed directories. ` +
+              `Allowed roots: workspace(${workspaceRoot})${allowedDirs?.length ? `, additional: ${allowedDirs.join(", ")}` : ""}. ` +
+              `Use relative paths or ask the user to add the target directory to the allowed list in Settings.`
+            );
+          }
+        }
+      }
+      
+      return tool.execute(toolCallId, args, signal, onUpdate);
     },
   };
 }

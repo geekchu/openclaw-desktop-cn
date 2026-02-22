@@ -489,52 +489,6 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
     }
 }
 
-/// 发送测试消息到渠道
-#[command]
-pub async fn send_test_message(channel_type: String, target: String) -> Result<ChannelTestResult, String> {
-    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    let message = format!("🤖 OpenClaw 测试消息\n\n✅ 连接成功！\n⏰ {}", timestamp);
-    
-    // 使用 openclaw message send 命令发送测试消息
-    let send_result = shell::run_openclaw(&[
-        "message", "send",
-        "--channel", &channel_type,
-        "--target", &target,
-        "--message", &message,
-        "--json"
-    ]);
-    
-    match send_result {
-        Ok(output) => {
-            // 尝试从混合输出中提取并解析 JSON 结果
-            let success = if let Some(json_str) = extract_json_from_output(&output) {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                    json.get("success").and_then(|v| v.as_bool()).unwrap_or(false)
-                        || json.get("ok").and_then(|v| v.as_bool()).unwrap_or(false)
-                        || json.get("messageId").is_some()
-                } else {
-                    false
-                }
-            } else {
-                // 非 JSON 输出，检查是否包含错误关键词
-                !output.to_lowercase().contains("error") && !output.to_lowercase().contains("failed")
-            };
-            
-            Ok(ChannelTestResult {
-                success,
-                channel: channel_type,
-                message: if success { "消息已发送".to_string() } else { "消息发送失败".to_string() },
-                error: if success { None } else { Some(output) },
-            })
-        }
-        Err(e) => Ok(ChannelTestResult {
-            success: false,
-            channel: channel_type,
-            message: "发送失败".to_string(),
-            error: Some(e),
-        }),
-    }
-}
 
 /// 获取系统信息
 #[command]
@@ -738,8 +692,6 @@ read -p "按回车键关闭..."
             {
                 return Err("Windows 暂不支持自动启动终端，请手动运行: openclaw channels login --channel whatsapp".to_string());
             }
-            
-            Ok("已在新终端窗口中启动 WhatsApp 登录，请查看弹出的终端窗口并扫描二维码".to_string())
         }
         _ => Err(format!("不支持 {} 的登录向导", channel_type)),
     }

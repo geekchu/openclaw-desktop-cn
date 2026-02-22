@@ -34,30 +34,46 @@ export function resolveSandboxInputPath(filePath: string, cwd: string): string {
   return resolveToCwd(filePath, cwd);
 }
 
-export function resolveSandboxPath(params: { filePath: string; cwd: string; root: string }): {
+export function resolveSandboxPath(params: {
+  filePath: string;
+  cwd: string;
+  root: string;
+  allowPaths?: string[];
+}): {
   resolved: string;
   relative: string;
+  appliedRoot: string;
 } {
   const resolved = resolveSandboxInputPath(params.filePath, params.cwd);
   const rootResolved = path.resolve(params.root);
   const relative = path.relative(rootResolved, resolved);
   if (!relative || relative === "") {
-    return { resolved, relative: "" };
+    return { resolved, relative: "", appliedRoot: rootResolved };
   }
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    if (params.allowPaths && params.allowPaths.length > 0) {
+      for (const allowPath of params.allowPaths) {
+        const allowResolved = path.resolve(allowPath);
+        const allowRelative = path.relative(allowResolved, resolved);
+        if (allowRelative === "" || (!allowRelative.startsWith("..") && !path.isAbsolute(allowRelative))) {
+          return { resolved, relative: allowRelative, appliedRoot: allowResolved };
+        }
+      }
+    }
     throw new Error(`Path escapes sandbox root (${shortPath(rootResolved)}): ${params.filePath}`);
   }
-  return { resolved, relative };
+  return { resolved, relative, appliedRoot: rootResolved };
 }
 
 export async function assertSandboxPath(params: {
   filePath: string;
   cwd: string;
   root: string;
+  allowPaths?: string[];
   allowFinalSymlink?: boolean;
 }) {
   const resolved = resolveSandboxPath(params);
-  await assertNoSymlinkEscape(resolved.relative, path.resolve(params.root), {
+  await assertNoSymlinkEscape(resolved.relative, resolved.appliedRoot, {
     allowFinalSymlink: params.allowFinalSymlink,
   });
   return resolved;

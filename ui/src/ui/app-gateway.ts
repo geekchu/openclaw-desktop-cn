@@ -247,9 +247,9 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       void loadChatHistory(app);
       for (const delay of delays) {
         chatFinalReloadTimers.push(
-          window.setTimeout(() => {
+          setTimeout(() => {
             void loadChatHistory(app);
-          }, delay),
+          }, delay) as unknown as ReturnType<typeof setTimeout>,
         );
       }
     }

@@ -65,8 +65,9 @@ run("pnpm build");
 console.log("\n[bundle] === Step 2: 编译 Control UI ===");
 run("pnpm ui:build");
 
-// Step 2.5: Manager UI 已废弃，使用原生 Lit 组件替代，跳过
-console.log("\n[bundle] === Step 2.5: 跳过 Manager UI（已由原生 Lit 组件替代）===");
+// Step 2.5: 编译 Manager UI
+console.log("\n[bundle] === Step 2.5: 编译 Manager UI ===");
+run("pnpm manager:build");
 
 // Step 2.6: 确保 splash.html 在 frontend 目录中
 // Tauri 生产构建仅嵌入 frontendDist（./frontend）中的文件，
@@ -116,24 +117,15 @@ copyIfExists(
 
 // 创建精简的 package.json（只保留 dependencies）
 const rootPkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf-8"));
-// npm 不支持 pnpm 的 workspace: 协议，过滤掉这些依赖
-const filteredDeps = {};
-for (const [name, version] of Object.entries(rootPkg.dependencies || {})) {
-  if (typeof version === "string" && version.startsWith("workspace:")) {
-    console.log(`[bundle] 跳过 workspace 依赖: ${name}@${version}`);
-    continue;
-  }
-  filteredDeps[name] = version;
-}
 const bundlePkg = {
   name: rootPkg.name,
   version: rootPkg.version,
   type: "module",
   main: "dist/index.js",
-  dependencies: filteredDeps,
+  dependencies: rootPkg.dependencies || {},
 };
 writeFileSync(join(bundleDir, "package.json"), JSON.stringify(bundlePkg, null, 2));
-console.log("[bundle] 创建 package.json（仅 dependencies，已过滤 workspace 协议）");
+console.log("[bundle] 创建 package.json（仅 dependencies）");
 
 // Step 5: 安装依赖（平铺模式，不使用 pnpm 符号链接）
 console.log("\n[bundle] === Step 5: 安装生产依赖 ===");
@@ -149,35 +141,7 @@ if (existsSync(extDir)) {
     const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
     const deps = extPkg.dependencies;
     if (!deps || Object.keys(deps).length === 0) continue;
-    // 过滤掉 workspace: 协议依赖
-    const extFilteredDeps = {};
-    let skipped = 0;
-    for (const [depName, depVer] of Object.entries(deps)) {
-      if (typeof depVer === "string" && depVer.startsWith("workspace:")) {
-        console.log(`[bundle] 跳过 extension/${name} workspace 依赖: ${depName}@${depVer}`);
-        skipped++;
-        continue;
-      }
-      extFilteredDeps[depName] = depVer;
-    }
-    if (Object.keys(extFilteredDeps).length === 0) {
-      console.log(`[bundle] extension/${name} 所有依赖均为 workspace 依赖，跳过安装`);
-      continue;
-    }
-    // 回写过滤后的 package.json（同时删除含 workspace: 的 devDependencies）
-    const devDeps = extPkg.devDependencies;
-    let hasWorkspaceDev = false;
-    if (devDeps) {
-      for (const v of Object.values(devDeps)) {
-        if (typeof v === "string" && v.startsWith("workspace:")) { hasWorkspaceDev = true; break; }
-      }
-    }
-    if (skipped > 0 || hasWorkspaceDev) {
-      extPkg.dependencies = extFilteredDeps;
-      if (hasWorkspaceDev) delete extPkg.devDependencies;
-      writeFileSync(extPkgPath, JSON.stringify(extPkg, null, 2));
-    }
-    console.log(`[bundle] 安装 extension/${name} 依赖 (${Object.keys(extFilteredDeps).length} 个包)`);
+    console.log(`[bundle] 安装 extension/${name} 依赖 (${Object.keys(deps).length} 个包)`);
     run("npm install --omit=dev --install-strategy=hoisted --ignore-scripts", {
       cwd: join(extDir, name),
     });

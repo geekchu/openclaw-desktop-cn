@@ -85,30 +85,3 @@ pub async fn check_port_in_use(port: u16) -> Result<bool, String> {
         },
     }
 }
-
-/// 获取 Node.js 版本
-/// 优先使用内置 Node.js，生产模式不回退到系统 node
-#[command]
-pub async fn get_node_version() -> Result<Option<String>, String> {
-    info!("[进程检查] 获取 Node.js 版本...");
-    
-    // 使用 get_node_path() 获取 Node.js 路径（生产模式仅返回内置版本）
-    let node_path = match shell::get_node_path() {
-        Some(p) => p,
-        None => {
-            info!("[进程检查] Node.js 不可用");
-            return Ok(None);
-        }
-    };
-    
-    match shell::run_command_output(&node_path, &["--version"]) {
-        Ok(version) => {
-            info!("[进程检查] Node.js 版本: {}", version);
-            Ok(Some(version))
-        },
-        Err(e) => {
-            debug!("[进程检查] 获取 Node.js 版本失败: {}", e);
-            Ok(None)
-        },
-    }
-}

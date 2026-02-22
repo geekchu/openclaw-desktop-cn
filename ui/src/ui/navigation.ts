@@ -4,7 +4,7 @@ export const TAB_GROUPS = [
   { label: "聊天", tabs: ["chat"] },
   {
     label: "控制",
-    tabs: ["overview", "channels", "instances", "sessions", "cron"],
+    tabs: ["overview", "instances", "sessions", "cron"],
   },
   { label: "代理", tabs: ["agents", "skills", "nodes"] },
   { label: "设置", tabs: ["config", "debug", "logs"] },

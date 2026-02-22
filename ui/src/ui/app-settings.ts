@@ -45,8 +45,8 @@ if (typeof window !== "undefined") {
   const params = new URLSearchParams(window.location.search);
   _isDesktopWebView =
     params.get("desktop") === "1" ||
-    Boolean((window as Record<string, unknown>).__TAURI__) ||
-    Boolean((window as Record<string, unknown>).__TAURI_INTERNALS__);
+    Boolean((window as unknown as Record<string, unknown>).__TAURI__) ||
+    Boolean((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__);
 
   if (!_isDesktopWebView) {
     const ua = navigator.userAgent;
@@ -347,9 +347,6 @@ export function syncTabWithLocation(host: SettingsHost, replace: boolean) {
   }
   let resolved = tabFromPath(window.location.pathname, host.basePath) ?? "chat";
   // When embedded in an iframe, the "manager" tab is suppressed — fall back to overview.
-  if (resolved === "manager" && window.self !== window.top) {
-    resolved = "overview";
-  }
   setTabFromRoute(host, resolved);
   syncUrlWithTab(host, resolved, replace);
 }
@@ -361,9 +358,6 @@ export function onPopState(host: SettingsHost) {
   let resolved = tabFromPath(window.location.pathname, host.basePath);
   if (!resolved) {
     return;
-  }
-  if (resolved === "manager" && window.self !== window.top) {
-    resolved = "overview";
   }
 
   const url = new URL(window.location.href);
