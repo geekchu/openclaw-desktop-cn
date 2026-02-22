@@ -1,7 +1,7 @@
 /**
  * 一站式接入全球AI大模型 — 配置组件
  *
- * 引导用户通过 api.openclawcn.net 获取 API Key，快速接入主流大语言模型。
+ * 从 api.openclawcn.net 动态获取可用模型列表，引导用户快速接入。
  */
 import { html, nothing } from "lit";
 import { renderCustomProviders } from "./config-custom-providers.js";
@@ -12,182 +12,310 @@ function invoke<T = unknown>(
   cmd: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  const t = (window as any).__TAURI_INTERNALS__;
-  if (!t) return Promise.reject(new Error("Tauri not available"));
-  return t.invoke(cmd, args) as Promise<T>;
+  const t = (window as any).__TAURI__;
+  if (t?.core?.invoke) {
+    return t.core.invoke(cmd, args) as Promise<T>;
+  }
+  return Promise.reject(new Error("Tauri invoke not available"));
 }
 
-// ─── 一站式保存逻辑（与自定义接入使用相同的 save_provider 命令）───
+// ─── 一站式保存逻辑 ───────────────────────────────────────────
 
 const ONESTOP_PROVIDER_NAME = "onestop";
 const ONESTOP_BASE_URL = "https://api.openclawcn.net/v1";
+const MODELS_API_URL = "https://api.openclawcn.net/v1/models";
+const PRICING_URL = "https://api.openclawcn.net/pricing";
 
 /**
- * Save the onestop API key and selected model via the same `save_provider`
- * Tauri command that CustomProvidersView uses.
+ * Save the onestop API key and selected model.
+ * Uses a single get_config → modify → save_config cycle to minimize file writes.
  */
 export async function saveOnestopConfig(apiKey: string, selectedModel: string): Promise<void> {
-  const model = ONESTOP_MODELS.find((m) => m.id === selectedModel);
-  // Build models array – if a model is selected, include it; otherwise save all models
-  const modelsToSave = model
-    ? [
-        {
-          id: model.id,
-          name: model.name,
-          api: "openai",
-          input: ["text", "image"],
-          contextWindow: 200000,
-          maxTokens: 8192,
-          reasoning: false,
-          cost: null,
-        },
-      ]
-    : ONESTOP_MODELS.map((m) => ({
-        id: m.id,
-        name: m.name,
-        api: "openai",
-        input: ["text", "image"],
-        contextWindow: 200000,
-        maxTokens: 8192,
-        reasoning: false,
-        cost: null,
-      }));
+  // 始终将所有已知模型保存到 provider 配置中，确保 gateway 能识别所有模型
+  let modelsToSave: OnestopModel[] = [..._cachedModels];
+  if (modelsToSave.length === 0 && selectedModel) {
+    // 如果缓存为空，尝试只保存选中的模型（fallback）
+    modelsToSave = [{
+      id: selectedModel,
+      name: formatModelName(selectedModel),
+      provider: inferProvider(selectedModel).name,
+      providerKey: inferProvider(selectedModel).key,
+    }];
+  }
 
-  await invoke("save_provider", {
-    provider_name: ONESTOP_PROVIDER_NAME,
-    base_url: ONESTOP_BASE_URL,
-    api_key: apiKey,
-    api_type: "openai",
-    models: modelsToSave,
-  });
+  // 单次原子写入：get_config → 修改全部字段 → save_config
+  // 避免多次写文件触发 gateway 的文件监视器反复重启
+  const cfg = await invoke<Record<string, any>>("get_config");
 
-  // If a model was selected, set it as the primary model
+  // 1. 设置 provider 配置 (models.providers.onestop)
+  if (!cfg.models) cfg.models = {};
+  if (!cfg.models.providers) cfg.models.providers = {};
+  cfg.models.providers[ONESTOP_PROVIDER_NAME] = {
+    baseUrl: ONESTOP_BASE_URL,
+    // 如果用户未输入新 Key，保留配置文件中已有的 Key
+    apiKey: apiKey || cfg.models.providers?.[ONESTOP_PROVIDER_NAME]?.apiKey || "",
+    models: modelsToSave.map((m) => ({
+      id: m.id,
+      name: m.name,
+      api: "openai-completions",
+      input: ["text", "image"],
+      contextWindow: 200000,
+      maxTokens: 8192,
+      reasoning: false,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    })),
+  };
+
+  // 2. 注册模型到 agents.defaults.models
+  if (!cfg.agents) cfg.agents = {};
+  if (!cfg.agents.defaults) cfg.agents.defaults = {};
+  if (!cfg.agents.defaults.models) cfg.agents.defaults.models = {};
+
+  // 先清理该 provider 下的旧模型
+  const prefix = `${ONESTOP_PROVIDER_NAME}/`;
+  for (const key of Object.keys(cfg.agents.defaults.models)) {
+    if (key.startsWith(prefix)) {
+      delete cfg.agents.defaults.models[key];
+    }
+  }
+  // 添加当前选中的模型
+  for (const m of modelsToSave) {
+    cfg.agents.defaults.models[`${ONESTOP_PROVIDER_NAME}/${m.id}`] = {};
+  }
+
+  // 3. 设置主模型
   if (selectedModel) {
     const fullId = `${ONESTOP_PROVIDER_NAME}/${selectedModel}`;
-    await invoke("set_primary_model", { model_id: fullId });
+    if (!cfg.agents.defaults.model) cfg.agents.defaults.model = {};
+    cfg.agents.defaults.model.primary = fullId;
   }
+
+  // 更新元数据
+  if (!cfg.meta) cfg.meta = {};
+  cfg.meta.lastTouchedAt = new Date().toISOString();
+
+  // 单次写入
+  await invoke("save_config", { config: cfg });
+}
+
+// ─── 测试连接 ─────────────────────────────────────────────────
+
+let _testing = false;
+let _testResult: { success: boolean; message: string } | null = null;
+
+async function testOnestopConnection(requestUpdate: () => void) {
+  _testing = true;
+  _testResult = null;
+  requestUpdate();
+
+  try {
+    const result = await invoke<{
+      success: boolean;
+      provider: string;
+      model: string;
+      response: string | null;
+      error: string | null;
+      latency_ms: number | null;
+    }>("test_ai_connection");
+
+    _testResult = {
+      success: result.success,
+      message: result.success
+        ? `✓ 连接成功 — ${result.model}${result.latency_ms ? ` (${result.latency_ms}ms)` : ""}`
+        : `✗ 连接失败: ${result.error || "未知错误"}`,
+    };
+  } catch (e) {
+    _testResult = {
+      success: false,
+      message: `✗ 测试失败: ${String(e)}`,
+    };
+  } finally {
+    _testing = false;
+    requestUpdate();
+  }
+}
+
+// ─── 保存结果反馈 ──────────────────────────────────────────────
+
+let _saveResult: { success: boolean; message: string } | null = null;
+let _saveResultTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showSaveResult(success: boolean, message: string, requestUpdate: () => void) {
+  if (_saveResultTimer) clearTimeout(_saveResultTimer);
+  _saveResult = { success, message };
+  requestUpdate();
+  _saveResultTimer = setTimeout(() => {
+    _saveResult = null;
+    requestUpdate();
+  }, 4000);
 }
 
 // ─── Tab 状态 ────────────────────────────────────────────────
 
 let _activeTab: "onestop" | "custom" = "onestop";
 
-// ─── 模型定义 ───────────────────────────────────────────────
+// 自定义接入设置的主模型（用于状态栏显示）
+let _customPrimaryModel: string | null = null;
+let _customPrimaryListenerAdded = false;
+let _latestRequestUpdate: (() => void) | null = null;
+
+// 已保存的 API Key 脱敏显示
+let _existingMaskedKey: string | null = null;
+let _existingKeyLoaded = false;
+let _existingKeyLoadPromise: Promise<void> | null = null;
+
+/** 从配置文件加载已有的 onestop API Key 并脱敏 */
+function loadExistingApiKey(requestUpdate: () => void): void {
+  if (_existingKeyLoaded || _existingKeyLoadPromise) return;
+  _existingKeyLoadPromise = (async () => {
+    try {
+      const cfg = await invoke<Record<string, any>>("get_config");
+      const apiKey = cfg?.models?.providers?.onestop?.apiKey;
+      if (typeof apiKey === "string" && apiKey.length > 0) {
+        // 脱敏显示：前4后4，中间用 • 填充
+        if (apiKey.length > 8) {
+          _existingMaskedKey = `${apiKey.slice(0, 4)}${"•".repeat(Math.min(apiKey.length - 8, 20))}${apiKey.slice(-4)}`;
+        } else {
+          _existingMaskedKey = "•".repeat(apiKey.length);
+        }
+      }
+    } catch {
+      // 配置不可用时忽略
+    } finally {
+      _existingKeyLoaded = true;
+      _existingKeyLoadPromise = null;
+      requestUpdate();
+    }
+  })();
+}
+
+// ─── 动态模型获取 ─────────────────────────────────────────────
 
 export type OnestopModel = {
   id: string;
   name: string;
   provider: string;
-  description: string;
-  category: "chat" | "code" | "reasoning" | "vision" | "multimodal";
-  badge?: string;
+  providerKey: string; // 用于匹配 Logo 和颜色
 };
 
-const ONESTOP_MODELS: OnestopModel[] = [
-  // OpenAI
-  {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    provider: "OpenAI",
-    description: "最新多模态旗舰模型，支持文本、图像和音频",
-    category: "multimodal",
-    badge: "推荐",
-  },
-  {
-    id: "gpt-4o-mini",
-    name: "GPT-4o Mini",
-    provider: "OpenAI",
-    description: "轻量高效模型，适合日常对话和简单任务",
-    category: "chat",
-  },
-  {
-    id: "o3-mini",
-    name: "o3-mini",
-    provider: "OpenAI",
-    description: "高级推理模型，擅长数学、编程和逻辑推理",
-    category: "reasoning",
-    badge: "新",
-  },
-  // Anthropic
-  {
-    id: "claude-sonnet-4-20250514",
-    name: "Claude Sonnet 4",
-    provider: "Anthropic",
-    description: "平衡性能与速度的对话模型",
-    category: "chat",
-    badge: "推荐",
-  },
-  {
-    id: "claude-3-5-haiku-20241022",
-    name: "Claude 3.5 Haiku",
-    provider: "Anthropic",
-    description: "快速轻量模型，适合实时交互场景",
-    category: "chat",
-  },
-  {
-    id: "claude-opus-4-20250514",
-    name: "Claude Opus 4",
-    provider: "Anthropic",
-    description: "最强大的 Claude 模型，适合复杂分析和创作",
-    category: "reasoning",
-  },
-  // Google
-  {
-    id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
-    provider: "Google",
-    description: "Google 最新多模态模型，支持超长上下文",
-    category: "multimodal",
-    badge: "新",
-  },
-  {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    provider: "Google",
-    description: "高速推理模型，平衡质量与效率",
-    category: "chat",
-  },
-  // DeepSeek
-  {
-    id: "deepseek-chat",
-    name: "DeepSeek V3",
-    provider: "DeepSeek",
-    description: "国产高性能模型，中文理解能力出色",
-    category: "chat",
-  },
-  {
-    id: "deepseek-reasoner",
-    name: "DeepSeek R1",
-    provider: "DeepSeek",
-    description: "深度推理模型，数学和逻辑能力突出",
-    category: "reasoning",
-  },
-  // Qwen
-  {
-    id: "qwen-max",
-    name: "通义千问 Max",
-    provider: "阿里云",
-    description: "阿里最强大语言模型，全面的中文能力",
-    category: "chat",
-  },
-];
+let _cachedModels: OnestopModel[] = [];
+let _modelsLoading = false;
+let _modelsError: string | null = null;
+let _fetchPromise: Promise<void> | null = null;
 
-const CATEGORY_LABELS: Record<string, string> = {
-  all: "全部",
-  chat: "对话",
-  code: "代码",
-  reasoning: "推理",
-  vision: "视觉",
-  multimodal: "多模态",
+/** 从模型 ID 推断 Provider */
+function inferProvider(modelId: string): { name: string; key: string } {
+  const id = modelId.toLowerCase();
+  if (id.startsWith("deepseek")) return { name: "DeepSeek", key: "deepseek" };
+  if (id.startsWith("doubao") || id.startsWith("seed")) return { name: "豆包", key: "doubao" };
+  if (id.startsWith("glm")) return { name: "智谱 GLM", key: "glm" };
+  if (id.startsWith("hunyuan") || id.startsWith("tencent")) return { name: "腾讯混元", key: "hunyuan" };
+  if (id.startsWith("kimi")) return { name: "Kimi", key: "kimi" };
+  if (id.startsWith("longcat")) return { name: "Longcat", key: "longcat" };
+  if (id.startsWith("mimo")) return { name: "Mimo", key: "mimo" };
+  if (id.startsWith("minimax")) return { name: "MiniMax", key: "minimax" };
+  if (id.startsWith("qwen")) return { name: "通义千问", key: "qwen" };
+  if (id.startsWith("gpt") || id.startsWith("o1") || id.startsWith("o3") || id.startsWith("o4")) return { name: "OpenAI", key: "openai" };
+  if (id.startsWith("claude")) return { name: "Anthropic", key: "anthropic" };
+  if (id.startsWith("gemini")) return { name: "Google", key: "google" };
+  return { name: modelId.split("-")[0] || "其他", key: "other" };
+}
+
+/** 将模型 ID 转为可读的显示名称 */
+function formatModelName(id: string): string {
+  // 去掉 provider 前缀，美化显示
+  return id
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")
+    .replace(/\bLatest\b/i, "Latest")
+    .replace(/\bPlus\b/i, "Plus")
+    .trim();
+}
+
+/** 获取模型列表 */
+export function fetchModels(requestUpdate: () => void): void {
+  if (_cachedModels.length > 0 || _modelsLoading) return;
+  if (_fetchPromise) return;
+
+  _modelsLoading = true;
+  _modelsError = null;
+
+  _fetchPromise = fetch(MODELS_API_URL)
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
+    .then((data: { data: Array<{ id: string; owned_by?: string }> }) => {
+      _cachedModels = data.data.map((m) => {
+        const p = inferProvider(m.id);
+        return {
+          id: m.id,
+          name: formatModelName(m.id),
+          provider: p.name,
+          providerKey: p.key,
+        };
+      });
+      _modelsLoading = false;
+      _fetchPromise = null;
+      requestUpdate();
+    })
+    .catch((err) => {
+      _modelsError = String(err);
+      _modelsLoading = false;
+      _fetchPromise = null;
+      requestUpdate();
+    });
+}
+
+/** 强制重新获取模型列表 */
+export function refetchModels(requestUpdate: () => void): void {
+  _cachedModels = [];
+  _fetchPromise = null;
+  fetchModels(requestUpdate);
+}
+
+// ─── Provider Logos (内联 SVG) ──────────────────────────────
+
+const providerLogos: Record<string, ReturnType<typeof html>> = {
+  deepseek: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#4d6bfe"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">D</text></svg>`,
+  doubao: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#ff6154"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">豆</text></svg>`,
+  glm: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#3366ff"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">智</text></svg>`,
+  hunyuan: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#06b4fd"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">混</text></svg>`,
+  kimi: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#0066ff"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">K</text></svg>`,
+  longcat: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#8b5cf6"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">L</text></svg>`,
+  mimo: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#e74c3c"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">M</text></svg>`,
+  minimax: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#ff9500"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="12" font-weight="bold" font-family="sans-serif">MM</text></svg>`,
+  qwen: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#ff6a00"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">千</text></svg>`,
+  openai: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#10a37f"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">G</text></svg>`,
+  anthropic: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#d4a27f"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">C</text></svg>`,
+  google: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#4285f4"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">G</text></svg>`,
+  other: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#666"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">?</text></svg>`,
 };
 
-// ─── 组件 Props ────────────────────────────────────────────
+const providerColors: Record<string, string> = {
+  deepseek: "#4d6bfe",
+  doubao: "#ff6154",
+  glm: "#3366ff",
+  hunyuan: "#06b4fd",
+  kimi: "#0066ff",
+  longcat: "#8b5cf6",
+  mimo: "#e74c3c",
+  minimax: "#ff9500",
+  qwen: "#ff6a00",
+  openai: "#10a37f",
+  anthropic: "#d4a27f",
+  google: "#4285f4",
+  other: "#666",
+};
+
+// ─── OnestopProps ──────────────────────────────────────────
 
 export type OnestopProps = {
   apiKey: string;
   selectedModel: string;
   showApiKey: boolean;
-  activeCategory: string;
+  activeCategory: string; // 现在用作 provider 筛选
   saving: boolean;
   onApiKeyChange: (value: string) => void;
   onModelSelect: (modelId: string) => void;
@@ -249,75 +377,145 @@ const icons = {
       <path d="M17 19h4"></path>
     </svg>
   `,
+  refresh: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+      <path d="M21 3v5h-5"></path>
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+      <path d="M8 16H3v5"></path>
+    </svg>
+  `,
 };
-
-// ─── Provider 颜色 ─────────────────────────────────────────
-
-function providerColor(provider: string): string {
-  switch (provider) {
-    case "OpenAI":
-      return "#10a37f";
-    case "Anthropic":
-      return "#d4a27f";
-    case "Google":
-      return "#4285f4";
-    case "DeepSeek":
-      return "#4d6bfe";
-    case "阿里云":
-      return "#ff6a00";
-    default:
-      return "#888";
-  }
-}
 
 // ─── 渲染函数 ───────────────────────────────────────────────
 
-// 缓存一站式内容模板，避免在切换到自定义 Tab 时重复渲染
-let _lastOnestopContent: any = null;
-
 export function renderOnestop(props: OnestopProps) {
-  // 优化：仅在当前 Tab 为 onestop 时重新执行渲染逻辑
-  // 如果是其他 Tab (隐藏状态)，直接使用缓存的模板
+  // 触发模型获取
+  fetchModels(props.requestUpdate);
+
+  // 加载已有的 API Key 脱敏显示
+  loadExistingApiKey(props.requestUpdate);
+
+  // 保存最新的 requestUpdate 引用，避免闭包捕获过期引用
+  _latestRequestUpdate = props.requestUpdate;
+
+  // 监听自定义接入的主模型变更事件
+  if (!_customPrimaryListenerAdded) {
+    _customPrimaryListenerAdded = true;
+    window.addEventListener("primary-model-changed", ((e: CustomEvent) => {
+      _customPrimaryModel = e.detail?.modelId ?? null;
+      _latestRequestUpdate?.();
+    }) as EventListener);
+  }
+
+  const hasApiKey = Boolean(props.apiKey?.trim()) || Boolean(_existingMaskedKey);
+  const selectedModelInfo = _cachedModels.find((m) => m.id === props.selectedModel);
+
+  // 判断当前显示的模型信息
+  const showOnestopModel = hasApiKey && selectedModelInfo;
+  const showCustomModel = !showOnestopModel && _customPrimaryModel;
+
   let onestopContent;
   if (_activeTab === "onestop") {
     onestopContent = renderOnestopContent(props);
-    _lastOnestopContent = onestopContent;
-  } else if (_lastOnestopContent) {
-    onestopContent = _lastOnestopContent;
   } else {
-    // 首次渲染且非激活状态（例如默认进入 custom tab）
-    onestopContent = renderOnestopContent(props);
-    _lastOnestopContent = onestopContent;
+    // 自定义接入 tab 激活时不渲染一站式内容
+    onestopContent = nothing;
   }
 
   return html`
     <div class="onestop">
-      <!-- Tab Navigation -->
-      <div class="onestop-tabs">
+      <!-- 全局状态栏：始终显示当前接入的模型 -->
+      ${showOnestopModel
+        ? html`
+          <div class="onestop-status-bar">
+            <div class="onestop-status-bar__info">
+              <span class="onestop-status-bar__dot"></span>
+              <span>当前模型:</span>
+              <span class="onestop-status-bar__model">${selectedModelInfo.provider} / ${selectedModelInfo.name}</span>
+              <span class="onestop-status-bar__id">(${selectedModelInfo.id})</span>
+            </div>
+            <div class="onestop-status-bar__actions">
+              <button
+                class="onestop-status-bar__test"
+                ?disabled=${_testing}
+                @click=${() => testOnestopConnection(props.requestUpdate)}
+              >
+                ${_testing ? "测试中…" : "测试连接"}
+              </button>
+            </div>
+          </div>
+          ${_testResult
+            ? html`<div class="onestop-result ${_testResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_testResult.message}</div>`
+            : nothing
+          }
+        `
+        : showCustomModel
+        ? html`
+          <div class="onestop-status-bar">
+            <div class="onestop-status-bar__info">
+              <span class="onestop-status-bar__dot"></span>
+              <span>当前模型:</span>
+              <span class="onestop-status-bar__model">${_customPrimaryModel}</span>
+            </div>
+            <div class="onestop-status-bar__actions">
+              <button
+                class="onestop-status-bar__test"
+                ?disabled=${_testing}
+                @click=${() => testOnestopConnection(props.requestUpdate)}
+              >
+                ${_testing ? "测试中…" : "测试连接"}
+              </button>
+            </div>
+          </div>
+          ${_testResult
+            ? html`<div class="onestop-result ${_testResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_testResult.message}</div>`
+            : nothing
+          }
+        `
+        : nothing
+      }
+
+      ${_saveResult
+        ? html`<div class="onestop-result ${_saveResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_saveResult.message}</div>`
+        : nothing
+      }
+
+
+
+      <!-- Tab Navigation — 分段控制器 -->
+      <div class="onestop-switcher">
         <button
-          class="onestop-tabs__item ${_activeTab === "onestop" ? "active" : ""}"
+          class="onestop-switcher__item ${_activeTab === "onestop" ? "active" : ""}"
           @click=${() => {
             _activeTab = "onestop";
             props.requestUpdate();
           }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="onestop-tabs__icon">
-            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path>
-          </svg>
-          一站式接入
+          <div class="onestop-switcher__main">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="onestop-switcher__icon">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path>
+            </svg>
+            <span>一站式接入</span>
+            <span class="onestop-switcher__badge">推荐</span>
+          </div>
+          <span class="onestop-switcher__desc">一个 API Key 接入所有模型</span>
         </button>
         <button
-          class="onestop-tabs__item ${_activeTab === "custom" ? "active" : ""}"
+          class="onestop-switcher__item ${_activeTab === "custom" ? "active" : ""}"
           @click=${() => {
             _activeTab = "custom";
             props.requestUpdate();
           }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="onestop-tabs__icon">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-          自定义接入
+          <div class="onestop-switcher__main">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="onestop-switcher__icon">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span>自定义接入</span>
+          </div>
+          <span class="onestop-switcher__desc">自行配置 OpenAI / Anthropic 兼容 API</span>
         </button>
       </div>
 
@@ -336,13 +534,45 @@ export function renderOnestop(props: OnestopProps) {
 // ─── 一站式接入内容 ──────────────────────────────────────────
 
 function renderOnestopContent(props: OnestopProps) {
-  const hasApiKey = Boolean(props.apiKey?.trim());
-  const filteredModels =
-    props.activeCategory === "all"
-      ? ONESTOP_MODELS
-      : ONESTOP_MODELS.filter((m) => m.category === props.activeCategory);
+  const hasApiKey = Boolean(props.apiKey?.trim()) || Boolean(_existingMaskedKey);
 
-  const categories = ["all", ...new Set(ONESTOP_MODELS.map((m) => m.category))];
+  // Provider 筛选
+  const allProviders = [...new Set(_cachedModels.map((m) => m.providerKey))];
+  const activeFilter = props.activeCategory || "all";
+  const filteredModels =
+    activeFilter === "all"
+      ? _cachedModels
+      : _cachedModels.filter((m) => m.providerKey === activeFilter);
+
+  // Provider 名称映射
+  const providerNames: Record<string, string> = {};
+  for (const m of _cachedModels) {
+    providerNames[m.providerKey] = m.provider;
+  }
+
+  // 当前选中模型信息
+  const selectedModelInfo = props.selectedModel
+    ? _cachedModels.find((m) => m.id === props.selectedModel)
+    : null;
+
+  // 切换模型：更新 provider 配置 → CLI 切换 → 重启 gateway
+  const handleSwitchModel = async (modelId: string) => {
+    if (_testing) return;
+    try {
+      // 1. 更新 provider 配置，确保目标模型在 provider 定义中存在
+      if (hasApiKey) {
+        await saveOnestopConfig(props.apiKey, modelId);
+      }
+      // 2. 通过 CLI 切换模型（处理白名单 + 设置 primary）
+      await invoke("switch_model", { modelId: `onestop/${modelId}` });
+      // 3. 立即更新 UI 显示
+      props.onModelSelect(modelId);
+      _customPrimaryModel = null;
+      showSaveResult(true, `✓ 已切换为 ${formatModelName(modelId)}，请在聊天中发送 /new 开启新会话`, props.requestUpdate);
+    } catch (e) {
+      showSaveResult(false, `切换失败: ${String(e)}`, props.requestUpdate);
+    }
+  };
 
   return html`
       <!-- Hero Banner -->
@@ -353,7 +583,7 @@ function renderOnestopContent(props: OnestopProps) {
           <div class="onestop-hero__text">
             <h2 class="onestop-hero__title">一站式接入全球AI大模型</h2>
             <p class="onestop-hero__subtitle">
-              只需一个 API Key，即可接入 OpenAI、Claude、Gemini、DeepSeek 等全球主流大语言模型
+              只需一个 API Key，即可接入 DeepSeek、通义千问、Kimi、GLM 等全球主流大语言模型
             </p>
           </div>
           <div class="onestop-hero__status">
@@ -399,7 +629,7 @@ function renderOnestopContent(props: OnestopProps) {
             <input
               type=${props.showApiKey ? "text" : "password"}
               class="onestop-apikey__input"
-              placeholder="请输入您的 API Key"
+              placeholder=${_existingMaskedKey ? `已配置: ${_existingMaskedKey}` : "请输入您的 API Key"}
               .value=${props.apiKey}
               @input=${(e: Event) =>
                 props.onApiKeyChange((e.target as HTMLInputElement).value)}
@@ -411,14 +641,18 @@ function renderOnestopContent(props: OnestopProps) {
             >
               ${props.showApiKey ? icons.eyeOff : icons.eye}
             </button>
+            <button
+              class="onestop-apikey__save"
+              ?disabled=${!hasApiKey || props.saving}
+              @click=${props.onSave}
+            >
+              ${props.saving ? "保存中…" : props.apiKey?.trim() ? "保存配置" : _existingMaskedKey ? "已配置" : "请先填写 API Key"}
+            </button>
           </div>
-          <button
-            class="onestop-apikey__save"
-            ?disabled=${!hasApiKey || props.saving}
-            @click=${props.onSave}
-          >
-            ${props.saving ? "保存中…" : hasApiKey ? "保存 API Key" : "请先填写 API Key"}
-          </button>
+          ${_existingMaskedKey && !props.apiKey?.trim()
+            ? html`<div class="onestop-apikey__hint">✓ API Key 已配置，输入新 Key 可更换</div>`
+            : nothing
+          }
         </div>
       </div>
 
@@ -429,61 +663,97 @@ function renderOnestopContent(props: OnestopProps) {
           <div class="onestop-section__meta">
             <h3 class="onestop-section__title">选择AI模型</h3>
             <p class="onestop-section__desc">
-              选择您想使用的默认模型，所有模型均通过统一 API 接入
+              选择您想使用的默认模型，所有模型均通过统一 API 接入 ·
+              <a href="${PRICING_URL}" target="_blank" rel="noopener noreferrer" class="onestop-link">
+                查看模型详情与定价
+                <span class="onestop-link__icon">${icons.externalLink}</span>
+              </a>
             </p>
           </div>
+          <button
+            class="onestop-refresh-btn"
+            @click=${() => refetchModels(props.requestUpdate)}
+            title="刷新模型列表"
+          >
+            ${icons.refresh}
+          </button>
         </div>
 
-        <!-- Category filter -->
-        <div class="onestop-categories">
-          ${categories.map(
-            (cat) => html`
+        ${_modelsLoading
+          ? html`
+            <div class="onestop-loading">
+              <div class="onestop-loading__spinner"></div>
+              <span>正在获取模型列表…</span>
+            </div>
+          `
+          : _modelsError
+          ? html`
+            <div class="onestop-error">
+              <span>获取模型列表失败: ${_modelsError}</span>
+              <button class="onestop-error__retry" @click=${() => refetchModels(props.requestUpdate)}>重试</button>
+            </div>
+          `
+          : html`
+            <!-- Provider filter -->
+            <div class="onestop-categories">
               <button
-                class="onestop-categories__item ${props.activeCategory === cat ? "active" : ""}"
-                @click=${() => props.onCategoryChange(cat)}
+                class="onestop-categories__item ${activeFilter === "all" ? "active" : ""}"
+                @click=${() => props.onCategoryChange("all")}
               >
-                ${CATEGORY_LABELS[cat] ?? cat}
+                全部 (${_cachedModels.length})
               </button>
-            `,
-          )}
-        </div>
-
-        <!-- Model Grid -->
-        <div class="onestop-models">
-          ${filteredModels.map(
-            (model) => html`
-              <button
-                class="onestop-model-card ${props.selectedModel === model.id ? "selected" : ""}"
-                style="border-left-color: ${props.selectedModel === model.id ? '#8b5cf6' : providerColor(model.provider)}"
-                @click=${() => props.onModelSelect(model.id)}
-              >
-                <div class="onestop-model-card__header">
-                  <span
-                    class="onestop-model-card__provider"
-                    style="color: ${providerColor(model.provider)}"
+              ${allProviders.map(
+                (pk) => html`
+                  <button
+                    class="onestop-categories__item ${activeFilter === pk ? "active" : ""}"
+                    @click=${() => props.onCategoryChange(pk)}
                   >
-                    ${model.provider}
-                  </span>
-                  ${
-                    model.badge
-                      ? html`<span class="onestop-model-card__badge">${model.badge}</span>`
-                      : nothing
-                  }
-                  ${
-                    props.selectedModel === model.id
-                      ? html`<span class="onestop-model-card__check">${icons.check}</span>`
-                      : nothing
-                  }
-                </div>
-                <div class="onestop-model-card__name">${model.name}</div>
-                <div class="onestop-model-card__desc">${model.description}</div>
-                <div class="onestop-model-card__category">
-                  ${CATEGORY_LABELS[model.category] ?? model.category}
-                </div>
-              </button>
-            `,
-          )}
-        </div>
+                    ${providerNames[pk] ?? pk}
+                    (${_cachedModels.filter((m) => m.providerKey === pk).length})
+                  </button>
+                `,
+              )}
+            </div>
+
+            <!-- Model Grid -->
+            <div class="onestop-models">
+              ${filteredModels.map(
+                (model) => html`
+                  <div
+                    class="onestop-model-card ${props.selectedModel === model.id ? "selected" : ""} ${_testing ? "locked" : ""}"
+                  >
+                    <div class="onestop-model-card__logo">
+                      ${providerLogos[model.providerKey] ?? providerLogos.other}
+                    </div>
+                    <div class="onestop-model-card__body">
+                      <div class="onestop-model-card__header">
+                        <span
+                          class="onestop-model-card__provider"
+                          style="color: ${providerColors[model.providerKey] ?? "#888"}"
+                        >
+                          ${model.provider}
+                        </span>
+                        ${
+                          props.selectedModel === model.id
+                            ? html`<span class="onestop-model-card__check">${icons.check}</span>`
+                            : nothing
+                        }
+                      </div>
+                      <div class="onestop-model-card__name">${model.name}</div>
+                      <div class="onestop-model-card__id">${model.id}</div>
+                    </div>
+                    <button
+                      class="onestop-model-card__switch-btn"
+                      ?disabled=${_testing || !hasApiKey || props.selectedModel === model.id}
+                      @click=${() => handleSwitchModel(model.id)}
+                      title="切换后请发送 /new 开启新会话"
+                    >${props.selectedModel === model.id ? "✓ 当前" : "切换"}</button>
+                  </div>
+                `,
+              )}
+            </div>
+          `
+        }
       </div>
     </div>
   `;

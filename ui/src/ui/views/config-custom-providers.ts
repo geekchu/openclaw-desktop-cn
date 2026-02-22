@@ -163,6 +163,13 @@ export class CustomProvidersView extends LitElement {
          setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000)
       );
       this.aiConfig = await Promise.race([configPromise, timeout2]);
+
+    // 过滤掉一站式接入的 provider，避免在自定义接入页面显示
+    if (this.aiConfig?.configured_providers) {
+      this.aiConfig.configured_providers = this.aiConfig.configured_providers.filter(
+        (p) => p.name !== "onestop"
+      );
+    }
       
       // this.addLog("配置加载完成");
       
@@ -177,12 +184,22 @@ export class CustomProvidersView extends LitElement {
     }
   }
 
-  async handleSetPrimary(modelId: string) {
+
+  async handleSwitchModel(modelId: string) {
     try {
-      await invoke("set_primary_model", { model_id: modelId });
+      await invoke<string>("switch_model", { modelId: modelId });
       await this.loadData();
+      // Notify parent components
+      this.dispatchEvent(
+        new CustomEvent("primary-model-changed", {
+          detail: { modelId },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+      this.error = `✓ 已切换模型，请在聊天中发送 /new 开启新会话`;
     } catch (e) {
-      this.error = "设置主模型失败: " + String(e);
+      this.error = "切换模型失败: " + String(e);
     }
   }
 
@@ -211,7 +228,7 @@ export class CustomProvidersView extends LitElement {
     this.deleting = true;
 
     try {
-      await invoke("delete_provider", { provider_name: providerName });
+      await invoke("delete_provider", { providerName: providerName });
       this.deleteConfirmProvider = null;
       await this.loadData();
     } catch (e) {
@@ -323,10 +340,10 @@ export class CustomProvidersView extends LitElement {
       });
 
       await invoke("save_provider", {
-        provider_name: this.formProviderName,
-        base_url: this.formBaseUrl,
-        api_key: this.formApiKey || null,
-        api_type: this.formApiType,
+        providerName: this.formProviderName,
+        baseUrl: this.formBaseUrl,
+        apiKey: this.formApiKey || null,
+        apiType: this.formApiType,
         models,
       });
 
@@ -643,15 +660,16 @@ export class CustomProvidersView extends LitElement {
                             <span class="onestop-custom-model-row__id">${model.full_id}</span>
                           </div>
                         </div>
-                        ${!model.is_primary
-                          ? html`<button
-                              class="onestop-custom-btn-text"
-                              @click=${(e: Event) => {
-                                e.stopPropagation();
-                                this.handleSetPrimary(model.full_id);
-                              }}
-                            >设为主模型</button>`
-                          : nothing}
+                      <div class="onestop-custom-model-row__actions">
+                        <button
+                          class="onestop-custom-btn-text"
+                          title="切换后请发送 /new 开启新会话"
+                          @click=${(e: Event) => {
+                            e.stopPropagation();
+                            this.handleSwitchModel(model.full_id);
+                          }}
+                        >切换</button>
+                      </div>
                       </div>
                     `,
                   )}

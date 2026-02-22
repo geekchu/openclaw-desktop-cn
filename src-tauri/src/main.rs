@@ -339,6 +339,7 @@ fn main() {
             config::save_provider,
             config::delete_provider,
             config::set_primary_model,
+            config::switch_model,
             config::add_available_model,
             config::remove_available_model,
             // 飞书插件管理

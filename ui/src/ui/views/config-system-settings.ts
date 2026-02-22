@@ -9,20 +9,15 @@ import { customElement, state } from "lit/decorators.js";
 import { checkForUpdate, downloadAndInstallUpdate } from "./updater.js";
 
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: {
-      invoke(cmd: string, args?: Record<string, unknown>): Promise<unknown>;
-    };
-  }
-}
 function invoke<T = unknown>(
   cmd: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  const t = window.__TAURI_INTERNALS__;
-  if (!t) return Promise.reject(new Error("Tauri not available"));
-  return t.invoke(cmd, args) as Promise<T>;
+  const t = (window as any).__TAURI__;
+  if (t?.core?.invoke) {
+    return t.core.invoke(cmd, args) as Promise<T>;
+  }
+  return Promise.reject(new Error("Tauri invoke not available"));
 }
 
 /* ── helpers ──────────────────────────────────────────────── */
@@ -854,13 +849,13 @@ export class SystemSettingsView extends LitElement {
           <label class="field-label">时区</label>
           <select class="input-base" .value=${this.timezone}
             @change=${(e: Event) => (this.timezone = (e.target as HTMLSelectElement).value)}>
-            <option value="Asia/Shanghai">Asia/Shanghai (北京时间)</option>
-            <option value="Asia/Hong_Kong">Asia/Hong_Kong (香港时间)</option>
-            <option value="Asia/Tokyo">Asia/Tokyo (东京时间)</option>
-            <option value="America/New_York">America/New_York (纽约时间)</option>
-            <option value="America/Los_Angeles">America/Los_Angeles (洛杉矶时间)</option>
-            <option value="Europe/London">Europe/London (伦敦时间)</option>
-            <option value="UTC">UTC</option>
+            <option value="Asia/Shanghai" ?selected=${this.timezone === "Asia/Shanghai"}>Asia/Shanghai (北京时间)</option>
+            <option value="Asia/Hong_Kong" ?selected=${this.timezone === "Asia/Hong_Kong"}>Asia/Hong_Kong (香港时间)</option>
+            <option value="Asia/Tokyo" ?selected=${this.timezone === "Asia/Tokyo"}>Asia/Tokyo (东京时间)</option>
+            <option value="America/New_York" ?selected=${this.timezone === "America/New_York"}>America/New_York (纽约时间)</option>
+            <option value="America/Los_Angeles" ?selected=${this.timezone === "America/Los_Angeles"}>America/Los_Angeles (洛杉矶时间)</option>
+            <option value="Europe/London" ?selected=${this.timezone === "Europe/London"}>Europe/London (伦敦时间)</option>
+            <option value="UTC" ?selected=${this.timezone === "UTC"}>UTC</option>
           </select>
         </div>
 

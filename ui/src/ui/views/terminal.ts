@@ -118,10 +118,10 @@ function observeResize(container: HTMLElement) {
     if (w === 0 || h === 0) return;
     if (_resizeCooldown) return;
 
-    // 仅在容器像素变化 >20px 时才重新 fit（排除滚动条出现/消失导致的微小变化）
+    // 仅在容器像素变化 >40px 时才重新 fit（排除滚动条/微小变化导致的抖动）
     const dw = Math.abs(w - _lastContainerW);
     const dh = Math.abs(h - _lastContainerH);
-    if (dw < 20 && dh < 20) return;
+    if (dw < 40 && dh < 40) return;
 
     _lastContainerW = w;
     _lastContainerH = h;
@@ -134,11 +134,11 @@ function observeResize(container: HTMLElement) {
       } catch {
         /* ignore */
       }
-      // 冷却 500ms，防止 ConPTY 重绘触发新一轮 resize
+      // 冷却 1s，防止 ConPTY 重绘触发新一轮 resize 循环
       setTimeout(() => {
         _resizeCooldown = false;
-      }, 500);
-    }, 150);
+      }, 1000);
+    }, 300);
   });
   _resizeObserver.observe(container);
 }
@@ -168,8 +168,8 @@ function disposeTerminal() {
 // 过滤 ConPTY 可能发送的清除滚动缓冲区序列
 function filterOutput(data: string): string {
   return data
-    .replace(/\x1b\[3J/g, "") // ED3: 清除滚动缓冲区
-    .replace(/\x1b\[\?1049[hl]/g, ""); // 备用屏幕缓冲区切换
+    .replace(/\x1b\[3J/g, "")              // ED3: 清除滚动缓冲区
+    .replace(/\x1b\[\?1049[hl]/g, "");     // 备用屏幕缓冲区切换
 }
 
 // ── PTY 会话管理 ──
@@ -326,7 +326,7 @@ async function createTerminalInstance(container: HTMLElement) {
   const fitAddon = new FitAddon();
   const term = new Terminal({
     cursorBlink: true,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 1.2,
     fontFamily:
       "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace",
@@ -375,8 +375,10 @@ async function createTerminalInstance(container: HTMLElement) {
       for (const part of parts) {
         if (part === "\r" || part === "\n" || part === "\r\n") {
           if (BLOCKED_CMD_RE.test(_lineBuffer)) {
+            // 先用 Escape 取消 PTY 中已输入的文本，再发 Enter 得到干净的新提示符
+            invoke("terminal_write", { id: _sessionId, data: "\x1b" }).catch(() => {});
+            invoke("terminal_write", { id: _sessionId, data: "\r" }).catch(() => {});
             term.write("\r\n\x1b[33m⚠ 桌面版不支持该命令，请通过应用内操作。\x1b[0m\r\n");
-            invoke("terminal_write", { id: _sessionId, data: "\x03" }).catch(() => {});
             _lineBuffer = "";
             continue;
           }

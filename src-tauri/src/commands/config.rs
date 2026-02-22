@@ -783,6 +783,23 @@ pub async fn set_primary_model(model_id: String) -> Result<String, String> {
     Ok(format!("主模型已设置为 {}", model_id))
 }
 
+/// 切换模型（通过 openclaw CLI 命令）
+/// 使用 `openclaw models set` 命令，会同时处理白名单和设置主模型
+#[command]
+pub async fn switch_model(model_id: String) -> Result<String, String> {
+    info!("[切换模型] 通过 CLI 切换模型: {}", model_id);
+    match shell::run_openclaw(&["models", "set", &model_id]) {
+        Ok(output) => {
+            info!("[切换模型] ✓ 模型已切换: {}", output.trim());
+            Ok(output.trim().to_string())
+        }
+        Err(e) => {
+            warn!("[切换模型] ✗ 切换失败: {}", e);
+            Err(format!("切换模型失败: {}", e))
+        }
+    }
+}
+
 /// 添加模型到可用列表
 #[command]
 pub async fn add_available_model(model_id: String) -> Result<String, String> {
@@ -1211,12 +1228,21 @@ pub async fn save_desktop_config(config: Value) -> Result<(), String> {
         json!({})
     };
 
-    // 合并新值
-    if let (Some(existing_obj), Some(new_obj)) = (existing.as_object_mut(), config.as_object()) {
-        for (k, v) in new_obj {
-            existing_obj.insert(k.clone(), v.clone());
+    // 深度合并新值（递归合并嵌套对象，防止覆盖丢失）
+    fn deep_merge(base: &mut Value, patch: &Value) {
+        match (base, patch) {
+            (Value::Object(base_map), Value::Object(patch_map)) => {
+                for (k, v) in patch_map {
+                    let entry = base_map.entry(k.clone()).or_insert(json!(null));
+                    deep_merge(entry, v);
+                }
+            }
+            (base, patch) => {
+                *base = patch.clone();
+            }
         }
     }
+    deep_merge(&mut existing, &config);
 
     let content = serde_json::to_string_pretty(&existing)
         .map_err(|e| format!("序列化桌面配置失败: {}", e))?;
