@@ -18,15 +18,15 @@ export const AgentDefaultsSchema = z
   .object({
     model: z
       .object({
-        primary: z.string().optional(),
-        fallbacks: z.array(z.string()).optional(),
+        primary: z.string().nullable().optional(),
+        fallbacks: z.array(z.string()).nullable().optional(),
       })
       .strict()
       .optional(),
     imageModel: z
       .object({
-        primary: z.string().optional(),
-        fallbacks: z.array(z.string()).optional(),
+        primary: z.string().nullable().optional(),
+        fallbacks: z.array(z.string()).nullable().optional(),
       })
       .strict()
       .optional(),
