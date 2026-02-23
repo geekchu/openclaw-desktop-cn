@@ -24,6 +24,9 @@ let _lastContainerW = 0;
 let _lastContainerH = 0;
 // resize 冷却期（防止 ConPTY 重绘导致循环）
 let _resizeCooldown = false;
+// 控制键回显过滤（仅在用户按下控制键后短窗口内生效）
+const _pendingEchoStrips = new Set<string>();
+let _echoStripTimer: ReturnType<typeof setTimeout> | null = null;
 
 const SESSION_STORAGE_KEY = "openclaw-terminal-session-id";
 
@@ -165,12 +168,38 @@ function disposeTerminal() {
   _currentContainer = null;
 }
 
-// 过滤 ConPTY 可能发送的清除滚动缓冲区序列及控制字符回显
+// 过滤 ConPTY 可能发送的清除滚动缓冲区序列
 function filterOutput(data: string): string {
   return data
     .replace(/\x1b\[3J/g, "")              // ED3: 清除滚动缓冲区
-    .replace(/\x1b\[\?1049[hl]/g, "")      // 备用屏幕缓冲区切换
-    .replace(/\^[CDZU\\]/g, "");            // ConPTY 回显的控制字符 (^C ^D ^Z ^U ^\)
+    .replace(/\x1b\[\?1049[hl]/g, "");     // 备用屏幕缓冲区切换
+}
+
+// 注册预期的控制键回显，500ms 内未匹配则自动过期
+function expectEchoStrip(...echoes: string[]) {
+  for (const e of echoes) _pendingEchoStrips.add(e);
+  if (_echoStripTimer) clearTimeout(_echoStripTimer);
+  _echoStripTimer = setTimeout(() => {
+    _pendingEchoStrips.clear();
+    _echoStripTimer = null;
+  }, 500);
+}
+
+// 从输出中移除预期的控制键回显（如 ^C）
+function stripExpectedEchoes(text: string): string {
+  if (_pendingEchoStrips.size === 0) return text;
+  let result = text;
+  for (const echo of _pendingEchoStrips) {
+    if (result.includes(echo)) {
+      result = result.replace(echo, "");
+      _pendingEchoStrips.delete(echo);
+    }
+  }
+  if (_pendingEchoStrips.size === 0 && _echoStripTimer) {
+    clearTimeout(_echoStripTimer);
+    _echoStripTimer = null;
+  }
+  return result;
 }
 
 // ── PTY 会话管理 ──
@@ -204,9 +233,9 @@ async function attachSession() {
         const payload = event.payload;
         if (!payload?.data) return;
         if (ready && payload.id === _sessionId) {
-          term.write(filterOutput(payload.data));
+          term.write(stripExpectedEchoes(filterOutput(payload.data)));
         } else if (!ready) {
-          earlyEvents.push({ id: payload.id, data: filterOutput(payload.data) });
+          earlyEvents.push({ id: payload.id, data: stripExpectedEchoes(filterOutput(payload.data)) });
         }
       });
       _unlistenExit = await tauri.event.listen("terminal-exit", (event: any) => {
@@ -260,7 +289,7 @@ async function reattachSession(term: any): Promise<boolean> {
       const payload = event.payload;
       if (!payload?.data) return;
       if (payload.id === _sessionId) {
-        term.write(filterOutput(payload.data));
+        term.write(stripExpectedEchoes(filterOutput(payload.data)));
       }
     });
     _unlistenExit = await tauri.event.listen("terminal-exit", (event: any) => {
@@ -367,11 +396,22 @@ async function createTerminalInstance(container: HTMLElement) {
   // ── 命令拦截：禁止自毁/自更新命令 ──
   const BLOCKED_CMD_RE = /\bopenclaw\s+(update|uninstall)\b/i;
 
+  // 控制键 → ConPTY 回显文本映射
+  const CTRL_ECHO_MAP: Record<string, string> = {
+    "\x03": "^C", "\x04": "^D", "\x1a": "^Z",
+    "\x15": "^U", "\x1c": "^\\",
+  };
+
   term.onData((data: string) => {
     // 无活跃 session 时触发创建
     if (!_sessionId) {
       void attachSession();
       return;
+    }
+
+    // 单个控制字符 → 预注册回显过滤
+    if (data.length === 1 && CTRL_ECHO_MAP[data]) {
+      expectEchoStrip(CTRL_ECHO_MAP[data]);
     }
 
     // Check if the user is pressing Enter (execution trigger)
@@ -385,6 +425,7 @@ async function createTerminalInstance(container: HTMLElement) {
       if (BLOCKED_CMD_RE.test(lineText)) {
         // Clear the shell's readline buffer and cancel the command.
         // Send: Ctrl+U (kill-line) + Ctrl+C (interrupt) + Enter (flush prompt)
+        expectEchoStrip("^U", "^C");
         invoke("terminal_write", { id: _sessionId, data: "\x15\x03\r" }).catch(() => {});
         term.write("\r\n\x1b[33m⚠ 桌面版不支持该命令，请通过应用内操作。\x1b[0m\r\n");
         return;
