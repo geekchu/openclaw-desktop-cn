@@ -165,11 +165,12 @@ function disposeTerminal() {
   _currentContainer = null;
 }
 
-// 过滤 ConPTY 可能发送的清除滚动缓冲区序列
+// 过滤 ConPTY 可能发送的清除滚动缓冲区序列及控制字符回显
 function filterOutput(data: string): string {
   return data
     .replace(/\x1b\[3J/g, "")              // ED3: 清除滚动缓冲区
-    .replace(/\x1b\[\?1049[hl]/g, "");     // 备用屏幕缓冲区切换
+    .replace(/\x1b\[\?1049[hl]/g, "")      // 备用屏幕缓冲区切换
+    .replace(/\^[CDZU\\]/g, "");            // ConPTY 回显的控制字符 (^C ^D ^Z ^U ^\)
 }
 
 // ── PTY 会话管理 ──
