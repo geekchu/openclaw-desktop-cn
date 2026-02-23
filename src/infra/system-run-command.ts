@@ -69,6 +69,30 @@ export function extractShellCommandFromArgv(argv: string[]): string | null {
     return typeof cmd === "string" ? cmd : null;
   }
 
+  // PowerShell: powershell.exe -Command "<cmd>" or pwsh -c "<cmd>"
+  if (
+    base0 === "powershell.exe" ||
+    base0 === "powershell" ||
+    base0 === "pwsh.exe" ||
+    base0 === "pwsh"
+  ) {
+    // Find -Command or -c flag (case-insensitive, PowerShell accepts prefix matching)
+    const idx = argv.findIndex((item, i) => {
+      if (i === 0) return false;
+      const lower = String(item).trim().toLowerCase();
+      return lower === "-command" || lower === "-c";
+    });
+    if (idx === -1) {
+      return null;
+    }
+    // The command text may be the next argument, or concatenated remaining args
+    const remaining = argv.slice(idx + 1);
+    if (remaining.length === 0) {
+      return null;
+    }
+    return remaining.join(" ");
+  }
+
   return null;
 }
 

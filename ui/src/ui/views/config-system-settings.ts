@@ -52,6 +52,8 @@ export class SystemSettingsView extends LitElement {
   @state() private toolProfile: "minimal" | "coding" | "messaging" | "full" = "full";
   @state() private fsWorkspaceOnly = false;
   @state() private fsAllowedDirs: string[] = [];
+  @state() private allowlistEntries: Array<{ id?: string; pattern: string; lastUsedCommand?: string }> = [];
+  private _execApprovalsData: Record<string, unknown> | null = null;
 
   @state() private botName = "Clawd";
   @state() private userName = "主人";
@@ -100,6 +102,16 @@ export class SystemSettingsView extends LitElement {
         }
       } catch { /* ignore */ }
       try { this.autoStart = await invoke<boolean>("autostart_is_enabled"); } catch { /* ignore */ }
+      try {
+        const approvals = (await invoke<Record<string, unknown>>("get_exec_approvals")) ?? {};
+        this._execApprovalsData = approvals;
+        const agents = (approvals.agents ?? {}) as Record<string, Record<string, unknown>>;
+        const mainAgent = agents.main ?? {};
+        const allowlist = Array.isArray(mainAgent.allowlist) ? mainAgent.allowlist : [];
+        this.allowlistEntries = allowlist
+          .filter((e: unknown): e is Record<string, unknown> => !!e && typeof e === "object" && typeof (e as Record<string,unknown>).pattern === "string")
+          .map((e: Record<string, unknown>) => ({ id: e.id as string | undefined, pattern: e.pattern as string, lastUsedCommand: e.lastUsedCommand as string | undefined }));
+      } catch { /* ignore */ }
     } catch (e) { console.error("加载配置失败:", e); }
     finally { this.loading = false; }
   }
@@ -170,6 +182,35 @@ export class SystemSettingsView extends LitElement {
     next.splice(index, 1);
     this.fsAllowedDirs = next;
     this._triggerDirsSave();
+  }
+
+  private async _handleRemoveAllowlistEntry(index: number) {
+    const removed = this.allowlistEntries[index];
+    if (!removed) return;
+    const next = [...this.allowlistEntries];
+    next.splice(index, 1);
+    this.allowlistEntries = next;
+    // Read-modify-write: re-read the file to avoid overwriting concurrent gateway changes
+    try {
+      const freshData = (await invoke<Record<string, unknown>>("get_exec_approvals")) ?? {};
+      const agents = { ...((freshData.agents ?? {}) as Record<string, Record<string, unknown>>) };
+      const mainAgent = { ...(agents.main ?? {}) };
+      const currentList = Array.isArray(mainAgent.allowlist) ? [...mainAgent.allowlist] as Array<Record<string, unknown>> : [];
+      // Remove by id if available, otherwise by pattern
+      const matchIdx = currentList.findIndex((e) =>
+        removed.id ? e.id === removed.id : e.pattern === removed.pattern
+      );
+      if (matchIdx >= 0) {
+        currentList.splice(matchIdx, 1);
+      }
+      mainAgent.allowlist = currentList;
+      agents.main = mainAgent;
+      freshData.agents = agents;
+      await invoke("save_exec_approvals", { data: freshData });
+      this._execApprovalsData = freshData;
+    } catch (e) {
+      console.error("删除白名单条目失败:", e);
+    }
   }
 
   private _dirsTimer?: ReturnType<typeof setTimeout>;
@@ -732,6 +773,59 @@ export class SystemSettingsView extends LitElement {
               <button class="opt ${this.execAsk === "off" ? "on-green" : ""}" @click=${() => this._handleAskChange("off")}>
                 <div>无需确认</div><div class="opt-sub">off</div>
               </button>
+            </div>
+          </div>
+        ` : nothing}
+
+        ${this.execSecurity === "allowlist" ? html`
+          <div class="section">
+            <label class="section-label">
+              命令白名单
+              <span class="section-hint">&nbsp;— 已批准的可执行程序路径</span>
+            </label>
+            <div style="margin-top: 4px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px; max-height: 300px; overflow-y: auto;">
+              ${this.allowlistEntries.length === 0 ? html`
+                <div style="font-size: 12px; color: var(--muted, #71717a); text-align: center; padding: 12px 0; border: 1px dashed var(--border, #27272a); border-radius: 8px; opacity: 0.7;">
+                  暂无白名单条目，点击"始终允许"后自动添加
+                </div>
+              ` : html`
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; max-width: 960px;">
+                  ${this.allowlistEntries.map((entry, idx) => {
+                    // Show the executable name as primary, full path as tooltip
+                    const parts = entry.pattern.replace(/\\/g, "/").split("/");
+                    const exeName = parts[parts.length - 1] || entry.pattern;
+                    return html`
+                      <div style="
+                        display: flex; align-items: center; gap: 8px;
+                        padding: 6px 10px;
+                        background: var(--card, #181b22);
+                        border: 1px solid var(--border, #27272a);
+                        border-radius: 8px; font-size: 12px;
+                        color: var(--text, #e4e4e7);
+                      " title=${entry.pattern}>
+                        <span style="flex-shrink: 0; font-size: 13px;">⚙️</span>
+                        <div style="flex: 1; min-width: 0; overflow: hidden;">
+                          <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${exeName}</div>
+                          <div style="font-size: 11px; color: var(--muted, #71717a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">${entry.pattern}</div>
+                        </div>
+                        <button @click=${() => this._handleRemoveAllowlistEntry(idx)}
+                          style="
+                            display: inline-flex; align-items: center; justify-content: center;
+                            width: 22px; height: 22px; border-radius: 50%;
+                            background: transparent; border: 1px solid var(--border, #27272a);
+                            color: var(--muted, #71717a); cursor: pointer;
+                            font-size: 11px; line-height: 1; padding: 0;
+                            flex-shrink: 0; transition: all 0.15s ease;
+                          "
+                          @mouseover=${(e: Event) => { (e.target as HTMLElement).style.background = "rgba(239,68,68,0.15)"; (e.target as HTMLElement).style.color = "#ef4444"; (e.target as HTMLElement).style.borderColor = "#ef4444"; }}
+                          @mouseout=${(e: Event) => { (e.target as HTMLElement).style.background = "transparent"; (e.target as HTMLElement).style.color = "var(--muted, #71717a)"; (e.target as HTMLElement).style.borderColor = "var(--border, #27272a)"; }}
+                          title="移除此白名单条目"
+                        >✕</button>
+                      </div>
+                    `;
+                  })}
+                </div>
+              `}
             </div>
           </div>
         ` : nothing}

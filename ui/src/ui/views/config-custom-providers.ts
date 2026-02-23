@@ -185,10 +185,25 @@ export class CustomProvidersView extends LitElement {
   }
 
 
+  /** Lightweight config refresh — only re-fetches AI config, no loading spinner. */
+  async refreshConfig() {
+    try {
+      const config = await invoke<AIConfigOverview>("get_ai_config");
+      if (config?.configured_providers) {
+        config.configured_providers = config.configured_providers.filter(
+          (p) => p.name !== "onestop"
+        );
+      }
+      this.aiConfig = config;
+    } catch (e) {
+      console.error("refreshConfig error:", e);
+    }
+  }
+
   async handleSwitchModel(modelId: string) {
     try {
       await invoke<string>("switch_model", { modelId: modelId });
-      await this.loadData();
+      await this.refreshConfig();
       // Notify parent components
       this.dispatchEvent(
         new CustomEvent("primary-model-changed", {
@@ -221,6 +236,10 @@ export class CustomProvidersView extends LitElement {
       };
     } finally {
       this.testing = false;
+      // 10 秒后自动隐藏测试结果
+      setTimeout(() => {
+        this.testResult = null;
+      }, 10000);
     }
   }
 
@@ -228,9 +247,24 @@ export class CustomProvidersView extends LitElement {
     this.deleting = true;
 
     try {
+      // 检查当前被删除的 provider 是否包含当前正在使用的全局主模型
+      const primaryModel = this.aiConfig?.primary_model;
+      const isDeletingPrimary = primaryModel && (primaryModel === providerName || primaryModel.startsWith(`${providerName}/`));
+
       await invoke("delete_provider", { providerName: providerName });
       this.deleteConfirmProvider = null;
       await this.loadData();
+      
+      // 如果被删除的是当前正在使用的主模型，通知父组件清除状态栏高亮显示
+      if (isDeletingPrimary) {
+        this.dispatchEvent(
+          new CustomEvent("primary-model-changed", {
+            detail: { modelId: null },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      }
     } catch (e) {
       this.error = "删除供应商失败: " + String(e);
     } finally {
@@ -643,9 +677,11 @@ export class CustomProvidersView extends LitElement {
                     `
                   : nothing}
 
-                <!-- 模型列表 -->
-                <div class="onestop-custom-card__models">
-                  ${provider.models.map(
+                <!-- 模型列表 (当前模型置顶) -->
+              <div class="onestop-custom-card__models">
+                ${[...provider.models]
+                  .sort((a, b) => (a.is_primary === b.is_primary ? 0 : a.is_primary ? -1 : 1))
+                  .map(
                     (model) => html`
                       <div class="onestop-custom-model-row ${model.is_primary ? "primary" : ""}">
                         <div class="onestop-custom-model-row__left">
@@ -662,7 +698,7 @@ export class CustomProvidersView extends LitElement {
                         </div>
                       <div class="onestop-custom-model-row__actions">
                         <button
-                          class="onestop-custom-btn-text"
+                          class="onestop-custom-btn-text onestop-custom-btn-text--switch"
                           title="切换后请发送 /new 开启新会话"
                           @click=${(e: Event) => {
                             e.stopPropagation();

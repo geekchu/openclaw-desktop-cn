@@ -369,15 +369,15 @@ export function wrapToolWorkspaceRootGuard(
  * Extract absolute file paths from a shell command string.
  * Catches patterns like:
  * - Windows: C:\path, D:\path, "C:\path with spaces"
- * - Unix: /absolute/path
- * Does NOT catch relative paths (those resolve against cwd which is the workspace root).
+ * - Unix: /absolute/path, >/path (redirect targets)
+ * Does NOT catch relative paths — those are handled separately by extractTraversalPaths.
  */
 function extractAbsolutePathsFromCommand(command: string): string[] {
   const paths: string[] = [];
   
   // Windows absolute paths: drive letter followed by :\ or :/
   // Match both quoted and unquoted paths
-  const winPathRegex = /[A-Za-z]:[\\/][^\s;|&><"'`]*|"([A-Za-z]:[\\/][^"]*)"|'([A-Za-z]:[\\/][^']*)'/g;
+  const winPathRegex = /[A-Za-z]:[\\\/][^\s;|&><"'`]*|"([A-Za-z]:[\\\/][^"]*)"|'([A-Za-z]:[\\\/][^']*)'/g;
   let match: RegExpExecArray | null;
   while ((match = winPathRegex.exec(command)) !== null) {
     const p = match[1] ?? match[2] ?? match[0];
@@ -385,7 +385,8 @@ function extractAbsolutePathsFromCommand(command: string): string[] {
   }
   
   // Unix absolute paths: starting with /
-  const unixPathRegex = /(?:^|\s|[;|&>=])(\/{1,2}[^\s;|&><"'`]+)|"(\/[^"]*)"|'(\/[^']*)'/g;
+  // Also match paths after redirect operators (>, >>, <) without spaces
+  const unixPathRegex = /(?:^|\s|[;|&>=<(])(\/{1,2}[^\s;|&><"'`]+)|"(\/[^"]*)"|'(\/[^']*)'/g;
   while ((match = unixPathRegex.exec(command)) !== null) {
     const p = match[1] ?? match[2] ?? match[3];
     if (p) paths.push(p);
@@ -395,11 +396,58 @@ function extractAbsolutePathsFromCommand(command: string): string[] {
 }
 
 /**
+ * Extract relative paths containing parent traversal (../) from a command string.
+ * These could be used to escape the workspace directory.
+ */
+function extractTraversalPaths(command: string): string[] {
+  const paths: string[] = [];
+  // Match paths that contain ../ or ..\ (parent directory traversal)
+  // Both quoted and unquoted
+  const traversalRegex = /(?:^|\s|[;|&>=<(])((?:\.\.[\\/])+[^\s;|&><"'`]*)|"((?:\.\.[\\/])[^"]*)"|'((?:\.\.[\\/])[^']*)'/g;
+  let match: RegExpExecArray | null;
+  while ((match = traversalRegex.exec(command)) !== null) {
+    const p = match[1] ?? match[2] ?? match[3];
+    if (p) paths.push(p);
+  }
+  return paths;
+}
+
+/**
+ * Detect shell evasion patterns that could dynamically construct paths
+ * to bypass static path analysis.
+ * Returns an error message if a dangerous pattern is detected, null otherwise.
+ */
+function detectShellEvasion(command: string): string | null {
+  // Command substitution: $(...) or backticks `...`
+  // These can dynamically construct paths that bypass static analysis.
+  // Only flag when the substitution contains BOTH a file-operation command AND an absolute path.
+  const cmdSubRegex = /\$\(([^)]+)\)|`([^`]+)`/g;
+  const fileOpRegex = /\b(cat|ls|rm|cp|mv|chmod|chown|mkdir|touch|find|grep|sed|awk|head|tail|readlink|realpath|dirname|basename)\b/;
+  let match: RegExpExecArray | null;
+  while ((match = cmdSubRegex.exec(command)) !== null) {
+    const inner = match[1] ?? match[2] ?? "";
+    // Skip safe command substitutions that don't involve file operations
+    // e.g. $(date), $(whoami), $(uname -r), $(git rev-parse HEAD)
+    if (!fileOpRegex.test(inner)) {
+      continue;
+    }
+    // Contains a file-op command — check if it also references absolute paths
+    if (/\/[^\s)]+/.test(inner) || /[A-Za-z]:[\\\/]/.test(inner)) {
+      return `Command substitution \`${match[0]}\` may be used to bypass path restrictions. Use explicit paths instead.`;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Wrap the exec tool to enforce directory access restrictions.
  * When workspaceOnly is enabled, this guard:
  * 1. Validates the `workdir` parameter against allowed directories
  * 2. Scans the `command` string for absolute paths and rejects commands
  *    that reference paths outside the workspace or allowed directories
+ * 3. Detects relative path traversals (../) that could escape the workspace
+ * 4. Blocks shell evasion patterns (command substitution with path references)
  */
 export function wrapExecToolPathGuard(
   tool: AnyAgentTool,
@@ -418,9 +466,9 @@ export function wrapExecToolPathGuard(
         assertDirectPathAccess(workdir, workspaceRoot, workspaceRoot, allowedDirs, denyDirs);
       }
       
-      // 2. Scan command string for absolute paths
       const command = params?.command;
       if (typeof command === "string" && command.trim()) {
+        // 2. Scan command string for absolute paths
         const absolutePaths = extractAbsolutePathsFromCommand(command);
         for (const absPath of absolutePaths) {
           try {
@@ -432,6 +480,26 @@ export function wrapExecToolPathGuard(
               `Use relative paths or ask the user to add the target directory to the allowed list in Settings.`
             );
           }
+        }
+
+        // 3. Check relative path traversals (../) that could escape workspace
+        const effectiveCwd = (typeof workdir === "string" && workdir.trim()) ? workdir : workspaceRoot;
+        const traversalPaths = extractTraversalPaths(command);
+        for (const relPath of traversalPaths) {
+          try {
+            assertDirectPathAccess(relPath, effectiveCwd, workspaceRoot, allowedDirs, denyDirs);
+          } catch {
+            throw new Error(
+              `Permission denied: The command uses parent traversal '${relPath}' which resolves to a path outside the workspace. ` +
+              `Use absolute paths within the workspace or ask the user to add the target directory to the allowed list in Settings.`
+            );
+          }
+        }
+
+        // 4. Block shell evasion patterns
+        const evasion = detectShellEvasion(command);
+        if (evasion) {
+          throw new Error(`Security warning: ${evasion}`);
         }
       }
       

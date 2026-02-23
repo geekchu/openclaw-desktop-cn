@@ -41,6 +41,15 @@ pub fn get_config_file_path() -> String {
     }
 }
 
+/// 获取 exec-approvals.json 文件路径
+pub fn get_exec_approvals_path() -> String {
+    if is_windows() {
+        format!("{}\\exec-approvals.json", get_config_dir())
+    } else {
+        format!("{}/exec-approvals.json", get_config_dir())
+    }
+}
+
 
 /// 检测当前平台是否为 macOS
 pub fn is_macos() -> bool {

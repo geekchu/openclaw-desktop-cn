@@ -2562,7 +2562,7 @@
   border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
-  color: var(--accent);
+  color: #a78bfa;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -2572,7 +2572,7 @@
 }
 
 .onestop-model-card__switch-btn:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: #a78bfa;
   background: rgba(139, 92, 246, 0.1);
   transform: scale(1.02);
 }
@@ -2924,6 +2924,14 @@
 
 .onestop-custom-btn-text--danger:hover {
   color: #fca5a5;
+}
+
+.onestop-custom-btn-text--switch {
+  color: #8bb4d8;
+}
+
+.onestop-custom-btn-text--switch:hover {
+  color: #a8cbea;
 }
 
 .onestop-custom-btn-icon {

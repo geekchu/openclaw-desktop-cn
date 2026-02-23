@@ -39,7 +39,7 @@ export type ChatProps = {
   queue: ChatQueueItem[];
   connected: boolean;
   canSend: boolean;
-  disabledReason: string | null;
+  disabledReason: string | import("lit").TemplateResult | null;
   error: string | null;
   sessions: SessionsListResult | null;
   // Focus mode

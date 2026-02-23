@@ -85,6 +85,28 @@ pub async fn save_config(config: Value) -> Result<String, String> {
     }
 }
 
+/// 获取 exec-approvals.json 内容
+#[command]
+pub async fn get_exec_approvals() -> Result<Value, String> {
+    let path = platform::get_exec_approvals_path();
+    if !file::file_exists(&path) {
+        return Ok(json!({}));
+    }
+    let content =
+        file::read_file(&path).map_err(|e| format!("读取 exec-approvals.json 失败: {}", e))?;
+    serde_json::from_str(&content).map_err(|e| format!("解析 exec-approvals.json 失败: {}", e))
+}
+
+/// 保存 exec-approvals.json 内容
+#[command]
+pub async fn save_exec_approvals(data: Value) -> Result<String, String> {
+    let path = platform::get_exec_approvals_path();
+    let content =
+        serde_json::to_string_pretty(&data).map_err(|e| format!("序列化失败: {}", e))?;
+    file::write_file(&path, &content).map_err(|e| format!("写入 exec-approvals.json 失败: {}", e))?;
+    Ok("exec-approvals.json 已保存".to_string())
+}
+
 /// 获取环境变量值
 #[command]
 pub async fn get_env_value(key: String) -> Result<Option<String>, String> {

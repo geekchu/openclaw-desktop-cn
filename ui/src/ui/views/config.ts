@@ -272,8 +272,8 @@ const VIRTUAL_SECTIONS = new Set(["onestop", "system_settings", "channels_config
 
 const SECTIONS: Array<{ key: string; label: string }> = [
   { key: "onestop", label: "AI大模型接入" },
-  { key: "system_settings", label: "系统设置" },
   { key: "channels_config", label: "消息配置" },
+  { key: "system_settings", label: "系统设置" },
   { key: "env", label: "环境" },
   { key: "update", label: "更新" },
   { key: "agents", label: "代理" },

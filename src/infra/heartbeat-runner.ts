@@ -399,8 +399,12 @@ export async function runHeartbeatOnce(opts: {
     return { status: "skipped", reason: "quiet-hours" };
   }
 
+  // exec-event heartbeats carry command output that must be delivered promptly.
+  // Don't skip them even when the main lane is busy — otherwise command output
+  // gets stuck until the AI finishes its current turn.
+  const isExecEventWake = opts.reason === "exec-event";
   const queueSize = (opts.deps?.getQueueSize ?? getQueueSize)(CommandLane.Main);
-  if (queueSize > 0) {
+  if (queueSize > 0 && !isExecEventWake) {
     return { status: "skipped", reason: "requests-in-flight" };
   }
 

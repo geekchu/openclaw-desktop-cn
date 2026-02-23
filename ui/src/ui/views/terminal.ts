@@ -326,7 +326,7 @@ async function createTerminalInstance(container: HTMLElement) {
   const fitAddon = new FitAddon();
   const term = new Terminal({
     cursorBlink: true,
-    fontSize: 15,
+    fontSize: 14,
     lineHeight: 1.2,
     fontFamily:
       "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace",
@@ -364,43 +364,34 @@ async function createTerminalInstance(container: HTMLElement) {
   observeResize(container);
 
   // ── 命令拦截：禁止自毁/自更新命令 ──
-  let _lineBuffer = "";
-  const BLOCKED_CMD_RE = /^\s*openclaw\s+(update|uninstall)\b/i;
+  const BLOCKED_CMD_RE = /\bopenclaw\s+(update|uninstall)\b/i;
 
   term.onData((data: string) => {
-    if (_sessionId) {
-      // 粘贴多行文本时 data 可能包含内嵌的换行符，
-      // 需要逐段拆分检查以防绕过拦截。
-      const parts = data.split(/(\r\n|\r|\n)/);
-      for (const part of parts) {
-        if (part === "\r" || part === "\n" || part === "\r\n") {
-          if (BLOCKED_CMD_RE.test(_lineBuffer)) {
-            // 先用 Escape 取消 PTY 中已输入的文本，再发 Enter 得到干净的新提示符
-            invoke("terminal_write", { id: _sessionId, data: "\x1b" }).catch(() => {});
-            invoke("terminal_write", { id: _sessionId, data: "\r" }).catch(() => {});
-            term.write("\r\n\x1b[33m⚠ 桌面版不支持该命令，请通过应用内操作。\x1b[0m\r\n");
-            _lineBuffer = "";
-            continue;
-          }
-          _lineBuffer = "";
-          invoke("terminal_write", { id: _sessionId, data: part }).catch(() => {});
-        } else if (part === "\x7f" || part === "\b") {
-          _lineBuffer = _lineBuffer.slice(0, -1);
-          invoke("terminal_write", { id: _sessionId, data: part }).catch(() => {});
-        } else if (part === "\x03" || part === "\x15") {
-          _lineBuffer = "";
-          invoke("terminal_write", { id: _sessionId, data: part }).catch(() => {});
-        } else if (part.length > 0) {
-          // Printable characters, tabs, or control sequences (arrows, etc.)
-          if (part.charCodeAt(0) >= 32 || part === "\t") {
-            _lineBuffer += part;
-          }
-          invoke("terminal_write", { id: _sessionId, data: part }).catch(() => {});
-        }
-      }
-    } else {
+    // 无活跃 session 时触发创建
+    if (!_sessionId) {
       void attachSession();
+      return;
     }
+
+    // Check if the user is pressing Enter (execution trigger)
+    const isEnter = data.includes("\r") || data.includes("\n");
+
+    if (isEnter) {
+      // Read the current line directly from the screen buffer before the Enter is processed
+      const y = term.buffer.active.baseY + term.buffer.active.cursorY;
+      const lineText = term.buffer.active.getLine(y)?.translateToString(true) || "";
+
+      if (BLOCKED_CMD_RE.test(lineText)) {
+        // Clear the shell's readline buffer and cancel the command.
+        // Send: Ctrl+U (kill-line) + Ctrl+C (interrupt) + Enter (flush prompt)
+        invoke("terminal_write", { id: _sessionId, data: "\x15\x03\r" }).catch(() => {});
+        term.write("\r\n\x1b[33m⚠ 桌面版不支持该命令，请通过应用内操作。\x1b[0m\r\n");
+        return;
+      }
+    }
+
+    // Normal command: pass the raw data payload directly to the PTY
+    invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
   });
 
   return term;

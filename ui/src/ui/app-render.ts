@@ -93,14 +93,32 @@ export function renderApp(state: AppViewState) {
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
-  const chatDisabledReason = state.connected ? null : "Disconnected from gateway.";
-  const isChat = state.tab === "chat";
-  const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
-  const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const configValue =
     state.configForm ?? (state.configSnapshot?.config as Record<string, unknown> | null);
+    
+  const agentsDefaults = configValue?.agents as Record<string, unknown> | undefined;
+  const agentsModelDefaults = agentsDefaults?.defaults as Record<string, unknown> | undefined;
+  const modelDefaults = agentsModelDefaults?.model as Record<string, unknown> | undefined;
+  const primaryModel = modelDefaults?.primary as string | undefined;
+
+  let chatDisabledReason: string | import("lit").TemplateResult | null = state.connected 
+    ? null 
+    : "Disconnected from gateway.";
+    
+  if (state.connected && !primaryModel && !state.configLoading) {
+    chatDisabledReason = html`
+      尚未配置大模型。请前往
+      <a href="#" @click=${(e: Event) => { e.preventDefault(); state.configActiveSection = "onestop"; state.setTab("config"); }}>AI大模型接入页</a>
+      进行配置。
+    `;
+  }
+
+  const isChat = state.tab === "chat";
+  const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
+  const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
+
   const basePath = normalizeBasePath(state.basePath ?? "");
   const resolvedAgentId =
     state.agentsSelectedId ??

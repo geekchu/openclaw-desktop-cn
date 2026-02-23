@@ -132,6 +132,11 @@ async function testOnestopConnection(requestUpdate: () => void) {
   } finally {
     _testing = false;
     requestUpdate();
+    // 10 秒后自动隐藏测试结果
+    setTimeout(() => {
+      _testResult = null;
+      requestUpdate();
+    }, 10_000);
   }
 }
 
@@ -412,8 +417,10 @@ export function renderOnestop(props: OnestopProps) {
   const selectedModelInfo = _cachedModels.find((m) => m.id === props.selectedModel);
 
   // 判断当前显示的模型信息
-  const showOnestopModel = hasApiKey && selectedModelInfo;
-  const showCustomModel = !showOnestopModel && _customPrimaryModel;
+  // _customPrimaryModel 仅在用户通过自定义接入切换模型时设置，
+  // 此时应优先显示（反映用户最近的选择）
+  const showCustomModel = Boolean(_customPrimaryModel);
+  const showOnestopModel = !showCustomModel && hasApiKey && selectedModelInfo;
 
   let onestopContent;
   if (_activeTab === "onestop") {
@@ -555,17 +562,14 @@ function renderOnestopContent(props: OnestopProps) {
     ? _cachedModels.find((m) => m.id === props.selectedModel)
     : null;
 
-  // 切换模型：更新 provider 配置 → CLI 切换 → 重启 gateway
+  // 切换模型：更新 provider 配置（包括白名单和 primary）
   const handleSwitchModel = async (modelId: string) => {
     if (_testing) return;
     try {
-      // 1. 更新 provider 配置，确保目标模型在 provider 定义中存在
-      if (hasApiKey) {
-        await saveOnestopConfig(props.apiKey, modelId);
-      }
-      // 2. 通过 CLI 切换模型（处理白名单 + 设置 primary）
-      await invoke("switch_model", { modelId: `onestop/${modelId}` });
-      // 3. 立即更新 UI 显示
+      // saveOnestopConfig 已同时处理：provider 配置 + 白名单 + primary 设置
+      // 单次写入避免 gateway 文件监视器触发多次重启
+      await saveOnestopConfig(props.apiKey, modelId);
+      // 立即更新 UI 显示
       props.onModelSelect(modelId);
       _customPrimaryModel = null;
       showSaveResult(true, `✓ 已切换为 ${formatModelName(modelId)}，请在聊天中发送 /new 开启新会话`, props.requestUpdate);
@@ -715,12 +719,19 @@ function renderOnestopContent(props: OnestopProps) {
               )}
             </div>
 
-            <!-- Model Grid -->
+            <!-- Model Grid (当前模型置顶) -->
             <div class="onestop-models">
-              ${filteredModels.map(
-                (model) => html`
+              ${[...filteredModels]
+                .sort((a, b) =>
+                  (!_customPrimaryModel && a.id === props.selectedModel) ? -1
+                  : (!_customPrimaryModel && b.id === props.selectedModel) ? 1
+                  : 0)
+                .map(
+                (model) => {
+                  const isCurrent = !_customPrimaryModel && props.selectedModel === model.id;
+                  return html`
                   <div
-                    class="onestop-model-card ${props.selectedModel === model.id ? "selected" : ""} ${_testing ? "locked" : ""}"
+                    class="onestop-model-card ${isCurrent ? "selected" : ""} ${_testing ? "locked" : ""}"
                   >
                     <div class="onestop-model-card__logo">
                       ${providerLogos[model.providerKey] ?? providerLogos.other}
@@ -734,7 +745,7 @@ function renderOnestopContent(props: OnestopProps) {
                           ${model.provider}
                         </span>
                         ${
-                          props.selectedModel === model.id
+                          isCurrent
                             ? html`<span class="onestop-model-card__check">${icons.check}</span>`
                             : nothing
                         }
@@ -744,13 +755,12 @@ function renderOnestopContent(props: OnestopProps) {
                     </div>
                     <button
                       class="onestop-model-card__switch-btn"
-                      ?disabled=${_testing || !hasApiKey || props.selectedModel === model.id}
+                      ?disabled=${_testing || !hasApiKey || isCurrent}
                       @click=${() => handleSwitchModel(model.id)}
                       title="切换后请发送 /new 开启新会话"
-                    >${props.selectedModel === model.id ? "✓ 当前" : "切换"}</button>
+                    >${isCurrent ? "✓ 当前" : "切换"}</button>
                   </div>
-                `,
-              )}
+                `})}
             </div>
           `
         }

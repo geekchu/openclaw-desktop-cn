@@ -321,6 +321,8 @@ fn main() {
             // 配置管理
             config::get_config,
             config::save_config,
+            config::get_exec_approvals,
+            config::save_exec_approvals,
             config::get_env_value,
             config::save_env_value,
             config::get_ai_providers,

@@ -435,8 +435,10 @@ export function recordAllowlistUse(
   command: string,
   resolvedPath?: string,
 ) {
+  // Re-read from disk to avoid overwriting concurrent changes.
+  const freshFile = loadExecApprovals();
   const target = agentId ?? DEFAULT_AGENT_ID;
-  const agents = approvals.agents ?? {};
+  const agents = freshFile.agents ?? {};
   const existing = agents[target] ?? {};
   const allowlist = Array.isArray(existing.allowlist) ? existing.allowlist : [];
   const nextAllowlist = allowlist.map((item) =>
@@ -451,8 +453,9 @@ export function recordAllowlistUse(
       : item,
   );
   agents[target] = { ...existing, allowlist: nextAllowlist };
-  approvals.agents = agents;
-  saveExecApprovals(approvals);
+  freshFile.agents = agents;
+  saveExecApprovals(freshFile);
+  approvals.agents = freshFile.agents;
 }
 
 export function addAllowlistEntry(
@@ -460,8 +463,12 @@ export function addAllowlistEntry(
   agentId: string | undefined,
   pattern: string,
 ) {
+  // Re-read from disk to avoid overwriting concurrent changes (the passed-in
+  // `approvals` object is a snapshot from when resolveExecApprovals was called,
+  // which may be stale by the time the user clicks "allow-always").
+  const freshFile = loadExecApprovals();
   const target = agentId ?? DEFAULT_AGENT_ID;
-  const agents = approvals.agents ?? {};
+  const agents = freshFile.agents ?? {};
   const existing = agents[target] ?? {};
   const allowlist = Array.isArray(existing.allowlist) ? existing.allowlist : [];
   const trimmed = pattern.trim();
@@ -473,8 +480,10 @@ export function addAllowlistEntry(
   }
   allowlist.push({ id: crypto.randomUUID(), pattern: trimmed, lastUsedAt: Date.now() });
   agents[target] = { ...existing, allowlist };
-  approvals.agents = agents;
-  saveExecApprovals(approvals);
+  freshFile.agents = agents;
+  saveExecApprovals(freshFile);
+  // Also update the caller's in-memory object so subsequent reads stay consistent.
+  approvals.agents = freshFile.agents;
 }
 
 export function minSecurity(a: ExecSecurity, b: ExecSecurity): ExecSecurity {
