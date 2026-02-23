@@ -34,6 +34,8 @@ export type ConfigState = {
   configActiveSection: string | null;
   configActiveSubsection: string | null;
   lastError: string | null;
+  // 一站式接入选中模型（纯 UI 状态，需从配置恢复）
+  onestopSelectedModel: string;
 };
 
 export async function loadConfig(state: ConfigState) {
@@ -98,6 +100,15 @@ export function applyConfigSnapshot(state: ConfigState, snapshot: ConfigSnapshot
     state.configForm = cloneConfigObject(snapshot.config ?? {});
     state.configFormOriginal = cloneConfigObject(snapshot.config ?? {});
     state.configRawOriginal = rawFromSnapshot;
+  }
+
+  // 从配置恢复一站式选中模型（重启后 onestopSelectedModel 为空）
+  if (!state.onestopSelectedModel) {
+    const cfg = snapshot.config as Record<string, any> | undefined;
+    const primary = cfg?.agents?.defaults?.model?.primary as string | undefined;
+    if (primary?.startsWith("onestop/")) {
+      state.onestopSelectedModel = primary.slice("onestop/".length);
+    }
   }
 }
 
