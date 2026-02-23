@@ -4,7 +4,6 @@ import type { AnyAgentTool } from "./pi-tools.types.js";
 import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
 import { detectMime } from "../media/mime.js";
 import { sniffMimeFromBase64 } from "../media/sniff-mime-from-base64.js";
-import { assertSandboxPath } from "./sandbox-paths.js";
 import { sanitizeToolResultImages } from "./tool-images.js";
 
 // NOTE(steipete): Upstream read now does file-magic MIME detection; we keep the wrapper
@@ -311,10 +310,26 @@ function assertDirectPathAccess(
     finalAbsPath = path.resolve(cwd, filePath);
   }
 
+  let realAbsPath = finalAbsPath;
+  try {
+    const fs = require("node:fs");
+    realAbsPath = fs.realpathSync(finalAbsPath);
+  } catch {
+    // ignore
+  }
+
   // Deny list takes precedence — unconditionally block access to protected dirs
   if (denyDirs && denyDirs.length > 0) {
     for (const denied of denyDirs) {
-      const rel = path.relative(norm(path.resolve(denied)), norm(finalAbsPath));
+      let realDenied = path.resolve(denied);
+      try {
+        const fs = require("node:fs");
+        realDenied = fs.realpathSync(realDenied);
+      } catch {
+        // ignore
+      }
+      
+      const rel = path.relative(norm(realDenied), norm(realAbsPath));
       if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
         throw new Error(
           `Permission denied: '${filePath}' is inside a protected OpenClaw directory and cannot be modified.`,
@@ -331,7 +346,15 @@ function assertDirectPathAccess(
   }
 
   for (const root of allowedRoots) {
-    const relative = path.relative(norm(root), norm(finalAbsPath));
+    let realRoot = root;
+    try {
+      const fs = require("node:fs");
+      realRoot = fs.realpathSync(realRoot);
+    } catch {
+      // ignore
+    }
+
+    const relative = path.relative(norm(realRoot), norm(realAbsPath));
     if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
       return;
     }
@@ -377,11 +400,11 @@ function extractAbsolutePathsFromCommand(command: string): string[] {
   
   // Windows absolute paths: drive letter followed by :\ or :/
   // Match both quoted and unquoted paths
-  const winPathRegex = /[A-Za-z]:[\\\/][^\s;|&><"'`]*|"([A-Za-z]:[\\\/][^"]*)"|'([A-Za-z]:[\\\/][^']*)'/g;
+  const winPathRegex = /[A-Za-z]:[\\/][^\s;|&><"'`]*|"([A-Za-z]:[\\/][^"]*)"|'([A-Za-z]:[\\/][^']*)'/g;
   let match: RegExpExecArray | null;
   while ((match = winPathRegex.exec(command)) !== null) {
     const p = match[1] ?? match[2] ?? match[0];
-    if (p) paths.push(p);
+    if (p) { paths.push(p); }
   }
   
   // Unix absolute paths: starting with /
@@ -389,7 +412,7 @@ function extractAbsolutePathsFromCommand(command: string): string[] {
   const unixPathRegex = /(?:^|\s|[;|&>=<(])(\/{1,2}[^\s;|&><"'`]+)|"(\/[^"]*)"|'(\/[^']*)'/g;
   while ((match = unixPathRegex.exec(command)) !== null) {
     const p = match[1] ?? match[2] ?? match[3];
-    if (p) paths.push(p);
+    if (p) { paths.push(p); }
   }
   
   return paths;
@@ -407,7 +430,7 @@ function extractTraversalPaths(command: string): string[] {
   let match: RegExpExecArray | null;
   while ((match = traversalRegex.exec(command)) !== null) {
     const p = match[1] ?? match[2] ?? match[3];
-    if (p) paths.push(p);
+    if (p) { paths.push(p); }
   }
   return paths;
 }
@@ -432,7 +455,7 @@ function detectShellEvasion(command: string): string | null {
       continue;
     }
     // Contains a file-op command — check if it also references absolute paths
-    if (/\/[^\s)]+/.test(inner) || /[A-Za-z]:[\\\/]/.test(inner)) {
+    if (/\/[^\s)]+/.test(inner) || /[A-Za-z]:[\\/]/.test(inner)) {
       return `Command substitution \`${match[0]}\` may be used to bypass path restrictions. Use explicit paths instead.`;
     }
   }

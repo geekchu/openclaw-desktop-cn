@@ -233,7 +233,14 @@ async function attachSession() {
         const payload = event.payload;
         if (!payload?.data) return;
         if (ready && payload.id === _sessionId) {
-          term.write(stripExpectedEchoes(filterOutput(payload.data)));
+          const filtered = stripExpectedEchoes(filterOutput(payload.data));
+          // DEBUG: 检查 ^f 来源
+          if (filtered.includes("^f") || filtered.includes("^F")) {
+            console.warn("[terminal-debug] ^f detected in output, raw hex:",
+              JSON.stringify(payload.data),
+              "filtered:", JSON.stringify(filtered));
+          }
+          term.write(filtered);
         } else if (!ready) {
           earlyEvents.push({ id: payload.id, data: stripExpectedEchoes(filterOutput(payload.data)) });
         }
@@ -423,10 +430,10 @@ async function createTerminalInstance(container: HTMLElement) {
       const lineText = term.buffer.active.getLine(y)?.translateToString(true) || "";
 
       if (BLOCKED_CMD_RE.test(lineText)) {
-        // Clear the shell's readline buffer and cancel the command.
-        // Send: Ctrl+U (kill-line) + Ctrl+C (interrupt) + Enter (flush prompt)
-        expectEchoStrip("^U", "^C");
-        invoke("terminal_write", { id: _sessionId, data: "\x15\x03\r" }).catch(() => {});
+        // Cancel the current readline input via Ctrl+C.
+        // PSReadLine discards the buffer and shows a new prompt.
+        expectEchoStrip("^C");
+        invoke("terminal_write", { id: _sessionId, data: "\x03" }).catch(() => {});
         term.write("\r\n\x1b[33m⚠ 桌面版不支持该命令，请通过应用内操作。\x1b[0m\r\n");
         return;
       }
