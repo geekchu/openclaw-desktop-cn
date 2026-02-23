@@ -168,10 +168,10 @@ function disposeTerminal() {
   _currentContainer = null;
 }
 
-// 过滤 ConPTY 可能发送的清除滚动缓冲区序列
+// 过滤 ConPTY 备用屏幕缓冲区切换（防止 TUI 应用切换屏幕）
+// 注意：不过滤 \x1b[3J (ED3)，否则会导致 ConPTY 与 xterm 状态不同步
 function filterOutput(data: string): string {
   return data
-    .replace(/\x1b\[3J/g, "")              // ED3: 清除滚动缓冲区
     .replace(/\x1b\[\?1049[hl]/g, "");     // 备用屏幕缓冲区切换
 }
 

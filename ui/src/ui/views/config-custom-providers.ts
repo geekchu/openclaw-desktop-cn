@@ -852,27 +852,21 @@ export class CustomProvidersView extends LitElement {
           ${this.testResult
             ? html`
                 <div class="onestop-custom-test-result ${this.testResult.success ? "success" : "error"}">
-                  <div class="onestop-custom-test-result__header">
-                    <span>${this.testResult.success ? "✅ 连接成功" : "❌ 连接失败"}</span>
+                  <div class="onestop-custom-test-result__compact-info">
+                    <span class="onestop-custom-test-result__status">
+                      ${this.testResult.success ? icons.check : icons.close}
+                      ${this.testResult.success ? "测试连接成功" : "测试连接失败"}
+                    </span>
                     ${this.testResult.latency_ms
-                      ? html`<span class="onestop-custom-label__hint">响应时间: ${this.testResult.latency_ms}ms</span>`
+                      ? html`<span class="onestop-custom-label__hint" style="font-family: var(--mono); margin-left: -4px;">${this.testResult.latency_ms}ms</span>`
                       : nothing}
-                    <button class="onestop-custom-btn-text" @click=${() => {
-                      this.testResult = null;
-                    }}>关闭</button>
+                    ${this.testResult.error || this.testResult.response
+                      ? html`<span class="onestop-custom-test-result__compact-msg" title=${this.testResult.error || this.testResult.response}>${this.testResult.error || this.testResult.response}</span>`
+                      : nothing}
                   </div>
-                  ${this.testResult.response
-                    ? html`<div class="onestop-custom-test-result__body">
-                        <span class="onestop-custom-label__hint">AI 响应:</span>
-                        <p>${this.testResult.response}</p>
-                      </div>`
-                    : nothing}
-                  ${this.testResult.error
-                    ? html`<div class="onestop-custom-test-result__body onestop-custom-test-result__error-body">
-                        <span class="onestop-custom-label__hint">错误信息:</span>
-                        <p>${this.testResult.error}</p>
-                      </div>`
-                    : nothing}
+                  <button class="onestop-custom-btn-text" @click=${() => {
+                    this.testResult = null;
+                  }} style="flex-shrink: 0;">关闭</button>
                 </div>
               `
             : nothing}

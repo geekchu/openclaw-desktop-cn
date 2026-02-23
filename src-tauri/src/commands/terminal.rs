@@ -169,6 +169,15 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
 
     path_parts.insert(0, wrapper_dir.display().to_string());
 
+    // npm 全局安装前缀 → ~/.openclaw/npm-global（持久化，不受应用更新影响）
+    if let Some(prefix) = crate::utils::shell::get_npm_global_prefix() {
+        let _ = std::fs::create_dir_all(&prefix);
+        cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
+        if let Some(bin_dir) = crate::utils::shell::get_npm_global_bin_dir() {
+            path_parts.insert(0, bin_dir);
+        }
+    }
+
     let current_path = std::env::var("PATH").unwrap_or_default();
     path_parts.push(current_path);
 

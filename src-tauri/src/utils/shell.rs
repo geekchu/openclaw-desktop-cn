@@ -13,6 +13,27 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+/// 获取 npm 全局安装前缀目录：~/.openclaw/npm-global
+/// 将 npm -g 安装目标从内嵌 node-runtime 重定向到用户目录，
+/// 使应用更新不会丢失已安装的技能/工具。
+pub fn get_npm_global_prefix() -> Option<PathBuf> {
+    let home = dirs::home_dir()?;
+    let prefix = home.join(".openclaw").join("npm-global");
+    Some(prefix)
+}
+
+/// 获取 npm 全局 bin 目录（已安装的可执行文件所在路径）
+/// Windows: <prefix>/          Unix: <prefix>/bin/
+pub fn get_npm_global_bin_dir() -> Option<String> {
+    let prefix = get_npm_global_prefix()?;
+    let bin_dir = if cfg!(windows) {
+        prefix.clone()
+    } else {
+        prefix.join("bin")
+    };
+    Some(bin_dir.to_string_lossy().to_string())
+}
+
 /// 获取扩展的 PATH 环境变量
 /// GUI 应用启动时可能没有继承用户 shell 的 PATH，需要手动添加常见路径
 pub fn get_extended_path() -> String {
@@ -548,21 +569,39 @@ pub fn get_bundle_entry() -> Option<(String, String)> {
 pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     debug!("[Shell] 执行 openclaw 命令: {:?}", args);
 
-    let extended_path = get_extended_path();
+    let mut extended_path = get_extended_path();
     let user_env_vars = load_openclaw_env_vars();
+    let sep = if platform::is_windows() { ";" } else { ":" };
+
+    // npm 全局安装前缀 → ~/.openclaw/npm-global
+    let npm_prefix = get_npm_global_prefix();
+    if npm_prefix.is_some() {
+        if let Some(bin_dir) = get_npm_global_bin_dir() {
+            extended_path = format!("{}{}{}", bin_dir, sep, extended_path);
+        }
+    }
 
     // 优先使用 bundle 模式：node + openclaw.mjs
     if let (Some(node_path), Some((bundle_dir, entry_point))) = (get_node_path(), get_bundle_entry()) {
         debug!("[Shell] bundle 模式: node={}, entry={}, dir={}", node_path, entry_point, bundle_dir);
 
+        // 将 node 所在目录加入 PATH
+        if let Some(parent) = Path::new(&node_path).parent() {
+            let parent_str = parent.to_string_lossy();
+            extended_path = format!("{}{}{}", parent_str, sep, extended_path);
+        }
+
         let mut cmd = Command::new(&node_path);
         cmd.arg(&entry_point);
         cmd.args(args);
         cmd.current_dir(&bundle_dir);
-        cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
-        cmd.env("PATH", &extended_path);
         for (key, value) in &user_env_vars {
             cmd.env(key, value);
+        }
+        cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
+        cmd.env("PATH", &extended_path);
+        if let Some(ref prefix) = npm_prefix {
+            cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
         }
 
         #[cfg(windows)]
@@ -596,16 +635,26 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     })?;
 
     debug!("[Shell] [开发模式] 回退到全局 openclaw: {}", openclaw_path);
+    
+    // 将 openclaw 所在目录加入 PATH
+    if let Some(parent) = Path::new(&openclaw_path).parent() {
+        let parent_str = parent.to_string_lossy();
+        let sep = if platform::is_windows() { ";" } else { ":" };
+        extended_path = format!("{}{}{}", parent_str, sep, extended_path);
+    }
 
     let output = if openclaw_path.ends_with(".cmd") {
         let mut cmd_args = vec!["/c", &openclaw_path];
         cmd_args.extend(args);
         let mut cmd = Command::new("cmd");
-        cmd.args(&cmd_args)
-            .env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
-            .env("PATH", &extended_path);
+        cmd.args(&cmd_args);
         for (key, value) in &user_env_vars {
             cmd.env(key, value);
+        }
+        cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
+            .env("PATH", &extended_path);
+        if let Some(ref prefix) = npm_prefix {
+            cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
         }
 
         #[cfg(windows)]
@@ -614,11 +663,14 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
         cmd.output()
     } else {
         let mut cmd = Command::new(&openclaw_path);
-        cmd.args(args)
-            .env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
-            .env("PATH", &extended_path);
+        cmd.args(args);
         for (key, value) in &user_env_vars {
             cmd.env(key, value);
+        }
+        cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
+            .env("PATH", &extended_path);
+        if let Some(ref prefix) = npm_prefix {
+            cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
         }
 
         #[cfg(windows)]
@@ -709,11 +761,29 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
     let user_env_vars = load_openclaw_env_vars();
     info!("[Shell] 已加载 {} 个环境变量", user_env_vars.len());
 
-    let extended_path = get_extended_path();
+    let mut extended_path = get_extended_path();
+    let sep = if platform::is_windows() { ";" } else { ":" };
+
+    // npm 全局安装前缀 → ~/.openclaw/npm-global（持久化，不受应用更新影响）
+    let npm_prefix = get_npm_global_prefix();
+    if let Some(ref prefix) = npm_prefix {
+        let _ = std::fs::create_dir_all(prefix);
+        info!("[Shell] NPM_CONFIG_PREFIX={}", prefix.display());
+        // 将 npm-global bin 目录加入 PATH，使已安装的技能可执行文件可被发现
+        if let Some(bin_dir) = get_npm_global_bin_dir() {
+            extended_path = format!("{}{}{}", bin_dir, sep, extended_path);
+        }
+    }
 
     // 优先使用 bundle 模式：node + openclaw.mjs
     if let (Some(node_path), Some((bundle_dir, entry_point))) = (get_node_path(), get_bundle_entry()) {
         info!("[Shell] bundle 模式启动 gateway: node={}, entry={}, dir={}", node_path, entry_point, bundle_dir);
+
+        // 将 node 所在目录加入 PATH
+        if let Some(parent) = Path::new(&node_path).parent() {
+            let parent_str = parent.to_string_lossy();
+            extended_path = format!("{}{}{}", parent_str, sep, extended_path);
+        }
 
         let mut cmd = Command::new(&node_path);
         cmd.arg(&entry_point);
@@ -725,6 +795,9 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         }
         cmd.env("PATH", &extended_path);
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
+        if let Some(ref prefix) = npm_prefix {
+            cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
+        }
 
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -778,6 +851,13 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
     })?;
 
     info!("[Shell] [开发模式] 回退到全局 openclaw: {}", openclaw_path);
+    
+    // 将 openclaw 所在目录加入 PATH
+    if let Some(parent) = Path::new(&openclaw_path).parent() {
+        let parent_str = parent.to_string_lossy();
+        let sep = if platform::is_windows() { ";" } else { ":" };
+        extended_path = format!("{}{}{}", parent_str, sep, extended_path);
+    }
 
     let mut cmd = if openclaw_path.ends_with(".cmd") {
         let mut c = Command::new("cmd");
@@ -794,6 +874,9 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
     }
     cmd.env("PATH", &extended_path);
     cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
+    if let Some(ref prefix) = npm_prefix {
+        cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
+    }
 
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);

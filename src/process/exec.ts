@@ -33,12 +33,19 @@ export function shouldSpawnWithShell(params: {
   resolvedCommand: string;
   platform: NodeJS.Platform;
 }): boolean {
+  if (params.platform === "win32") {
+    const ext = path.extname(params.resolvedCommand).toLowerCase();
+    if (ext === ".cmd" || ext === ".bat") {
+      // Node.js >= 20.12.2 and 22+ throw EINVAL when spawning .cmd/.bat
+      // without shell: true due to CVE-2024-27980.
+      return true;
+    }
+  }
   // SECURITY: never enable `shell` for argv-based execution.
   // `shell` routes through cmd.exe on Windows, which turns untrusted argv values
   // (like chat prompts passed as CLI args) into command-injection primitives.
   // If you need a shell, use an explicit shell-wrapper argv (e.g. `cmd.exe /c ...`)
   // and validate/escape at the call site.
-  void params;
   return false;
 }
 

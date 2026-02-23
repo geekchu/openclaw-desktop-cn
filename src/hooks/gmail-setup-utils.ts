@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { hasBinary } from "../agents/skills.js";
+import { clearHasBinaryCache, hasBinary } from "../agents/skills.js";
 import { runCommandWithTimeout, type SpawnResult } from "../process/exec.js";
 import { resolveUserPath } from "../utils.js";
 import { normalizeServePath } from "./gmail.js";
@@ -190,6 +190,7 @@ export async function ensureDependency(bin: string, brewArgs: string[]) {
   if (result.code !== 0) {
     throw new Error(`brew install failed for ${bin}: ${result.stderr || result.stdout}`);
   }
+  clearHasBinaryCache();
   if (!hasBinary(bin)) {
     throw new Error(`${bin} still not available after brew install`);
   }

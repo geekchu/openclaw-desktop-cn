@@ -11,6 +11,7 @@ import { runCommandWithTimeout } from "../process/exec.js";
 import { scanDirectoryWithSummary } from "../security/skill-scanner.js";
 import { CONFIG_DIR, ensureDir, resolveUserPath } from "../utils.js";
 import {
+  clearHasBinaryCache,
   hasBinary,
   loadWorkspaceSkillEntries,
   resolveSkillsInstallPreferences,
@@ -562,6 +563,9 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
   }
   if (spec.kind === "download") {
     const downloadResult = await installDownloadSpec({ entry, spec, timeoutMs });
+    if (downloadResult.ok) {
+      clearHasBinaryCache();
+    }
     return withWarnings(downloadResult, warnings);
   }
 
@@ -696,6 +700,9 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
   })();
 
   const success = result.code === 0;
+  if (success) {
+    clearHasBinaryCache();
+  }
   return withWarnings(
     {
       ok: success,
