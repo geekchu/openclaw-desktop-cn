@@ -599,6 +599,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
+        cmd.env("OPENCLAW_DESKTOP", "1");
         cmd.env("PATH", &extended_path);
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
@@ -652,6 +653,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
+            .env("OPENCLAW_DESKTOP", "1")
             .env("PATH", &extended_path);
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
@@ -668,6 +670,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
+            .env("OPENCLAW_DESKTOP", "1")
             .env("PATH", &extended_path);
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
@@ -795,6 +798,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         }
         cmd.env("PATH", &extended_path);
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
+        cmd.env("OPENCLAW_DESKTOP", "1");
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
         }
@@ -874,6 +878,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
     }
     cmd.env("PATH", &extended_path);
     cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
+    cmd.env("OPENCLAW_DESKTOP", "1");
     if let Some(ref prefix) = npm_prefix {
         cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
     }

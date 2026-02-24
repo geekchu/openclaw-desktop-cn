@@ -160,9 +160,11 @@ export function diffConfigPaths(prev: unknown, next: unknown, prefix = ""): stri
 export function resolveGatewayReloadSettings(cfg: OpenClawConfig): GatewayReloadSettings {
   const rawMode = cfg.gateway?.reload?.mode;
   const mode =
-    rawMode === "off" || rawMode === "restart" || rawMode === "hot" || rawMode === "hybrid"
-      ? rawMode
-      : DEFAULT_RELOAD_SETTINGS.mode;
+    process.env.OPENCLAW_DESKTOP === "1"
+      ? "hot"
+      : rawMode === "off" || rawMode === "restart" || rawMode === "hot" || rawMode === "hybrid"
+        ? rawMode
+        : DEFAULT_RELOAD_SETTINGS.mode;
   const debounceRaw = cfg.gateway?.reload?.debounceMs;
   const debounceMs =
     typeof debounceRaw === "number" && Number.isFinite(debounceRaw)
