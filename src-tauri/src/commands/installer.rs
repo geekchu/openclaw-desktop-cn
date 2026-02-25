@@ -805,9 +805,9 @@ echo ""
 echo "初始化配置..."
 openclaw config set gateway.mode local 2>/dev/null || true
 
-mkdir -p ~/.openclaw/agents/main/sessions
-mkdir -p ~/.openclaw/agents/main/agent
-mkdir -p ~/.openclaw/credentials
+mkdir -p ~/.openclawcn/agents/main/sessions
+mkdir -p ~/.openclawcn/agents/main/agent
+mkdir -p ~/.openclawcn/credentials
 
 echo ""
 echo "安装完成！"
@@ -815,7 +815,7 @@ openclaw --version
 echo ""
 read -p "按回车键关闭此窗口..."
 "#;
-        
+
         let script_path = "/tmp/openclaw_install_openclaw.command";
         std::fs::write(script_path, script_content)
             .map_err(|e| format!("创建脚本失败: {}", e))?;
@@ -847,9 +847,9 @@ echo ""
 echo "初始化配置..."
 openclaw config set gateway.mode local 2>/dev/null || true
 
-mkdir -p ~/.openclaw/agents/main/sessions
-mkdir -p ~/.openclaw/agents/main/agent
-mkdir -p ~/.openclaw/credentials
+mkdir -p ~/.openclawcn/agents/main/sessions
+mkdir -p ~/.openclawcn/agents/main/agent
+mkdir -p ~/.openclawcn/credentials
 
 echo ""
 echo "安装完成！"

@@ -69,7 +69,7 @@ fn resolve_gateway_bundle_dir(app: &tauri::App) -> PathBuf {
     }
 }
 
-/// 从 ~/.openclaw/openclaw.json 读取 gateway.auth.token
+/// 从 ~/.openclawcn/openclaw.json 读取 gateway.auth.token
 pub(crate) fn read_gateway_token() -> Option<String> {
     let config_path = utils::platform::get_config_file_path();
     let content = utils::file::read_file(&config_path).ok()?;
@@ -266,6 +266,11 @@ fn main() {
                     Err(e) => log::warn!("[Main] 创建 tokio runtime 失败: {}", e),
                 }
 
+                // 确保所有内置渠道插件在配置中已启用
+                if let Err(e) = config::ensure_channel_plugins_enabled() {
+                    log::warn!("[Main] 预初始化渠道插件配置失败: {}", e);
+                }
+
                 // 发送状态：正在启动
                 let _ = handle.emit("gateway-status", "正在启动 Gateway...");
 
@@ -347,6 +352,9 @@ fn main() {
             // 飞书插件管理
             config::check_feishu_plugin,
             config::install_feishu_plugin,
+            // 配对码审批
+            config::list_pairing_requests,
+            config::approve_pairing_code,
             // 目录操作
             config::open_config_dir,
             config::pick_folder,

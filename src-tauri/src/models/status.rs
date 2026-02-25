@@ -92,3 +92,28 @@ pub struct ChannelTestResult {
     pub error: Option<String>,
 }
 
+/// 配对请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PairingRequest {
+    /// 配对码
+    pub code: String,
+    /// 发送者 ID
+    #[serde(default)]
+    pub id: Option<String>,
+    /// 请求时间 (camelCase from CLI JSON)
+    #[serde(default, rename = "createdAt")]
+    pub created_at: Option<String>,
+    /// 元数据（用户名等）
+    #[serde(default)]
+    pub meta: Option<serde_json::Value>,
+}
+
+/// 配对审批结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PairingApproveResult {
+    /// 是否成功
+    pub success: bool,
+    /// 消息
+    pub message: String,
+}
+

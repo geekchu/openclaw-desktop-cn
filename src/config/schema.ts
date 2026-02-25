@@ -540,7 +540,7 @@ const FIELD_HELP: Record<string, string> = {
   "agents.defaults.memorySearch.fallback":
     '嵌入失败时的回退提供商（"openai"、"gemini"、"local" 或 "none"）。',
   "agents.defaults.memorySearch.store.path":
-    "SQLite 索引路径（默认：~/.openclaw/memory/{agentId}.sqlite）。",
+    "SQLite 索引路径（默认：~/.openclawcn/memory/{agentId}.sqlite）。",
   "agents.defaults.memorySearch.store.vector.enabled":
     "为向量搜索启用 sqlite-vec 扩展（默认：true）。",
   "agents.defaults.memorySearch.store.vector.extensionPath":
@@ -573,7 +573,7 @@ const FIELD_HELP: Record<string, string> = {
   "plugins.installs.*.source": '安装源（"npm"、"archive" 或 "path"）。',
   "plugins.installs.*.spec": "用于安装的原始 npm 规格（如果源是 npm）。",
   "plugins.installs.*.sourcePath": "用于安装的原始归档/路径（如果有）。",
-  "plugins.installs.*.installPath": "解析的安装目录（通常是 ~/.openclaw/extensions/<id>）。",
+  "plugins.installs.*.installPath": "解析的安装目录（通常是 ~/.openclawcn/extensions/<id>）。",
   "plugins.installs.*.version": "安装时记录的版本（如果可用）。",
   "plugins.installs.*.installedAt": "上次安装/更新的 ISO 时间戳。",
   "agents.list.*.identity.avatar": "代理头像（工作区相对路径、http(s) URL 或 data URI）。",

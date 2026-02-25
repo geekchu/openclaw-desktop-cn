@@ -24,6 +24,10 @@ let _lastContainerW = 0;
 let _lastContainerH = 0;
 // resize 冷却期（防止 ConPTY 重绘导致循环）
 let _resizeCooldown = false;
+// 命令拦截：输入缓冲区 + 延迟队列
+let _inputBuffer = "";
+let _enterPending = false;
+let _pendingQueue: string[] = [];
 // 控制键回显过滤（仅在用户按下控制键后短窗口内生效）
 const _pendingEchoStrips = new Set<string>();
 let _echoStripTimer: ReturnType<typeof setTimeout> | null = null;
@@ -171,8 +175,7 @@ function disposeTerminal() {
 // 过滤 ConPTY 备用屏幕缓冲区切换（防止 TUI 应用切换屏幕）
 // 注意：不过滤 \x1b[3J (ED3)，否则会导致 ConPTY 与 xterm 状态不同步
 function filterOutput(data: string): string {
-  return data
-    .replace(/\x1b\[\?1049[hl]/g, "");     // 备用屏幕缓冲区切换
+  return data.replace(/\x1b\[\?1049[hl]/g, ""); // 备用屏幕缓冲区切换
 }
 
 // 注册预期的控制键回显，500ms 内未匹配则自动过期
@@ -208,6 +211,11 @@ async function attachSession() {
   if (_attachBusy) return;
   _attachBusy = true;
 
+  // 重置命令拦截状态
+  _inputBuffer = "";
+  _enterPending = false;
+  _pendingQueue = [];
+
   if (_unlistenOutput) {
     _unlistenOutput();
     _unlistenOutput = null;
@@ -236,13 +244,19 @@ async function attachSession() {
           const filtered = stripExpectedEchoes(filterOutput(payload.data));
           // DEBUG: 检查 ^f 来源
           if (filtered.includes("^f") || filtered.includes("^F")) {
-            console.warn("[terminal-debug] ^f detected in output, raw hex:",
+            console.warn(
+              "[terminal-debug] ^f detected in output, raw hex:",
               JSON.stringify(payload.data),
-              "filtered:", JSON.stringify(filtered));
+              "filtered:",
+              JSON.stringify(filtered),
+            );
           }
           term.write(filtered);
         } else if (!ready) {
-          earlyEvents.push({ id: payload.id, data: stripExpectedEchoes(filterOutput(payload.data)) });
+          earlyEvents.push({
+            id: payload.id,
+            data: stripExpectedEchoes(filterOutput(payload.data)),
+          });
         }
       });
       _unlistenExit = await tauri.event.listen("terminal-exit", (event: any) => {
@@ -281,6 +295,11 @@ async function attachSession() {
 // 重新连接到已有的 PTY 会话（tab 切换回来时 / 页面刷新后）
 // 返回 true 表示成功，false 表示会话已不存在
 async function reattachSession(term: any): Promise<boolean> {
+  // 重置命令拦截状态
+  _inputBuffer = "";
+  _enterPending = false;
+  _pendingQueue = [];
+
   if (_unlistenOutput) {
     _unlistenOutput();
     _unlistenOutput = null;
@@ -402,12 +421,36 @@ async function createTerminalInstance(container: HTMLElement) {
 
   // ── 命令拦截：禁止自毁/自更新命令 ──
   const BLOCKED_CMD_RE = /\bopenclaw\s+(update|uninstall)\b/i;
+  const OPENCLAW_RE = /openclaw/i;
 
   // 控制键 → ConPTY 回显文本映射
   const CTRL_ECHO_MAP: Record<string, string> = {
-    "\x03": "^C", "\x04": "^D", "\x1a": "^Z",
-    "\x15": "^U", "\x1c": "^\\",
+    "\x03": "^C",
+    "\x04": "^D",
+    "\x1a": "^Z",
+    "\x15": "^U",
+    "\x1c": "^\\",
   };
+
+  /** 读取光标所在行文本（自动拼接折行） */
+  function readCurrentLine(): string {
+    const buf = term.buffer.active;
+    let y = buf.baseY + buf.cursorY;
+    let text = buf.getLine(y)?.translateToString(true) || "";
+    // 向上拼接折行（保留尾随空格避免丢失单词分隔）
+    while (y > 0 && buf.getLine(y)?.isWrapped) {
+      y--;
+      text = (buf.getLine(y)?.translateToString(false) || "") + text;
+    }
+    return text;
+  }
+
+  /** 拦截命令：先显示警告，再发 Ctrl+C 取消 PSReadLine 输入 */
+  function blockCommand() {
+    term.write("\r\n\x1b[33m⚠ 桌面版不支持该命令，请通过应用内操作。\x1b[0m\r\n");
+    expectEchoStrip("^C");
+    invoke("terminal_write", { id: _sessionId!, data: "\x03" }).catch(() => {});
+  }
 
   term.onData((data: string) => {
     // 无活跃 session 时触发创建
@@ -421,26 +464,89 @@ async function createTerminalInstance(container: HTMLElement) {
       expectEchoStrip(CTRL_ECHO_MAP[data]);
     }
 
-    // Check if the user is pressing Enter (execution trigger)
-    const isEnter = data.includes("\r") || data.includes("\n");
+    // 延迟期间：暂存后续输入，不发 PTY
+    if (_enterPending) {
+      _pendingQueue.push(data);
+      return;
+    }
 
-    if (isEnter) {
-      // Read the current line directly from the screen buffer before the Enter is processed
-      const y = term.buffer.active.baseY + term.buffer.active.cursorY;
-      const lineText = term.buffer.active.getLine(y)?.translateToString(true) || "";
-
-      if (BLOCKED_CMD_RE.test(lineText)) {
-        // Cancel the current readline input via Ctrl+C.
-        // PSReadLine discards the buffer and shows a new prompt.
-        expectEchoStrip("^C");
-        invoke("terminal_write", { id: _sessionId, data: "\x03" }).catch(() => {});
-        term.write("\r\n\x1b[33m⚠ 桌面版不支持该命令，请通过应用内操作。\x1b[0m\r\n");
-        return;
+    // 剥离 ANSI 转义序列后维护输入缓冲区
+    const stripped = data.replace(/\x1b(?:\[[0-9;]*[A-Za-z~]|.)/g, "");
+    for (const ch of stripped) {
+      if (ch === "\r" || ch === "\n") {
+        /* Enter 在下方处理 */
+      } else if (ch === "\x7f" || ch === "\b") {
+        _inputBuffer = _inputBuffer.slice(0, -1);
+      } else if (ch === "\x03" || ch === "\x15") {
+        _inputBuffer = "";
+      } else if (ch >= " ") {
+        _inputBuffer += ch;
       }
     }
 
-    // Normal command: pass the raw data payload directly to the PTY
-    invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+    const isEnter = data.includes("\r") || data.includes("\n");
+    if (!isEnter) {
+      invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      return;
+    }
+
+    // ── Enter 键处理 ──
+
+    // 第一关：输入缓冲区检查（手动输入/粘贴）
+    if (BLOCKED_CMD_RE.test(_inputBuffer)) {
+      _inputBuffer = "";
+      blockCommand();
+      return;
+    }
+
+    // 判断是否需要延迟检查屏幕缓冲区
+    const needsDelay = _inputBuffer.length === 0 || OPENCLAW_RE.test(_inputBuffer);
+    _inputBuffer = "";
+
+    if (!needsDelay) {
+      // 与 openclaw 无关 → 立即放行
+      invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      return;
+    }
+
+    // 空行（无命令文本）直接放行，不延迟
+    const quickLine = readCurrentLine();
+    const afterPrompt = quickLine.replace(/^.*>\s*/, "");
+    if (afterPrompt.length === 0) {
+      invoke("terminal_write", { id: _sessionId, data }).catch(() => {});
+      return;
+    }
+
+    // 可能是历史回调/Tab补全 → 延迟读屏幕缓冲区
+    _enterPending = true;
+    const sid = _sessionId;
+    const enterData = data;
+    setTimeout(() => {
+      _enterPending = false;
+      try {
+        // session 已变更 → 丢弃
+        if (_sessionId !== sid) {
+          _pendingQueue = [];
+          return;
+        }
+        // 读取完整行（含折行拼接）
+        const lineText = readCurrentLine();
+        if (BLOCKED_CMD_RE.test(lineText)) {
+          blockCommand();
+        } else {
+          invoke("terminal_write", { id: sid, data: enterData }).catch(() => {});
+        }
+        // flush 暂存队列
+        const queue = _pendingQueue.slice();
+        _pendingQueue = [];
+        for (const q of queue) {
+          invoke("terminal_write", { id: sid, data: q }).catch(() => {});
+        }
+      } catch {
+        // 终端已销毁，静默忽略
+        _pendingQueue = [];
+      }
+    }, 100);
   });
 
   return term;

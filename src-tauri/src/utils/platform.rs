@@ -14,12 +14,12 @@ pub fn get_arch() -> String {
 pub fn get_config_dir() -> String {
     if let Some(home) = dirs::home_dir() {
         if is_windows() {
-            format!("{}\\.openclaw", home.display())
+            format!("{}\\.openclawcn", home.display())
         } else {
-            format!("{}/.openclaw", home.display())
+            format!("{}/.openclawcn", home.display())
         }
     } else {
-        String::from("~/.openclaw")
+        String::from("~/.openclawcn")
     }
 }
 

@@ -995,7 +995,7 @@ export class SystemSettingsView extends LitElement {
             <div class="toggle-row-icon">📁</div>
             <div>
               <div class="toggle-text-primary">打开配置目录</div>
-              <div class="toggle-text-secondary">在文件管理器中查看 ~/.openclaw</div>
+              <div class="toggle-text-secondary">在文件管理器中查看 ~/.openclawcn</div>
             </div>
           </div>
           <span class="chevron">${this._chevronRight}</span>

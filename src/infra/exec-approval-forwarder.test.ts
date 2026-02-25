@@ -195,4 +195,76 @@ describe("exec approval forwarder", () => {
 
     expect(getFirstDeliveryText(deliver)).toContain("Command:\n````\necho ```danger```\n````");
   });
+
+  it("sends telegram inline buttons with approval request", async () => {
+    vi.useFakeTimers();
+    const deliver = vi.fn().mockResolvedValue([
+      { channel: "telegram", messageId: "msg-42", chatId: "123" },
+    ]);
+    const cfg = {
+      approvals: {
+        exec: {
+          enabled: true,
+          mode: "targets",
+          targets: [{ channel: "telegram", to: "123" }],
+        },
+      },
+    } as OpenClawConfig;
+
+    const forwarder = createExecApprovalForwarder({
+      getConfig: () => cfg,
+      deliver,
+      nowMs: () => 1000,
+      resolveSessionTarget: () => null,
+    });
+
+    await forwarder.handleRequested(baseRequest);
+
+    const call = deliver.mock.calls[0]?.[0] as {
+      payloads?: Array<{ text?: string; channelData?: Record<string, unknown> }>;
+    };
+    const payload = call?.payloads?.[0];
+    expect(payload?.channelData).toBeDefined();
+    const buttons = (payload?.channelData?.telegram as { buttons?: unknown[][] })?.buttons;
+    expect(buttons).toHaveLength(1);
+    expect(buttons?.[0]).toHaveLength(3);
+    expect(buttons?.[0]?.[0]).toEqual({
+      text: "✅ 允许一次",
+      callback_data: `/approve ${baseRequest.id} allow-once`,
+    });
+  });
+
+  it("does not send channelData for resolved or expired messages", async () => {
+    vi.useFakeTimers();
+    const deliver = vi.fn().mockResolvedValue([]);
+    const cfg = {
+      approvals: {
+        exec: {
+          enabled: true,
+          mode: "targets",
+          targets: [{ channel: "telegram", to: "123" }],
+        },
+      },
+    } as OpenClawConfig;
+
+    const forwarder = createExecApprovalForwarder({
+      getConfig: () => cfg,
+      deliver,
+      nowMs: () => 1000,
+      resolveSessionTarget: () => null,
+    });
+
+    await forwarder.handleRequested(baseRequest);
+    await forwarder.handleResolved({
+      id: baseRequest.id,
+      decision: "deny",
+      resolvedBy: "telegram:123",
+      ts: 2000,
+    });
+
+    const resolvedCall = deliver.mock.calls[1]?.[0] as {
+      payloads?: Array<{ text?: string; channelData?: Record<string, unknown> }>;
+    };
+    expect(resolvedCall?.payloads?.[0]?.channelData).toBeUndefined();
+  });
 });

@@ -13,7 +13,7 @@ import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { parseAgentSessionKey } from "../routing/session-key.js";
 import { isDeliverableMessageChannel, normalizeMessageChannel } from "../utils/message-channel.js";
-import { deliverOutboundPayloads } from "./outbound/deliver.js";
+import { deliverOutboundPayloads, type OutboundDeliveryResult } from "./outbound/deliver.js";
 import { resolveSessionDeliveryTarget } from "./outbound/targets.js";
 
 const log = createSubsystemLogger("gateway/exec-approvals");
@@ -22,10 +22,13 @@ export type { ExecApprovalRequest, ExecApprovalResolved };
 
 type ForwardTarget = ExecApprovalForwardTarget & { source: "session" | "target" };
 
+type SentMessage = { channel: string; chatId: string; messageId: string };
+
 type PendingApproval = {
   request: ExecApprovalRequest;
   targets: ForwardTarget[];
   timeoutId: NodeJS.Timeout | null;
+  sentMessages?: SentMessage[];
 };
 
 export type ExecApprovalForwarder = {
@@ -206,7 +209,9 @@ async function deliverToTargets(params: {
   text: string;
   deliver: typeof deliverOutboundPayloads;
   shouldSend?: () => boolean;
-}) {
+  channelData?: Record<string, unknown>;
+}): Promise<OutboundDeliveryResult[]> {
+  const allResults: OutboundDeliveryResult[] = [];
   const deliveries = params.targets.map(async (target) => {
     if (params.shouldSend && !params.shouldSend()) {
       return;
@@ -216,19 +221,70 @@ async function deliverToTargets(params: {
       return;
     }
     try {
-      await params.deliver({
+      const payload: { text: string; channelData?: Record<string, unknown> } = { text: params.text };
+      if (params.channelData) {
+        payload.channelData = params.channelData;
+      }
+      const results = await params.deliver({
         cfg: params.cfg,
         channel,
         to: target.to,
         accountId: target.accountId,
         threadId: target.threadId,
-        payloads: [{ text: params.text }],
+        payloads: [payload],
       });
+      allResults.push(...results);
     } catch (err) {
       log.error(`exec approvals: failed to deliver to ${channel}:${target.to}: ${String(err)}`);
     }
   });
   await Promise.allSettled(deliveries);
+  return allResults;
+}
+
+function buildTelegramApprovalButtons(requestId: string) {
+  return {
+    telegram: {
+      buttons: [
+        [
+          { text: "✅ 允许一次", callback_data: `/approve ${requestId} allow-once` },
+          { text: "✅ 始终允许", callback_data: `/approve ${requestId} allow-always` },
+          { text: "❌ 拒绝", callback_data: `/approve ${requestId} deny` },
+        ],
+      ],
+    },
+  };
+}
+
+function collectSentMessages(results: OutboundDeliveryResult[]): SentMessage[] {
+  const messages: SentMessage[] = [];
+  for (const r of results) {
+    if (r.channel === "telegram" && r.messageId && r.chatId) {
+      messages.push({ channel: r.channel, chatId: r.chatId, messageId: r.messageId });
+    }
+  }
+  return messages;
+}
+
+async function editTelegramSentMessages(
+  sentMessages: SentMessage[],
+  text: string,
+) {
+  const telegramMessages = sentMessages.filter((m) => m.channel === "telegram");
+  if (telegramMessages.length === 0) {
+    return;
+  }
+  // Lazy-import to avoid pulling in telegram deps when not needed.
+  const { editMessageTelegram } = await import("../telegram/send.js");
+  await Promise.allSettled(
+    telegramMessages.map(async (m) => {
+      try {
+        await editMessageTelegram(m.chatId, m.messageId, text, { buttons: [] });
+      } catch {
+        // Silently ignore edit failures (message deleted, bot kicked, etc.)
+      }
+    }),
+  );
 }
 
 export function createExecApprovalForwarder(
@@ -292,6 +348,11 @@ export function createExecApprovalForwarder(
         pending.delete(request.id);
         const expiredText = buildExpiredMessage(request);
         await deliverToTargets({ cfg, targets: entry.targets, text: expiredText, deliver });
+
+        if (entry.sentMessages?.length) {
+          const editText = `${buildRequestMessage(request, nowMs())}\n\n${expiredText}`;
+          await editTelegramSentMessages(entry.sentMessages, editText);
+        }
       })();
     }, expiresInMs);
     timeoutId.unref?.();
@@ -304,13 +365,16 @@ export function createExecApprovalForwarder(
     }
 
     const text = buildRequestMessage(request, nowMs());
-    await deliverToTargets({
+    const channelData = buildTelegramApprovalButtons(request.id);
+    const results = await deliverToTargets({
       cfg,
       targets: filteredTargets,
       text,
       deliver,
+      channelData,
       shouldSend: () => pending.get(request.id) === pendingEntry,
     });
+    pendingEntry.sentMessages = collectSentMessages(results);
   };
 
   const handleResolved = async (resolved: ExecApprovalResolved) => {
@@ -326,6 +390,11 @@ export function createExecApprovalForwarder(
     const cfg = getConfig();
     const text = buildResolvedMessage(resolved);
     await deliverToTargets({ cfg, targets: entry.targets, text, deliver });
+
+    if (entry.sentMessages?.length) {
+      const editText = `${buildRequestMessage(entry.request, nowMs())}\n\n${text}`;
+      await editTelegramSentMessages(entry.sentMessages, editText);
+    }
   };
 
   const stop = () => {

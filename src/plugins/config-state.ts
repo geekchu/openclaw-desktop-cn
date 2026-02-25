@@ -168,7 +168,8 @@ export function resolveEnableState(
   if (config.deny.includes(id)) {
     return { enabled: false, reason: "blocked by denylist" };
   }
-  if (config.allow.length > 0 && !config.allow.includes(id)) {
+  const isDesktop = process.env.OPENCLAW_DESKTOP === "1";
+  if (config.allow.length > 0 && !config.allow.includes(id) && !(isDesktop && origin === "bundled")) {
     return { enabled: false, reason: "not in allowlist" };
   }
   if (config.slots.memory === id) {
@@ -181,7 +182,7 @@ export function resolveEnableState(
   if (entry?.enabled === false) {
     return { enabled: false, reason: "disabled in config" };
   }
-  if (origin === "bundled" && BUNDLED_ENABLED_BY_DEFAULT.has(id)) {
+  if (origin === "bundled" && (BUNDLED_ENABLED_BY_DEFAULT.has(id) || isDesktop)) {
     return { enabled: true };
   }
   if (origin === "bundled") {

@@ -216,7 +216,7 @@ export function subtitleForTab(tab: Tab) {
     case "chat":
       return "直接网关聊天会话，用于快速干预。";
     case "config":
-      return "安全编辑 ~/.openclaw/openclaw.json。";
+      return "安全编辑 ~/.openclawcn/openclaw.json。";
     case "debug":
       return "网关快照、事件和手动 RPC 调用。";
     case "logs":

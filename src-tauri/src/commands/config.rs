@@ -999,12 +999,8 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
     // 确保 plugins 对象存在
     if config.get("plugins").is_none() {
         config["plugins"] = json!({
-            "allow": [],
             "entries": {}
         });
-    }
-    if config["plugins"].get("allow").is_none() {
-        config["plugins"]["allow"] = json!([]);
     }
     if config["plugins"].get("entries").is_none() {
         config["plugins"]["entries"] = json!({});
@@ -1038,14 +1034,6 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
     
     // 更新 channels 配置
     config["channels"][&channel.id] = channel_obj;
-    
-    // 更新 plugins.allow 数组 - 确保渠道在白名单中
-    if let Some(allow_arr) = config["plugins"]["allow"].as_array_mut() {
-        let channel_id_val = json!(&channel.id);
-        if !allow_arr.contains(&channel_id_val) {
-            allow_arr.push(channel_id_val);
-        }
-    }
     
     // 更新 plugins.entries - 确保插件已启用
     config["plugins"]["entries"][&channel.id] = json!({
@@ -1081,12 +1069,6 @@ pub async fn clear_channel_config(channel_id: String) -> Result<String, String> 
     if let Some(channels) = config.get_mut("channels").and_then(|v| v.as_object_mut()) {
         channels.remove(&channel_id);
         info!("[清空渠道配置] 已从 channels 中删除: {}", channel_id);
-    }
-    
-    // 从 plugins.allow 数组中删除
-    if let Some(allow_arr) = config.pointer_mut("/plugins/allow").and_then(|v| v.as_array_mut()) {
-        allow_arr.retain(|v| v.as_str() != Some(&channel_id));
-        info!("[清空渠道配置] 已从 plugins.allow 中删除: {}", channel_id);
     }
     
     // 从 plugins.entries 中删除
@@ -1128,99 +1110,66 @@ pub struct FeishuPluginStatus {
     pub plugin_name: Option<String>,
 }
 
-/// 检查飞书插件是否已安装
+/// 检查飞书插件是否已安装（桌面端已内置所有插件，始终返回已安装）
 #[command]
 pub async fn check_feishu_plugin() -> Result<FeishuPluginStatus, String> {
-    info!("[飞书插件] 检查飞书插件安装状态...");
-    
-    // 执行 openclaw plugins list 命令
-    match shell::run_openclaw(&["plugins", "list"]) {
-        Ok(output) => {
-            debug!("[飞书插件] plugins list 输出: {}", output);
-            
-            // 查找包含 feishu 的行（不区分大小写）
-            let lines: Vec<&str> = output.lines().collect();
-            let feishu_line = lines.iter().find(|line| {
-                line.to_lowercase().contains("feishu")
-            });
-            
-            if let Some(line) = feishu_line {
-                info!("[飞书插件] ✓ 飞书插件已安装: {}", line);
-                
-                // 尝试解析版本号（通常格式为 "name@version" 或 "name version"）
-                let version = if line.contains('@') {
-                    line.split('@').last().map(|s| s.trim().to_string())
-                } else {
-                    // 尝试匹配版本号模式 (如 0.1.2)
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    parts.iter()
-                        .find(|p| p.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
-                        .map(|s| s.to_string())
-                };
-                
-                Ok(FeishuPluginStatus {
-                    installed: true,
-                    version,
-                    plugin_name: Some(line.trim().to_string()),
-                })
-            } else {
-                info!("[飞书插件] ✗ 飞书插件未安装");
-                Ok(FeishuPluginStatus {
-                    installed: false,
-                    version: None,
-                    plugin_name: None,
-                })
-            }
-        }
-        Err(e) => {
-            warn!("[飞书插件] 检查插件列表失败: {}", e);
-            // 如果命令失败，假设插件未安装
-            Ok(FeishuPluginStatus {
-                installed: false,
-                version: None,
-                plugin_name: None,
-            })
-        }
-    }
+    info!("[飞书插件] 桌面端已内置飞书插件，直接返回已安装");
+    Ok(FeishuPluginStatus {
+        installed: true,
+        version: None,
+        plugin_name: Some("feishu (bundled)".to_string()),
+    })
 }
 
-/// 安装飞书插件
+/// 安装飞书插件（桌面端已内置所有插件，直接返回成功）
 #[command]
 pub async fn install_feishu_plugin() -> Result<String, String> {
-    info!("[飞书插件] 开始安装飞书插件...");
-    
-    // 先检查是否已安装
-    let status = check_feishu_plugin().await?;
-    if status.installed {
-        info!("[飞书插件] 飞书插件已安装，跳过");
-        return Ok(format!("飞书插件已安装: {}", status.plugin_name.unwrap_or_default()));
-    }
-    
-    // 安装飞书插件
-    // 注意：使用 @m1heng-clawd/feishu 包名
-    info!("[飞书插件] 执行 openclaw plugins install @m1heng-clawd/feishu ...");
-    match shell::run_openclaw(&["plugins", "install", "@m1heng-clawd/feishu"]) {
-        Ok(output) => {
-            info!("[飞书插件] 安装输出: {}", output);
-            
-            // 验证安装结果
-            let verify_status = check_feishu_plugin().await?;
-            if verify_status.installed {
-                info!("[飞书插件] ✓ 飞书插件安装成功");
-                Ok(format!("飞书插件安装成功: {}", verify_status.plugin_name.unwrap_or_default()))
-            } else {
-                warn!("[飞书插件] 安装命令执行成功但插件未找到");
-                Err("安装命令执行成功但插件未找到，请检查 openclaw 版本".to_string())
-            }
-        }
-        Err(e) => {
-            error!("[飞书插件] ✗ 安装失败: {}", e);
-            Err(format!("安装飞书插件失败: {}\n\n请手动执行: openclaw plugins install @m1heng-clawd/feishu", e))
-        }
-    }
+    info!("[飞书插件] 桌面端已内置飞书插件，无需安装");
+    Ok("飞书插件已内置，无需安装".to_string())
 }
 
-/// 获取桌面端专用配置（~/.openclaw/desktop.json）
+/// 确保所有内置渠道插件在配置中已启用
+/// 桌面端内置了所有渠道插件，启动时调用此函数预写 plugins.entries
+pub fn ensure_channel_plugins_enabled() -> Result<(), String> {
+    let mut config = load_openclaw_config()?;
+
+    // 确保 plugins.entries 存在
+    if config.get("plugins").is_none() {
+        config["plugins"] = json!({ "entries": {} });
+    }
+    if config["plugins"].get("entries").is_none() {
+        config["plugins"]["entries"] = json!({});
+    }
+
+    let channel_ids = vec![
+        "telegram", "discord", "slack", "feishu", "whatsapp", "imessage",
+        "signal", "line", "matrix", "msteams", "googlechat", "mattermost",
+        "irc", "nostr", "zalo", "zalouser", "tlon", "twitch",
+        "bluebubbles", "nextcloud-talk",
+    ];
+
+    let entries = config["plugins"]["entries"].as_object_mut()
+        .ok_or("plugins.entries 不是对象")?;
+
+    let mut changed = false;
+    for id in &channel_ids {
+        if !entries.contains_key(*id) {
+            entries.insert(id.to_string(), json!({ "enabled": true }));
+            changed = true;
+        }
+    }
+
+    if changed {
+        info!("[插件初始化] 已为内置渠道插件预写 plugins.entries");
+        save_openclaw_config(&config)?;
+    } else {
+        debug!("[插件初始化] 所有内置渠道插件已在配置中");
+    }
+
+    Ok(())
+}
+
+/// 获取桌面端专用配置（~/.openclawcn/desktop.json）
 #[command]
 pub async fn get_desktop_config() -> Result<Value, String> {
     let config_dir = platform::get_config_dir();
@@ -1236,7 +1185,7 @@ pub async fn get_desktop_config() -> Result<Value, String> {
         .map_err(|e| format!("解析桌面配置失败: {}", e))
 }
 
-/// 保存桌面端专用配置（合并写入 ~/.openclaw/desktop.json）
+/// 保存桌面端专用配置（合并写入 ~/.openclawcn/desktop.json）
 #[command]
 pub async fn save_desktop_config(config: Value) -> Result<(), String> {
     let config_dir = platform::get_config_dir();
@@ -1342,4 +1291,87 @@ pub async fn autostart_disable(app: tauri::AppHandle) -> Result<(), String> {
     manager.disable().map_err(|e| format!("禁用自启失败: {}", e))?;
     info!("[Config] 已禁用开机自启");
     Ok(())
+}
+
+// ============ 配对码审批 ============
+
+use crate::models::status::{PairingRequest, PairingApproveResult};
+
+/// 获取指定渠道的待审批配对请求列表
+#[command]
+pub async fn list_pairing_requests(channel: String) -> Result<Vec<PairingRequest>, String> {
+    info!("[配对请求] 获取 {} 的配对请求列表...", channel);
+
+    match shell::run_openclaw(&["pairing", "list", "--channel", &channel, "--json"]) {
+        Ok(output) => {
+            let trimmed = output.trim();
+            if trimmed.is_empty() || trimmed == "[]" || trimmed == "{}" {
+                info!("[配对请求] {} 无待审批请求", channel);
+                return Ok(vec![]);
+            }
+            // CLI outputs { "channel": "...", "requests": [...] }
+            if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                if let Some(requests_val) = wrapper.get("requests") {
+                    match serde_json::from_value::<Vec<PairingRequest>>(requests_val.clone()) {
+                        Ok(requests) => {
+                            info!("[配对请求] ✓ {} 有 {} 个待审批请求", channel, requests.len());
+                            return Ok(requests);
+                        }
+                        Err(e) => {
+                            warn!("[配对请求] requests 数组解析失败: {}", e);
+                        }
+                    }
+                }
+                // Fallback: try parsing as direct array
+                if let Ok(requests) = serde_json::from_value::<Vec<PairingRequest>>(wrapper) {
+                    info!("[配对请求] ✓ {} 有 {} 个待审批请求（直接数组）", channel, requests.len());
+                    return Ok(requests);
+                }
+            }
+            warn!("[配对请求] JSON 解析失败，输出: {}", &trimmed[..trimmed.len().min(200)]);
+            Ok(vec![])
+        }
+        Err(e) => {
+            // 命令不存在或无数据时不算错误，返回空列表
+            warn!("[配对请求] 获取失败（可能无数据）: {}", e);
+            Ok(vec![])
+        }
+    }
+}
+
+/// 审批配对码
+#[command]
+pub async fn approve_pairing_code(channel: String, code: String) -> Result<PairingApproveResult, String> {
+    info!("[配对审批] 审批 {} 配对码: {}", channel, code);
+
+    // 简单剥离 ANSI 转义序列（CLI 输出带颜色码）
+    fn strip_ansi(s: &str) -> String {
+        let mut out = String::with_capacity(s.len());
+        let mut in_esc = false;
+        for c in s.chars() {
+            if c == '\x1b' { in_esc = true; continue; }
+            if in_esc { if c.is_ascii_alphabetic() { in_esc = false; } continue; }
+            out.push(c);
+        }
+        out
+    }
+
+    match shell::run_openclaw(&["pairing", "approve", &channel, &code, "--notify"]) {
+        Ok(output) => {
+            let clean = strip_ansi(output.trim());
+            info!("[配对审批] ✓ 审批成功: {}", clean);
+            Ok(PairingApproveResult {
+                success: true,
+                message: clean,
+            })
+        }
+        Err(e) => {
+            let clean = strip_ansi(&e);
+            error!("[配对审批] ✗ 审批失败: {}", clean);
+            Ok(PairingApproveResult {
+                success: false,
+                message: format!("审批失败: {}", clean),
+            })
+        }
+    }
 }

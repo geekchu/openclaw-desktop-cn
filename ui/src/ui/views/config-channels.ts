@@ -10,12 +10,6 @@ async function invoke<T = any>(cmd: string, args?: Record<string, unknown>): Pro
   throw new Error("Tauri invoke not available");
 }
 
-interface FeishuPluginStatus {
-  installed: boolean;
-  version: string | null;
-  plugin_name: string | null;
-}
-
 interface ChannelConfig {
   id: string;
   channel_type: string;
@@ -48,13 +42,19 @@ const iconChevronRight = html`<svg viewBox="0 0 24 24" width="16" height="16" fi
 const iconCheck = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
 const iconCheckCircle = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
 const iconXCircle = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`;
-const iconPackage = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`;
-const iconDownload = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`;
-const iconAlertTriangle = html`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
 const iconQrCode = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>`;
 const iconPlay = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
 const iconTrash2 = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
 const iconLoader2 = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
+const iconRefresh = html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>`;
+const iconUserCheck = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>`;
+
+interface PairingRequest {
+  code: string;
+  id?: string;
+  createdAt?: string;
+  meta?: Record<string, string>;
+}
 
 const channelInfo: Record<
   string,
@@ -515,6 +515,47 @@ export class OpenClawConfigChannels extends LitElement {
     .test-result-desc { font-size: 13px; color: var(--text, #e4e4e7); word-break: break-all; margin-top: 4px; }
     .test-result-err { font-size: 12px; color: var(--accent, #ff5c5c); font-family: monospace; white-space: pre-wrap; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; }
     .empty-state { text-align: center; color: var(--muted, #71717a); padding: 60px 20px; }
+
+    /* ── pairing section ── */
+    .pairing-list { display: flex; flex-direction: column; gap: 8px; }
+    .pairing-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--bg, #09090b);
+      border: 1px solid var(--border, #27272a);
+    }
+    .pairing-code {
+      font-family: monospace;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-strong, #fafafa);
+      letter-spacing: 0.05em;
+    }
+    .pairing-meta {
+      flex: 1;
+      font-size: 12px;
+      color: var(--muted, #71717a);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pairing-empty {
+      text-align: center;
+      color: var(--muted, #71717a);
+      font-size: 13px;
+      padding: 20px 0;
+    }
+    .pairing-input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .pairing-input-row input {
+      flex: 1;
+    }
   `;
 
   @state() private channels: ChannelConfig[] = [];
@@ -528,14 +569,17 @@ export class OpenClawConfigChannels extends LitElement {
   @state() private clearing = false;
   @state() private showClearConfirm = false;
 
-  @state() private feishuPluginStatus: FeishuPluginStatus | null = null;
-  @state() private feishuPluginLoading = false;
-  @state() private feishuPluginInstalling = false;
-
   @state() private visiblePasswords = new Set<string>();
+
+  @state() private pairingRequests: PairingRequest[] = [];
+  @state() private pairingLoading = false;
+  @state() private approveCode = '';
+  @state() private approveLoading = false;
+  @state() private approveResult: { success: boolean; message: string } | null = null;
 
   private _whatsappPollTimer: ReturnType<typeof setInterval> | null = null;
   private _whatsappTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private _pairingPollTimer: ReturnType<typeof setInterval> | null = null;
 
   override async connectedCallback() {
     super.connectedCallback();
@@ -551,6 +595,61 @@ export class OpenClawConfigChannels extends LitElement {
     if (this._whatsappTimeoutTimer) {
       clearTimeout(this._whatsappTimeoutTimer);
       this._whatsappTimeoutTimer = null;
+    }
+    this._stopPairingPoll();
+  }
+
+  private _stopPairingPoll() {
+    if (this._pairingPollTimer) {
+      clearInterval(this._pairingPollTimer);
+      this._pairingPollTimer = null;
+    }
+  }
+
+  private _startPairingPoll(channelId: string) {
+    this._stopPairingPoll();
+    this._fetchPairingRequests(channelId);
+    this._pairingPollTimer = setInterval(() => {
+      this._fetchPairingRequests(channelId);
+    }, 30000);
+  }
+
+  private async _fetchPairingRequests(channelId: string) {
+    this.pairingLoading = true;
+    try {
+      const result: PairingRequest[] = await invoke('list_pairing_requests', { channel: channelId });
+      // Guard against stale responses from a previously selected channel
+      if (this.selectedChannel !== channelId) return;
+      this.pairingRequests = result;
+    } catch (e) {
+      if (this.selectedChannel !== channelId) return;
+      console.error('获取配对请求失败:', e);
+      this.pairingRequests = [];
+    } finally {
+      if (this.selectedChannel === channelId) {
+        this.pairingLoading = false;
+      }
+    }
+  }
+
+  private async _handleApproveCode(channelId: string, code: string) {
+    if (!code.trim()) return;
+    this.approveLoading = true;
+    this.approveResult = null;
+    try {
+      const result: { success: boolean; message: string } = await invoke('approve_pairing_code', {
+        channel: channelId,
+        code: code.trim(),
+      });
+      this.approveResult = result;
+      if (result.success) {
+        this.approveCode = '';
+        this._fetchPairingRequests(channelId);
+      }
+    } catch (e) {
+      this.approveResult = { success: false, message: String(e) };
+    } finally {
+      this.approveLoading = false;
     }
   }
 
@@ -588,32 +687,6 @@ export class OpenClawConfigChannels extends LitElement {
       next.add(fieldKey);
     }
     this.visiblePasswords = next;
-  }
-
-  private async checkFeishuPlugin() {
-    this.feishuPluginLoading = true;
-    try {
-      const status: FeishuPluginStatus = await invoke('check_feishu_plugin');
-      this.feishuPluginStatus = status;
-    } catch (e) {
-      console.error('检查飞书插件失败:', e);
-      this.feishuPluginStatus = { installed: false, version: null, plugin_name: null };
-    } finally {
-      this.feishuPluginLoading = false;
-    }
-  }
-
-  private async handleInstallFeishuPlugin() {
-    this.feishuPluginInstalling = true;
-    try {
-      const result: string = await invoke('install_feishu_plugin');
-      alert(result);
-      await this.checkFeishuPlugin();
-    } catch (e) {
-      alert('安装失败: ' + e);
-    } finally {
-      this.feishuPluginInstalling = false;
-    }
   }
 
   private handleShowClearConfirm() {
@@ -741,7 +814,11 @@ export class OpenClawConfigChannels extends LitElement {
   private handleChannelSelect(channelId: string, channelList?: ChannelConfig[]) {
     this.selectedChannel = channelId;
     this.testResult = null;
-    
+    this.approveResult = null;
+    this.approveCode = '';
+    this.pairingRequests = [];
+    this._stopPairingPoll();
+
     const list = channelList || this.channels;
     const channel = list.find((c) => c.id === channelId);
     
@@ -767,9 +844,10 @@ export class OpenClawConfigChannels extends LitElement {
         });
       }
       this.configForm = form;
-      
-      if (channel.channel_type === 'feishu') {
-        this.checkFeishuPlugin();
+
+      // Start pairing poll if dmPolicy is 'pairing'
+      if (form.dmPolicy === 'pairing') {
+        this._startPairingPoll(channelId);
       }
     } else {
       this.configForm = {};
@@ -835,6 +913,17 @@ export class OpenClawConfigChannels extends LitElement {
   private handleSelectChange(e: Event, key: string) {
     const v = (e.target as HTMLSelectElement).value;
     this.configForm = { ...this.configForm, [key]: v };
+
+    // dmPolicy 切换时启动/停止配对轮询
+    if (key === 'dmPolicy' && this.selectedChannel) {
+      if (v === 'pairing') {
+        this._startPairingPoll(this.selectedChannel);
+      } else {
+        this._stopPairingPoll();
+        this.pairingRequests = [];
+        this.approveResult = null;
+      }
+    }
   }
 
   override render() {
@@ -896,33 +985,6 @@ export class OpenClawConfigChannels extends LitElement {
                 </div>
               </div>
 
-              <!-- Feishu specific plugins check -->
-              ${currentChannel.channel_type === 'feishu' ? html`
-                <div class="notice ${this.feishuPluginStatus?.installed ? 'success' : 'warn'}">
-                  <div class="notice-icon">
-                    ${this.feishuPluginLoading ? iconLoader2 : (this.feishuPluginStatus?.installed ? iconCheckCircle : iconAlertTriangle)}
-                  </div>
-                  <div style="flex: 1;">
-                    <div class="notice-title">
-                      ${this.feishuPluginLoading ? '检查状态中...' : (this.feishuPluginStatus?.installed ? '飞书插件已安装' : '需要安装飞书插件')}
-                    </div>
-                    <div class="notice-desc">
-                      ${this.feishuPluginStatus?.installed 
-                        ? (this.feishuPluginStatus.plugin_name || '@m1heng-clawd/feishu') + (this.feishuPluginStatus.version ? ` v${this.feishuPluginStatus.version}` : '') 
-                        : '无法独立收发消息，必须先在终端安装 @m1heng-clawd/feishu 插件。'}
-                    </div>
-                    ${!this.feishuPluginStatus?.installed ? html`
-                      <div class="btn-group" style="margin-top: 12px;">
-                        <button class="btn btn-secondary btn-sm" @click=${this.handleInstallFeishuPlugin} ?disabled=${this.feishuPluginInstalling}>
-                          ${this.feishuPluginInstalling ? iconLoader2 : iconDownload} 自动安装
-                        </button>
-                        <button class="btn btn-secondary btn-sm" @click=${this.checkFeishuPlugin} ?disabled=${this.feishuPluginLoading}>刷新状态</button>
-                      </div>
-                    ` : nothing}
-                  </div>
-                </div>
-              ` : nothing}
-
               <!-- Config form fields -->
               <div class="fields-container">
                 ${currentInfo.fields?.map((field: ChannelField) => html`
@@ -935,12 +997,11 @@ export class OpenClawConfigChannels extends LitElement {
                     
                     ${field.type === 'select' ? html`
                       <select
-                        .value=${this.configForm[field.key] || ''}
                         @change=${(e: Event) => this.handleSelectChange(e, field.key)}
                         class="input-base"
                       >
-                        <option value="">请选择...</option>
-                        ${field.options?.map(opt => html`<option value="${opt.value}">${opt.label}</option>`)}
+                        <option value="" ?selected=${!this.configForm[field.key]}>请选择...</option>
+                        ${field.options?.map(opt => html`<option value="${opt.value}" ?selected=${this.configForm[field.key] === opt.value}>${opt.label}</option>`)}
                       </select>
                     ` : field.type === 'password' ? html`
                       <div class="input-wrapper">
@@ -994,6 +1055,61 @@ export class OpenClawConfigChannels extends LitElement {
                       </button>
                     </div>
                   </div>
+                </div>
+              ` : nothing}
+
+              <!-- Pairing requests block (when dmPolicy is 'pairing') -->
+              ${this.configForm.dmPolicy === 'pairing' ? html`
+                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border, #27272a);">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                    ${iconUserCheck}
+                    <span style="font-size: 15px; font-weight: 600; color: var(--text-strong, #fafafa);">配对请求</span>
+                    <button class="btn btn-secondary btn-sm" style="margin-left: auto;" @click=${() => this._fetchPairingRequests(currentChannel.id)} ?disabled=${this.pairingLoading}>
+                      ${this.pairingLoading ? iconLoader2 : iconRefresh} 刷新
+                    </button>
+                  </div>
+
+                  ${this.pairingRequests.length > 0 ? html`
+                    <div class="pairing-list">
+                      ${this.pairingRequests.map(req => html`
+                        <div class="pairing-item">
+                          <span class="pairing-code">${req.code}</span>
+                          <span class="pairing-meta">
+                            ${req.id || '未知用户'}
+                            ${req.createdAt ? html` · ${req.createdAt}` : nothing}
+                          </span>
+                          <button class="btn btn-primary btn-sm" @click=${() => this._handleApproveCode(currentChannel.id, req.code)} ?disabled=${this.approveLoading}>
+                            ${iconCheck} 通过
+                          </button>
+                        </div>
+                      `)}
+                    </div>
+                  ` : html`
+                    <div class="pairing-empty">${this.pairingLoading ? '加载中...' : '暂无待审批的配对请求'}</div>
+                  `}
+
+                  <div class="pairing-input-row">
+                    <input
+                      type="text"
+                      class="input-base"
+                      placeholder="输入配对码（如 L2ZNDN2D）"
+                      .value=${this.approveCode}
+                      @input=${(e: Event) => { this.approveCode = (e.target as HTMLInputElement).value; }}
+                      @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._handleApproveCode(currentChannel.id, this.approveCode); }}
+                    />
+                    <button class="btn btn-primary btn-sm" @click=${() => this._handleApproveCode(currentChannel.id, this.approveCode)} ?disabled=${this.approveLoading || !this.approveCode.trim()}>
+                      ${this.approveLoading ? iconLoader2 : iconCheck} 通过
+                    </button>
+                  </div>
+
+                  ${this.approveResult ? html`
+                    <div class="test-result ${this.approveResult.success ? 'ok' : 'err'}" style="margin-top: 12px;">
+                      <div>${this.approveResult.success ? iconCheckCircle : iconXCircle}</div>
+                      <div style="flex: 1">
+                        <div class="test-result-title">${this.approveResult.message}</div>
+                      </div>
+                    </div>
+                  ` : nothing}
                 </div>
               ` : nothing}
 

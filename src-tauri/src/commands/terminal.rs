@@ -169,7 +169,7 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
 
     path_parts.insert(0, wrapper_dir.display().to_string());
 
-    // npm 全局安装前缀 → ~/.openclaw/npm-global（持久化，不受应用更新影响）
+    // npm 全局安装前缀 → ~/.openclawcn/npm-global（持久化，不受应用更新影响）
     if let Some(prefix) = crate::utils::shell::get_npm_global_prefix() {
         let _ = std::fs::create_dir_all(&prefix);
         cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
@@ -188,9 +188,11 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
 
     cmd.env("PATH", new_path);
 
-    // 传递 gateway token
+    // 传递 gateway token 和配置目录
     let token = crate::utils::shell::session_gateway_token();
     cmd.env("OPENCLAW_GATEWAY_TOKEN", token);
+    cmd.env("OPENCLAW_DESKTOP", "1");
+    cmd.env("OPENCLAW_STATE_DIR", crate::utils::platform::get_config_dir());
 
     // 在 slave 端启动子进程
     let child = pair.slave.spawn_command(cmd)

@@ -320,7 +320,7 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                         success: false,
                         channel: channel_type.clone(),
                         message: format!("{} 未配置", channel_type),
-                        error: Some(format!("请运行: openclaw channels add --channel {}", channel_lower)),
+                        error: Some(format!("请先在消息渠道设置中配置 {} 的凭据并保存，然后重启 Gateway", channel_type)),
                     });
                 }
                 
@@ -364,7 +364,7 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
     if !channel_ok {
         info!("[渠道测试] {} 状态检查失败，不发送测试消息", channel_type);
         let error_msg = if debug_info.is_empty() {
-            "渠道未运行或未配置".to_string()
+            "请先在消息渠道设置中配置凭据并保存，然后重启 Gateway".to_string()
         } else {
             debug_info
         };
@@ -566,7 +566,7 @@ python3 << 'PYEOF'
 import json
 import os
 
-config_path = os.path.expanduser("~/.openclaw/openclaw.json")
+config_path = os.path.expanduser("~/.openclawcn/openclaw.json")
 plugin_id = "whatsapp"
 
 try:
