@@ -34,7 +34,9 @@ const channelIcons = {
   imessage: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>`,
   whatsapp: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>`,
   wechat: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`,
+  wecom: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`,
   dingtalk: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
+  qqbot: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="10" r="1.25"/><circle cx="15" cy="10" r="1.25"/></svg>`,
   default: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
 };
 
@@ -181,15 +183,59 @@ const channelInfo: Record<
     ],
     helpText: '微信公众号/企业微信',
   },
+  wecom: {
+    name: '企业微信',
+    icon: channelIcons.wecom,
+    theme: 'green',
+    fields: [
+      { key: 'token', label: 'Token', type: 'password', placeholder: '企业微信 AI Bot 回调 Token' },
+      { key: 'encodingAesKey', label: 'EncodingAESKey', type: 'password', placeholder: '企业微信消息加密密钥 (43位)' },
+    ],
+    helpText: '企业微信 AI Bot，使用回调模式接收消息',
+  },
   dingtalk: {
     name: '钉钉',
     icon: channelIcons.dingtalk,
     theme: 'blue',
     fields: [
-      { key: 'appKey', label: 'App Key', type: 'text', placeholder: '钉钉应用 App Key' },
-      { key: 'appSecret', label: 'App Secret', type: 'password', placeholder: '钉钉应用 App Secret' },
+      { key: 'clientId', label: 'Client ID', type: 'text', placeholder: '钉钉应用 AppKey (Client ID)' },
+      { key: 'clientSecret', label: 'Client Secret', type: 'password', placeholder: '钉钉应用 AppSecret (Client Secret)' },
+      { key: 'robotCode', label: '机器人编码', type: 'text', placeholder: '可选，用于媒体下载' },
+      { key: 'corpId', label: '企业 ID', type: 'text', placeholder: '可选，企业 Corp ID' },
+      { key: 'messageType', label: '消息类型', type: 'select', options: [
+        { value: 'markdown', label: 'Markdown' },
+        { value: 'card', label: 'AI 卡片' },
+      ]},
+      { key: 'dmPolicy', label: '私聊策略', type: 'select', options: [
+        { value: 'open', label: '开放' },
+        { value: 'pairing', label: '配对' },
+        { value: 'allowlist', label: '白名单' },
+      ]},
+      { key: 'groupPolicy', label: '群聊策略', type: 'select', options: [
+        { value: 'open', label: '开放' },
+        { value: 'allowlist', label: '白名单' },
+      ]},
     ],
-    helpText: '钉钉机器人凭据',
+    helpText: '钉钉企业内部机器人，使用 Stream 模式，无需公网 IP',
+  },
+  qqbot: {
+    name: 'QQ',
+    icon: channelIcons.qqbot,
+    theme: 'blue',
+    fields: [
+      { key: 'appId', label: 'App ID', type: 'text', placeholder: 'QQ 开放平台 AppID' },
+      { key: 'clientSecret', label: 'App Secret', type: 'password', placeholder: 'QQ 开放平台 AppSecret' },
+      { key: 'markdownSupport', label: 'Markdown 消息', type: 'select', options: [
+        { value: 'false', label: '关闭' },
+        { value: 'true', label: '开启 (需要平台权限)' },
+      ]},
+      { key: 'dmPolicy', label: '私聊策略', type: 'select', options: [
+        { value: 'open', label: '开放' },
+        { value: 'pairing', label: '配对' },
+        { value: 'allowlist', label: '白名单' },
+      ]},
+    ],
+    helpText: 'QQ 官方机器人，使用 WebSocket 连接，无需公网 IP',
   },
 };
 

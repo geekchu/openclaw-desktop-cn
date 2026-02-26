@@ -161,6 +161,9 @@ export function applySettingsFromUrl(host: SettingsHost) {
   if (!shouldCleanUrl) {
     return;
   }
+  if (_isDesktopWebView) {
+    return; // WebView2 treats replaceState URL changes as navigation, causing flicker
+  }
   url.search = params.toString();
   const nextHash = hashParams.toString();
   url.hash = nextHash ? `#${nextHash}` : "";

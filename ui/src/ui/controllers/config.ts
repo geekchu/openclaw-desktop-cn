@@ -80,25 +80,39 @@ export function applyConfigSchema(state: ConfigState, res: ConfigSchemaResponse)
 
 export function applyConfigSnapshot(state: ConfigState, snapshot: ConfigSnapshot) {
   state.configSnapshot = snapshot;
-  const rawFromSnapshot =
-    typeof snapshot.raw === "string"
-      ? snapshot.raw
-      : snapshot.config && typeof snapshot.config === "object"
-        ? serializeConfigForm(snapshot.config)
-        : state.configRaw;
-  if (!state.configFormDirty || state.configFormMode === "raw") {
-    state.configRaw = rawFromSnapshot;
-  } else if (state.configForm) {
-    state.configRaw = serializeConfigForm(state.configForm);
-  } else {
+
+  let rawFromSnapshot: string;
+  try {
+    rawFromSnapshot =
+      typeof snapshot.raw === "string"
+        ? snapshot.raw
+        : snapshot.config && typeof snapshot.config === "object"
+          ? serializeConfigForm(snapshot.config)
+          : state.configRaw;
+  } catch {
+    rawFromSnapshot = state.configRaw || "{}\n";
+  }
+
+  try {
+    if (!state.configFormDirty || state.configFormMode === "raw") {
+      state.configRaw = rawFromSnapshot;
+    } else if (state.configForm) {
+      state.configRaw = serializeConfigForm(state.configForm);
+    } else {
+      state.configRaw = rawFromSnapshot;
+    }
+  } catch {
     state.configRaw = rawFromSnapshot;
   }
+
   state.configValid = typeof snapshot.valid === "boolean" ? snapshot.valid : null;
   state.configIssues = Array.isArray(snapshot.issues) ? snapshot.issues : [];
 
   if (!state.configFormDirty) {
-    state.configForm = cloneConfigObject(snapshot.config ?? {});
-    state.configFormOriginal = cloneConfigObject(snapshot.config ?? {});
+    // Use the config object directly if cloning fails — better than leaving configForm null
+    const cfg = snapshot.config ?? {};
+    state.configForm = cloneConfigObject(cfg);
+    state.configFormOriginal = cloneConfigObject(cfg);
     state.configRawOriginal = rawFromSnapshot;
   }
 

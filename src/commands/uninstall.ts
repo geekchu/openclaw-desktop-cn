@@ -98,6 +98,12 @@ async function removeMacApp(runtime: RuntimeEnv, dryRun?: boolean) {
 }
 
 export async function uninstallCommand(runtime: RuntimeEnv, opts: UninstallOptions) {
+  if (process.env.OPENCLAW_DESKTOP === "1") {
+    runtime.error("桌面版不支持 uninstall 命令，请通过系统卸载。");
+    runtime.exit(1);
+    return;
+  }
+
   const { scopes, hadExplicit } = buildScopeSelection(opts);
   const interactive = !opts.nonInteractive;
   if (!interactive && !opts.yes) {

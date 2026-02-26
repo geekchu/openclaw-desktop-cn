@@ -70,6 +70,7 @@ export class SystemSettingsView extends LitElement {
   @state() private updateProgress = 0;
   @state() private updateError = "";
   @state() private updateDone = false;
+  @state() private updateInstalled = false;
   private _updateRid: number | null = null;
 
   /* ── lifecycle ── */
@@ -1006,11 +1007,19 @@ export class SystemSettingsView extends LitElement {
   /* ── Update card ── */
 
   private async _handleCheckUpdate() {
+    // 释放旧的更新资源
+    if (this._updateRid != null) {
+      try {
+        const t = (window as any).__TAURI__;
+        await t?.core?.invoke("plugin:updater|close", { rid: this._updateRid });
+      } catch { /* ignore */ }
+    }
+    this._updateRid = null;
     this.updateChecking = true;
     this.updateError = "";
     this.updateAvailable = false;
     this.updateDone = false;
-    this._updateRid = null;
+    this.updateInstalled = false;
     try {
       const result = await checkForUpdate();
       if (result) {
@@ -1040,11 +1049,18 @@ export class SystemSettingsView extends LitElement {
       await downloadAndInstallUpdate(this._updateRid, (percent) => {
         this.updateProgress = percent;
       });
-      // downloadAndInstallUpdate 内部会调用 restart
+      // 安装完成，显示重启按钮
+      this.updateInstalled = true;
+      this.updateDownloading = false;
     } catch (e: any) {
       this.updateError = String(e?.message || e);
       this.updateDownloading = false;
     }
+  }
+
+  private _handleRestart() {
+    const t = (window as any).__TAURI__;
+    t?.core?.invoke("plugin:process|restart");
   }
 
   private _renderUpdateCard() {
@@ -1058,7 +1074,14 @@ export class SystemSettingsView extends LitElement {
           </div>
         </div>
 
-        ${this.updateDownloading ? html`
+        ${this.updateInstalled ? html`
+          <div class="update-row">
+            <div class="update-info">
+              <div class="toggle-text-primary">✅ 更新已下载完成，重启后生效</div>
+            </div>
+            <button class="btn-primary" @click=${this._handleRestart}>重启应用</button>
+          </div>
+        ` : this.updateDownloading ? html`
           <div class="update-row">
             <div class="update-info">
               <div class="toggle-text-primary">正在下载 v${this.updateVersion}...</div>

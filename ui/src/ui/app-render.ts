@@ -97,17 +97,19 @@ export function renderApp(state: AppViewState) {
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const configValue =
     state.configForm ?? (state.configSnapshot?.config as Record<string, unknown> | null);
-    
+
   const agentsDefaults = configValue?.agents as Record<string, unknown> | undefined;
   const agentsModelDefaults = agentsDefaults?.defaults as Record<string, unknown> | undefined;
   const modelDefaults = agentsModelDefaults?.model as Record<string, unknown> | undefined;
   const primaryModel = modelDefaults?.primary as string | undefined;
 
-  let chatDisabledReason: string | import("lit").TemplateResult | null = state.connected 
-    ? null 
+  let chatDisabledReason: string | import("lit").TemplateResult | null = state.connected
+    ? null
     : "Disconnected from gateway.";
-    
-  if (state.connected && !primaryModel && !state.configLoading) {
+
+  // 仅在配置已成功加载且确认无主模型时才提示；
+  // 如果配置加载失败（lastError）或尚未加载（configSnapshot 为 null），不显示此提示
+  if (state.connected && !primaryModel && !state.configLoading && !state.lastError && state.configSnapshot) {
     chatDisabledReason = html`
       尚未配置大模型。请前往
       <a href="#" @click=${(e: Event) => { e.preventDefault(); state.configActiveSection = "onestop"; state.setTab("config"); }}>AI大模型接入页</a>
@@ -924,13 +926,14 @@ export function renderApp(state: AppViewState) {
                   activeCategory: state.onestopActiveCategory,
                   saving: state.onestopSaving,
                   onApiKeyChange: (value) => { state.onestopApiKey = value; },
-                  onModelSelect: (modelId) => { state.onestopSelectedModel = modelId; },
+                  onModelSelect: (modelId) => { state.onestopSelectedModel = modelId; void loadConfig(state); },
                   onToggleShowApiKey: () => { state.onestopShowApiKey = !state.onestopShowApiKey; },
                   onCategoryChange: (cat) => { state.onestopActiveCategory = cat; },
                   onSave: async () => {
                     state.onestopSaving = true;
                     try {
                       await saveOnestopConfig(state.onestopApiKey, state.onestopSelectedModel);
+                      void loadConfig(state);
                     } catch (e) {
                       console.error("一站式保存失败:", e);
                     } finally {

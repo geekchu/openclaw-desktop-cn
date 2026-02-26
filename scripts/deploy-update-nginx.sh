@@ -15,14 +15,14 @@ else
     # ── OpenClaw Auto-Update static files ──
     location /update/ {
         alias /var/www/openclaw-update/;
-        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Origin "https://tauri.localhost" always;
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         default_type application/octet-stream;
     }
 
     location = /update/latest.json {
         alias /var/www/openclaw-update/latest.json;
-        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Origin "https://tauri.localhost" always;
         add_header Cache-Control "no-cache" always;
         default_type application/json;
     }

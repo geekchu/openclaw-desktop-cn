@@ -53,6 +53,12 @@ async function stopGatewayIfRunning(runtime: RuntimeEnv) {
 }
 
 export async function resetCommand(runtime: RuntimeEnv, opts: ResetOptions) {
+  if (process.env.OPENCLAW_DESKTOP === "1") {
+    runtime.error("桌面版不支持 reset 命令。");
+    runtime.exit(1);
+    return;
+  }
+
   const interactive = !opts.nonInteractive;
   if (!interactive && !opts.yes) {
     runtime.error("Non-interactive mode requires --yes.");

@@ -1,12 +1,26 @@
 export function cloneConfigObject<T>(value: T): T {
-  if (typeof structuredClone === "function") {
-    return structuredClone(value);
+  try {
+    if (typeof structuredClone === "function") {
+      return structuredClone(value);
+    }
+    return JSON.parse(JSON.stringify(value)) as T;
+  } catch {
+    // Fallback: return the original value if cloning fails (e.g. RangeError on huge objects)
+    return value;
   }
-  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 export function serializeConfigForm(form: Record<string, unknown>): string {
-  return `${JSON.stringify(form, null, 2).trimEnd()}\n`;
+  try {
+    return `${JSON.stringify(form, null, 2).trimEnd()}\n`;
+  } catch {
+    // Fallback: compact serialization if pretty-print exceeds string length limit
+    try {
+      return `${JSON.stringify(form)}\n`;
+    } catch {
+      return "{}\n";
+    }
+  }
 }
 
 export function setPathValue(

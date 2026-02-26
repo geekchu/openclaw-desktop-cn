@@ -445,6 +445,12 @@ async function maybeRestartService(params: {
 }
 
 export async function updateCommand(opts: UpdateCommandOptions): Promise<void> {
+  if (process.env.OPENCLAW_DESKTOP === "1") {
+    defaultRuntime.error("桌面版不支持 update 命令，请通过应用内更新。");
+    defaultRuntime.exit(1);
+    return;
+  }
+
   suppressDeprecations();
 
   const timeoutMs = opts.timeout ? Number.parseInt(opts.timeout, 10) * 1000 : undefined;

@@ -118,8 +118,24 @@ async function doUpdate(version: string) {
       rid: _updateRid,
     });
 
-    // 安装完成，重启
-    await tauri.core.invoke("plugin:process|restart");
+    // 安装完成，显示重启确认（而非直接重启）
+    const banner = ensureBanner();
+    banner.innerHTML = `
+      <div class="update-banner__content">
+        <span class="update-banner__icon">✅</span>
+        <span>更新已下载完成，重启后生效</span>
+        <button class="update-banner__btn" id="update-restart-btn">立即重启</button>
+        <button class="update-banner__dismiss" id="update-restart-later" title="稍后重启">稍后</button>
+      </div>
+    `;
+    banner.style.display = "";
+    banner.classList.remove("update-banner--downloading");
+    document.getElementById("update-restart-btn")?.addEventListener("click", () => {
+      tauri.core.invoke("plugin:process|restart");
+    });
+    document.getElementById("update-restart-later")?.addEventListener("click", () => {
+      banner.style.display = "none";
+    });
   } catch (e: any) {
     console.error("[Updater] 更新失败:", e);
     showError(String(e?.message || e));
@@ -189,9 +205,7 @@ export async function downloadAndInstallUpdate(
     onEvent: channel,
     rid,
   });
-
-  // 安装完成，重启
-  await tauri.core.invoke("plugin:process|restart");
+  // 安装完成，不自动重启 — 让调用方决定何时重启
 }
 
 /**
@@ -208,11 +222,22 @@ export function initAutoUpdater() {
     return;
   }
 
-  setTimeout(async () => {
+  const CHECK_INTERVAL = 4 * 60 * 60 * 1000; // 4 小时
+  const RETRY_DELAY = 30 * 60 * 1000;         // 30 分钟
+  let _retried = false;
+
+  async function doCheck() {
     try {
       console.log("[Updater] 正在检查更新...");
-      const update = await checkForUpdate();
+      // 释放旧的更新资源
+      if (_updateRid != null) {
+        try {
+          await tauri.core.invoke("plugin:updater|close", { rid: _updateRid });
+        } catch { /* ignore */ }
+        _updateRid = null;
+      }
 
+      const update = await checkForUpdate();
       if (update) {
         console.log(`[Updater] 发现新版本: ${update.version}`);
         _updateRid = update.rid;
@@ -220,9 +245,26 @@ export function initAutoUpdater() {
       } else {
         console.log("[Updater] 当前已是最新版本");
       }
+      _retried = false; // 成功后重置重试标记
     } catch (e: any) {
-      // 检查失败时静默忽略（可能是网络问题或服务器未就绪）
       console.warn("[Updater] 检查更新失败:", e);
+      // 失败后 30 分钟重试一次（仅一次）
+      if (!_retried) {
+        _retried = true;
+        setTimeout(doCheck, RETRY_DELAY);
+        return;
+      }
+      _retried = false;
     }
-  }, 5000);
+    setTimeout(doCheck, CHECK_INTERVAL);
+  }
+
+  // 延迟首次检查，避免与页面初始化渲染竞争
+  setTimeout(() => {
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(() => doCheck(), { timeout: 30000 });
+    } else {
+      doCheck();
+    }
+  }, 15000);
 }

@@ -19,13 +19,13 @@ cat > /etc/nginx/conf.d/openclaw-update.conf << 'EOF'
 # OpenClaw 自动更新文件服务
 location /update/ {
     alias /var/www/openclaw-update/;
-    add_header Access-Control-Allow-Origin *;
+    add_header Access-Control-Allow-Origin "https://tauri.localhost";
     add_header Cache-Control "no-cache, no-store, must-revalidate";
 
     # 允许 latest.json 不被缓存
     location = /update/latest.json {
         alias /var/www/openclaw-update/latest.json;
-        add_header Access-Control-Allow-Origin *;
+        add_header Access-Control-Allow-Origin "https://tauri.localhost";
         add_header Cache-Control "no-cache";
         default_type application/json;
     }

@@ -10,6 +10,8 @@
 
 set -euo pipefail
 
+command -v jq >/dev/null 2>&1 || { echo "❌ 需要安装 jq"; exit 1; }
+
 VERSION="${1:?用法: $0 <版本号> <用户@服务器>}"
 SERVER="${2:?用法: $0 <版本号> <用户@服务器>}"
 REMOTE_DIR="/var/www/openclaw-update"
@@ -73,31 +75,27 @@ fi
 PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # 构建 platforms JSON
-PLATFORMS_JSON="{"
-FIRST=true
+PLATFORMS_JSON="{}"
 for PLATFORM in "${!PLATFORMS[@]}"; do
   FILE="${PLATFORMS[$PLATFORM]}"
   SIG="${SIGS[$PLATFORM]}"
   FILENAME=$(basename "$FILE")
   URL="https://api.openclawcn.net/update/artifacts/${FILENAME}"
-
-  if [ "$FIRST" = true ]; then
-    FIRST=false
-  else
-    PLATFORMS_JSON+=","
-  fi
-  PLATFORMS_JSON+="\"${PLATFORM}\":{\"url\":\"${URL}\",\"signature\":\"${SIG}\"}"
+  PLATFORMS_JSON=$(echo "$PLATFORMS_JSON" | jq \
+    --arg p "$PLATFORM" \
+    --arg url "$URL" \
+    --arg sig "$SIG" \
+    '.[$p] = {"url": $url, "signature": $sig}')
 done
-PLATFORMS_JSON+="}"
 
-cat > "$TEMP_JSON" << EOF
-{
-  "version": "${VERSION}",
-  "notes": "OpenClaw v${VERSION} 更新",
-  "pub_date": "${PUB_DATE}",
-  "platforms": ${PLATFORMS_JSON}
-}
-EOF
+# 构建完整 latest.json
+jq -n \
+  --arg ver "$VERSION" \
+  --arg notes "OpenClaw v${VERSION} 更新" \
+  --arg date "$PUB_DATE" \
+  --argjson platforms "$PLATFORMS_JSON" \
+  '{version: $ver, notes: $notes, pub_date: $date, platforms: $platforms}' \
+  > "$TEMP_JSON"
 
 echo ""
 echo "📄 latest.json:"

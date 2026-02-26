@@ -31,16 +31,18 @@ const PRICING_URL = "https://api.openclawcn.net/pricing";
  * Uses a single get_config → modify → save_config cycle to minimize file writes.
  */
 export async function saveOnestopConfig(apiKey: string, selectedModel: string): Promise<void> {
-  // 始终将所有已知模型保存到 provider 配置中，确保 gateway 能识别所有模型
-  let modelsToSave: OnestopModel[] = [..._cachedModels];
-  if (modelsToSave.length === 0 && selectedModel) {
-    // 如果缓存为空，尝试只保存选中的模型（fallback）
-    modelsToSave = [{
-      id: selectedModel,
-      name: formatModelName(selectedModel),
-      provider: inferProvider(selectedModel).name,
-      providerKey: inferProvider(selectedModel).key,
-    }];
+  // 只保存选中的模型到配置，不保存全部缓存模型（避免配置膨胀）
+  let modelsToSave: OnestopModel[] = [];
+  if (selectedModel) {
+    const found = _cachedModels.find(m => m.id === selectedModel);
+    modelsToSave = found
+      ? [found]
+      : [{
+          id: selectedModel,
+          name: formatModelName(selectedModel),
+          provider: inferProvider(selectedModel).name,
+          providerKey: inferProvider(selectedModel).key,
+        }];
   }
 
   // 单次原子写入：get_config → 修改全部字段 → save_config
