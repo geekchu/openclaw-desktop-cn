@@ -49,6 +49,19 @@ export function shouldSpawnWithShell(params: {
   return false;
 }
 
+/**
+ * Escape a single argument for cmd.exe when using `shell: true`.
+ * Wraps in double quotes if the arg contains spaces or shell metacharacters,
+ * and escapes inner double quotes with backslash.
+ */
+function escapeShellArg(arg: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (!/[ "&|<>^%]/.test(arg)) {
+    return arg;
+  }
+  return `"${arg.replace(/"/g, '\\"')}"`;
+}
+
 // Simple promise-wrapped execFile with optional verbosity logging.
 export async function runExec(
   command: string,
@@ -137,15 +150,23 @@ export async function runCommandWithTimeout(
 
   const stdio = resolveCommandStdio({ hasInput, preferInherit: true });
   const resolvedCommand = resolveCommand(argv[0] ?? "");
-  const child = spawn(resolvedCommand, argv.slice(1), {
-    stdio,
-    cwd,
-    env: resolvedEnv,
-    windowsVerbatimArguments,
-    ...(shouldSpawnWithShell({ resolvedCommand, platform: process.platform })
-      ? { shell: true }
-      : {}),
-  });
+  const useShell = shouldSpawnWithShell({ resolvedCommand, platform: process.platform });
+  // DEP0190 (Node 22+): passing args array with shell: true triggers a deprecation
+  // warning. When shell is needed (.cmd/.bat on Windows), join into a single string.
+  const child = useShell
+    ? spawn([resolvedCommand, ...argv.slice(1).map(escapeShellArg)].join(" "), [], {
+        stdio,
+        cwd,
+        env: resolvedEnv,
+        windowsVerbatimArguments,
+        shell: true,
+      })
+    : spawn(resolvedCommand, argv.slice(1), {
+        stdio,
+        cwd,
+        env: resolvedEnv,
+        windowsVerbatimArguments,
+      });
   // Spawn with inherited stdin (TTY) so tools like `pi` stay interactive when needed.
   return await new Promise((resolve, reject) => {
     let stdout = "";

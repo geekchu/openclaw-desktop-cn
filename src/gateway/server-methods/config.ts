@@ -269,9 +269,25 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const snapshot = await readConfigFileSnapshot();
-    const schema = loadSchemaWithPlugins();
-    respond(true, redactConfigSnapshot(snapshot, schema.uiHints), undefined);
+    try {
+      const snapshot = await readConfigFileSnapshot();
+      const schema = loadSchemaWithPlugins();
+      const redacted = redactConfigSnapshot(snapshot, schema.uiHints);
+      // Strip server-only fields that the UI never reads.
+      // `parsed` and `resolved` are redundant copies of the config data that
+      // inflate the payload and can push JSON.stringify past V8's string limit.
+      const { parsed: _p, resolved: _r, ...slim } = redacted;
+      respond(true, slim, undefined);
+    } catch (err) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.UNAVAILABLE,
+          `config.get failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }
   },
   "config.schema": ({ params, respond }) => {
     if (!validateConfigSchemaParams(params)) {
@@ -285,7 +301,18 @@ export const configHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    respond(true, loadSchemaWithPlugins(), undefined);
+    try {
+      respond(true, loadSchemaWithPlugins(), undefined);
+    } catch (err) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.UNAVAILABLE,
+          `config.schema failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }
   },
   "config.set": async ({ params, respond }) => {
     if (!validateConfigSetParams(params)) {

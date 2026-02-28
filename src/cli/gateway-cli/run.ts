@@ -54,6 +54,11 @@ type GatewayRunOpts = {
 const gatewayLog = createSubsystemLogger("gateway");
 
 async function runGatewayCommand(opts: GatewayRunOpts) {
+  if (process.env.OPENCLAW_DESKTOP === "1") {
+    defaultRuntime.error("Gateway is managed by the desktop app. Manual startup is not needed.");
+    defaultRuntime.exit(1);
+    return;
+  }
   const isDevProfile = process.env.OPENCLAW_PROFILE?.trim().toLowerCase() === "dev";
   const devMode = Boolean(opts.dev) || isDevProfile;
   if (opts.reset && !devMode) {

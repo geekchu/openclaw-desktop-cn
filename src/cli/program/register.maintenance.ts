@@ -49,6 +49,10 @@ export function registerMaintenanceCommands(program: Command) {
     )
     .option("--no-open", "Print URL but do not launch a browser", false)
     .action(async (opts) => {
+      if (process.env.OPENCLAW_DESKTOP === "1") {
+        defaultRuntime.log("Dashboard is already available in the desktop app.");
+        return;
+      }
       await runCommandWithRuntime(defaultRuntime, async () => {
         await dashboardCommand(defaultRuntime, {
           noOpen: Boolean(opts.noOpen),

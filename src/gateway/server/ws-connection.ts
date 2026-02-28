@@ -153,8 +153,12 @@ export function attachGatewayWsConnectionHandler(params: {
     const send = (obj: unknown) => {
       try {
         socket.send(JSON.stringify(obj));
-      } catch {
-        /* ignore */
+      } catch (err) {
+        try {
+          logGateway.warn(`ws send failed: ${err instanceof Error ? err.message : String(err)}`);
+        } catch {
+          /* ignore logging failures */
+        }
       }
     };
 

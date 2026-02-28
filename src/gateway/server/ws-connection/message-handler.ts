@@ -968,7 +968,7 @@ export function attachGatewayWsMessageHandler(params: {
           context: buildRequestContext(),
         });
       })().catch((err) => {
-        logGateway.error(`request handler failed: ${formatForLog(err)}`);
+        logGateway.error(`request handler failed: method=${req.method} ${formatForLog(err)}`);
         respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(err)));
       });
     } catch (err) {

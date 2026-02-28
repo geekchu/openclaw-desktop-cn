@@ -78,7 +78,40 @@ export function readSessionMessages(
     return [];
   }
 
-  const lines = fs.readFileSync(filePath, "utf-8").split(/\r?\n/);
+  // V8 has a max string length of ~256 MB. Guard against transcript files that
+  // would exceed this limit by reading only the tail when the file is too large.
+  const MAX_TRANSCRIPT_READ_BYTES = 200 * 1024 * 1024;
+  let rawContent: string;
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(filePath);
+  } catch {
+    return [];
+  }
+  if (stat.size > MAX_TRANSCRIPT_READ_BYTES) {
+    let fd: number | null = null;
+    try {
+      fd = fs.openSync(filePath, "r");
+      const readStart = stat.size - MAX_TRANSCRIPT_READ_BYTES;
+      const buf = Buffer.alloc(MAX_TRANSCRIPT_READ_BYTES);
+      const bytesRead = fs.readSync(fd, buf, 0, MAX_TRANSCRIPT_READ_BYTES, readStart);
+      rawContent = buf.toString("utf-8", 0, bytesRead);
+    } catch {
+      return [];
+    } finally {
+      if (fd !== null) {
+        try {
+          fs.closeSync(fd);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } else {
+    rawContent = fs.readFileSync(filePath, "utf-8");
+  }
+
+  const lines = rawContent.split(/\r?\n/);
   const messages: unknown[] = [];
   for (const line of lines) {
     if (!line.trim()) {
