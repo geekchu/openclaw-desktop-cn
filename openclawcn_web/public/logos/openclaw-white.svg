@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff"/>
+      <stop offset="100%" stop-color="#ffe0d0"/>
+    </linearGradient>
+  </defs>
+  <!-- body -->
+  <ellipse cx="32" cy="34" rx="10" ry="14" fill="url(#lg)"/>
+  <!-- tail -->
+  <path d="M26 46q-2 6 0 10l6 2l6-2q2-4 0-10" fill="#ffe0d0"/>
+  <path d="M28 56l4 4l4-4" fill="#fff"/>
+  <!-- head -->
+  <ellipse cx="32" cy="22" rx="8" ry="6" fill="url(#lg)"/>
+  <!-- eyes -->
+  <circle cx="28" cy="20" r="2" fill="#ff6b35"/>
+  <circle cx="36" cy="20" r="2" fill="#ff6b35"/>
+  <circle cx="28.5" cy="20" r="1" fill="#fff"/>
+  <circle cx="36.5" cy="20" r="1" fill="#fff"/>
+  <!-- antennae -->
+  <path d="M28 17Q22 8 16 4" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M36 17Q42 8 48 4" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="15" cy="3.5" r="2" fill="#ffe0d0"/>
+  <circle cx="49" cy="3.5" r="2" fill="#ffe0d0"/>
+  <!-- claws left -->
+  <path d="M22 28Q14 22 10 18" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M10 18Q6 14 4 16Q2 18 6 20Q3 22 5 24Q7 26 10 22L10 18Z" fill="url(#lg)"/>
+  <!-- claws right -->
+  <path d="M42 28Q50 22 54 18" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M54 18Q58 14 60 16Q62 18 58 20Q61 22 59 24Q57 26 54 22L54 18Z" fill="url(#lg)"/>
+  <!-- legs -->
+  <path d="M24 34Q18 36 14 38" stroke="#ffe0d0" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M24 38Q18 40 14 44" stroke="#ffe0d0" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M40 34Q46 36 50 38" stroke="#ffe0d0" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M40 38Q46 40 50 44" stroke="#ffe0d0" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

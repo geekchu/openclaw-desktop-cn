@@ -1,8 +1,8 @@
 #!/bin/bash
-# Deploy update location block to api.openclawcn.net Nginx config
+# Deploy update location block to openclawcn.net Nginx config
 set -euo pipefail
 
-CONF="/etc/nginx/sites-available/api.openclawcn.net"
+CONF="/etc/nginx/sites-available/openclawcn.net"
 
 # Check if /update/ location already exists
 if grep -q 'location /update/' "$CONF" 2>/dev/null; then
@@ -15,14 +15,14 @@ else
     # ── OpenClaw Auto-Update static files ──
     location /update/ {
         alias /var/www/openclaw-update/;
-        add_header Access-Control-Allow-Origin "https://tauri.localhost" always;
+        add_header Access-Control-Allow-Origin "*" always;
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         default_type application/octet-stream;
     }
 
     location = /update/latest.json {
         alias /var/www/openclaw-update/latest.json;
-        add_header Access-Control-Allow-Origin "https://tauri.localhost" always;
+        add_header Access-Control-Allow-Origin "*" always;
         add_header Cache-Control "no-cache" always;
         default_type application/json;
     }
@@ -36,10 +36,7 @@ BLOCK
     exit 1
   fi
 
-  # Insert our block before that line
-  sed -i "${LAST_LOC}r $TMPF" "$CONF"
-  # Actually we need to insert BEFORE, so use a different approach
-  # Re-do: use head/tail
+  # Insert our block before the last "location / {" line
   head -n $((LAST_LOC - 1)) "$CONF" > "${CONF}.new"
   cat "$TMPF" >> "${CONF}.new"
   tail -n +${LAST_LOC} "$CONF" >> "${CONF}.new"

@@ -5,7 +5,7 @@
 #
 # 前提条件:
 # 1. 已完成 `cargo tauri build`（且设置了 TAURI_SIGNING_PRIVATE_KEY 环境变量）
-# 2. 服务器已通过 setup-update-server.sh 初始化
+# 2. 服务器已通过 setup-update-server.sh + deploy-update-nginx.sh 初始化
 # 3. 本机已配置 SSH 密钥登录
 
 set -euo pipefail
@@ -45,11 +45,10 @@ if [ -d "$MACOS_DIR" ]; then
   MAC_SIG="${MAC_FILE}.sig"
   if [ -f "$MAC_FILE" ] && [ -f "$MAC_SIG" ]; then
     SIG_CONTENT=$(cat "$MAC_SIG")
-    PLATFORMS["darwin-x86_64"]="$MAC_FILE"
-    SIGS["darwin-x86_64"]="$SIG_CONTENT"
+    # Apple Silicon (aarch64) — 默认架构
     PLATFORMS["darwin-aarch64"]="$MAC_FILE"
     SIGS["darwin-aarch64"]="$SIG_CONTENT"
-    echo "  ✅ macOS: $(basename "$MAC_FILE")"
+    echo "  ✅ macOS (aarch64): $(basename "$MAC_FILE")"
   fi
 fi
 
@@ -70,17 +69,33 @@ if [ ${#PLATFORMS[@]} -eq 0 ]; then
   exit 1
 fi
 
-# ── 生成 latest.json ──
+# ── 生成 latest.json（合并已有的其他平台条目） ──
 
 PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+UPDATE_URL="https://openclawcn.net/update/latest.json"
 
-# 构建 platforms JSON
-PLATFORMS_JSON="{}"
+# 尝试获取服务器上现有的 latest.json，合并其他平台的条目
+EXISTING_JSON=""
+EXISTING_PLATFORMS="{}"
+if EXISTING_JSON=$(curl -sf "$UPDATE_URL" 2>/dev/null); then
+  EXISTING_VER=$(echo "$EXISTING_JSON" | jq -r '.version // ""')
+  if [ "$EXISTING_VER" = "$VERSION" ]; then
+    EXISTING_PLATFORMS=$(echo "$EXISTING_JSON" | jq '.platforms // {}')
+    echo "ℹ 服务器上已有 v${VERSION} 的 latest.json，将合并平台条目"
+  else
+    echo "ℹ 服务器上版本为 v${EXISTING_VER}，将创建全新的 latest.json"
+  fi
+else
+  echo "ℹ 无法获取服务器上的 latest.json，将创建全新文件"
+fi
+
+# 以现有 platforms 为基础，用本次构建的条目覆盖对应 key
+PLATFORMS_JSON="$EXISTING_PLATFORMS"
 for PLATFORM in "${!PLATFORMS[@]}"; do
   FILE="${PLATFORMS[$PLATFORM]}"
   SIG="${SIGS[$PLATFORM]}"
   FILENAME=$(basename "$FILE")
-  URL="https://api.openclawcn.net/update/artifacts/${FILENAME}"
+  URL="https://openclawcn.net/update/artifacts/${FILENAME}"
   PLATFORMS_JSON=$(echo "$PLATFORMS_JSON" | jq \
     --arg p "$PLATFORM" \
     --arg url "$URL" \
@@ -124,4 +139,10 @@ rm -f "$TEMP_JSON"
 
 echo ""
 echo "✅ 发布完成！v${VERSION} 的更新文件已上传到 ${SERVER}"
-echo "   更新端点: https://api.openclawcn.net/update/latest.json"
+echo "   更新端点: https://openclawcn.net/update/latest.json"
+echo ""
+echo "⚠️  别忘了更新官网下载链接！"
+echo "   1. 修改 openclawcn_web/src/app/page.tsx 中的版本号和文件名"
+echo "   2. cd openclawcn_web && npm run build"
+echo "   3. python deploy.py upload && python deploy.py pm2"
+echo "   4. cd .. && git add openclawcn_web/src/app/page.tsx && git commit -m 'chore: update website download link to v${VERSION}' && git push"

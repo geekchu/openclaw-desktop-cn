@@ -124,6 +124,17 @@ function checkEnvironment() {
     log("ℹ Windows: NSIS 由 Tauri 自动下载，无需手动安装");
   }
 
+  // Signing key check
+  if (!process.env.TAURI_SIGNING_PRIVATE_KEY) {
+    log("⚠ 未设置 TAURI_SIGNING_PRIVATE_KEY 环境变量");
+    log("  构建产物将不包含 .sig 签名文件，无法用于自动更新发布");
+    log("  设置方法 (PowerShell): $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content ~/.tauri/openclaw.key -Raw");
+  } else if (process.env.TAURI_SIGNING_PRIVATE_KEY.includes("ENCRYPTED") && !process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+    log("⚠ 签名私钥已加密，但未设置 TAURI_SIGNING_PRIVATE_KEY_PASSWORD");
+    log("  构建过程可能会卡住等待密码输入");
+    log("  设置方法 (PowerShell): $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '你的密码'");
+  }
+
   if (!ok) {
     log("\n环境检查未通过，请安装缺少的工具后重试。");
     process.exit(1);
@@ -251,7 +262,8 @@ function isInstallerFile(name) {
     lower.endsWith(".app.tar.gz") ||
     lower.endsWith(".appimage") ||
     lower.endsWith(".deb") ||
-    lower.endsWith(".rpm")
+    lower.endsWith(".rpm") ||
+    lower.endsWith(".sig")
   );
 }
 
