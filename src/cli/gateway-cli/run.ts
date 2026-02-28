@@ -47,6 +47,7 @@ type GatewayRunOpts = {
   compact?: boolean;
   rawStream?: boolean;
   rawStreamPath?: unknown;
+  desktopInternal?: boolean;
   dev?: boolean;
   reset?: boolean;
 };
@@ -54,7 +55,7 @@ type GatewayRunOpts = {
 const gatewayLog = createSubsystemLogger("gateway");
 
 async function runGatewayCommand(opts: GatewayRunOpts) {
-  if (process.env.OPENCLAW_DESKTOP === "1") {
+  if (process.env.OPENCLAW_DESKTOP === "1" && !opts.desktopInternal) {
     defaultRuntime.error("Gateway is managed by the desktop app. Manual startup is not needed.");
     defaultRuntime.exit(1);
     return;
@@ -358,6 +359,7 @@ export function addGatewayRunCommand(cmd: Command): Command {
     .option("--compact", 'Alias for "--ws-log compact"', false)
     .option("--raw-stream", "Log raw model stream events to jsonl", false)
     .option("--raw-stream-path <path>", "Raw stream jsonl path")
+    .option("--desktop-internal", "Internal flag: allow gateway start from desktop app", false)
     .action(async (opts) => {
       await runGatewayCommand(opts);
     });
