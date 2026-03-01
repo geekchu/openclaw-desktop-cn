@@ -1,6 +1,6 @@
 [package]
 name = "openclaw-desktop"
-version = "0.2.0"
+version = "0.2.1"
 description = "OpenClaw AI 助手桌面客户端"
 authors = ["OpenClaw Team"]
 edition = "2021"

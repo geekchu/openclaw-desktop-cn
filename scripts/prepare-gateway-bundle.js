@@ -15,7 +15,15 @@
  */
 
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,12 +42,16 @@ function copyIfExists(src, dest) {
     if (process.platform === "win32") {
       // cpSync triggers V8 heap corruption on Windows with pnpm symlink trees;
       // robocopy handles junctions/symlinks correctly, exit codes 0-7 = success.
-      // /XD node_modules: skip node_modules to avoid circular pnpm symlinks
+      // /XD: skip node_modules (circular pnpm symlinks), .git, .github, test dirs
+      // /XF: skip git metadata files
       mkdirSync(dest, { recursive: true });
       try {
-        execSync(`robocopy "${src}" "${dest}" /E /NFL /NDL /NJH /NJS /NP /XD node_modules`, {
-          stdio: "inherit",
-        });
+        execSync(
+          `robocopy "${src}" "${dest}" /E /NFL /NDL /NJH /NJS /NP /XD node_modules .git .github __tests__ test .nyc_output /XF .gitignore .gitattributes .npmignore`,
+          {
+            stdio: "inherit",
+          },
+        );
       } catch (err) {
         // robocopy exit codes: 0-7 = success (bitmask), >=8 = error
         if (err.status >= 8) throw err;
@@ -56,6 +68,26 @@ function copyIfExists(src, dest) {
 // Step 0: 下载 Node.js 运行环境
 console.log("\n[bundle] === Step 0: 准备 Node.js 运行环境 ===");
 run("node scripts/download-node.js");
+
+// Step 0.5: 精简 Node.js 运行环境（只删除文档文件）
+console.log("\n[bundle] === Step 0.5: 精简 Node.js 运行环境 ===");
+{
+  const nodeRuntimeDir = join(projectRoot, "src-tauri", "node-runtime");
+  if (existsSync(nodeRuntimeDir)) {
+    for (const platform of readdirSync(nodeRuntimeDir)) {
+      const platDir = join(nodeRuntimeDir, platform);
+      if (!existsSync(platDir) || platform.startsWith(".")) {
+        continue;
+      }
+      for (const f of ["CHANGELOG.md", "README.md", "LICENSE"]) {
+        const fp = join(platDir, f);
+        if (existsSync(fp)) {
+          rmSync(fp, { force: true });
+        }
+      }
+    }
+  }
+}
 
 // Step 1: 编译 TypeScript
 console.log("\n[bundle] === Step 1: 编译 TypeScript ===");
@@ -169,7 +201,10 @@ if (existsSync(extDir)) {
     let hasWorkspaceDev = false;
     if (devDeps) {
       for (const v of Object.values(devDeps)) {
-        if (typeof v === "string" && v.startsWith("workspace:")) { hasWorkspaceDev = true; break; }
+        if (typeof v === "string" && v.startsWith("workspace:")) {
+          hasWorkspaceDev = true;
+          break;
+        }
       }
     }
     if (skipped > 0 || hasWorkspaceDev) {
@@ -177,11 +212,277 @@ if (existsSync(extDir)) {
       if (hasWorkspaceDev) delete extPkg.devDependencies;
       writeFileSync(extPkgPath, JSON.stringify(extPkg, null, 2));
     }
-    console.log(`[bundle] 安装 extension/${name} 依赖 (${Object.keys(extFilteredDeps).length} 个包)`);
+    console.log(
+      `[bundle] 安装 extension/${name} 依赖 (${Object.keys(extFilteredDeps).length} 个包)`,
+    );
     run("npm install --omit=dev --install-strategy=hoisted --ignore-scripts", {
       cwd: join(extDir, name),
     });
   }
+}
+
+// Step 6.5: 去重 — 删除 extension 中已存在于顶层 node_modules 的重复包
+// Node.js 模块解析会向上遍历目录，extension 代码能找到 gateway-bundle/node_modules/ 中的包
+console.log("\n[bundle] === Step 6.5: 去重 extension node_modules ===");
+{
+  const topNodeModules = join(bundleDir, "node_modules");
+  if (existsSync(extDir) && existsSync(topNodeModules)) {
+    let totalRemoved = 0;
+    let savedBytes = 0;
+
+    for (const extName of readdirSync(extDir)) {
+      const extNM = join(extDir, extName, "node_modules");
+      if (!existsSync(extNM)) continue;
+
+      let extRemoved = 0;
+      for (const pkg of readdirSync(extNM)) {
+        // 跳过 .bin / .package-lock.json 等 npm 内部文件
+        if (pkg.startsWith(".")) {
+          continue;
+        }
+
+        // 比较两个目录下的 package.json version 的主版本号是否一致
+        function canDedup(extPkgDir, topPkgDir) {
+          try {
+            const extVer =
+              JSON.parse(readFileSync(join(extPkgDir, "package.json"), "utf-8")).version || "";
+            const topVer =
+              JSON.parse(readFileSync(join(topPkgDir, "package.json"), "utf-8")).version || "";
+            // 主版本号一致才去重，避免大版本不兼容
+            return extVer.split(".")[0] === topVer.split(".")[0];
+          } catch {
+            // 读不到 package.json 则保守不去重
+            return false;
+          }
+        }
+
+        // 处理 scoped 包（@scope/name）
+        if (pkg.startsWith("@")) {
+          const scopeDir = join(extNM, pkg);
+          if (!existsSync(join(topNodeModules, pkg))) {
+            continue;
+          }
+          for (const scopedPkg of readdirSync(scopeDir)) {
+            const topPkgDir = join(topNodeModules, pkg, scopedPkg);
+            if (existsSync(topPkgDir)) {
+              const pkgDir = join(scopeDir, scopedPkg);
+              if (!canDedup(pkgDir, topPkgDir)) {
+                continue;
+              }
+              try {
+                const stat = execSync(`du -sb "${pkgDir}" 2>/dev/null || echo "0"`, {
+                  encoding: "utf-8",
+                });
+                savedBytes += parseInt(stat.split("\t")[0]) || 0;
+              } catch {
+                /* ignore */
+              }
+              rmSync(pkgDir, { recursive: true, force: true });
+              extRemoved++;
+            }
+          }
+          // 如果 scope 目录为空，删除它
+          try {
+            if (readdirSync(scopeDir).length === 0) {
+              rmSync(scopeDir, { recursive: true, force: true });
+            }
+          } catch {
+            /* ignore */
+          }
+        } else if (existsSync(join(topNodeModules, pkg))) {
+          const pkgDir = join(extNM, pkg);
+          if (!canDedup(pkgDir, join(topNodeModules, pkg))) {
+            continue;
+          }
+          try {
+            const stat = execSync(`du -sb "${pkgDir}" 2>/dev/null || echo "0"`, {
+              encoding: "utf-8",
+            });
+            savedBytes += parseInt(stat.split("\t")[0]) || 0;
+          } catch {
+            /* ignore */
+          }
+          rmSync(pkgDir, { recursive: true, force: true });
+          extRemoved++;
+        }
+      }
+      // 如果 node_modules 为空，删除它
+      try {
+        if (readdirSync(extNM).length === 0) {
+          rmSync(extNM, { recursive: true, force: true });
+        }
+      } catch {
+        /* ignore */
+      }
+
+      if (extRemoved > 0) {
+        console.log(`[bundle] extension/${extName}: 去重 ${extRemoved} 个包`);
+        totalRemoved += extRemoved;
+      }
+    }
+
+    const savedMB = (savedBytes / (1024 * 1024)).toFixed(0);
+    console.log(`[bundle] 共去重 ${totalRemoved} 个包，节省约 ${savedMB} MB`);
+  }
+}
+
+// Step 6.6: 删除桌面版不需要的重量级包
+// 这些包不在顶层 node_modules 中，无法被 Step 6.5 去重
+console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ===");
+{
+  // 桌面版通过 API 接入模型，不需要本地推理引擎
+  // typescript / @types / bun-types 是开发工具，运行时不需要
+  // Node.js 22 已内置 Web Streams，不需要 polyfill
+  const heavyPkgsToRemove = [
+    "@node-llama-cpp", // 本地 LLM 推理引擎 (~681MB)
+    "node-llama-cpp", // 本地 LLM (~33MB)
+    "typescript", // 开发工具 (~23MB)
+    "chromium-bidi", // 浏览器调试协议 (~19MB)
+    "web-streams-polyfill", // Node 22 已内置 (~8.8MB)
+    "discord-api-types", // 仅类型定义 (~5.1MB)
+    "bun-types", // Bun 运行时类型 (~3.2MB)
+    "@types", // TypeScript 类型声明 (~2.8MB)
+    "@anthropic-ai/bedrock-sdk", // AWS Bedrock SDK（桌面版直接用 API）
+  ];
+
+  let heavyRemoved = 0;
+  function removeHeavyPkgs(nmDir) {
+    if (!existsSync(nmDir)) {
+      return;
+    }
+    for (const pkg of heavyPkgsToRemove) {
+      const pkgPath = join(nmDir, pkg);
+      if (existsSync(pkgPath)) {
+        rmSync(pkgPath, { recursive: true, force: true });
+        console.log(`[bundle] 删除 ${pkgPath.replace(bundleDir, ".")}`);
+        heavyRemoved++;
+      }
+    }
+  }
+
+  // 清理顶层 node_modules
+  removeHeavyPkgs(join(bundleDir, "node_modules"));
+  // 清理所有 extension 的 node_modules
+  if (existsSync(extDir)) {
+    for (const name of readdirSync(extDir)) {
+      removeHeavyPkgs(join(extDir, name, "node_modules"));
+    }
+  }
+  console.log(`[bundle] 共删除 ${heavyRemoved} 个重量级包`);
+}
+
+// Step 7: 清理不必要的文件（减小安装包体积）
+console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
+{
+  // 注意：不要在此列表中加 "docs"，因为 gateway-bundle 自身有 docs/reference/templates/
+  const dirsToRemove = new Set([
+    ".git",
+    ".github",
+    "__tests__",
+    "test",
+    "tests",
+    ".nyc_output",
+    "doc",
+    "example",
+    "examples",
+    "coverage",
+  ]);
+  const filesToRemove = new Set([
+    ".gitignore",
+    ".gitattributes",
+    ".npmignore",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "HISTORY.md",
+    "README.md",
+    "README.markdown",
+    "readme.md",
+    ".eslintrc",
+    ".eslintrc.js",
+    ".eslintrc.json",
+    ".prettierrc",
+    ".prettierrc.js",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    ".travis.yml",
+    ".editorconfig",
+    "Makefile",
+    "Gruntfile.js",
+    "Gulpfile.js",
+    "karma.conf.js",
+    "jest.config.js",
+    "jest.config.ts",
+  ]);
+  // 注意：.d.ts 等复合扩展名无法通过 lastIndexOf(".") 匹配，
+  // 所以这里只放单段扩展名，复合扩展名通过 endsWith 判断
+  const extsToRemove = new Set([".map"]);
+
+  let removedCount = 0;
+
+  function cleanDir(dir, depth = 0) {
+    if (!existsSync(dir) || depth > 15) {
+      return;
+    }
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (dirsToRemove.has(entry.name)) {
+          rmSync(fullPath, { recursive: true, force: true });
+          removedCount++;
+        } else {
+          cleanDir(fullPath, depth + 1);
+        }
+      } else {
+        const shouldRemove =
+          filesToRemove.has(entry.name) ||
+          extsToRemove.has(entry.name.slice(entry.name.lastIndexOf("."))) ||
+          entry.name.endsWith(".d.ts") ||
+          entry.name.endsWith(".d.mts") ||
+          entry.name.endsWith(".d.cts") ||
+          entry.name.endsWith(".js.map") ||
+          entry.name.endsWith(".ts.map") ||
+          entry.name.endsWith(".mjs.map");
+        if (shouldRemove) {
+          rmSync(fullPath, { force: true });
+          removedCount++;
+        }
+      }
+    }
+  }
+
+  cleanDir(bundleDir);
+
+  // 删除 extension 中的 src/ 目录（如果已有 dist/ 则不需要源码）
+  if (existsSync(extDir)) {
+    for (const name of readdirSync(extDir)) {
+      const extPath = join(extDir, name);
+      const hasDist = existsSync(join(extPath, "dist"));
+      const hasSrc = existsSync(join(extPath, "src"));
+      if (hasDist && hasSrc) {
+        rmSync(join(extPath, "src"), { recursive: true, force: true });
+        console.log(`[bundle] 删除 extension/${name}/src（已有 dist）`);
+        removedCount++;
+      }
+      // 删除 tsconfig 等开发文件
+      for (const devFile of ["tsconfig.json", "tsconfig.build.json", ".eslintrc.json"]) {
+        const devPath = join(extPath, devFile);
+        if (existsSync(devPath)) {
+          rmSync(devPath, { force: true });
+          removedCount++;
+        }
+      }
+    }
+  }
+
+  console.log(`[bundle] 清理了 ${removedCount} 个不必要的文件/目录`);
+}
+
+// 显示最终 bundle 大小
+try {
+  const result = execSync(`du -sh "${bundleDir}"`, { encoding: "utf-8" }).trim();
+  console.log(`[bundle] Bundle 大小: ${result.split("\t")[0]}`);
+} catch {
+  /* du not available on all platforms */
 }
 
 console.log("\n[bundle] === 完成 ===");
