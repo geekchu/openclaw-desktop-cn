@@ -186,7 +186,7 @@ export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="123"
 pnpm installer:build
 ```
 
-**构建脚本自动完成：** 环境检查 → `pnpm install` → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 Vite UI 构建 + gateway-bundle 打包） → Cargo 编译并嵌入 `dist/control-ui/`（含 `splash.html`）→ 收集产物到 `dist/installers/`
+**构建脚本自动完成：** 环境检查 → `pnpm install` → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 Vite UI 构建 + gateway-bundle 打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
 
 > ⚠️ **首次构建或修改前端代码/配置后**，建议先清除 Cargo 编译缓存再构建：
 >
@@ -195,8 +195,8 @@ pnpm installer:build
 > pnpm installer:build
 > ```
 >
-> 原因：Tauri 的 `generate_context!()` proc macro 会在编译时嵌入 `frontendDist` 目录中的所有文件（包括 `splash.html`）。
-> Cargo 增量编译可能复用旧的宏展开结果，导致安装后白屏（"No resource with given URL found"）。
+> 原因：Tauri 的 `generate_context!()` proc macro 会在编译时嵌入 `frontendDist` 目录中的所有文件。
+> Cargo 增量编译可能复用旧的宏展开结果，导致前端资源未更新。
 
 > ⚠️ 如果忘记设置 `TAURI_SIGNING_PRIVATE_KEY` 或 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，构建会在 NSIS 打包后签名阶段失败。
 > 可以在构建完成后手动签名：`cargo tauri signer sign <exe路径> --private-key-path "$HOME\.tauri\openclaw.key" --password 123`
@@ -527,17 +527,17 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 
 ### 构建相关
 
-| 问题                                          | 原因                                               | 解决                                                                                               |
-| --------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| 构建成功但没有 `.sig` 文件                    | 未设置 `TAURI_SIGNING_PRIVATE_KEY`                 | 设置环境变量后重新构建                                                                             |
-| NSIS 打包后报 "Wrong password"                | 签名密钥密码不对或 PowerShell 读取密钥时添加了 BOM | 用 `[System.IO.File]::ReadAllText().Trim()` 读取密钥                                               |
-| NSIS 打包后报 "no private key"                | 只设了 `TAURI_SIGNING_PRIVATE_KEY_PATH`            | Tauri v2 需用 `TAURI_SIGNING_PRIVATE_KEY`（内容）                                                  |
-| 构建卡住在 `Running makensis`                 | gateway-bundle 太大（>1GB）                        | 检查 `prepare-gateway-bundle.js` 的去重和清理步骤是否正常执行                                      |
-| 构建卡住在 WebView2 下载                      | 网络无法访问 Microsoft CDN                         | `tauri.conf.json` 已设置 `webviewInstallMode: skip`                                                |
-| `cargo-lock` 文件锁定错误                     | Windows Defender 实时监控                          | 将项目目录加入排除列表                                                                             |
-| `beforeBuildCommand` 失败                     | `pnpm install` 未执行                              | 先运行 `pnpm install`                                                                              |
-| 安装后白屏 "No resource with given URL found" | Cargo 增量编译跳过前端资源嵌入                     | `build.rs` 已添加 `rerun-if-changed=../dist/control-ui`；如仍复现可 `cargo clean` 后重建           |
-| 安装后白屏但 Gateway 手动可启动               | `frontendDist` 指向的目录缺少 UI 构建产物          | 已修复：`frontendDist` 直接指向 `../dist/control-ui`（Vite 输出），`splash.html` 放在 `ui/public/` |
+| 问题                                          | 原因                                               | 解决                                                                                                     |
+| --------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 构建成功但没有 `.sig` 文件                    | 未设置 `TAURI_SIGNING_PRIVATE_KEY`                 | 设置环境变量后重新构建                                                                                   |
+| NSIS 打包后报 "Wrong password"                | 签名密钥密码不对或 PowerShell 读取密钥时添加了 BOM | 用 `[System.IO.File]::ReadAllText().Trim()` 读取密钥                                                     |
+| NSIS 打包后报 "no private key"                | 只设了 `TAURI_SIGNING_PRIVATE_KEY_PATH`            | Tauri v2 需用 `TAURI_SIGNING_PRIVATE_KEY`（内容）                                                        |
+| 构建卡住在 `Running makensis`                 | gateway-bundle 太大（>1GB）                        | 检查 `prepare-gateway-bundle.js` 的去重和清理步骤是否正常执行                                            |
+| 构建卡住在 WebView2 下载                      | 网络无法访问 Microsoft CDN                         | `tauri.conf.json` 已设置 `webviewInstallMode: skip`                                                      |
+| `cargo-lock` 文件锁定错误                     | Windows Defender 实时监控                          | 将项目目录加入排除列表                                                                                   |
+| `beforeBuildCommand` 失败                     | `pnpm install` 未执行                              | 先运行 `pnpm install`                                                                                    |
+| 安装后白屏 "No resource with given URL found" | Cargo 增量编译跳过前端资源嵌入                     | `build.rs` 已添加 `rerun-if-changed=../dist/control-ui`；如仍复现可 `cargo clean` 后重建                 |
+| 安装后白屏但 Gateway 手动可启动               | `frontendDist` 指向的目录缺少 UI 构建产物          | 已修复：`frontendDist` 直接指向 `../dist/control-ui`（Vite 输出），splash 通过 Rust `window.eval()` 注入 |
 
 ### 发布相关
 
@@ -607,11 +607,11 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### 前端代码
 
-| 文件                                        | 用途                                             |
-| ------------------------------------------- | ------------------------------------------------ |
-| `ui/public/splash.html`                     | 启动闪屏页（Vite 自动打包到 `dist/control-ui/`） |
-| `ui/src/ui/views/updater.ts`                | 自动更新核心模块（检查→横幅→下载→重启）          |
-| `ui/src/ui/views/config-system-settings.ts` | 「软件更新」设置卡片（手动检查入口）             |
+| 文件                                        | 用途                                                             |
+| ------------------------------------------- | ---------------------------------------------------------------- |
+| `src-tauri/src/main.rs`                     | Splash 启动画面（通过 `window.eval()` 注入）+ gateway token 传递 |
+| `ui/src/ui/views/updater.ts`                | 自动更新核心模块（检查→横幅→下载→重启）                          |
+| `ui/src/ui/views/config-system-settings.ts` | 「软件更新」设置卡片（手动检查入口）                             |
 
 ### 官网
 

@@ -255,7 +255,23 @@ fn main() {
                     let _ = window.hide();
                 }
             }
-            // 注入 Splash 启动画面（直接写入 webview，不依赖嵌入资源协议）
+
+            // 全新安装检测：如果 openclaw.json 不存在，清除 WebView2 缓存
+            // 防止旧的 device auth token 残留在 localStorage 中导致 "device token mismatch"
+            // 必须在 splash 注入和 gateway 启动之前执行，给异步清除留出足够时间
+            {
+                let config_path = utils::platform::get_config_file_path();
+                if !std::path::Path::new(&config_path).exists() {
+                    log::info!("[Main] 检测到全新安装（无 openclaw.json），清除 WebView2 缓存");
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.clear_all_browsing_data();
+                    }
+                }
+            }
+
+            // 注入 Splash 启动画面
+            // webview 初始 URL 为 about:blank（避免加载 control-ui JS 触发 WebSocket 连接），
+            // 通过 eval 注入纯 HTML/CSS 的 splash 画面
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.eval(r#"
                     document.documentElement.innerHTML = `

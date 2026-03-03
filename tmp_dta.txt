@@ -1,0 +1,6 @@
+19109:						setCloseCause("device-auth-invalid", {
+19126:						setCloseCause("device-auth-invalid", {
+19144:						setCloseCause("device-auth-invalid", {
+19160:						setCloseCause("device-auth-invalid", {
+19187:						setCloseCause("device-auth-invalid", {
+19223:						setCloseCause("device-auth-invalid", {

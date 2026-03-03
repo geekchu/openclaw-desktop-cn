@@ -123,13 +123,26 @@ export async function sendChatMessage(
     : undefined;
 
   try {
-    await state.client.request("chat.send", {
+    const sendPromise = state.client.request("chat.send", {
       sessionKey: state.sessionKey,
       message: msg,
       deliver: false,
       idempotencyKey: runId,
       attachments: apiAttachments,
     });
+    // 超时保护：防止 gateway 无响应（如模型未配置）导致 UI 卡死
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error("请求超时，请检查大模型是否已配置（点击左侧 ⚙️ 设置）")),
+        30_000,
+      );
+    });
+    try {
+      await Promise.race([sendPromise, timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutId!);
+    }
     return runId;
   } catch (err) {
     const error = String(err);

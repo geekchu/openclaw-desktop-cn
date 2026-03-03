@@ -72,13 +72,35 @@ impl GatewayManager {
         info!("[Gateway] gateway 进程已停止");
     }
 
-    /// 检查 gateway 是否就绪（TCP 端口可连接）
+    /// 检查 gateway 是否就绪（HTTP 请求可响应）
+    /// 发送简单 HTTP 请求而非仅检查 TCP，确保 gateway 的完整中间件栈
+    /// （包括 auth、config、设备配对模块）已全部初始化
     pub fn is_ready(&self) -> bool {
+        use std::io::{Read, Write};
         let addr = format!("127.0.0.1:{}", self.port);
-        TcpStream::connect_timeout(
+        let mut stream = match TcpStream::connect_timeout(
             &addr.parse().unwrap(),
-            Duration::from_millis(200),
-        ).is_ok()
+            Duration::from_millis(500),
+        ) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+        let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
+        // 发送最简 HTTP 请求
+        let request = format!("GET / HTTP/1.0\r\nHost: 127.0.0.1:{}\r\n\r\n", self.port);
+        if stream.write_all(request.as_bytes()).is_err() {
+            return false;
+        }
+        // 只需读到 HTTP 响应头即可确认 gateway 完全就绪
+        let mut buf = [0u8; 16];
+        match stream.read(&mut buf) {
+            Ok(n) if n >= 4 => {
+                let response = String::from_utf8_lossy(&buf[..n]);
+                response.starts_with("HTTP/")
+            }
+            _ => false,
+        }
     }
 
     /// 轮询等待 gateway 就绪，最多等待 timeout_secs 秒
