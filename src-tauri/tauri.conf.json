@@ -14,7 +14,7 @@
       {
         "title": "OpenClaw桌面版",
         "label": "main",
-        "url": "splash.html",
+        "url": "index.html",
         "width": 1200,
         "height": 800,
         "minWidth": 900,

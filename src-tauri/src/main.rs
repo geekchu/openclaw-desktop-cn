@@ -255,6 +255,20 @@ fn main() {
                     let _ = window.hide();
                 }
             }
+            // 注入 Splash 启动画面（直接写入 webview，不依赖嵌入资源协议）
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.eval(r#"
+                    document.documentElement.innerHTML = `
+                    <head><meta charset="utf-8"><style>
+                        body{margin:0;background:#0f0f0f;display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:system-ui}
+                        .logo{font-size:72px;margin-bottom:24px}
+                        .spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,.15);border-top-color:rgba(255,255,255,.8);border-radius:50%;animation:spin .8s linear infinite}
+                        @keyframes spin{to{transform:rotate(360deg)}}
+                        .text{color:rgba(255,255,255,.5);font-size:13px;margin-top:18px}
+                    </style></head>
+                    <body><div class="logo">🦞</div><div class="spinner"></div><div class="text">正在启动...</div></body>`;
+                "#);
+            }
 
             // 异步启动 gateway + 等待就绪 + 通知前端
             let handle = app.handle().clone();
@@ -283,7 +297,7 @@ fn main() {
                     Ok(_) => {
                         let _ = handle.emit("gateway-status", "正在等待 Gateway 就绪...");
                         if gm.wait_for_ready(300) {
-                            // Gateway 就绪，直接导航 webview 到 gateway URL
+                            // Gateway 就绪，导航 webview 到 gateway URL
                             let url = if let Some(token) = read_gateway_token() {
                                 format!("http://localhost:18789?token={}", token)
                             } else {

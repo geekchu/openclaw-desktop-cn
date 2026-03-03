@@ -198,10 +198,12 @@ console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ==
     "bun-types", // Bun 运行时类型 (~3.2MB)
     "@types", // TypeScript 类型声明 (~2.8MB)
     "@anthropic-ai/bedrock-sdk", // AWS Bedrock SDK（桌面版直接用 API）
+    "@opentelemetry", // 遥测（桌面版不需要，~15MB）
+    "@mariozechner", // 开发工具（~14MB）
     // 注意：以下包不能删除，运行时会 import
     // - discord-api-types: Discord 渠道运行时依赖（dist/send-*.js import）
     // - web-streams-polyfill: openai 等 SDK 依赖
-    // - chromium-bidi: playwright-core 依赖
+    // - playwright-core + chromium-bidi: 网页内容抓取功能依赖
     // - typescript: 部分 extension 运行时可能需要
   ];
 

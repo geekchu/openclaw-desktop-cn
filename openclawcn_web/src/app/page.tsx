@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Footer from "@/components/Footer";
 import ImageLightbox from "@/components/ImageLightbox";
-import Navigation from "@/components/Navigation";
 
 export const metadata: Metadata = {
   title: "OpenClaw桌面版下载 — 龙虾AI助理，一键安装的全能 AI 助手",
@@ -17,28 +16,28 @@ const testimonials = [
   {
     name: "张明",
     handle: "产品经理",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=zhangming",
+    color: "#ef4b58",
     content:
       "用了 OpenClaw 之后，工作效率提升了至少 3 倍。它能自动处理邮件、安排日程，甚至帮我订机票。真正的全能助手！",
   },
   {
     name: "李华",
     handle: "全栈工程师",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=lihua",
+    color: "#3b82f6",
     content:
       "让 OpenClaw 帮我管理 GitHub issues、审查代码、自动部署项目。它就像一个永不疲倦的搭档，7x24 待命。",
   },
   {
     name: "王芳",
     handle: "智能家居爱好者",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=wangfang",
+    color: "#8b5cf6",
     content:
       "把 OpenClaw 接入了家里的智能设备，现在通过微信就能控制灯光、空调、扫地机器人。科技改变生活！",
   },
   {
     name: "陈伟",
     handle: "创业者",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=chenwei",
+    color: "#10b981",
     content:
       "每天早上自动发送今日待办、天气预报、重要邮件摘要。它比任何 App 都懂我的需求，已经离不开了。",
   },
@@ -183,7 +182,7 @@ export default function Home() {
               </div>
             </div>
             <a
-              href="https://openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.1_x64-setup.exe"
+              href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.1_x64-setup.exe"
               className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#ef4b58] to-[#ff7079] text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-[#ef4b58]/15 hover:shadow-lg hover:shadow-[#ef4b58]/25 hover:scale-[1.02] transition-all duration-300"
             >
               <svg
@@ -480,14 +479,12 @@ export default function Home() {
                 className="bg-white border border-gray-100 rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
               >
                 <div className="flex items-center gap-3 mb-2.5">
-                  <Image
-                    src={t.avatar}
-                    alt={t.name}
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-full bg-[#fff0f1] ring-2 ring-[#ef4b58]/10 shrink-0"
-                    unoptimized
-                  />
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                    style={{ backgroundColor: t.color }}
+                  >
+                    {t.name[0]}
+                  </div>
                   <div>
                     <p className="text-[#1a1a2e] font-semibold text-sm md:text-base">{t.name}</p>
                     <p className="text-[#bbb] text-xs">{t.handle}</p>

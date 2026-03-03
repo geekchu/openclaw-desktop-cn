@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Deploy openclawcn_web to production server via SSH/SFTP."""
+"""Deploy openclawcn_web static export to production server via SSH/SFTP."""
 import paramiko
 import os
 import sys
-import stat
 
 HOST = "8.223.32.138"
 USER = "root"
@@ -66,95 +65,74 @@ def main():
     print("Connected!")
 
     if action == "upload":
-        # Create remote directory
-        ssh_exec(ssh, f"mkdir -p {REMOTE_DIR}")
+        # Static export: upload out/ directory contents
+        out_dir = os.path.join(LOCAL_DIR, "out")
+        if not os.path.isdir(out_dir):
+            print("ERROR: out/ directory not found. Run 'npm run build' first.")
+            sys.exit(1)
+
+        # Clean and recreate remote directory
+        ssh_exec(ssh, f"rm -rf {REMOTE_DIR} && mkdir -p {REMOTE_DIR}")
 
         sftp = ssh.open_sftp()
-
-        # Upload root config files
-        root_files = [
-            "package.json",
-            "package-lock.json",
-            "next.config.js",
-            "postcss.config.js",
-            "tailwind.config.js",
-            "tsconfig.json",
-        ]
-        print("Uploading config files...")
-        for f in root_files:
-            local_f = os.path.join(LOCAL_DIR, f)
-            if os.path.exists(local_f):
-                print(f"  -> {f}")
-                sftp.put(local_f, f"{REMOTE_DIR}/{f}")
-
-        # Upload public/ directory
-        public_dir = os.path.join(LOCAL_DIR, "public")
-        if os.path.isdir(public_dir):
-            print("Uploading public/...")
-            sftp_upload_dir(sftp, public_dir, f"{REMOTE_DIR}/public")
-
-        # Upload .next/ directory (build output)
-        next_dir = os.path.join(LOCAL_DIR, ".next")
-        if os.path.isdir(next_dir):
-            print("Uploading .next/ (this may take a while)...")
-            sftp_upload_dir(sftp, next_dir, f"{REMOTE_DIR}/.next", skip_dirs={"cache", "dev"})
-
-        # Upload src/ directory (needed for some Next.js features)
-        src_dir = os.path.join(LOCAL_DIR, "src")
-        if os.path.isdir(src_dir):
-            print("Uploading src/...")
-            sftp_upload_dir(sftp, src_dir, f"{REMOTE_DIR}/src")
-
+        print("Uploading static files from out/...")
+        sftp_upload_dir(sftp, out_dir, REMOTE_DIR)
         sftp.close()
         print("Upload complete!")
 
-        # Install production dependencies on server
-        print("Installing production dependencies on server...")
-        ssh_exec(ssh, f"cd {REMOTE_DIR} && npm install --production", check=True)
-        print("Dependencies installed!")
-
-    elif action == "pm2":
-        # Install pm2 if not present
-        _, _, code = ssh_exec(ssh, "pm2 --version", check=False)
-        if code != 0:
-            print("Installing pm2...")
-            ssh_exec(ssh, "npm install -g pm2")
-
-        # Stop existing process if any
+        # Stop PM2 process if running (no longer needed for static site)
         ssh_exec(ssh, "pm2 delete openclawcn-web 2>/dev/null || true", check=False)
 
-        # Start with pm2
-        print("Starting Next.js with pm2 on port 3002...")
-        ssh_exec(ssh, f"cd {REMOTE_DIR} && PORT=3002 pm2 start npm --name openclawcn-web -- start")
-
-        # Save and setup startup
-        ssh_exec(ssh, "pm2 save")
-        ssh_exec(ssh, "pm2 startup systemd -u root --hp /root 2>/dev/null || true", check=False)
-
-        # Verify it's running
-        ssh_exec(ssh, "pm2 list")
-        ssh_exec(ssh, "sleep 3 && curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3002/", check=False)
-
     elif action == "nginx":
+        # Static site: serve directly from Nginx, no proxy needed
         nginx_config = """server {
     listen 80;
     server_name openclawcn.net www.openclawcn.net;
 
+    root /var/www/openclawcn_web;
+    index index.html;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/html text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 256;
+
+    # Static assets: long cache
+    location /_next/static/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location /logos/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location /images/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    # HTML pages: no cache (always fresh)
     location / {
-        proxy_pass http://127.0.0.1:3002;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_cache_bypass $http_upgrade;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri $uri.html $uri/index.html =404;
+    }
+
+    # Update endpoint (keep existing)
+    location /update/ {
+        alias /var/www/openclaw-update/;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        default_type application/octet-stream;
+    }
+
+    location = /update/latest.json {
+        alias /var/www/openclaw-update/latest.json;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "no-cache" always;
+        default_type application/json;
     }
 }
 """
-        print("Writing nginx config...")
-        # Write config file
+        print("Writing nginx config for static site...")
         sftp = ssh.open_sftp()
         config_path = "/etc/nginx/sites-available/openclawcn.net"
         with sftp.open(config_path, 'w') as f:
@@ -167,7 +145,7 @@ def main():
         # Test and reload
         ssh_exec(ssh, "nginx -t")
         ssh_exec(ssh, "systemctl reload nginx")
-        print("Nginx configured and reloaded!")
+        print("Nginx configured for static serving!")
 
     elif action == "certbot":
         print("Running certbot for HTTPS...")
@@ -176,8 +154,6 @@ def main():
 
     elif action == "verify":
         print("Verifying deployment...")
-        ssh_exec(ssh, "pm2 list")
-        ssh_exec(ssh, "curl -s -o /dev/null -w 'HTTP Status: %{http_code}\\n' http://127.0.0.1:3002/", check=False)
         ssh_exec(ssh, "curl -s -o /dev/null -w 'HTTPS Status: %{http_code}\\n' https://openclawcn.net/", check=False)
         ssh_exec(ssh, "curl -s -o /dev/null -w 'HTTP->HTTPS redirect: %{http_code}\\n' -L http://openclawcn.net/", check=False)
         # Check existing services

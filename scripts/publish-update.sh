@@ -95,7 +95,7 @@ for PLATFORM in "${!PLATFORMS[@]}"; do
   FILE="${PLATFORMS[$PLATFORM]}"
   SIG="${SIGS[$PLATFORM]}"
   FILENAME=$(basename "$FILE")
-  URL="https://openclawcn.net/update/artifacts/${FILENAME}"
+  URL="https://cdn.openclawcn.net/update/artifacts/${FILENAME}"
   PLATFORMS_JSON=$(echo "$PLATFORMS_JSON" | jq \
     --arg p "$PLATFORM" \
     --arg url "$URL" \
@@ -140,9 +140,10 @@ rm -f "$TEMP_JSON"
 echo ""
 echo "✅ 发布完成！v${VERSION} 的更新文件已上传到 ${SERVER}"
 echo "   更新端点: https://openclawcn.net/update/latest.json"
+echo "   安装包CDN: https://cdn.openclawcn.net/update/artifacts/"
 echo ""
 echo "⚠️  别忘了更新官网下载链接！"
 echo "   1. 修改 openclawcn_web/src/app/page.tsx 中的版本号和文件名"
 echo "   2. cd openclawcn_web && npm run build"
-echo "   3. python deploy.py upload && python deploy.py pm2"
+echo "   3. python deploy.py upload"
 echo "   4. cd .. && git add openclawcn_web/src/app/page.tsx && git commit -m 'chore: update website download link to v${VERSION}' && git push"

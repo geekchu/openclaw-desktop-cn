@@ -34,6 +34,10 @@
 │ pnpm installer:  │ ─────────────────────────────→ │ /var/www/             │
 │   build          │   publish-update.sh            │   openclaw-update/    │
 └──────────────────┘                                └───────────────────────┘
+                                                      ↓ latest.json (元数据)
+                                                    openclawcn.net/update/
+                                                      ↓ 安装包文件
+                                                    cdn.openclawcn.net/update/artifacts/
 ```
 
 **关键配置文件：** `src-tauri/tauri.conf.json`
@@ -105,10 +109,19 @@
 # 步骤 1: 创建目录和占位文件
 ssh root@openclawcn.net 'bash -s' < scripts/setup-update-server.sh
 
-# 步骤 2: 配置 Nginx
+# 步骤 2: 配置 Nginx（主域名 /update/ location）
 scp scripts/deploy-update-nginx.sh root@openclawcn.net:/tmp/
 ssh root@openclawcn.net 'bash /tmp/deploy-update-nginx.sh'
+
+# 步骤 3: 配置 CDN 子域名（安装包下载加速）
+ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 ```
+
+> **CDN 架构说明：**
+>
+> - `openclawcn.net/update/latest.json` — 更新元数据（版本号、签名），由原服务器直接提供
+> - `cdn.openclawcn.net/update/artifacts/` — 安装包二进制文件，通过 CDN 分发加速下载
+> - 当前 `cdn.openclawcn.net` 临时指向原服务器 `8.223.32.138`，后续切换 DNS 即可无缝迁移到真正的 CDN
 
 ---
 
@@ -173,7 +186,17 @@ export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="123"
 pnpm installer:build
 ```
 
-**构建脚本自动完成：** 环境检查 → `pnpm install` → 下载 Node.js 运行时 → 打包 gateway-bundle（含依赖去重和清理优化） → `cargo tauri build` → 收集产物到 `dist/installers/`
+**构建脚本自动完成：** 环境检查 → `pnpm install` → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 Vite UI 构建 + gateway-bundle 打包） → Cargo 编译并嵌入 `dist/control-ui/`（含 `splash.html`）→ 收集产物到 `dist/installers/`
+
+> ⚠️ **首次构建或修改前端代码/配置后**，建议先清除 Cargo 编译缓存再构建：
+>
+> ```powershell
+> cd src-tauri; cargo clean; cd ..
+> pnpm installer:build
+> ```
+>
+> 原因：Tauri 的 `generate_context!()` proc macro 会在编译时嵌入 `frontendDist` 目录中的所有文件（包括 `splash.html`）。
+> Cargo 增量编译可能复用旧的宏展开结果，导致安装后白屏（"No resource with given URL found"）。
 
 > ⚠️ 如果忘记设置 `TAURI_SIGNING_PRIVATE_KEY` 或 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，构建会在 NSIS 打包后签名阶段失败。
 > 可以在构建完成后手动签名：`cargo tauri signer sign <exe路径> --private-key-path "$HOME\.tauri\openclaw.key" --password 123`
@@ -243,7 +266,7 @@ cat > /var/www/openclaw-update/latest.json << 'EOF'
   "pub_date": "2026-03-01T12:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "url": "https://openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe",
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe",
       "signature": "粘贴 .sig 文件的完整内容"
     }
   }
@@ -257,17 +280,29 @@ EOF
 
 ```tsx
 // 找到 Windows 下载按钮，更新 href 和按钮文字中的版本号
-href="https://openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe"
+href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe"
 下载 Windows 版 (v0.3.0)
 ```
 
-然后部署官网：
+**macOS 首次发版时（仅需操作一次）：** 将 disabled 按钮替换为真实下载链接：
+
+```tsx
+// 找到 macOS 区域的 <button disabled> ... macOS 版即将推出 </button>
+// 替换为：
+<a
+  href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_aarch64.dmg"
+  className="...（复制 Windows 按钮的 className）"
+>
+  下载 macOS 版 (v0.3.0)
+</a>
+```
+
+然后部署官网（静态导出，无需 PM2）：
 
 ```bash
 cd openclawcn_web
 npm run build
 python deploy.py upload
-python deploy.py pm2
 ```
 
 最后提交官网改动：
@@ -286,7 +321,7 @@ git push
 curl https://openclawcn.net/update/latest.json
 
 # 检查安装包可下载（替换为实际文件名）
-curl -I "https://openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe"
+curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe"
 ```
 
 确认：
@@ -370,15 +405,15 @@ curl -I "https://openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-set
   "pub_date": "2026-03-01T12:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "url": "https://openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe",
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe",
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6..."
     },
     "darwin-aarch64": {
-      "url": "https://openclawcn.net/update/artifacts/OpenClaw桌面版.app.tar.gz",
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版.app.tar.gz",
       "signature": "..."
     },
     "linux-x86_64": {
-      "url": "https://openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_amd64.AppImage",
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_amd64.AppImage",
       "signature": "..."
     }
   }
@@ -554,12 +589,12 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### 构建脚本
 
-| 文件                                | 用途                                                                            |
-| ----------------------------------- | ------------------------------------------------------------------------------- |
-| `scripts/build-installer.js`        | 统一构建入口（环境检查→依赖→构建→收集产物）                                     |
-| `scripts/prepare-gateway-bundle.js` | beforeBuildCommand，打包 gateway 代码（含依赖去重、重量级包删除、文件清理优化） |
-| `scripts/download-node.js`          | 下载 Node.js 运行时嵌入安装包                                                   |
-| `.npmrc`                            | npm 注册表镜像（`registry.npmmirror.com`）+ 允许构建脚本列表                    |
+| 文件                                | 用途                                                                        |
+| ----------------------------------- | --------------------------------------------------------------------------- |
+| `scripts/build-installer.js`        | 统一构建入口（环境检查→依赖→构建→收集产物）                                 |
+| `scripts/prepare-gateway-bundle.js` | beforeBuildCommand，打包 gateway 代码（含 UI 构建、依赖去重、文件清理优化） |
+| `scripts/download-node.js`          | 下载 Node.js 运行时嵌入安装包                                               |
+| `.npmrc`                            | npm 注册表镜像（`registry.npmmirror.com`）+ 允许构建脚本列表                |
 
 ### 发布脚本
 
@@ -568,6 +603,7 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 | `scripts/publish-update.sh`      | 一键发布（收集产物→生成 latest.json→scp 上传） |
 | `scripts/setup-update-server.sh` | 服务器目录初始化（一次性）                     |
 | `scripts/deploy-update-nginx.sh` | 服务器 Nginx 配置部署（一次性）                |
+| `scripts/deploy-cdn-nginx.sh`    | CDN 子域名 Nginx 配置 + SSL（一次性）          |
 
 ### 前端代码
 
@@ -579,10 +615,10 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### 官网
 
-| 文件                              | 用途                                           |
-| --------------------------------- | ---------------------------------------------- |
-| `openclawcn_web/src/app/page.tsx` | 官网首页（含下载链接，每次发版需更新版本号）   |
-| `openclawcn_web/deploy.py`        | 官网部署脚本（upload / pm2 / nginx / certbot） |
+| 文件                              | 用途                                               |
+| --------------------------------- | -------------------------------------------------- |
+| `openclawcn_web/src/app/page.tsx` | 官网首页（含下载链接，每次发版需更新版本号）       |
+| `openclawcn_web/deploy.py`        | 官网部署脚本（upload / nginx / certbot，静态导出） |
 
 ### 签名密钥
 
