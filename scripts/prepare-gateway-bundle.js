@@ -100,12 +100,34 @@ run("pnpm ui:build");
 // Step 2.5: Manager UI 已废弃，使用原生 Lit 组件替代，跳过
 console.log("\n[bundle] === Step 2.5: 跳过 Manager UI（已由原生 Lit 组件替代）===");
 
-// Step 2.6: 确保 splash.html 在 frontend 目录中
+// Step 2.6: 复制 UI 构建产物到 frontend 目录
+// pnpm ui:build 输出到 dist/control-ui/，但 Tauri 的 frontendDist 指向 src-tauri/frontend/
+// 需要将构建产物（index.html、assets/ 等）复制过来，否则安装后没有前端页面（白屏）
+console.log("\n[bundle] === Step 2.6: 复制 UI 构建产物到 frontend ===");
+const frontendDir = join(projectRoot, "src-tauri", "frontend");
+{
+  const uiBuildDir = join(projectRoot, "dist", "control-ui");
+  if (existsSync(uiBuildDir)) {
+    // 先清理旧的 assets 目录，避免堆积历史构建的哈希文件
+    const oldAssetsDir = join(frontendDir, "assets");
+    if (existsSync(oldAssetsDir)) {
+      rmSync(oldAssetsDir, { recursive: true, force: true });
+      console.log("[bundle] 已清理旧的 frontend/assets/");
+    }
+    mkdirSync(frontendDir, { recursive: true });
+    // 复制 UI 构建产物
+    cpSync(uiBuildDir, frontendDir, { recursive: true });
+    console.log("[bundle] 已复制 dist/control-ui/ → frontend/");
+  } else {
+    console.warn("[bundle] 警告: dist/control-ui/ 不存在，UI 可能未构建");
+  }
+}
+
+// Step 2.7: 确保 splash.html 在 frontend 目录中（放在 UI 复制之后，保证 splash 始终优先）
 // Tauri 生产构建仅嵌入 frontendDist（./frontend）中的文件，
 // 而 splash.html 源文件在 src-tauri/ 根目录，需要复制到 frontend/ 中
-console.log("\n[bundle] === Step 2.6: 复制 splash.html 到 frontend ===");
+console.log("\n[bundle] === Step 2.7: 复制 splash.html 到 frontend ===");
 const splashSrc = join(projectRoot, "src-tauri", "splash.html");
-const frontendDir = join(projectRoot, "src-tauri", "frontend");
 if (existsSync(splashSrc)) {
   mkdirSync(frontendDir, { recursive: true });
   cpSync(splashSrc, join(frontendDir, "splash.html"));
