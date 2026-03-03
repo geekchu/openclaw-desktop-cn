@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "node scripts/prepare-gateway-bundle.js",
-    "frontendDist": "./frontend"
+    "frontendDist": "../dist/control-ui"
   },
   "app": {
     "withGlobalTauri": true,
