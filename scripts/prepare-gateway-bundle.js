@@ -232,6 +232,8 @@ console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ==
   const heavyPkgsToRemove = [
     "@node-llama-cpp", // 本地 LLM 推理引擎 (~681MB)
     "node-llama-cpp", // 本地 LLM (~33MB)
+    "@lancedb", // 本地向量数据库（仅 extension/memory-lancedb 使用，~145MB）
+    "apache-arrow", // @lancedb 的依赖 (~3.7MB)
     "bun-types", // Bun 运行时类型 (~3.2MB)
     "@types", // TypeScript 类型声明 (~2.8MB)
     "@anthropic-ai/bedrock-sdk", // AWS Bedrock SDK（桌面版直接用 API）
