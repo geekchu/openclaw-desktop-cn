@@ -146,7 +146,7 @@ copyIfExists(
   join(bundleDir, "docs", "reference", "templates"),
 );
 
-// 创建精简的 package.json（只保留 dependencies）
+// 创建精简的 package.json（合并根依赖 + 所有 extension 依赖）
 const rootPkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf-8"));
 // npm 不支持 pnpm 的 workspace: 协议，过滤掉这些依赖
 const filteredDeps = {};
@@ -157,6 +157,35 @@ for (const [name, version] of Object.entries(rootPkg.dependencies || {})) {
   }
   filteredDeps[name] = version;
 }
+
+// 合并所有 extension 的 dependencies 到根 package.json
+// 这样只需一次 npm install，所有包统一安装到 gateway-bundle/node_modules/
+// Node.js 模块解析会从 extension 目录向上遍历到 gateway-bundle/node_modules/
+const extDir = join(bundleDir, "extensions");
+if (existsSync(extDir)) {
+  for (const name of readdirSync(extDir)) {
+    const extPkgPath = join(extDir, name, "package.json");
+    if (!existsSync(extPkgPath)) continue;
+    const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
+    const deps = extPkg.dependencies;
+    if (!deps) continue;
+    let merged = 0;
+    for (const [depName, depVer] of Object.entries(deps)) {
+      if (typeof depVer === "string" && depVer.startsWith("workspace:")) {
+        continue;
+      }
+      // 根已有同名包时保留根的版本（更保守，避免版本冲突）
+      if (!filteredDeps[depName]) {
+        filteredDeps[depName] = depVer;
+        merged++;
+      }
+    }
+    if (merged > 0) {
+      console.log(`[bundle] 合并 extension/${name} 的 ${merged} 个依赖到根 package.json`);
+    }
+  }
+}
+
 const bundlePkg = {
   name: rootPkg.name,
   version: rootPkg.version,
@@ -165,184 +194,30 @@ const bundlePkg = {
   dependencies: filteredDeps,
 };
 writeFileSync(join(bundleDir, "package.json"), JSON.stringify(bundlePkg, null, 2));
-console.log("[bundle] 创建 package.json（仅 dependencies，已过滤 workspace 协议）");
+console.log(
+  `[bundle] 创建 package.json（${Object.keys(filteredDeps).length} 个依赖，含 extension 合并）`,
+);
 
-// Step 5: 安装依赖（平铺模式，不使用 pnpm 符号链接）
-console.log("\n[bundle] === Step 5: 安装生产依赖 ===");
+// Step 5: 安装依赖（一次性安装根 + 所有 extension 的依赖）
+console.log("\n[bundle] === Step 5: 安装生产依赖（含 extension 依赖）===");
 run("npm install --omit=dev --install-strategy=hoisted --ignore-scripts", { cwd: bundleDir });
 
-// Step 6: 安装 extension 依赖
-console.log("\n[bundle] === Step 6: 安装 extension 依赖 ===");
-const extDir = join(bundleDir, "extensions");
-if (existsSync(extDir)) {
-  for (const name of readdirSync(extDir)) {
-    const extPkgPath = join(extDir, name, "package.json");
-    if (!existsSync(extPkgPath)) continue;
-    const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
-    const deps = extPkg.dependencies;
-    if (!deps || Object.keys(deps).length === 0) continue;
-    // 过滤掉 workspace: 协议依赖
-    const extFilteredDeps = {};
-    let skipped = 0;
-    for (const [depName, depVer] of Object.entries(deps)) {
-      if (typeof depVer === "string" && depVer.startsWith("workspace:")) {
-        console.log(`[bundle] 跳过 extension/${name} workspace 依赖: ${depName}@${depVer}`);
-        skipped++;
-        continue;
-      }
-      extFilteredDeps[depName] = depVer;
-    }
-    if (Object.keys(extFilteredDeps).length === 0) {
-      console.log(`[bundle] extension/${name} 所有依赖均为 workspace 依赖，跳过安装`);
-      continue;
-    }
-    // 回写过滤后的 package.json（同时删除含 workspace: 的 devDependencies）
-    const devDeps = extPkg.devDependencies;
-    let hasWorkspaceDev = false;
-    if (devDeps) {
-      for (const v of Object.values(devDeps)) {
-        if (typeof v === "string" && v.startsWith("workspace:")) {
-          hasWorkspaceDev = true;
-          break;
-        }
-      }
-    }
-    if (skipped > 0 || hasWorkspaceDev) {
-      extPkg.dependencies = extFilteredDeps;
-      if (hasWorkspaceDev) delete extPkg.devDependencies;
-      writeFileSync(extPkgPath, JSON.stringify(extPkg, null, 2));
-    }
-    console.log(
-      `[bundle] 安装 extension/${name} 依赖 (${Object.keys(extFilteredDeps).length} 个包)`,
-    );
-    run("npm install --omit=dev --install-strategy=hoisted --ignore-scripts", {
-      cwd: join(extDir, name),
-    });
-  }
-}
-
-// Step 6.5: 去重 — 删除 extension 中已存在于顶层 node_modules 的重复包
-// Node.js 模块解析会向上遍历目录，extension 代码能找到 gateway-bundle/node_modules/ 中的包
-console.log("\n[bundle] === Step 6.5: 去重 extension node_modules ===");
-{
-  const topNodeModules = join(bundleDir, "node_modules");
-  if (existsSync(extDir) && existsSync(topNodeModules)) {
-    let totalRemoved = 0;
-    let savedBytes = 0;
-
-    for (const extName of readdirSync(extDir)) {
-      const extNM = join(extDir, extName, "node_modules");
-      if (!existsSync(extNM)) continue;
-
-      let extRemoved = 0;
-      for (const pkg of readdirSync(extNM)) {
-        // 跳过 .bin / .package-lock.json 等 npm 内部文件
-        if (pkg.startsWith(".")) {
-          continue;
-        }
-
-        // 比较两个目录下的 package.json version 的主版本号是否一致
-        function canDedup(extPkgDir, topPkgDir) {
-          try {
-            const extVer =
-              JSON.parse(readFileSync(join(extPkgDir, "package.json"), "utf-8")).version || "";
-            const topVer =
-              JSON.parse(readFileSync(join(topPkgDir, "package.json"), "utf-8")).version || "";
-            // 主版本号一致才去重，避免大版本不兼容
-            return extVer.split(".")[0] === topVer.split(".")[0];
-          } catch {
-            // 读不到 package.json 则保守不去重
-            return false;
-          }
-        }
-
-        // 处理 scoped 包（@scope/name）
-        if (pkg.startsWith("@")) {
-          const scopeDir = join(extNM, pkg);
-          if (!existsSync(join(topNodeModules, pkg))) {
-            continue;
-          }
-          for (const scopedPkg of readdirSync(scopeDir)) {
-            const topPkgDir = join(topNodeModules, pkg, scopedPkg);
-            if (existsSync(topPkgDir)) {
-              const pkgDir = join(scopeDir, scopedPkg);
-              if (!canDedup(pkgDir, topPkgDir)) {
-                continue;
-              }
-              try {
-                const stat = execSync(`du -sb "${pkgDir}" 2>/dev/null || echo "0"`, {
-                  encoding: "utf-8",
-                });
-                savedBytes += parseInt(stat.split("\t")[0]) || 0;
-              } catch {
-                /* ignore */
-              }
-              rmSync(pkgDir, { recursive: true, force: true });
-              extRemoved++;
-            }
-          }
-          // 如果 scope 目录为空，删除它
-          try {
-            if (readdirSync(scopeDir).length === 0) {
-              rmSync(scopeDir, { recursive: true, force: true });
-            }
-          } catch {
-            /* ignore */
-          }
-        } else if (existsSync(join(topNodeModules, pkg))) {
-          const pkgDir = join(extNM, pkg);
-          if (!canDedup(pkgDir, join(topNodeModules, pkg))) {
-            continue;
-          }
-          try {
-            const stat = execSync(`du -sb "${pkgDir}" 2>/dev/null || echo "0"`, {
-              encoding: "utf-8",
-            });
-            savedBytes += parseInt(stat.split("\t")[0]) || 0;
-          } catch {
-            /* ignore */
-          }
-          rmSync(pkgDir, { recursive: true, force: true });
-          extRemoved++;
-        }
-      }
-      // 如果 node_modules 为空，删除它
-      try {
-        if (readdirSync(extNM).length === 0) {
-          rmSync(extNM, { recursive: true, force: true });
-        }
-      } catch {
-        /* ignore */
-      }
-
-      if (extRemoved > 0) {
-        console.log(`[bundle] extension/${extName}: 去重 ${extRemoved} 个包`);
-        totalRemoved += extRemoved;
-      }
-    }
-
-    const savedMB = (savedBytes / (1024 * 1024)).toFixed(0);
-    console.log(`[bundle] 共去重 ${totalRemoved} 个包，节省约 ${savedMB} MB`);
-  }
-}
-
 // Step 6.6: 删除桌面版不需要的重量级包
-// 这些包不在顶层 node_modules 中，无法被 Step 6.5 去重
 console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ===");
 {
   // 桌面版通过 API 接入模型，不需要本地推理引擎
-  // typescript / @types / bun-types 是开发工具，运行时不需要
-  // Node.js 22 已内置 Web Streams，不需要 polyfill
+  // 仅删除确定不需要的包，保留可能被运行时 import 的包
   const heavyPkgsToRemove = [
     "@node-llama-cpp", // 本地 LLM 推理引擎 (~681MB)
     "node-llama-cpp", // 本地 LLM (~33MB)
-    "typescript", // 开发工具 (~23MB)
-    "chromium-bidi", // 浏览器调试协议 (~19MB)
-    "web-streams-polyfill", // Node 22 已内置 (~8.8MB)
-    "discord-api-types", // 仅类型定义 (~5.1MB)
     "bun-types", // Bun 运行时类型 (~3.2MB)
     "@types", // TypeScript 类型声明 (~2.8MB)
     "@anthropic-ai/bedrock-sdk", // AWS Bedrock SDK（桌面版直接用 API）
+    // 注意：以下包不能删除，运行时会 import
+    // - discord-api-types: Discord 渠道运行时依赖（dist/send-*.js import）
+    // - web-streams-polyfill: openai 等 SDK 依赖
+    // - chromium-bidi: playwright-core 依赖
+    // - typescript: 部分 extension 运行时可能需要
   ];
 
   let heavyRemoved = 0;
@@ -374,7 +249,9 @@ console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ==
 // Step 7: 清理不必要的文件（减小安装包体积）
 console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
 {
-  // 注意：不要在此列表中加 "docs"，因为 gateway-bundle 自身有 docs/reference/templates/
+  // 注意：不要在此列表中加 "docs" 或 "doc"：
+  //   - gateway-bundle 自身有 docs/reference/templates/
+  //   - yaml 包有 dist/doc/ 目录（含 directives.js 等运行时代码）
   const dirsToRemove = new Set([
     ".git",
     ".github",
@@ -382,7 +259,6 @@ console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
     "test",
     "tests",
     ".nyc_output",
-    "doc",
     "example",
     "examples",
     "coverage",
@@ -452,17 +328,12 @@ console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
 
   cleanDir(bundleDir);
 
-  // 删除 extension 中的 src/ 目录（如果已有 dist/ 则不需要源码）
+  // 注意：不删除 extension 的 src/ 目录
+  // 部分 extension 即使有 dist/ 也会在运行时 require src/ 下的文件
+  // 例如 twitch extension 的 src/token.ts 引用 src/routing/session-key.js
   if (existsSync(extDir)) {
     for (const name of readdirSync(extDir)) {
       const extPath = join(extDir, name);
-      const hasDist = existsSync(join(extPath, "dist"));
-      const hasSrc = existsSync(join(extPath, "src"));
-      if (hasDist && hasSrc) {
-        rmSync(join(extPath, "src"), { recursive: true, force: true });
-        console.log(`[bundle] 删除 extension/${name}/src（已有 dist）`);
-        removedCount++;
-      }
       // 删除 tsconfig 等开发文件
       for (const devFile of ["tsconfig.json", "tsconfig.build.json", ".eslintrc.json"]) {
         const devPath = join(extPath, devFile);

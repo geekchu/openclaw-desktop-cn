@@ -7,7 +7,7 @@ import stat
 
 HOST = "8.223.32.138"
 USER = "root"
-PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "")
+PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "Wqx505@550719")
 REMOTE_DIR = "/var/www/openclawcn_web"
 LOCAL_DIR = os.path.dirname(os.path.abspath(__file__))
 

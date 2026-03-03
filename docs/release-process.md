@@ -142,6 +142,12 @@ git tag v0.3.0
 git push && git push --tags
 ```
 
+> ⚠️ 如果构建过程中需要修改配置并 `git commit --amend`，之后推送时需加 `--force`：
+>
+> ```bash
+> git push --force && git push --tags --force
+> ```
+
 ### 步骤 3：构建签名安装包
 
 #### Windows（在 Windows 机器上执行）
@@ -192,6 +198,9 @@ pnpm installer:build
 #### 方式 A：使用脚本（推荐）
 
 ```bash
+# Windows 下先确保原生 jq 在 PATH 中（如果已配好可跳过）
+export PATH="/c/Users/$USERNAME/AppData/Local/Microsoft/WinGet/Packages:$PATH"
+
 bash scripts/publish-update.sh 0.3.0 root@8.223.32.138
 ```
 
@@ -508,6 +517,26 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 | 客户端检测不到更新 | `latest.json` 版本号不大于当前版本 | 检查 `latest.json` 的 `version` 字段 |
 | 下载后验签失败     | 密钥对不匹配或 `.sig` 内容损坏     | 重新构建并确保使用正确的私钥         |
 | 更新横幅不出现     | 用户之前点了关闭                   | 去「系统设置 → 软件更新」手动检查    |
+
+### 安装后 Gateway 启动相关
+
+| 问题                                        | 原因                                                                  | 解决                                                      |
+| ------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
+| 白屏 + "Gateway 启动超时"                   | Gateway 进程崩溃，多种可能原因                                        | 手动运行 gateway 看报错（见下方）                         |
+| `EISDIR: lstat 'C:'`                        | Tauri `resource_dir()` 返回 `\\?\` 前缀路径，Node.js 无法解析         | `main.rs` 已修复：strip `\\?\` 前缀                       |
+| `Cannot find module 'xxx'` (extension 依赖) | extension 的 npm 依赖未安装到 `gateway-bundle/node_modules/`          | `prepare-gateway-bundle.js` 已修复：合并到根 package.json |
+| `Cannot find module '../doc/xxx'`           | Step 7 清理误删了 npm 包内的 `doc/` 目录                              | 已修复：`doc` 从 `dirsToRemove` 中移除                    |
+| matrix extension 加载失败                   | `@matrix-org/matrix-sdk-crypto-nodejs` 是原生模块，`--ignore-scripts` | 已知限制，不影响核心功能                                  |
+
+**诊断命令**：手动启动 gateway 查看完整错误输出：
+
+```powershell
+# 找到安装目录
+$appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "openclaw-desktop.exe" -Recurse -ErrorAction SilentlyContinue | Select -First 1).DirectoryName
+
+# 手动运行 gateway
+& "$appDir\node-runtime\win-x64\node.exe" "$appDir\gateway-bundle\openclaw.mjs" gateway --port 18789
+```
 
 ---
 

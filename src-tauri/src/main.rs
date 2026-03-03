@@ -133,8 +133,13 @@ fn main() {
 
             // 解析并设置 gateway bundle 目录
             let gateway_dir = resolve_gateway_bundle_dir(app);
-            std::env::set_var("OPENCLAW_GATEWAY_BUNDLE_DIR", gateway_dir.to_str().unwrap_or("."));
-            log::info!("[Main] OPENCLAW_GATEWAY_BUNDLE_DIR = {}", gateway_dir.display());
+            // Windows 上 Tauri 的 resource_dir() 返回 \\?\ 前缀的路径，
+            // Node.js 无法正确解析此前缀（会导致 EISDIR: lstat 'C:' 错误），需要去掉
+            let gateway_dir_str = gateway_dir.to_str().unwrap_or(".");
+            #[cfg(windows)]
+            let gateway_dir_str = gateway_dir_str.strip_prefix("\\\\?\\").unwrap_or(gateway_dir_str);
+            std::env::set_var("OPENCLAW_GATEWAY_BUNDLE_DIR", gateway_dir_str);
+            log::info!("[Main] OPENCLAW_GATEWAY_BUNDLE_DIR = {}", gateway_dir_str);
 
             // 创建 GatewayManager 并存储到 app state
             let gm = gateway::GatewayManager::new(18789);
