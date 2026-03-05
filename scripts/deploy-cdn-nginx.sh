@@ -1,8 +1,8 @@
 #!/bin/bash
 # 在原服务器上配置 cdn.openclawcn.net 子域名
-# 用法: ssh root@8.223.32.138 'bash -s' < scripts/deploy-cdn-nginx.sh
+# 用法: ssh root@47.57.241.17 'bash -s' < scripts/deploy-cdn-nginx.sh
 #
-# 前提: 已在 DNS 中将 cdn.openclawcn.net 指向 8.223.32.138
+# 前提: 已在 DNS 中将 cdn.openclawcn.net 指向 47.57.241.17
 # 当前临时指向原服务器，后续会切换到真正的 CDN
 
 set -euo pipefail

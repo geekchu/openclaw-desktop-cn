@@ -3002,54 +3002,6 @@
   height: 16px;
 }
 
-/* Test result */
-.onestop-custom-test-result {
-  padding: 14px 18px;
-  border-radius: var(--radius-lg);
-  margin-top: 8px;
-}
-
-.onestop-custom-test-result.success {
-  background: #22c55e14;
-  border: 1px solid #22c55e30;
-}
-
-.onestop-custom-test-result.error {
-  background: #ef444414;
-  border: 1px solid #ef444430;
-}
-
-.onestop-custom-test-result__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.onestop-custom-test-result.success .onestop-custom-test-result__header {
-  color: #4ade80;
-}
-
-.onestop-custom-test-result.error .onestop-custom-test-result__header {
-  color: #f87171;
-}
-
-.onestop-custom-test-result__body {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.5;
-}
-
-.onestop-custom-test-result__error-body {
-  background: #ef44441a;
-  color: #fca5a5;
-}
-
 /* Add section */
 .onestop-custom-add-section {
   border-radius: var(--radius-lg);

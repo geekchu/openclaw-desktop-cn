@@ -4,7 +4,7 @@ import paramiko
 import os
 import sys
 
-HOST = "8.223.32.138"
+HOST = "47.57.241.17"
 USER = "root"
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "Wqx505@550719")
 REMOTE_DIR = "/var/www/openclawcn_web"
@@ -61,7 +61,7 @@ def main():
     print(f"Connecting to {HOST}...")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(HOST, username=USER, password=PASSWORD, timeout=30)
+    ssh.connect(HOST, username=USER, password=PASSWORD, timeout=30, banner_timeout=60)
     print("Connected!")
 
     if action == "upload":

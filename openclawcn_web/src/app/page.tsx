@@ -4,7 +4,7 @@ import ImageLightbox from "@/components/ImageLightbox";
 import { OpenClawLogo, aiModelLogos, appLogos } from "@/components/logos";
 
 export const metadata: Metadata = {
-  title: "OpenClaw桌面版下载 — 龙虾AI助理，一键安装的全能 AI 助手",
+  title: "OpenClaw桌面版 — 龙虾AI助理，一键安装的全能 AI 助手",
   description:
     "OpenClaw 中文版免费下载。龙虾AI助理 桌面客户端支持 Windows/macOS 一键安装，接入 ChatGPT、Claude、DeepSeek 等 10+ 大模型，Clawdbot/MoltBot 中文版，通过微信钉钉飞书操控 AI。",
   alternates: {
@@ -149,7 +149,7 @@ export default function Home() {
         aria-label="OpenClaw 下载"
       >
         <h2 className="text-xl md:text-2xl font-bold text-[#1a1a2e] mb-1">
-          <span className="text-[#ef4b58]">⟩</span> OpenClaw桌面版下载
+          <span className="text-[#ef4b58]">⟩</span> OpenClaw桌面版
         </h2>
         <p className="text-[#999] text-sm md:text-base mb-5">
           选择你的平台，一键安装，30 秒即可开始使用龙虾AI助理

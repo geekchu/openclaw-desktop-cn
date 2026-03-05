@@ -29,7 +29,7 @@
                                         │        └── *.AppImage              │
                                         └───────────────────────────────────┘
 
-构建机器 (Windows / macOS)                         更新服务器 (8.223.32.138)
+构建机器 (Windows / macOS)                         更新服务器 (47.57.241.17)
 ┌──────────────────┐   scp 上传产物 + latest.json   ┌───────────────────────┐
 │ pnpm installer:  │ ─────────────────────────────→ │ /var/www/             │
 │   build          │   publish-update.sh            │   openclaw-update/    │
@@ -96,7 +96,7 @@
 
 ### 3. 服务器初始化（已完成）
 
-更新服务器 `8.223.32.138`（openclawcn.net）已配置完毕：
+更新服务器 `47.57.241.17`（openclawcn.net）已配置完毕：
 
 - `/var/www/openclaw-update/` 目录已创建
 - `/var/www/openclaw-update/artifacts/` 目录已创建
@@ -121,7 +121,7 @@ ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 >
 > - `openclawcn.net/update/latest.json` — 更新元数据（版本号、签名），由原服务器直接提供
 > - `cdn.openclawcn.net/update/artifacts/` — 安装包二进制文件，通过 CDN 分发加速下载
-> - 当前 `cdn.openclawcn.net` 临时指向原服务器 `8.223.32.138`，后续切换 DNS 即可无缝迁移到真正的 CDN
+> - 当前 `cdn.openclawcn.net` 临时指向原服务器 `47.57.241.17`，后续切换 DNS 即可无缝迁移到真正的 CDN
 
 ---
 
@@ -223,7 +223,7 @@ pnpm installer:build
 # Windows 下先确保原生 jq 在 PATH 中（如果已配好可跳过）
 export PATH="/c/Users/$USERNAME/AppData/Local/Microsoft/WinGet/Packages:$PATH"
 
-bash scripts/publish-update.sh 0.3.0 root@8.223.32.138
+bash scripts/publish-update.sh 0.3.0 root@47.57.241.17
 ```
 
 脚本自动完成：
@@ -243,7 +243,7 @@ bash scripts/publish-update.sh 0.3.0 root@8.223.32.138
 **1) 上传安装包到服务器**
 
 ```powershell
-scp src-tauri\target\release\bundle\nsis\*setup.exe root@8.223.32.138:/var/www/openclaw-update/artifacts/
+scp src-tauri\target\release\bundle\nsis\*setup.exe root@47.57.241.17:/var/www/openclaw-update/artifacts/
 ```
 
 **2) 读取签名内容**
@@ -256,7 +256,7 @@ Write-Host $sig
 **3) 在服务器上写入 latest.json**
 
 ```bash
-ssh root@8.223.32.138
+ssh root@47.57.241.17
 
 cat > /var/www/openclaw-update/latest.json << 'EOF'
 {
@@ -453,9 +453,9 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 
 | 项目           | 值                                          |
 | -------------- | ------------------------------------------- |
-| IP             | `8.223.32.138`                              |
+| IP             | `47.57.241.17`                              |
 | 域名           | `openclawcn.net`                            |
-| SSH            | `root@8.223.32.138`                         |
+| SSH            | `root@47.57.241.17`                         |
 | 更新文件根目录 | `/var/www/openclaw-update/`                 |
 | Nginx 站点配置 | `/etc/nginx/sites-available/openclawcn.net` |
 | SSL 证书       | Let's Encrypt，自动续期                     |
@@ -485,7 +485,7 @@ location = /update/latest.json {
 发布多个版本后，`/var/www/openclaw-update/artifacts/` 目录会积累旧安装包。可定期清理：
 
 ```bash
-ssh root@8.223.32.138
+ssh root@47.57.241.17
 
 # 查看当前占用
 du -sh /var/www/openclaw-update/artifacts/*
