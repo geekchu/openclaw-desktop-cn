@@ -175,7 +175,7 @@ export default function Home() {
               </div>
             </div>
             <a
-              href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.1_x64-setup.exe"
+              href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.3_x64-setup.exe"
               className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#ef4b58] to-[#ff7079] text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-[#ef4b58]/15 hover:shadow-lg hover:shadow-[#ef4b58]/25 hover:scale-[1.02] transition-all duration-300"
             >
               <svg
@@ -192,7 +192,7 @@ export default function Home() {
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              下载 Windows 版 (v0.2.1)
+              下载 Windows 版 (v0.2.3)
             </a>
           </div>
 
