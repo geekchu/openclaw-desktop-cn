@@ -803,6 +803,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
         cmd.env("OPENCLAW_DESKTOP", "1");
         cmd.env("OPENCLAW_NO_RESPAWN", "1");
+        cmd.env("OPENCLAW_GATEWAY_PORT", "28789");
         cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
@@ -906,6 +907,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
     cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
     cmd.env("OPENCLAW_DESKTOP", "1");
     cmd.env("OPENCLAW_NO_RESPAWN", "1");
+    cmd.env("OPENCLAW_GATEWAY_PORT", "28789");
     cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
     if let Some(ref prefix) = npm_prefix {
         cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
