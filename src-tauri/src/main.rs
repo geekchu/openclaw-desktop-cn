@@ -142,7 +142,7 @@ fn main() {
             log::info!("[Main] OPENCLAW_GATEWAY_BUNDLE_DIR = {}", gateway_dir_str);
 
             // 创建 GatewayManager 并存储到 app state
-            let gm = gateway::GatewayManager::new(18789);
+            let gm = gateway::GatewayManager::new(28789);
             app.manage(gm);
 
             // 创建终端状态管理
@@ -316,9 +316,9 @@ fn main() {
                         if gm.wait_for_ready(300) {
                             // Gateway 就绪，导航 webview 到 gateway URL
                             let url = if let Some(token) = read_gateway_token() {
-                                format!("http://localhost:18789?token={}", token)
+                                format!("http://localhost:28789?token={}", token)
                             } else {
-                                "http://localhost:18789".to_string()
+                                "http://localhost:28789".to_string()
                             };
                             let _ = handle.emit("gateway-ready", url.as_str());
                             // 使用 Tauri navigate API（绕过 webview 安全策略限制）

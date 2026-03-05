@@ -12,7 +12,7 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-const SERVICE_PORT: u16 = 18789;
+const SERVICE_PORT: u16 = 28789;
 
 /// 检测端口是否有服务在监听，返回 PID
 /// 简单直接：端口被占用 = 服务运行中
@@ -243,8 +243,8 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
     if gm.wait_for_ready(60) {
         // 重启成功，通知前端重新导航
         let url = match crate::read_gateway_token() {
-            Some(token) => format!("http://localhost:{}?token={}", 18789, token),
-            None => format!("http://localhost:{}", 18789),
+            Some(token) => format!("http://localhost:{}?token={}", 28789, token),
+            None => format!("http://localhost:{}", 28789),
         };
         let _ = app.emit("gateway-ready", url.as_str());
         if let Some(window) = app.get_webview_window("main") {

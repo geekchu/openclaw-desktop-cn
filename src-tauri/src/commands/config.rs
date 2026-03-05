@@ -212,7 +212,7 @@ pub async fn get_dashboard_url() -> Result<String, String> {
     info!("[Dashboard URL] 获取 Dashboard URL...");
     
     let token = get_or_create_gateway_token().await?;
-    let url = format!("http://localhost:18789?token={}", token);
+    let url = format!("http://localhost:28789?token={}", token);
     
     info!("[Dashboard URL] ✓ URL: {}...", &url[..50.min(url.len())]);
     Ok(url)

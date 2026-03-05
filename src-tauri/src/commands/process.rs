@@ -58,13 +58,13 @@ pub async fn check_port_in_use(port: u16) -> Result<bool, String> {
     info!("[进程检查] 检查端口 {} 是否被占用...", port);
     
     // 使用 openclaw health 检查 gateway 是否在运行
-    // 如果 port 是默认的 18789，直接使用 openclaw health
-    if port == 18789 {
-        debug!("[进程检查] 使用 openclaw health 检查端口 18789...");
+    // 如果 port 是默认的 28789，直接使用 openclaw health
+    if port == 28789 {
+        debug!("[进程检查] 使用 openclaw health 检查端口 28789...");
         let result = shell::run_openclaw(&["health", "--timeout", "2000"]);
         // 如果 health 命令成功，说明端口被 gateway 占用
         let in_use = result.is_ok();
-        info!("[进程检查] 端口 18789 状态: {}", if in_use { "被占用" } else { "空闲" });
+        info!("[进程检查] 端口 28789 状态: {}", if in_use { "被占用" } else { "空闲" });
         return Ok(in_use);
     }
     
