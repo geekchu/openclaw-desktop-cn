@@ -1,7 +1,8 @@
 import { html } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { until } from "lit/directives/until.js";
 import { icons } from "../icons.ts";
-import { toSanitizedMarkdownHtml } from "../markdown.ts";
+import { toSanitizedMarkdownHtmlAsync } from "../markdown.ts";
 
 export type MarkdownSidebarProps = {
   content: string | null;
@@ -29,7 +30,14 @@ export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
               </button>
             `
             : props.content
-              ? html`<div class="sidebar-markdown">${unsafeHTML(toSanitizedMarkdownHtml(props.content))}</div>`
+              ? html`<div class="sidebar-markdown">${until(
+                  toSanitizedMarkdownHtmlAsync(props.content).then((htmlStr) =>
+                    unsafeHTML(htmlStr),
+                  ),
+                  html`
+                    <span class="chat-loading-markdown">...</span>
+                  `,
+                )}</div>`
               : html`
                   <div class="muted">暂无内容</div>
                 `

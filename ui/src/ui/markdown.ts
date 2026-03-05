@@ -1,11 +1,4 @@
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 import { truncateText } from "./format.ts";
-
-marked.setOptions({
-  gfm: true,
-  breaks: true,
-});
 
 const allowedTags = [
   "a",
@@ -72,7 +65,41 @@ function setCachedMarkdown(key: string, value: string) {
   }
 }
 
-function installHooks() {
+// Lazy-loaded engine definitions
+type EngineType = {
+  DOMPurify: typeof import("dompurify").default;
+  marked: typeof import("marked").marked;
+  htmlEscapeRenderer: import("marked").Renderer;
+};
+
+let enginePromise: Promise<EngineType> | null = null;
+
+async function loadMarkdownEngine(): Promise<EngineType> {
+  if (enginePromise) {
+    return enginePromise;
+  }
+  enginePromise = (async () => {
+    const [dompurifyMod, markedMod] = await Promise.all([import("dompurify"), import("marked")]);
+
+    const DOMPurify = dompurifyMod.default;
+    const { marked } = markedMod;
+
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+    });
+
+    // Prevent raw HTML in chat messages from being rendered as formatted HTML.
+    // Display it as escaped text so users see the literal markup.
+    const htmlEscapeRenderer = new marked.Renderer();
+    htmlEscapeRenderer.html = ({ text }: { text: string }) => escapeHtml(text);
+
+    return { DOMPurify, marked, htmlEscapeRenderer };
+  })();
+  return enginePromise;
+}
+
+function installHooks(DOMPurify: EngineType["DOMPurify"]) {
   if (hooksInstalled) {
     return;
   }
@@ -91,18 +118,22 @@ function installHooks() {
   });
 }
 
-export function toSanitizedMarkdownHtml(markdown: string): string {
+export async function toSanitizedMarkdownHtmlAsync(markdown: string): Promise<string> {
   const input = markdown.trim();
   if (!input) {
     return "";
   }
-  installHooks();
+
   if (input.length <= MARKDOWN_CACHE_MAX_CHARS) {
     const cached = getCachedMarkdown(input);
     if (cached !== null) {
       return cached;
     }
   }
+
+  const engine = await loadMarkdownEngine();
+  installHooks(engine.DOMPurify);
+
   const truncated = truncateText(input, MARKDOWN_CHAR_LIMIT);
   const suffix = truncated.truncated
     ? `\n\n… truncated (${truncated.total} chars, showing first ${truncated.text.length}).`
@@ -110,28 +141,21 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
   if (truncated.text.length > MARKDOWN_PARSE_LIMIT) {
     const escaped = escapeHtml(`${truncated.text}${suffix}`);
     const html = `<pre class="code-block">${escaped}</pre>`;
-    const sanitized = DOMPurify.sanitize(html, sanitizeOptions);
+    const sanitized = engine.DOMPurify.sanitize(html, sanitizeOptions);
     if (input.length <= MARKDOWN_CACHE_MAX_CHARS) {
       setCachedMarkdown(input, sanitized);
     }
     return sanitized;
   }
-  const rendered = marked.parse(`${truncated.text}${suffix}`, {
-    renderer: htmlEscapeRenderer,
-  }) as string;
-  const sanitized = DOMPurify.sanitize(rendered, sanitizeOptions);
+  const rendered = (await engine.marked.parse(`${truncated.text}${suffix}`, {
+    renderer: engine.htmlEscapeRenderer,
+  })) as string;
+  const sanitized = engine.DOMPurify.sanitize(rendered, sanitizeOptions);
   if (input.length <= MARKDOWN_CACHE_MAX_CHARS) {
     setCachedMarkdown(input, sanitized);
   }
   return sanitized;
 }
-
-// Prevent raw HTML in chat messages from being rendered as formatted HTML.
-// Display it as escaped text so users see the literal markup.
-// Security is handled by DOMPurify, but rendering pasted HTML (e.g. error
-// pages) as formatted output is confusing UX (#13937).
-const htmlEscapeRenderer = new marked.Renderer();
-htmlEscapeRenderer.html = ({ text }: { text: string }) => escapeHtml(text);
 
 function escapeHtml(value: string): string {
   return value

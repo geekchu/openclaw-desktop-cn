@@ -122,34 +122,15 @@ impl GatewayManager {
     /// 轮询等待 gateway 就绪，最多等待 timeout_secs 秒
     /// 需要连续多次检测到就绪状态才确认（避免在插件加载阻塞前的短暂窗口误判为就绪）
     pub fn wait_for_ready(&self, timeout_secs: u64) -> bool {
-        let poll_interval = Duration::from_millis(200);
+        let poll_interval = Duration::from_millis(50);
         let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
         let mut last_child_check = std::time::Instant::now();
-        // 需要连续 2 次检测成功（间隔 500ms）才认为真正就绪，
-        // 避免在 HTTP 端口绑定后、WebSocket handler 注册前的短暂窗口误判
-        let required_consecutive = 2;
-        let mut consecutive_ready = 0u32;
-        let sustained_check_interval = Duration::from_millis(500);
 
         loop {
             if self.is_ready() {
-                consecutive_ready += 1;
-                if consecutive_ready >= required_consecutive {
-                    let elapsed = std::time::Instant::now().duration_since(deadline - Duration::from_secs(timeout_secs));
-                    info!("[Gateway] gateway 已就绪 ({:.1}秒)", elapsed.as_secs_f64());
-                    return true;
-                }
-                // 就绪但还需要更多确认，等待后再检查
-                if consecutive_ready == 1 {
-                    info!("[Gateway] gateway 首次响应，验证稳定性 ({}/{})", consecutive_ready, required_consecutive);
-                }
-                std::thread::sleep(sustained_check_interval);
-                continue;
-            } else {
-                if consecutive_ready > 0 {
-                    info!("[Gateway] gateway 响应中断 (已连续{}次成功后失败，重置计数)", consecutive_ready);
-                }
-                consecutive_ready = 0;
+                let elapsed = std::time::Instant::now().duration_since(deadline - Duration::from_secs(timeout_secs));
+                info!("[Gateway] gateway 已就绪 ({:.1}秒)", elapsed.as_secs_f64());
+                return true;
             }
 
             if std::time::Instant::now() >= deadline {

@@ -1,8 +1,9 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { until } from "lit/directives/until.js";
 import type { AssistantIdentity } from "../assistant-identity.ts";
 import type { MessageGroup } from "../types/chat-types.ts";
-import { toSanitizedMarkdownHtml } from "../markdown.ts";
+import { toSanitizedMarkdownHtmlAsync } from "../markdown.ts";
 import { detectTextDirection } from "../text-direction.ts";
 import { renderCopyAsMarkdownButton } from "./copy-as-markdown.ts";
 import {
@@ -266,14 +267,24 @@ function renderGroupedMessage(
       ${renderMessageImages(images)}
       ${
         reasoningMarkdown
-          ? html`<div class="chat-thinking">${unsafeHTML(
-              toSanitizedMarkdownHtml(reasoningMarkdown),
+          ? html`<div class="chat-thinking">${until(
+              toSanitizedMarkdownHtmlAsync(reasoningMarkdown).then((htmlStr) =>
+                unsafeHTML(htmlStr),
+              ),
+              html`
+                <span class="chat-loading-markdown">...</span>
+              `,
             )}</div>`
           : nothing
       }
       ${
         markdown
-          ? html`<div class="chat-text" dir="${detectTextDirection(markdown)}">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}</div>`
+          ? html`<div class="chat-text" dir="${detectTextDirection(markdown)}">${until(
+              toSanitizedMarkdownHtmlAsync(markdown).then((htmlStr) => unsafeHTML(htmlStr)),
+              html`
+                <span class="chat-loading-markdown">...</span>
+              `,
+            )}</div>`
           : nothing
       }
       ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}
