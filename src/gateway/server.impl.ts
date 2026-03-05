@@ -2,7 +2,6 @@ import path from "node:path";
 import type { CanvasHostServer } from "../canvas-host/server.js";
 import type { PluginRegistry } from "../plugins/registry.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
-import { setActivePluginRegistry } from "../plugins/runtime.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { ControlUiRootState } from "./control-ui.js";
 import type { startBrowserControlServerIfEnabled } from "./server-browser.js";
@@ -45,7 +44,7 @@ import {
 import { scheduleGatewayUpdateCheck } from "../infra/update-startup.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
-import { getGlobalHookRunner, initializeGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
+import { getGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
 import { getTotalQueueSize } from "../process/command-queue.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import { createAuthRateLimiter, type AuthRateLimiter } from "./auth-rate-limit.js";
@@ -66,7 +65,7 @@ import { safeParseJson } from "./server-methods/nodes.helpers.js";
 import { hasConnectedMobileNode } from "./server-mobile-nodes.js";
 import { loadGatewayModelCatalog } from "./server-model-catalog.js";
 import { createNodeSubscriptionManager } from "./server-node-subscriptions.js";
-import { loadGatewayCorePluginsAsync, loadGatewayChannelPluginsAsync, mergePluginRegistry } from "./server-plugins.js";
+import { loadGatewayPlugins } from "./server-plugins.js";
 import { createGatewayReloadHandlers } from "./server-reload-handlers.js";
 import { resolveGatewayRuntimeConfig } from "./server-runtime-config.js";
 import { createGatewayRuntimeState } from "./server-runtime-state.js";
@@ -239,6 +238,7 @@ export async function startGatewayServer(
   initSubagentRegistry();
   const defaultAgentId = resolveDefaultAgentId(cfgAtStart);
   const defaultWorkspaceDir = resolveAgentWorkspaceDir(cfgAtStart, defaultAgentId);
+  const baseMethods = listGatewayMethods();
   const emptyPluginRegistry: PluginRegistry = {
     plugins: [],
     tools: [],
@@ -254,11 +254,24 @@ export async function startGatewayServer(
     commands: [],
     diagnostics: [],
   };
-
-  let pluginRegistry: PluginRegistry | null = null;
-  const baseMethods = listGatewayMethods();
-
-  console.time("time: resolveGatewayRuntimeConfig");
+  const { pluginRegistry, gatewayMethods: baseGatewayMethods } = minimalTestGateway
+    ? { pluginRegistry: emptyPluginRegistry, gatewayMethods: baseMethods }
+    : loadGatewayPlugins({
+        cfg: cfgAtStart,
+        workspaceDir: defaultWorkspaceDir,
+        log,
+        coreGatewayHandlers,
+        baseMethods,
+      });
+  const channelLogs = Object.fromEntries(
+    listChannelPlugins().map((plugin) => [plugin.id, logChannels.child(plugin.id)]),
+  ) as Record<ChannelId, ReturnType<typeof createSubsystemLogger>>;
+  const channelRuntimeEnvs = Object.fromEntries(
+    Object.entries(channelLogs).map(([id, logger]) => [id, runtimeForLogger(logger)]),
+  ) as Record<ChannelId, RuntimeEnv>;
+  const channelMethods = listChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? []);
+  const gatewayMethods = Array.from(new Set([...baseGatewayMethods, ...channelMethods]));
+  let pluginServices: PluginServicesHandle | null = null;
   const runtimeConfig = await resolveGatewayRuntimeConfig({
     cfg: cfgAtStart,
     port,
@@ -270,7 +283,6 @@ export async function startGatewayServer(
     auth: opts.auth,
     tailscale: opts.tailscale,
   });
-  console.timeEnd("time: resolveGatewayRuntimeConfig");
   const {
     bindHost,
     controlUiEnabled,
@@ -309,9 +321,7 @@ export async function startGatewayServer(
       cwd: process.cwd(),
     });
     if (!resolvedRoot) {
-      console.time("time: ensureControlUiAssetsBuilt");
       const ensureResult = await ensureControlUiAssetsBuilt(gatewayRuntime);
-      console.timeEnd("time: ensureControlUiAssetsBuilt");
       if (!ensureResult.ok && ensureResult.message) {
         log.warn(`gateway: ${ensureResult.message}`);
       }
@@ -331,9 +341,7 @@ export async function startGatewayServer(
 
   const deps = createDefaultDeps();
   let canvasHostServer: CanvasHostServer | null = null;
-  console.time("time: loadGatewayTlsRuntime");
   const gatewayTls = await loadGatewayTlsRuntime(cfgAtStart.gateway?.tls, log.child("tls"));
-  console.timeEnd("time: loadGatewayTlsRuntime");
   if (cfgAtStart.gateway?.tls?.enabled && !gatewayTls.enabled) {
     throw new Error(gatewayTls.error ?? "gateway tls: failed to enable");
   }
@@ -369,7 +377,7 @@ export async function startGatewayServer(
     rateLimiter: authRateLimiter,
     gatewayTls,
     hooksConfig: () => hooksConfig,
-    getPluginRegistry: () => pluginRegistry,
+    pluginRegistry,
     deps,
     canvasRuntime,
     canvasHostEnabled,
@@ -379,51 +387,6 @@ export async function startGatewayServer(
     logHooks,
     logPlugins,
   });
-
-  // Load core (non-channel) plugins first — channel plugins are loaded lazily below
-  console.time("time: loadGatewayCorePlugins");
-  const { pluginRegistry: loadedRegistry, gatewayMethods: baseGatewayMethods } = minimalTestGateway
-    ? { pluginRegistry: emptyPluginRegistry, gatewayMethods: baseMethods }
-    : await loadGatewayCorePluginsAsync({
-        cfg: cfgAtStart,
-        workspaceDir: defaultWorkspaceDir,
-        log,
-        coreGatewayHandlers,
-        baseMethods,
-      });
-  console.timeEnd("time: loadGatewayCorePlugins");
-  pluginRegistry = loadedRegistry;
-
-  // Load channel plugins (deferred from core load to let HTTP port bind faster)
-  if (!minimalTestGateway) {
-    console.time("time: loadGatewayChannelPlugins");
-    const { pluginRegistry: channelRegistry } =
-      await loadGatewayChannelPluginsAsync({
-        cfg: cfgAtStart,
-        workspaceDir: defaultWorkspaceDir,
-        log,
-        coreGatewayHandlers,
-        baseMethods,
-      });
-    console.timeEnd("time: loadGatewayChannelPlugins");
-    mergePluginRegistry(pluginRegistry, channelRegistry);
-  }
-
-  // Now that all plugins are loaded, set the active registry
-  // so listChannelPlugins() and other runtime queries work correctly
-  setActivePluginRegistry(pluginRegistry);
-  initializeGlobalHookRunner(pluginRegistry);
-
-  const channelLogs = Object.fromEntries(
-    listChannelPlugins().map((plugin) => [plugin.id, logChannels.child(plugin.id)]),
-  ) as Record<ChannelId, ReturnType<typeof createSubsystemLogger>>;
-  const channelRuntimeEnvs = Object.fromEntries(
-    Object.entries(channelLogs).map(([id, logger]) => [id, runtimeForLogger(logger)]),
-  ) as Record<ChannelId, RuntimeEnv>;
-  const channelMethods = listChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? []);
-  const gatewayMethods = Array.from(new Set([...baseGatewayMethods, ...channelMethods]));
-  let pluginServices: PluginServicesHandle | null = null;
-
   let bonjourStop: (() => Promise<void>) | null = null;
   const nodeRegistry = new NodeRegistry();
   const nodePresenceTimers = new Map<string, ReturnType<typeof setInterval>>();

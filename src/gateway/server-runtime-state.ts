@@ -46,7 +46,7 @@ export async function createGatewayRuntimeState(params: {
   rateLimiter?: AuthRateLimiter;
   gatewayTls?: GatewayTlsRuntime;
   hooksConfig: () => HooksConfigResolved | null;
-  getPluginRegistry: () => PluginRegistry | null;
+  pluginRegistry: PluginRegistry;
   deps: CliDeps;
   canvasRuntime: RuntimeEnv;
   canvasHostEnabled: boolean;
@@ -110,20 +110,10 @@ export async function createGatewayRuntimeState(params: {
     logHooks: params.logHooks,
   });
 
-  let pluginHandler: import("./server-http.js").HooksRequestHandler | null = null;
-  const handlePluginRequest: import("./server-http.js").HooksRequestHandler = async (req, res) => {
-    const registry = params.getPluginRegistry();
-    if (!registry) {
-      return false;
-    }
-    if (!pluginHandler) {
-      pluginHandler = createGatewayPluginRequestHandler({
-        registry,
-        log: params.logPlugins,
-      });
-    }
-    return pluginHandler(req, res);
-  };
+  const handlePluginRequest = createGatewayPluginRequestHandler({
+    registry: params.pluginRegistry,
+    log: params.logPlugins,
+  });
 
   const bindHosts = await resolveGatewayListenHosts(params.bindHost);
   const httpServers: HttpServer[] = [];
