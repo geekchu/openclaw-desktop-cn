@@ -7,6 +7,7 @@
 ## 📦 插件管理
 
 ### 安装插件
+
 ```bash
 # 从当前目录安装插件
 openclaw plugins install .
@@ -16,6 +17,7 @@ openclaw plugins install /path/to/plugin
 ```
 
 ### 禁用/启用插件
+
 ```bash
 # 禁用指定插件
 openclaw plugins disable qqbot
@@ -25,6 +27,7 @@ openclaw plugins enable qqbot
 ```
 
 ### 查看已安装插件
+
 ```bash
 openclaw plugins list
 ```
@@ -34,6 +37,7 @@ openclaw plugins list
 ## 📺 通道管理
 
 ### 配置 QQBot 通道
+
 ```bash
 # QQBot 是自定义插件，通过 config set 配置（不是 channels add）
 openclaw config set channels.qqbot.appId "你的AppID"
@@ -45,11 +49,13 @@ openclaw config set channels.qqbot.enabled true
 > QQBot 作为自定义插件，需通过 `config set` 或直接编辑 `~/.openclaw/openclaw.json` 配置。
 
 ### 禁用通道
+
 ```bash
 openclaw config set channels.qqbot.enabled false
 ```
 
 ### 查看通道列表
+
 ```bash
 openclaw channels list
 ```
@@ -59,6 +65,7 @@ openclaw channels list
 ## 🚀 网关控制
 
 ### 启动网关
+
 ```bash
 # 普通启动
 openclaw gateway
@@ -68,11 +75,13 @@ openclaw gateway --verbose
 ```
 
 ### 重启网关
+
 ```bash
 openclaw gateway restart
 ```
 
 ### 停止网关
+
 ```bash
 openclaw gateway stop
 ```
@@ -82,6 +91,7 @@ openclaw gateway stop
 ## 📋 日志查看
 
 ### 查看实时日志
+
 ```bash
 # 跟踪模式（实时刷新）
 openclaw logs --follow
@@ -91,12 +101,14 @@ openclaw logs
 ```
 
 ### 查看指定行数
+
 ```bash
 # 查看最近 100 行日志
 openclaw logs --limit 100
 ```
 
 ### 其他日志选项
+
 ```bash
 # JSON 格式输出
 openclaw logs --json
@@ -110,6 +122,7 @@ openclaw logs --plain
 ## ⚙️ 配置管理
 
 ### 设置配置项
+
 ```bash
 # 启用 Markdown 消息格式
 openclaw config set channels.qqbot.markdownSupport true
@@ -119,12 +132,14 @@ openclaw config set channels.qqbot.markdownSupport false
 ```
 
 ### 获取配置项
+
 ```bash
 # 查看某个配置项的值
 openclaw config get channels.qqbot.markdownSupport
 ```
 
 ### 查看所有配置
+
 ```bash
 openclaw config
 ```
@@ -136,6 +151,7 @@ openclaw config
 项目中提供了一些便捷脚本，简化日常操作：
 
 ### 一键升级并启动
+
 ```bash
 # 基本用法
 ./upgrade-and-run.sh
@@ -151,6 +167,7 @@ openclaw config
 ```
 
 **环境变量方式：**
+
 ```bash
 export QQBOT_APPID="123456789"
 export QQBOT_SECRET="your_secret"
@@ -159,6 +176,7 @@ export QQBOT_MARKDOWN="no"
 ```
 
 ### Markdown 设置脚本
+
 ```bash
 # 启用 Markdown
 ./set-markdown.sh enable
@@ -174,6 +192,7 @@ export QQBOT_MARKDOWN="no"
 ```
 
 ### 升级脚本（清理旧版本）
+
 ```bash
 # 清理旧版本插件和配置
 bash ./scripts/upgrade.sh
@@ -183,33 +202,37 @@ bash ./scripts/upgrade.sh
 
 ## 📁 常用路径
 
-| 路径 | 说明 |
-|------|------|
-| `~/.openclaw/` | OpenClaw 主目录 |
-| `~/.openclaw/openclaw.json` | 全局配置文件 |
-| `~/.openclaw/extensions/` | 插件安装目录 |
-| `~/.openclaw/extensions/qqbot/` | QQBot 插件目录 |
+| 路径                            | 说明            |
+| ------------------------------- | --------------- |
+| `~/.openclaw/`                  | OpenClaw 主目录 |
+| `~/.openclaw/openclaw.json`     | 全局配置文件    |
+| `~/.openclaw/extensions/`       | 插件安装目录    |
+| `~/.openclaw/extensions/qqbot/` | QQBot 插件目录  |
 
 ---
 
 ## 🔧 故障排查
 
 ### 查看详细日志
+
 ```bash
 openclaw logs --follow
 ```
 
 ### 检查插件状态
+
 ```bash
 openclaw plugins list
 ```
 
 ### 检查通道配置
+
 ```bash
 openclaw channels list
 ```
 
 ### 重新安装插件
+
 ```bash
 # 1. 清理旧版本
 bash ./scripts/upgrade.sh

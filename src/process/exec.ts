@@ -70,11 +70,12 @@ export async function runExec(
 ): Promise<{ stdout: string; stderr: string }> {
   const options =
     typeof opts === "number"
-      ? { timeout: opts, encoding: "utf8" as const }
+      ? { timeout: opts, encoding: "utf8" as const, windowsHide: true }
       : {
           timeout: opts.timeoutMs,
           maxBuffer: opts.maxBuffer,
           encoding: "utf8" as const,
+          windowsHide: true,
         };
   try {
     const { stdout, stderr } = await execFileAsync(resolveCommand(command), args, options);
@@ -160,12 +161,14 @@ export async function runCommandWithTimeout(
         env: resolvedEnv,
         windowsVerbatimArguments,
         shell: true,
+        windowsHide: true,
       })
     : spawn(resolvedCommand, argv.slice(1), {
         stdio,
         cwd,
         env: resolvedEnv,
         windowsVerbatimArguments,
+        windowsHide: true,
       });
   // Spawn with inherited stdin (TTY) so tools like `pi` stay interactive when needed.
   return await new Promise((resolve, reject) => {

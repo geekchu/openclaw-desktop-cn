@@ -49,7 +49,7 @@ export interface QQBotAccountConfig {
  * 富媒体附件
  */
 export interface MessageAttachment {
-  content_type: string;  // 如 "image/png"
+  content_type: string; // 如 "image/png"
   filename?: string;
   height?: number;
   width?: number;

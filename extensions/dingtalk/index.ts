@@ -1,8 +1,8 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
+import type { DingtalkPluginModule } from "./src/types";
 import { dingtalkPlugin } from "./src/channel";
 import { setDingTalkRuntime } from "./src/runtime";
-import type { DingtalkPluginModule } from "./src/types";
 
 const plugin: DingtalkPluginModule = {
   id: "dingtalk",

@@ -29,9 +29,7 @@ export class WecomCrypto {
   getSignature(timestamp, nonce, encrypt) {
     const shasum = createHash("sha1");
     // WeCom requires plain lexicographic sorting before SHA1; localeCompare is locale-sensitive.
-    const sorted = [this.token, timestamp, nonce, encrypt]
-      .map((value) => String(value))
-      .toSorted();
+    const sorted = [this.token, timestamp, nonce, encrypt].map((value) => String(value)).toSorted();
     shasum.update(sorted.join(""));
     return shasum.digest("hex");
   }
@@ -105,10 +103,7 @@ export class WecomCrypto {
   decryptMedia(encryptedData) {
     const decipher = createDecipheriv("aes-256-cbc", this.aesKey, this.iv);
     decipher.setAutoPadding(false);
-    const decrypted = Buffer.concat([
-      decipher.update(encryptedData),
-      decipher.final(),
-    ]);
+    const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
 
     // Remove PKCS7 padding manually (padded to 32-byte blocks).
     const padLen = decrypted[decrypted.length - 1];

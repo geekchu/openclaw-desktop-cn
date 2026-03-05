@@ -210,8 +210,7 @@
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 
-
-Tauri 调试版本启动 gateway 时，加载的是 
-src-tauri/target/debug/gateway-bundle/dist/ 中的代码，不是 项目根目录的 
-dist/。之前所有的重新编译和修复都只更新了 
+Tauri 调试版本启动 gateway 时，加载的是
+src-tauri/target/debug/gateway-bundle/dist/ 中的代码，不是 项目根目录的
+dist/。之前所有的重新编译和修复都只更新了
 dist/，但 Tauri 二进制文件从未读取过那个目录。

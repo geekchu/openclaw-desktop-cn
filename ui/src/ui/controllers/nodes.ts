@@ -37,7 +37,7 @@ export function loadNodes(state: NodesState, opts?: { quiet?: boolean }): Promis
       state.nodesLoading = true;
       state.lastError = null;
     }
-    
+
     try {
       const res = await client.request<{ nodes?: Record<string, unknown> }>("node.list", {});
       state.nodes = Array.isArray(res.nodes) ? res.nodes : [];

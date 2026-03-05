@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Footer from "@/components/Footer";
 import ImageLightbox from "@/components/ImageLightbox";
+import { OpenClawLogo, aiModelLogos, appLogos } from "@/components/logos";
 
 export const metadata: Metadata = {
   title: "OpenClaw桌面版下载 — 龙虾AI助理，一键安装的全能 AI 助手",
@@ -79,14 +79,7 @@ export default function Home() {
         <div className="relative max-w-4xl mx-auto px-5 pt-10 md:pt-14 pb-8 md:pb-10 text-center">
           {/* Lobster Logo */}
           <div className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-4 animate-float lobster-logo cursor-pointer">
-            <Image
-              src="/logos/openclaw.svg"
-              alt="OpenClaw 龙虾AI助理 Logo"
-              width={96}
-              height={96}
-              className="w-full h-full"
-              priority
-            />
+            <OpenClawLogo className="w-full h-full" aria-label="OpenClaw 龙虾AI助理 Logo" />
           </div>
           <h1 className="text-3xl md:text-5xl font-bold text-[#1a1a2e] mb-1 leading-tight tracking-tight animate-fade-in-up">
             OpenClaw <span className="text-[#ef4b58]">桌面版</span>
@@ -244,24 +237,21 @@ export default function Home() {
           </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 md:gap-3 mb-6 md:mb-8">
-            {aiModels.map((ai, i) => (
-              <div
-                key={i}
-                className="bg-white border border-gray-100 rounded-xl px-3 py-3 md:px-4 md:py-4 text-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col items-center gap-1.5 md:gap-2"
-              >
-                <Image
-                  src={ai.logo}
-                  alt={ai.name}
-                  width={36}
-                  height={36}
-                  className="w-8 h-8 md:w-9 md:h-9 rounded-lg"
-                />
-                <div>
-                  <p className="text-[#1a1a2e] font-semibold text-xs md:text-sm">{ai.name}</p>
-                  <p className="text-[#bbb] text-[10px] md:text-xs mt-0.5">{ai.models}</p>
+            {aiModels.map((ai, i) => {
+              const Logo = aiModelLogos[ai.logo];
+              return (
+                <div
+                  key={i}
+                  className="bg-white border border-gray-100 rounded-xl px-3 py-3 md:px-4 md:py-4 text-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col items-center gap-1.5 md:gap-2"
+                >
+                  {Logo && <Logo className="w-8 h-8 md:w-9 md:h-9 rounded-lg" aria-hidden="true" />}
+                  <div>
+                    <p className="text-[#1a1a2e] font-semibold text-xs md:text-sm">{ai.name}</p>
+                    <p className="text-[#bbb] text-[10px] md:text-xs mt-0.5">{ai.models}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
@@ -444,24 +434,22 @@ export default function Home() {
         </p>
 
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-          {worksWithApps.map((app, i) => (
-            <div
-              key={i}
-              className="bg-white border border-gray-100 rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 aspect-square"
-            >
-              <Image
-                src={app.logo}
-                alt={app.name}
-                width={36}
-                height={36}
-                className="w-8 h-8 md:w-10 md:h-10 mb-2 md:mb-3"
-                loading="lazy"
-              />
-              <span className="text-[#666] text-[10px] md:text-xs text-center font-medium">
-                {app.name}
-              </span>
-            </div>
-          ))}
+          {worksWithApps.map((app, i) => {
+            const Logo = appLogos[app.logo];
+            return (
+              <div
+                key={i}
+                className="bg-white border border-gray-100 rounded-2xl p-3 md:p-4 flex flex-col items-center justify-center shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 aspect-square"
+              >
+                {Logo && (
+                  <Logo className="w-8 h-8 md:w-10 md:h-10 mb-2 md:mb-3" aria-hidden="true" />
+                )}
+                <span className="text-[#666] text-[10px] md:text-xs text-center font-medium">
+                  {app.name}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </section>
 

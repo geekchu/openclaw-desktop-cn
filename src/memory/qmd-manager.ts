@@ -641,6 +641,7 @@ export class QmdMemoryManager implements MemorySearchManager {
       const child = spawn(this.qmd.command, args, {
         env: this.env,
         cwd: this.workspaceDir,
+        windowsHide: true,
       });
       let stdout = "";
       let stderr = "";

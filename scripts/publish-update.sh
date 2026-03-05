@@ -25,6 +25,7 @@ echo "📦 发布 OpenClaw v${VERSION} 更新到 ${SERVER}..."
 
 declare -A PLATFORMS
 declare -A SIGS
+declare -a EXTRA_UPLOADS
 
 # Windows NSIS
 NSIS_DIR="${BUNDLE_BASE}/nsis"
@@ -49,6 +50,12 @@ if [ -d "$MACOS_DIR" ]; then
     PLATFORMS["darwin-aarch64"]="$MAC_FILE"
     SIGS["darwin-aarch64"]="$SIG_CONTENT"
     echo "  ✅ macOS (aarch64): $(basename "$MAC_FILE")"
+  fi
+  # Also collect .dmg for website downloads
+  MAC_DMG=$(find "$MACOS_DIR" -name "*.dmg" 2>/dev/null | head -1)
+  if [ -f "$MAC_DMG" ]; then
+    EXTRA_UPLOADS+=("$MAC_DMG")
+    echo "  ✅ macOS DMG: $(basename "$MAC_DMG")"
   fi
 fi
 
@@ -130,6 +137,14 @@ for PLATFORM in "${!PLATFORMS[@]}"; do
   echo "  📤 $(basename "$FILE")"
   scp "$FILE" "${SERVER}:${REMOTE_DIR}/artifacts/"
 done
+
+# 上传额外用于官网下载的文件 (如 .dmg)
+if [ ${#EXTRA_UPLOADS[@]} -gt 0 ]; then
+  for FILE in "${EXTRA_UPLOADS[@]}"; do
+    echo "  📤 $(basename "$FILE")"
+    scp "$FILE" "${SERVER}:${REMOTE_DIR}/artifacts/"
+  done
+fi
 
 # 上传 latest.json
 echo "  📤 latest.json"

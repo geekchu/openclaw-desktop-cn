@@ -68,10 +68,10 @@ openclaw plugins list
 
 ```json5
 {
-  "plugins": {
-    "enabled": true,
-    "allow": ["dingtalk"]
-  }
+  plugins: {
+    enabled: true,
+    allow: ["dingtalk"],
+  },
 }
 ```
 
@@ -79,9 +79,9 @@ openclaw plugins list
 
 ```json5
 {
-  "plugins": {
-    "allow": ["dingtalk", "telegram", "voice-call"]
-  }
+  plugins: {
+    allow: ["dingtalk", "telegram", "voice-call"],
+  },
 }
 ```
 
@@ -387,12 +387,12 @@ openclaw gateway restart
 
 当 `messageType` 为 `card` 时，插件可以在卡片中实时展示 AI 的推理过程（🤔 思考中）和工具调用结果（🛠️ 工具执行）。这两项功能通过**对话级命令**控制，无需修改配置文件：
 
-| 功能              | 对话命令              | 说明                               |
-| ----------------- | --------------------- | ---------------------------------- |
-| 显示 AI 推理流    | `/reasoning stream`   | 开启后，AI 思考内容实时更新到卡片  |
-| 显示工具执行结果  | `/verbose on`         | 开启后，工具调用结果实时更新到卡片 |
-| 关闭 AI 推理流    | `/reasoning off`      | 关闭推理流显示                     |
-| 关闭工具执行显示  | `/verbose off`        | 关闭工具执行结果显示               |
+| 功能             | 对话命令            | 说明                               |
+| ---------------- | ------------------- | ---------------------------------- |
+| 显示 AI 推理流   | `/reasoning stream` | 开启后，AI 思考内容实时更新到卡片  |
+| 显示工具执行结果 | `/verbose on`       | 开启后，工具调用结果实时更新到卡片 |
+| 关闭 AI 推理流   | `/reasoning off`    | 关闭推理流显示                     |
+| 关闭工具执行显示 | `/verbose off`      | 关闭工具执行结果显示               |
 
 **显示格式：**
 
@@ -405,9 +405,9 @@ openclaw gateway restart
 
 ```json5
 {
-  messageType: 'card', // 启用 AI 互动卡片模式
-  cardTemplateId: '382e4302-551d-4880-bf29-a30acfab2e71.schema', // AI 卡片模板 ID（默认值）
-  cardTemplateKey: 'msgContent', // 卡片内容字段键（默认值：msgContent）
+  messageType: "card", // 启用 AI 互动卡片模式
+  cardTemplateId: "382e4302-551d-4880-bf29-a30acfab2e71.schema", // AI 卡片模板 ID（默认值）
+  cardTemplateKey: "msgContent", // 卡片内容字段键（默认值：msgContent）
 }
 ```
 
@@ -561,7 +561,7 @@ getAccessToken(config, log); // 获取访问令牌
 **使用示例：**
 
 ```typescript
-import { createAICard, streamAICard, finishAICard } from './src/channel';
+import { createAICard, streamAICard, finishAICard } from "./src/channel";
 
 // 创建 AI 卡片
 const card = await createAICard(config, conversationId, messageData, log);

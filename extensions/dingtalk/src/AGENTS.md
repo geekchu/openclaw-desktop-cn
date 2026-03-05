@@ -31,18 +31,18 @@ src/
 
 ## WHERE TO LOOK
 
-| Task | Location | Notes |
-| --- | --- | --- |
-| Inbound processing main entry | `inbound-handler.ts` | `handleDingTalkMessage` |
-| Inbound media download | `inbound-handler.ts` | `downloadMedia` |
-| Session/proactive message send | `send-service.ts` | `sendBySession`, `sendProactive*` |
-| Message mode auto-selection | `send-service.ts` | `sendMessage` card/markdown fallback |
-| AI Card create/stream/finalize | `card-service.ts` | card lifecycle + cache |
-| Token cache | `auth.ts` | `getAccessToken` |
-| Allowlist checks | `access-control.ts` | normalized allowFrom matching |
-| Inbound payload parsing | `message-utils.ts` | `extractMessageContent` |
-| Target/config/workspace helpers | `config.ts` | `getConfig`, `resolveRelativePath`, `stripTargetPrefix` |
-| Plugin wiring | `channel.ts` | exports `dingtalkPlugin` |
+| Task                            | Location             | Notes                                                   |
+| ------------------------------- | -------------------- | ------------------------------------------------------- |
+| Inbound processing main entry   | `inbound-handler.ts` | `handleDingTalkMessage`                                 |
+| Inbound media download          | `inbound-handler.ts` | `downloadMedia`                                         |
+| Session/proactive message send  | `send-service.ts`    | `sendBySession`, `sendProactive*`                       |
+| Message mode auto-selection     | `send-service.ts`    | `sendMessage` card/markdown fallback                    |
+| AI Card create/stream/finalize  | `card-service.ts`    | card lifecycle + cache                                  |
+| Token cache                     | `auth.ts`            | `getAccessToken`                                        |
+| Allowlist checks                | `access-control.ts`  | normalized allowFrom matching                           |
+| Inbound payload parsing         | `message-utils.ts`   | `extractMessageContent`                                 |
+| Target/config/workspace helpers | `config.ts`          | `getConfig`, `resolveRelativePath`, `stripTargetPrefix` |
+| Plugin wiring                   | `channel.ts`         | exports `dingtalkPlugin`                                |
 
 ## CONVENTIONS
 

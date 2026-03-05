@@ -151,7 +151,7 @@ async function resolveBinaryPath(binary: string): Promise<string> {
   const { execSync } = await import("node:child_process");
   const cmd = process.platform === "win32" ? "where" : "which";
   try {
-    const output = execSync(`${cmd} ${binary}`, { encoding: "utf8" }).trim();
+    const output = execSync(`${cmd} ${binary}`, { encoding: "utf8", windowsHide: true }).trim();
     const resolved = output.split(/\r?\n/)[0]?.trim();
     if (!resolved) {
       throw new Error("empty");

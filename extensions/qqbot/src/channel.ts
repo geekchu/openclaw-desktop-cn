@@ -5,12 +5,17 @@ import {
   deleteAccountFromConfigSection,
   setAccountEnabledInConfigSection,
 } from "openclaw/plugin-sdk";
-
 import type { ResolvedQQBotAccount } from "./types.js";
-import { DEFAULT_ACCOUNT_ID, listQQBotAccountIds, resolveQQBotAccount, applyQQBotAccountConfig, resolveDefaultQQBotAccountId } from "./config.js";
-import { sendText, sendMedia } from "./outbound.js";
+import {
+  DEFAULT_ACCOUNT_ID,
+  listQQBotAccountIds,
+  resolveQQBotAccount,
+  applyQQBotAccountConfig,
+  resolveDefaultQQBotAccountId,
+} from "./config.js";
 import { startGateway } from "./gateway.js";
 import { qqbotOnboardingAdapter } from "./onboarding.js";
+import { sendText, sendMedia } from "./outbound.js";
 import { getQQBotRuntime } from "./runtime.js";
 
 /**
@@ -19,16 +24,16 @@ import { getQQBotRuntime } from "./runtime.js";
  */
 function chunkText(text: string, limit: number): string[] {
   if (text.length <= limit) return [text];
-  
+
   const chunks: string[] = [];
   let remaining = text;
-  
+
   while (remaining.length > 0) {
     if (remaining.length <= limit) {
       chunks.push(remaining);
       break;
     }
-    
+
     // 尝试在换行处分割
     let splitAt = remaining.lastIndexOf("\n", limit);
     if (splitAt <= 0 || splitAt < limit * 0.5) {
@@ -39,11 +44,11 @@ function chunkText(text: string, limit: number): string[] {
       // 还是没找到，强制在 limit 处分割
       splitAt = limit;
     }
-    
+
     chunks.push(remaining.slice(0, splitAt));
     remaining = remaining.slice(splitAt).trimStart();
   }
-  
+
   return chunks;
 }
 
@@ -83,7 +88,12 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
         // 先去掉 qqbot: 前缀
         const normalized = id.replace(/^qqbot:/i, "");
         // 支持 c2c:xxx, group:xxx, channel:xxx 格式
-        if (normalized.startsWith("c2c:") || normalized.startsWith("group:") || normalized.startsWith("channel:")) return true;
+        if (
+          normalized.startsWith("c2c:") ||
+          normalized.startsWith("group:") ||
+          normalized.startsWith("channel:")
+        )
+          return true;
         // 支持纯 openid（32位十六进制）
         if (/^[A-F0-9]{32}$/i.test(normalized)) return true;
         return false;
@@ -124,7 +134,9 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
     resolveAllowFrom: ({ cfg, accountId }: { cfg: OpenClawConfig; accountId?: string }) => {
       const account = resolveQQBotAccount(cfg, accountId);
       const allowFrom = account.config?.allowFrom ?? [];
-      console.log(`[qqbot] resolveAllowFrom: accountId=${accountId}, allowFrom=${JSON.stringify(allowFrom)}`);
+      console.log(
+        `[qqbot] resolveAllowFrom: accountId=${accountId}, allowFrom=${JSON.stringify(allowFrom)}`,
+      );
       return allowFrom.map((entry: string | number) => String(entry));
     },
     // 格式化 allowFrom 条目（移除 qqbot: 前缀，统一大写）
@@ -189,23 +201,24 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
     normalizeTarget: (target: string) => {
       // 去掉 qqbot: 前缀（如果有）
       let id = target.replace(/^qqbot:/i, "");
-      
+
       // 检查是否是已知格式
       if (id.startsWith("c2c:") || id.startsWith("group:") || id.startsWith("channel:")) {
         return { ok: true, to: `qqbot:${id}` };
       }
-      
+
       // 检查是否是纯 openid（32位十六进制，带连字符）
       // QQ Bot OpenID 格式类似: 207A5B8339D01F6582911C014668B77B
-      const openIdPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      const openIdPattern =
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
       if (openIdPattern.test(id)) {
         return { ok: true, to: `qqbot:c2c:${id}` };
       }
-      
+
       // 不认识的格式
-      return { 
-        ok: false, 
-        error: `Invalid QQ Bot target format: "${target}". Expected: qqbot:c2c:openid, qqbot:group:groupid, or openid (UUID format)` 
+      return {
+        ok: false,
+        error: `Invalid QQ Bot target format: "${target}". Expected: qqbot:c2c:openid, qqbot:group:groupid, or openid (UUID format)`,
       };
     },
     /**
@@ -217,7 +230,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
        * 判断目标 ID 是否可能是 QQ Bot 格式
        * 支持以下格式：
        * - qqbot:c2c:xxx
-       * - qqbot:group:xxx  
+       * - qqbot:group:xxx
        * - qqbot:channel:xxx
        * - c2c:xxx
        * - group:xxx
@@ -234,7 +247,8 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
           return true;
         }
         // UUID 格式的 openid（QQ Bot 的用户/群 ID 格式）
-        const openIdPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+        const openIdPattern =
+          /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
         return openIdPattern.test(id);
       },
       hint: "QQ Bot 目标格式: qqbot:c2c:openid (私聊) 或 qqbot:group:groupid (群聊)",
@@ -256,7 +270,14 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
     },
     sendMedia: async ({ to, text, mediaUrl, accountId, replyToId, cfg }) => {
       const account = resolveQQBotAccount(cfg, accountId);
-      const result = await sendMedia({ to, text: text ?? "", mediaUrl: mediaUrl ?? "", accountId, replyToId, account });
+      const result = await sendMedia({
+        to,
+        text: text ?? "",
+        mediaUrl: mediaUrl ?? "",
+        accountId,
+        replyToId,
+        account,
+      });
       return {
         channel: "qqbot",
         messageId: result.messageId,
@@ -325,7 +346,9 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       if (changed && nextQQBot) {
         nextCfg.channels = { ...nextCfg.channels, qqbot: nextQQBot };
         const runtime = getQQBotRuntime();
-        const configApi = runtime.config as { writeConfigFile: (cfg: OpenClawConfig) => Promise<void> };
+        const configApi = runtime.config as {
+          writeConfigFile: (cfg: OpenClawConfig) => Promise<void>;
+        };
         await configApi.writeConfigFile(nextCfg);
       }
 
@@ -355,7 +378,13 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       lastConnectedAt: snapshot.lastConnectedAt ?? null,
       lastError: snapshot.lastError ?? null,
     }),
-    buildAccountSnapshot: ({ account, runtime }: { account?: ResolvedQQBotAccount; runtime?: Record<string, unknown> }) => ({
+    buildAccountSnapshot: ({
+      account,
+      runtime,
+    }: {
+      account?: ResolvedQQBotAccount;
+      runtime?: Record<string, unknown>;
+    }) => ({
       accountId: account?.accountId ?? DEFAULT_ACCOUNT_ID,
       name: account?.name,
       enabled: account?.enabled ?? false,

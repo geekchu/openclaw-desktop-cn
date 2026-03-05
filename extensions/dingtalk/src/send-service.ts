@@ -1,5 +1,13 @@
-import * as path from "node:path";
 import axios from "axios";
+import * as path from "node:path";
+import type {
+  AxiosResponse,
+  DingTalkConfig,
+  Logger,
+  ProactiveMessagePayload,
+  SendMessageOptions,
+  SessionWebhookResponse,
+} from "./types";
 import { getAccessToken } from "./auth";
 import {
   deleteActiveCardByTarget,
@@ -14,16 +22,8 @@ import { uploadMedia as uploadMediaUtil } from "./media-utils";
 import { detectMarkdownAndExtractTitle } from "./message-utils";
 import { resolveOriginalPeerId } from "./peer-id-registry";
 import { getProactiveRiskObservation } from "./proactive-risk-registry";
-import { formatDingTalkErrorPayloadLog } from "./utils";
-import type {
-  AxiosResponse,
-  DingTalkConfig,
-  Logger,
-  ProactiveMessagePayload,
-  SendMessageOptions,
-  SessionWebhookResponse,
-} from "./types";
 import { AICardStatus } from "./types";
+import { formatDingTalkErrorPayloadLog } from "./utils";
 
 export { detectMediaTypeFromExtension } from "./media-utils";
 

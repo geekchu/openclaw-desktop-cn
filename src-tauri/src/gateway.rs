@@ -59,11 +59,27 @@ impl GatewayManager {
                 Ok(None) => {
                     // 进程仍在运行，强制终止
                     warn!("[Gateway] gateway 进程未响应停止信号，强制终止");
+                    #[cfg(target_os = "windows")]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/F", "/T", "/PID", &child.id().to_string()])
+                            .creation_flags(0x08000000)
+                            .status();
+                    }
                     let _ = child.kill();
                     let _ = child.wait();
                 }
                 Err(e) => {
                     warn!("[Gateway] 检查进程状态失败: {}", e);
+                    #[cfg(target_os = "windows")]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/F", "/T", "/PID", &child.id().to_string()])
+                            .creation_flags(0x08000000)
+                            .status();
+                    }
                     let _ = child.kill();
                 }
             }
@@ -104,17 +120,36 @@ impl GatewayManager {
     }
 
     /// 轮询等待 gateway 就绪，最多等待 timeout_secs 秒
-    /// 使用 200ms 间隔快速轮询，尽早检测到 gateway 启动
+    /// 需要连续多次检测到就绪状态才确认（避免在插件加载阻塞前的短暂窗口误判为就绪）
     pub fn wait_for_ready(&self, timeout_secs: u64) -> bool {
         let poll_interval = Duration::from_millis(200);
         let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
         let mut last_child_check = std::time::Instant::now();
+        // 需要连续 2 次检测成功（间隔 500ms）才认为真正就绪，
+        // 渠道插件已改为懒加载，HTTP 响应即表示核心就绪
+        let required_consecutive = 2;
+        let mut consecutive_ready = 0u32;
+        let sustained_check_interval = Duration::from_millis(500);
 
         loop {
             if self.is_ready() {
-                let elapsed = std::time::Instant::now().duration_since(deadline - Duration::from_secs(timeout_secs));
-                info!("[Gateway] gateway 已就绪 ({:.1}秒)", elapsed.as_secs_f64());
-                return true;
+                consecutive_ready += 1;
+                if consecutive_ready >= required_consecutive {
+                    let elapsed = std::time::Instant::now().duration_since(deadline - Duration::from_secs(timeout_secs));
+                    info!("[Gateway] gateway 已就绪 ({:.1}秒)", elapsed.as_secs_f64());
+                    return true;
+                }
+                // 就绪但还需要更多确认，等待后再检查
+                if consecutive_ready == 1 {
+                    info!("[Gateway] gateway 首次响应，验证稳定性 ({}/{})", consecutive_ready, required_consecutive);
+                }
+                std::thread::sleep(sustained_check_interval);
+                continue;
+            } else {
+                if consecutive_ready > 0 {
+                    info!("[Gateway] gateway 响应中断 (已连续{}次成功后失败，重置计数)", consecutive_ready);
+                }
+                consecutive_ready = 0;
             }
 
             if std::time::Instant::now() >= deadline {
@@ -192,12 +227,13 @@ fn update_tray_status(handle: &AppHandle, running: bool) {
 
 /// 健康检查循环：每 10 秒检查一次 gateway 状态
 /// 如果 gateway 不响应且子进程已退出，自动尝试重启（最多 3 次连续失败后退避）
-pub fn health_check_loop(handle: &AppHandle) {
+/// `already_navigated`: 启动线程是否已经成功导航到 gateway URL
+pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
     let check_interval = Duration::from_secs(10);
     let max_consecutive_failures = 3;
     let backoff_interval = Duration::from_secs(60);
     let mut consecutive_failures: u32 = 0;
-    let mut navigated = false;
+    let mut navigated = already_navigated;
 
     loop {
         let wait = if consecutive_failures >= max_consecutive_failures {
@@ -245,7 +281,7 @@ pub fn health_check_loop(handle: &AppHandle) {
         match gm.start() {
             Ok(_) => {
                 let _ = handle.emit("gateway-status", "正在等待 Gateway 重启...");
-                if gm.wait_for_ready(15) {
+                if gm.wait_for_ready(60) {
                     info!("[Gateway] 自动重启成功");
                     consecutive_failures = 0;
                     update_tray_status(handle, true);

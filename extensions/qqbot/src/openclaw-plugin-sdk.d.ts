@@ -1,6 +1,6 @@
 /**
  * OpenClaw Plugin SDK 类型声明
- * 
+ *
  * 此文件为 openclaw/plugin-sdk 模块提供 TypeScript 类型声明
  * 仅包含本项目实际使用的类型和函数
  */
@@ -163,7 +163,11 @@ declare module "openclaw/plugin-sdk" {
     listAccountIds: (cfg: OpenClawConfig) => string[];
     resolveAccount: (cfg: OpenClawConfig, accountId?: string | null) => TAccount;
     defaultAccountId: (cfg: OpenClawConfig) => string;
-    setAccountEnabled?: (ctx: { cfg: OpenClawConfig; accountId: string; enabled: boolean }) => OpenClawConfig;
+    setAccountEnabled?: (ctx: {
+      cfg: OpenClawConfig;
+      accountId: string;
+      enabled: boolean;
+    }) => OpenClawConfig;
     deleteAccount?: (ctx: { cfg: OpenClawConfig; accountId: string }) => OpenClawConfig;
     isConfigured?: (account: TAccount | undefined) => boolean;
     describeAccount?: (account: TAccount | undefined) => AccountDescription;
@@ -187,10 +191,22 @@ declare module "openclaw/plugin-sdk" {
    */
   export interface ChannelPluginSetup {
     resolveAccountId?: (ctx: { accountId?: string }) => string;
-    applyAccountName?: (ctx: { cfg: OpenClawConfig; accountId: string; name: string }) => OpenClawConfig;
+    applyAccountName?: (ctx: {
+      cfg: OpenClawConfig;
+      accountId: string;
+      name: string;
+    }) => OpenClawConfig;
     validateInput?: (ctx: { input: SetupInput }) => string | null;
-    applyConfig?: (ctx: { cfg: OpenClawConfig; accountId: string; input: SetupInput }) => OpenClawConfig;
-    applyAccountConfig?: (ctx: { cfg: OpenClawConfig; accountId: string; input: SetupInput }) => OpenClawConfig;
+    applyConfig?: (ctx: {
+      cfg: OpenClawConfig;
+      accountId: string;
+      input: SetupInput;
+    }) => OpenClawConfig;
+    applyAccountConfig?: (ctx: {
+      cfg: OpenClawConfig;
+      accountId: string;
+      input: SetupInput;
+    }) => OpenClawConfig;
     [key: string]: unknown;
   }
 
@@ -433,9 +449,13 @@ declare module "openclaw/plugin-sdk" {
    */
   export interface ChannelOnboardingAdapter {
     /** 获取状态 */
-    getStatus?: (ctx: ChannelOnboardingStatusContext) => ChannelOnboardingStatus | Promise<ChannelOnboardingStatus>;
+    getStatus?: (
+      ctx: ChannelOnboardingStatusContext,
+    ) => ChannelOnboardingStatus | Promise<ChannelOnboardingStatus>;
     /** 配置函数 */
-    configure?: (ctx: ChannelOnboardingConfigureContext) => ChannelOnboardingResult | Promise<ChannelOnboardingResult>;
+    configure?: (
+      ctx: ChannelOnboardingConfigureContext,
+    ) => ChannelOnboardingResult | Promise<ChannelOnboardingResult>;
     /** 其他适配器方法 */
     [key: string]: unknown;
   }

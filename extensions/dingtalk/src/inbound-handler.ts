@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { DingTalkConfig, HandleDingTalkMessageParams, MediaFile } from "./types";
 import { normalizeAllowFrom, isSenderAllowed, isSenderGroupAllowed } from "./access-control";
 import { getAccessToken } from "./auth";
 import {
@@ -22,7 +23,6 @@ import {
 } from "./proactive-risk-registry";
 import { getDingTalkRuntime } from "./runtime";
 import { sendBySession, sendMessage } from "./send-service";
-import type { DingTalkConfig, HandleDingTalkMessageParams, MediaFile } from "./types";
 import { AICardStatus } from "./types";
 import { formatDingTalkErrorPayloadLog, maskSensitiveData } from "./utils";
 
@@ -213,7 +213,9 @@ export async function handleDingTalkMessage(params: HandleDingTalkMessageParams)
     } catch (err: any) {
       log?.debug?.(`[DingTalk] Failed to send proactive permission hint: ${err.message}`);
       if (err?.response?.data !== undefined) {
-        log?.debug?.(formatDingTalkErrorPayloadLog("inbound.proactivePermissionHint", err.response.data));
+        log?.debug?.(
+          formatDingTalkErrorPayloadLog("inbound.proactivePermissionHint", err.response.data),
+        );
       }
     }
   }
@@ -255,7 +257,9 @@ export async function handleDingTalkMessage(params: HandleDingTalkMessageParams)
         } catch (err: any) {
           log?.debug?.(`[DingTalk] Failed to send access denied message: ${err.message}`);
           if (err?.response?.data !== undefined) {
-            log?.debug?.(formatDingTalkErrorPayloadLog("inbound.accessDeniedReply", err.response.data));
+            log?.debug?.(
+              formatDingTalkErrorPayloadLog("inbound.accessDeniedReply", err.response.data),
+            );
           }
         }
 
@@ -528,7 +532,9 @@ export async function handleDingTalkMessage(params: HandleDingTalkMessageParams)
         } catch (err: any) {
           log?.debug?.(`[DingTalk] Thinking stream update failed: ${err.message}`);
           if (err?.response?.data !== undefined) {
-            log?.debug?.(formatDingTalkErrorPayloadLog("inbound.thinkingStream", err.response.data));
+            log?.debug?.(
+              formatDingTalkErrorPayloadLog("inbound.thinkingStream", err.response.data),
+            );
           }
         }
       },

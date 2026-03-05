@@ -395,11 +395,7 @@ function renderAgentOverview(params: {
   const identityEmoji = resolvedEmoji || "-";
   const skillFilter = Array.isArray(config.entry?.skills) ? config.entry?.skills : null;
   const skillCount = skillFilter?.length ?? null;
-  const identityStatus = agentIdentityLoading
-    ? "加载中…"
-    : agentIdentityError
-      ? "不可用"
-      : "";
+  const identityStatus = agentIdentityLoading ? "加载中…" : agentIdentityError ? "不可用" : "";
   const isDefault = Boolean(params.defaultId && agent.id === params.defaultId);
 
   return html`

@@ -61,7 +61,11 @@ export function formatDingTalkErrorPayload(payload: unknown): string {
   } catch {
     if (typeof payload === "string") {
       serialized = payload;
-    } else if (typeof payload === "number" || typeof payload === "boolean" || typeof payload === "bigint") {
+    } else if (
+      typeof payload === "number" ||
+      typeof payload === "boolean" ||
+      typeof payload === "bigint"
+    ) {
       serialized = `${payload}`;
     } else {
       serialized = "[unserializable-payload]";

@@ -1,6 +1,6 @@
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert';
-import { AsyncLocalStorage } from 'node:async_hooks';
+import assert from "node:assert";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { describe, it, beforeEach, afterEach } from "node:test";
 
 /**
  * Unit tests for outbound message delivery with three-layer fallback
@@ -11,7 +11,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  * 3. Layer 3: Warning log when no channel available
  */
 
-describe('outbound.sendText - three-layer fallback', () => {
+describe("outbound.sendText - three-layer fallback", () => {
   // Mock dependencies
   let streamManager;
   let responseUrls;
@@ -38,11 +38,11 @@ describe('outbound.sendText - three-layer fallback', () => {
     responseUrls.clear();
   });
 
-  it('Layer 1: should deliver via active stream when available', async () => {
+  it("Layer 1: should deliver via active stream when available", async () => {
     // Setup: Active stream exists
-    const streamId = 'stream_test_123';
-    const userId = 'user_abc';
-    mockStreams.set(streamId, { finished: false, content: 'thinking...' });
+    const streamId = "stream_test_123";
+    const userId = "user_abc";
+    mockStreams.set(streamId, { finished: false, content: "thinking..." });
 
     // Simulate streamContext having streamId
     streamContext = new AsyncLocalStorage();
@@ -56,14 +56,14 @@ describe('outbound.sendText - three-layer fallback', () => {
     });
   });
 
-  it('Layer 2: should use response_url fallback when stream closed', async () => {
+  it("Layer 2: should use response_url fallback when stream closed", async () => {
     // Setup: Stream is closed, but response_url is available
-    const streamId = 'stream_test_123';
-    const userId = 'user_abc';
-    const testUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test';
+    const streamId = "stream_test_123";
+    const userId = "user_abc";
+    const testUrl = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test";
 
     // Stream is finished
-    mockStreams.set(streamId, { finished: true, content: 'done' });
+    mockStreams.set(streamId, { finished: true, content: "done" });
 
     // response_url saved
     responseUrls.set(userId, {
@@ -84,18 +84,18 @@ describe('outbound.sendText - three-layer fallback', () => {
     // Simulate fetch call
     if (canUseFallback) {
       const response = await fetch(saved.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msgtype: 'text', text: { content: 'test' } }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ msgtype: "text", text: { content: "test" } }),
       });
       assert.strictEqual(response.ok, true);
     }
   });
 
-  it('Layer 2: should not use response_url if already used', async () => {
+  it("Layer 2: should not use response_url if already used", async () => {
     // Setup: response_url was already used
-    const userId = 'user_abc';
-    const testUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test';
+    const userId = "user_abc";
+    const testUrl = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test";
 
     responseUrls.set(userId, {
       url: testUrl,
@@ -108,10 +108,10 @@ describe('outbound.sendText - three-layer fallback', () => {
     assert.strictEqual(canUseFallback, false);
   });
 
-  it('Layer 2: should not use response_url if expired', async () => {
+  it("Layer 2: should not use response_url if expired", async () => {
     // Setup: response_url has expired
-    const userId = 'user_abc';
-    const testUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test';
+    const userId = "user_abc";
+    const testUrl = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test";
 
     responseUrls.set(userId, {
       url: testUrl,
@@ -124,11 +124,11 @@ describe('outbound.sendText - three-layer fallback', () => {
     assert.strictEqual(canUseFallback, false);
   });
 
-  it('Layer 3: should log warning when no delivery channel available', async () => {
+  it("Layer 3: should log warning when no delivery channel available", async () => {
     // Setup: No active stream, no response_url
-    const userId = 'user_abc';
+    const userId = "user_abc";
 
-    const stream = streamManager.getStream('nonexistent');
+    const stream = streamManager.getStream("nonexistent");
     const saved = responseUrls.get(userId);
 
     const canUseStream = !!(stream && !stream.finished);
@@ -141,7 +141,7 @@ describe('outbound.sendText - three-layer fallback', () => {
   });
 });
 
-describe('stream refresh handler - delayed close logic', () => {
+describe("stream refresh handler - delayed close logic", () => {
   let streamMeta;
   let mockStreams;
 
@@ -150,8 +150,8 @@ describe('stream refresh handler - delayed close logic', () => {
     mockStreams = new Map();
   });
 
-  it('should close stream when main response done + idle for 10s', () => {
-    const streamId = 'stream_test_123';
+  it("should close stream when main response done + idle for 10s", () => {
+    const streamId = "stream_test_123";
     const now = Date.now();
 
     // Setup: Main response done, stream idle for 11s
@@ -163,7 +163,7 @@ describe('stream refresh handler - delayed close logic', () => {
     mockStreams.set(streamId, {
       finished: false,
       updatedAt: now - 11000,
-      content: 'done',
+      content: "done",
     });
 
     // Simulate refresh handler logic
@@ -175,8 +175,8 @@ describe('stream refresh handler - delayed close logic', () => {
     assert.strictEqual(shouldClose, true);
   });
 
-  it('should NOT close stream when idle time < 10s', () => {
-    const streamId = 'stream_test_123';
+  it("should NOT close stream when idle time < 10s", () => {
+    const streamId = "stream_test_123";
     const now = Date.now();
 
     // Setup: Main response done, but only idle for 5s
@@ -188,7 +188,7 @@ describe('stream refresh handler - delayed close logic', () => {
     mockStreams.set(streamId, {
       finished: false,
       updatedAt: now - 5000,
-      content: 'done',
+      content: "done",
     });
 
     // Simulate refresh handler logic
@@ -200,8 +200,8 @@ describe('stream refresh handler - delayed close logic', () => {
     assert.strictEqual(shouldClose, false);
   });
 
-  it('should NOT close stream when main response not done', () => {
-    const streamId = 'stream_test_123';
+  it("should NOT close stream when main response not done", () => {
+    const streamId = "stream_test_123";
     const now = Date.now();
 
     // Setup: Stream idle for 11s, but main response not done
@@ -213,7 +213,7 @@ describe('stream refresh handler - delayed close logic', () => {
     mockStreams.set(streamId, {
       finished: false,
       updatedAt: now - 11000,
-      content: 'processing...',
+      content: "processing...",
     });
 
     // Simulate refresh handler logic
@@ -224,8 +224,8 @@ describe('stream refresh handler - delayed close logic', () => {
     assert.strictEqual(shouldClose, false);
   });
 
-  it('should NOT close stream when already finished', () => {
-    const streamId = 'stream_test_123';
+  it("should NOT close stream when already finished", () => {
+    const streamId = "stream_test_123";
     const now = Date.now();
 
     // Setup: Stream already finished
@@ -237,7 +237,7 @@ describe('stream refresh handler - delayed close logic', () => {
     mockStreams.set(streamId, {
       finished: true,
       updatedAt: now - 11000,
-      content: 'done',
+      content: "done",
     });
 
     // Simulate refresh handler logic
@@ -249,7 +249,7 @@ describe('stream refresh handler - delayed close logic', () => {
   });
 });
 
-describe('safety net - emergency stream cleanup', () => {
+describe("safety net - emergency stream cleanup", () => {
   let mockStreams;
   let streamMeta;
 
@@ -258,8 +258,8 @@ describe('safety net - emergency stream cleanup', () => {
     streamMeta = new Map();
   });
 
-  it('should close idle stream after 30s safety timeout', () => {
-    const streamId = 'stream_test_123';
+  it("should close idle stream after 30s safety timeout", () => {
+    const streamId = "stream_test_123";
     const now = Date.now();
 
     // Setup: Stream idle for 31s (exceeds safety net timeout)
@@ -271,7 +271,7 @@ describe('safety net - emergency stream cleanup', () => {
     mockStreams.set(streamId, {
       finished: false,
       updatedAt: now - 31000,
-      content: 'done',
+      content: "done",
     });
 
     // Simulate safety net logic
@@ -282,8 +282,8 @@ describe('safety net - emergency stream cleanup', () => {
     assert.strictEqual(shouldForceClose, true);
   });
 
-  it('should NOT close stream with recent activity', () => {
-    const streamId = 'stream_test_123';
+  it("should NOT close stream with recent activity", () => {
+    const streamId = "stream_test_123";
     const now = Date.now();
 
     // Setup: Stream updated 5s ago
@@ -295,7 +295,7 @@ describe('safety net - emergency stream cleanup', () => {
     mockStreams.set(streamId, {
       finished: false,
       updatedAt: now - 5000,
-      content: 'done',
+      content: "done",
     });
 
     // Simulate safety net logic

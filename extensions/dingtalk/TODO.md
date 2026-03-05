@@ -90,14 +90,14 @@
 
 ## 📋 Statistics
 
-| Category                    | Count |
-| --------------------------- | ----- |
-| Issue (Open)                | 8     |
-| Issue (Closed)              | 6     |
-| Open Bugs                   | 2     |
-| Open Feature Requests       | 6     |
-| Closed in Tracked Set       | 6     |
-| Recent PR Dynamics (Merged) | 5     |
+| Category                    | Count  |
+| --------------------------- | ------ |
+| Issue (Open)                | 8      |
+| Issue (Closed)              | 6      |
+| Open Bugs                   | 2      |
+| Open Feature Requests       | 6      |
+| Closed in Tracked Set       | 6      |
+| Recent PR Dynamics (Merged) | 5      |
 | **Tracked Issues Total**    | **14** |
 
 ---

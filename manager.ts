@@ -32,9 +32,7 @@ function ensureIframe(container: HTMLElement) {
 
 export function renderManager(props: ManagerProps) {
   // 始终渲染容器 div（保持 iframe 存活），通过 CSS 控制可见性
-  const hiddenStyle = props.active
-    ? "display: flex; flex: 1; min-height: 0;"
-    : "display: none;";
+  const hiddenStyle = props.active ? "display: flex; flex: 1; min-height: 0;" : "display: none;";
 
   // 无论是否激活，首次渲染时就预加载 iframe（用户感觉不到延迟）
   if (!_preloadScheduled) {

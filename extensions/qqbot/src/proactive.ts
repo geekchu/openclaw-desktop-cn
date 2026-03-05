@@ -1,6 +1,6 @@
 /**
  * QQ Bot 主动发送消息模块
- * 
+ *
  * 该模块提供以下能力：
  * 1. 记录已知用户（曾与机器人交互过的用户）
  * 2. 主动发送消息给用户或群组
@@ -55,6 +55,7 @@ export interface ListKnownUsersOptions {
   sortByLastInteraction?: boolean;
   limit?: number;
 }
+import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import {
   getAccessToken,
   sendProactiveC2CMessage,
@@ -64,7 +65,6 @@ import {
   sendGroupImageMessage,
 } from "./api.js";
 import { resolveQQBotAccount } from "./config.js";
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
 
 // ============ 用户存储管理 ============
 
@@ -113,7 +113,7 @@ function loadKnownUsers(): Map<string, KnownUser> {
   }
 
   const users = new Map<string, KnownUser>();
-  
+
   try {
     if (fs.existsSync(KNOWN_USERS_FILE)) {
       const data = fs.readFileSync(KNOWN_USERS_FILE, "utf-8");
@@ -149,16 +149,16 @@ function saveKnownUsers(users: Map<string, KnownUser>): void {
 
 /**
  * 记录一个已知用户（当收到用户消息时调用）
- * 
+ *
  * @param user - 用户信息
  */
 export function recordKnownUser(user: Omit<KnownUser, "firstInteractionAt">): void {
   const users = loadKnownUsers();
   const key = getUserKey(user.type, user.openid, user.accountId);
-  
+
   const existing = users.get(key);
   const now = user.lastInteractionAt || Date.now();
-  
+
   users.set(key, {
     ...user,
     lastInteractionAt: now,
@@ -166,19 +166,23 @@ export function recordKnownUser(user: Omit<KnownUser, "firstInteractionAt">): vo
     // 更新昵称（如果有新的）
     nickname: user.nickname || existing?.nickname,
   });
-  
+
   saveKnownUsers(users);
   console.log(`[qqbot:proactive] Recorded user: ${key}`);
 }
 
 /**
  * 获取一个已知用户
- * 
+ *
  * @param type - 用户类型
  * @param openid - 用户 openid
  * @param accountId - 账户 ID
  */
-export function getKnownUser(type: string, openid: string, accountId: string): KnownUser | undefined {
+export function getKnownUser(
+  type: string,
+  openid: string,
+  accountId: string,
+): KnownUser | undefined {
   const users = loadKnownUsers();
   const key = getUserKey(type, openid, accountId);
   return users.get(key);
@@ -186,39 +190,39 @@ export function getKnownUser(type: string, openid: string, accountId: string): K
 
 /**
  * 列出已知用户
- * 
+ *
  * @param options - 过滤选项
  */
 export function listKnownUsers(options?: ListKnownUsersOptions): KnownUser[] {
   const users = loadKnownUsers();
   let result = Array.from(users.values());
-  
+
   // 过滤类型
   if (options?.type) {
-    result = result.filter(u => u.type === options.type);
+    result = result.filter((u) => u.type === options.type);
   }
-  
+
   // 过滤账户
   if (options?.accountId) {
-    result = result.filter(u => u.accountId === options.accountId);
+    result = result.filter((u) => u.accountId === options.accountId);
   }
-  
+
   // 排序
   if (options?.sortByLastInteraction !== false) {
     result.sort((a, b) => b.lastInteractionAt - a.lastInteractionAt);
   }
-  
+
   // 限制数量
   if (options?.limit && options.limit > 0) {
     result = result.slice(0, options.limit);
   }
-  
+
   return result;
 }
 
 /**
  * 删除一个已知用户
- * 
+ *
  * @param type - 用户类型
  * @param openid - 用户 openid
  * @param accountId - 账户 ID
@@ -235,13 +239,13 @@ export function removeKnownUser(type: string, openid: string, accountId: string)
 
 /**
  * 清除所有已知用户
- * 
+ *
  * @param accountId - 可选，只清除指定账户的用户
  */
 export function clearKnownUsers(accountId?: string): number {
   const users = loadKnownUsers();
   let count = 0;
-  
+
   if (accountId) {
     for (const [key, user] of users) {
       if (user.accountId === accountId) {
@@ -253,7 +257,7 @@ export function clearKnownUsers(accountId?: string): number {
     count = users.size;
     users.clear();
   }
-  
+
   if (count > 0) {
     saveKnownUsers(users);
   }
@@ -265,11 +269,11 @@ export function clearKnownUsers(accountId?: string): number {
 /**
  * 主动发送消息（带配置解析）
  * 注意：与 outbound.ts 中的 sendProactiveMessage 不同，这个函数接受 OpenClawConfig 并自动解析账户
- * 
+ *
  * @param options - 发送选项
  * @param cfg - OpenClaw 配置
  * @returns 发送结果
- * 
+ *
  * @example
  * ```typescript
  * // 发送私聊消息
@@ -278,14 +282,14 @@ export function clearKnownUsers(accountId?: string): number {
  *   text: "你好！这是一条主动消息",
  *   type: "c2c",
  * }, cfg);
- * 
+ *
  * // 发送群聊消息
  * const result = await sendProactive({
  *   to: "A1B2C3D4E5F6A7B8",  // 群组 openid
  *   text: "群公告：今天有活动",
  *   type: "group",
  * }, cfg);
- * 
+ *
  * // 发送带图片的消息
  * const result = await sendProactive({
  *   to: "E7A8F3B2C1D4E5F6A7B8C9D0E1F2A3B4",
@@ -297,23 +301,23 @@ export function clearKnownUsers(accountId?: string): number {
  */
 export async function sendProactive(
   options: ProactiveSendOptions,
-  cfg: OpenClawConfig
+  cfg: OpenClawConfig,
 ): Promise<ProactiveSendResult> {
   const { to, text, type = "c2c", imageUrl, accountId = "default" } = options;
-  
+
   // 解析账户配置
   const account = resolveQQBotAccount(cfg, accountId);
-  
+
   if (!account.appId || !account.clientSecret) {
     return {
       success: false,
       error: "QQBot not configured (missing appId or clientSecret)",
     };
   }
-  
+
   try {
     const accessToken = await getAccessToken(account.appId, account.clientSecret);
-    
+
     // 如果有图片，先发送图片
     if (imageUrl) {
       try {
@@ -328,10 +332,10 @@ export async function sendProactive(
         // 图片发送失败不影响文本发送
       }
     }
-    
+
     // 发送文本消息
     let result: { id: string; timestamp: number | string };
-    
+
     if (type === "c2c") {
       result = await sendProactiveC2CMessage(accessToken, to, text);
     } else if (type === "group") {
@@ -348,9 +352,9 @@ export async function sendProactive(
         error: `Unknown message type: ${type}`,
       };
     }
-    
+
     console.log(`[qqbot:proactive] Sent message to ${type}:${to}, id: ${result.id}`);
-    
+
     return {
       success: true,
       messageId: result.id,
@@ -359,7 +363,7 @@ export async function sendProactive(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[qqbot:proactive] Failed to send message: ${message}`);
-    
+
     return {
       success: false,
       error: message,
@@ -369,7 +373,7 @@ export async function sendProactive(
 
 /**
  * 批量发送主动消息
- * 
+ *
  * @param recipients - 接收者列表（openid 数组）
  * @param text - 消息内容
  * @param type - 消息类型
@@ -382,24 +386,24 @@ export async function sendBulkProactiveMessage(
   text: string,
   type: "c2c" | "group",
   cfg: OpenClawConfig,
-  accountId = "default"
+  accountId = "default",
 ): Promise<Array<{ to: string; result: ProactiveSendResult }>> {
   const results: Array<{ to: string; result: ProactiveSendResult }> = [];
-  
+
   for (const to of recipients) {
     const result = await sendProactive({ to, text, type, accountId }, cfg);
     results.push({ to, result });
-    
+
     // 添加延迟，避免频率限制
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  
+
   return results;
 }
 
 /**
  * 发送消息给所有已知用户
- * 
+ *
  * @param text - 消息内容
  * @param cfg - OpenClaw 配置
  * @param options - 过滤选项
@@ -412,7 +416,7 @@ export async function broadcastMessage(
     type?: "c2c" | "group";
     accountId?: string;
     limit?: number;
-  }
+  },
 ): Promise<{
   total: number;
   success: number;
@@ -425,34 +429,37 @@ export async function broadcastMessage(
     limit: options?.limit,
     sortByLastInteraction: true,
   });
-  
+
   // 过滤掉频道用户（不支持主动发送）
-  const validUsers = users.filter(u => u.type === "c2c" || u.type === "group");
-  
+  const validUsers = users.filter((u) => u.type === "c2c" || u.type === "group");
+
   const results: Array<{ to: string; result: ProactiveSendResult }> = [];
   let success = 0;
   let failed = 0;
-  
+
   for (const user of validUsers) {
-    const result = await sendProactive({
-      to: user.openid,
-      text,
-      type: user.type as "c2c" | "group",
-      accountId: user.accountId,
-    }, cfg);
-    
+    const result = await sendProactive(
+      {
+        to: user.openid,
+        text,
+        type: user.type as "c2c" | "group",
+        accountId: user.accountId,
+      },
+      cfg,
+    );
+
     results.push({ to: user.openid, result });
-    
+
     if (result.success) {
       success++;
     } else {
       failed++;
     }
-    
+
     // 添加延迟，避免频率限制
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  
+
   return {
     total: validUsers.length,
     success,
@@ -465,7 +472,7 @@ export async function broadcastMessage(
 
 /**
  * 根据账户配置直接发送主动消息（不需要 cfg）
- * 
+ *
  * @param account - 已解析的账户配置
  * @param to - 目标 openid
  * @param text - 消息内容
@@ -475,7 +482,7 @@ export async function sendProactiveMessageDirect(
   account: ResolvedQQBotAccount,
   to: string,
   text: string,
-  type: "c2c" | "group" = "c2c"
+  type: "c2c" | "group" = "c2c",
 ): Promise<ProactiveSendResult> {
   if (!account.appId || !account.clientSecret) {
     return {
@@ -483,18 +490,18 @@ export async function sendProactiveMessageDirect(
       error: "QQBot not configured (missing appId or clientSecret)",
     };
   }
-  
+
   try {
     const accessToken = await getAccessToken(account.appId, account.clientSecret);
-    
+
     let result: { id: string; timestamp: number | string };
-    
+
     if (type === "c2c") {
       result = await sendProactiveC2CMessage(accessToken, to, text);
     } else {
       result = await sendProactiveGroupMessage(accessToken, to, text);
     }
-    
+
     return {
       success: true,
       messageId: result.id,
@@ -518,11 +525,11 @@ export function getKnownUsersStats(accountId?: string): {
   channel: number;
 } {
   const users = listKnownUsers({ accountId });
-  
+
   return {
     total: users.length,
-    c2c: users.filter(u => u.type === "c2c").length,
-    group: users.filter(u => u.type === "group").length,
-    channel: users.filter(u => u.type === "channel").length,
+    c2c: users.filter((u) => u.type === "c2c").length,
+    group: users.filter((u) => u.type === "group").length,
+    channel: users.filter((u) => u.type === "channel").length,
   };
 }

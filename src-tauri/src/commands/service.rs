@@ -185,21 +185,21 @@ pub async fn start_service() -> Result<String, String> {
     shell::spawn_openclaw_gateway()
         .map_err(|e| format!("启动服务失败: {}", e))?;
     
-    // 轮询等待端口开始监听（最多 15 秒）
+    // 轮询等待端口开始监听（最多 60 秒）
     info!("[服务] 等待端口 {} 开始监听...", SERVICE_PORT);
-    for i in 1..=15 {
+    for i in 1..=60 {
         std::thread::sleep(std::time::Duration::from_secs(1));
         if let Some(pid) = check_port_listening(SERVICE_PORT) {
             info!("[服务] ✓ 启动成功 ({}秒), PID: {}", i, pid);
             return Ok(format!("服务已启动，PID: {}", pid));
         }
-        if i % 3 == 0 {
+        if i % 5 == 0 {
             debug!("[服务] 等待中... ({}秒)", i);
         }
     }
     
     info!("[服务] 等待超时，端口仍未监听");
-    Err("服务启动超时（15秒），请检查 openclaw 日志".to_string())
+    Err("服务启动超时（60秒），请检查 openclaw 日志".to_string())
 }
 
 /// 停止服务
@@ -240,7 +240,7 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
 
     gm.start().map_err(|e| format!("重启 Gateway 失败: {}", e))?;
 
-    if gm.wait_for_ready(15) {
+    if gm.wait_for_ready(60) {
         // 重启成功，通知前端重新导航
         let url = match crate::read_gateway_token() {
             Some(token) => format!("http://localhost:{}?token={}", 18789, token),

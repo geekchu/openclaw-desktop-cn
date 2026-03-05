@@ -301,7 +301,7 @@ function assertDirectPathAccess(
 ): void {
   // Windows paths are case-insensitive; normalize for comparison
   const isWin = process.platform === "win32";
-  const norm = (p: string) => isWin ? p.toLowerCase() : p;
+  const norm = (p: string) => (isWin ? p.toLowerCase() : p);
 
   let finalAbsPath: string;
   if (path.isAbsolute(filePath)) {
@@ -328,7 +328,7 @@ function assertDirectPathAccess(
       } catch {
         // ignore
       }
-      
+
       const rel = path.relative(norm(realDenied), norm(realAbsPath));
       if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
         throw new Error(
@@ -360,7 +360,9 @@ function assertDirectPathAccess(
     }
   }
 
-  throw new Error(`Permission denied: You do not have permission to access '${filePath}'. Path is outside the workspace and not in any manually allowed directories.`);
+  throw new Error(
+    `Permission denied: You do not have permission to access '${filePath}'. Path is outside the workspace and not in any manually allowed directories.`,
+  );
 }
 
 export function wrapToolWorkspaceRootGuard(
@@ -376,10 +378,10 @@ export function wrapToolWorkspaceRootGuard(
       const record =
         normalized ??
         (args && typeof args === "object" ? (args as Record<string, unknown>) : undefined);
-      
+
       // Some tools like `ls` might use `dir` or `path` depending on schema. We check both.
       const targetPath = record?.path ?? record?.dir ?? record?.file_path ?? record?.dir_path;
-      
+
       if (typeof targetPath === "string" && targetPath.trim()) {
         assertDirectPathAccess(targetPath, root, root, allowPaths, denyPaths);
       }
@@ -397,24 +399,29 @@ export function wrapToolWorkspaceRootGuard(
  */
 function extractAbsolutePathsFromCommand(command: string): string[] {
   const paths: string[] = [];
-  
+
   // Windows absolute paths: drive letter followed by :\ or :/
   // Match both quoted and unquoted paths
-  const winPathRegex = /[A-Za-z]:[\\/][^\s;|&><"'`]*|"([A-Za-z]:[\\/][^"]*)"|'([A-Za-z]:[\\/][^']*)'/g;
+  const winPathRegex =
+    /[A-Za-z]:[\\/][^\s;|&><"'`]*|"([A-Za-z]:[\\/][^"]*)"|'([A-Za-z]:[\\/][^']*)'/g;
   let match: RegExpExecArray | null;
   while ((match = winPathRegex.exec(command)) !== null) {
     const p = match[1] ?? match[2] ?? match[0];
-    if (p) { paths.push(p); }
+    if (p) {
+      paths.push(p);
+    }
   }
-  
+
   // Unix absolute paths: starting with /
   // Also match paths after redirect operators (>, >>, <) without spaces
   const unixPathRegex = /(?:^|\s|[;|&>=<(])(\/{1,2}[^\s;|&><"'`]+)|"(\/[^"]*)"|'(\/[^']*)'/g;
   while ((match = unixPathRegex.exec(command)) !== null) {
     const p = match[1] ?? match[2] ?? match[3];
-    if (p) { paths.push(p); }
+    if (p) {
+      paths.push(p);
+    }
   }
-  
+
   return paths;
 }
 
@@ -426,11 +433,14 @@ function extractTraversalPaths(command: string): string[] {
   const paths: string[] = [];
   // Match paths that contain ../ or ..\ (parent directory traversal)
   // Both quoted and unquoted
-  const traversalRegex = /(?:^|\s|[;|&>=<(])((?:\.\.[\\/])+[^\s;|&><"'`]*)|"((?:\.\.[\\/])[^"]*)"|'((?:\.\.[\\/])[^']*)'/g;
+  const traversalRegex =
+    /(?:^|\s|[;|&>=<(])((?:\.\.[\\/])+[^\s;|&><"'`]*)|"((?:\.\.[\\/])[^"]*)"|'((?:\.\.[\\/])[^']*)'/g;
   let match: RegExpExecArray | null;
   while ((match = traversalRegex.exec(command)) !== null) {
     const p = match[1] ?? match[2] ?? match[3];
-    if (p) { paths.push(p); }
+    if (p) {
+      paths.push(p);
+    }
   }
   return paths;
 }
@@ -445,7 +455,8 @@ function detectShellEvasion(command: string): string | null {
   // These can dynamically construct paths that bypass static analysis.
   // Only flag when the substitution contains BOTH a file-operation command AND an absolute path.
   const cmdSubRegex = /\$\(([^)]+)\)|`([^`]+)`/g;
-  const fileOpRegex = /\b(cat|ls|rm|cp|mv|chmod|chown|mkdir|touch|find|grep|sed|awk|head|tail|readlink|realpath|dirname|basename)\b/;
+  const fileOpRegex =
+    /\b(cat|ls|rm|cp|mv|chmod|chown|mkdir|touch|find|grep|sed|awk|head|tail|readlink|realpath|dirname|basename)\b/;
   let match: RegExpExecArray | null;
   while ((match = cmdSubRegex.exec(command)) !== null) {
     const inner = match[1] ?? match[2] ?? "";
@@ -482,13 +493,13 @@ export function wrapExecToolPathGuard(
     ...tool,
     execute: async (toolCallId, args, signal, onUpdate) => {
       const params = args as Record<string, unknown> | undefined;
-      
+
       // 1. Check workdir parameter
       const workdir = params?.workdir;
       if (typeof workdir === "string" && workdir.trim()) {
         assertDirectPathAccess(workdir, workspaceRoot, workspaceRoot, allowedDirs, denyDirs);
       }
-      
+
       const command = params?.command;
       if (typeof command === "string" && command.trim()) {
         // 2. Scan command string for absolute paths
@@ -499,14 +510,15 @@ export function wrapExecToolPathGuard(
           } catch {
             throw new Error(
               `Permission denied: The command references path '${absPath}' which is outside the workspace and allowed directories. ` +
-              `Allowed roots: workspace(${workspaceRoot})${allowedDirs?.length ? `, additional: ${allowedDirs.join(", ")}` : ""}. ` +
-              `Use relative paths or ask the user to add the target directory to the allowed list in Settings.`
+                `Allowed roots: workspace(${workspaceRoot})${allowedDirs?.length ? `, additional: ${allowedDirs.join(", ")}` : ""}. ` +
+                `Use relative paths or ask the user to add the target directory to the allowed list in Settings.`,
             );
           }
         }
 
         // 3. Check relative path traversals (../) that could escape workspace
-        const effectiveCwd = (typeof workdir === "string" && workdir.trim()) ? workdir : workspaceRoot;
+        const effectiveCwd =
+          typeof workdir === "string" && workdir.trim() ? workdir : workspaceRoot;
         const traversalPaths = extractTraversalPaths(command);
         for (const relPath of traversalPaths) {
           try {
@@ -514,7 +526,7 @@ export function wrapExecToolPathGuard(
           } catch {
             throw new Error(
               `Permission denied: The command uses parent traversal '${relPath}' which resolves to a path outside the workspace. ` +
-              `Use absolute paths within the workspace or ask the user to add the target directory to the allowed list in Settings.`
+                `Use absolute paths within the workspace or ask the user to add the target directory to the allowed list in Settings.`,
             );
           }
         }
@@ -525,7 +537,7 @@ export function wrapExecToolPathGuard(
           throw new Error(`Security warning: ${evasion}`);
         }
       }
-      
+
       return tool.execute(toolCallId, args, signal, onUpdate);
     },
   };

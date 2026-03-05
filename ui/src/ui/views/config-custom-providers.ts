@@ -80,23 +80,124 @@ interface AITestResult {
 // ─── SVG Icons ──────────────────────────────────────────────
 
 const icons = {
-  plus: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"></line><line x1="5" x2="19" y1="12" y2="12"></line></svg>`,
-  settings: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
-  trash: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
-  edit: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>`,
-  check: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
-  chevronDown: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"></path></svg>`,
-  chevronRight: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"></path></svg>`,
-  star: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`,
-  zap: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
-  loader: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="onestop-custom-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`,
-  eye: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
-  eyeOff: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>`,
-  externalLink: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" x2="21" y1="14" y2="3"></line></svg>`,
-  server: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect><rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>`,
-  cpu: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9" rx="1"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>`,
-  close: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg>`,
-  arrowLeft: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>`,
+  plus: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="12" x2="12" y1="5" y2="19"></line>
+      <line x1="5" x2="19" y1="12" y2="12"></line>
+    </svg>
+  `,
+  settings: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path
+        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+      ></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+  `,
+  trash: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  `,
+  edit: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+    </svg>
+  `,
+  check: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  `,
+  chevronDown: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="m6 9 6 6 6-6"></path>
+    </svg>
+  `,
+  chevronRight: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="m9 18 6-6-6-6"></path>
+    </svg>
+  `,
+  star: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon
+        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+      ></polygon>
+    </svg>
+  `,
+  zap: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+    </svg>
+  `,
+  loader: html`
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      class="onestop-custom-spin"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+    </svg>
+  `,
+  eye: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+  `,
+  eyeOff: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+      <line x1="2" x2="22" y1="2" y2="22"></line>
+    </svg>
+  `,
+  externalLink: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+      <polyline points="15 3 21 3 21 9"></polyline>
+      <line x1="10" x2="21" y1="14" y2="3"></line>
+    </svg>
+  `,
+  server: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect>
+      <rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect>
+      <line x1="6" x2="6.01" y1="6" y2="6"></line>
+      <line x1="6" x2="6.01" y1="18" y2="18"></line>
+    </svg>
+  `,
+  cpu: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect width="16" height="16" x="4" y="4" rx="2"></rect>
+      <rect width="6" height="6" x="9" y="9" rx="1"></rect>
+      <path d="M15 2v2"></path>
+      <path d="M15 20v2"></path>
+      <path d="M2 15h2"></path>
+      <path d="M2 9h2"></path>
+      <path d="M20 15h2"></path>
+      <path d="M20 9h2"></path>
+      <path d="M9 2v2"></path>
+      <path d="M9 20v2"></path>
+    </svg>
+  `,
+  close: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="18" x2="6" y1="6" y2="18"></line>
+      <line x1="6" x2="18" y1="6" y2="18"></line>
+    </svg>
+  `,
+  arrowLeft: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="m12 19-7-7 7-7"></path>
+      <path d="M19 12H5"></path>
+    </svg>
+  `,
 };
 
 @customElement("openclaw-custom-providers")
@@ -135,8 +236,6 @@ export class CustomProvidersView extends LitElement {
 
   @state() expandedProviders = new Set<string>();
 
-
-
   connectedCallback() {
     super.connectedCallback();
     if (!this.aiConfig && !this.loading) {
@@ -149,30 +248,29 @@ export class CustomProvidersView extends LitElement {
     this.error = null;
     this.loadingStatus = "初始化中...";
     // this.addLog("开始加载数据...");
-    
+
     try {
       const officialPromise = invoke<OfficialProvider[]>("get_official_providers");
-      const timeout1 = new Promise<never>((_, reject) => 
-         setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000)
+      const timeout1 = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000),
       );
-      
+
       this.officialProviders = await Promise.race([officialPromise, timeout1]);
-      
+
       const configPromise = invoke<AIConfigOverview>("get_ai_config");
-      const timeout2 = new Promise<never>((_, reject) => 
-         setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000)
+      const timeout2 = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000),
       );
       this.aiConfig = await Promise.race([configPromise, timeout2]);
 
-    // 过滤掉一站式接入的 provider，避免在自定义接入页面显示
-    if (this.aiConfig?.configured_providers) {
-      this.aiConfig.configured_providers = this.aiConfig.configured_providers.filter(
-        (p) => p.name !== "onestop"
-      );
-    }
-      
+      // 过滤掉一站式接入的 provider，避免在自定义接入页面显示
+      if (this.aiConfig?.configured_providers) {
+        this.aiConfig.configured_providers = this.aiConfig.configured_providers.filter(
+          (p) => p.name !== "onestop",
+        );
+      }
+
       // this.addLog("配置加载完成");
-      
     } catch (e: any) {
       console.error("Load Data Error:", e);
       const errMsg = e?.message || String(e);
@@ -184,14 +282,13 @@ export class CustomProvidersView extends LitElement {
     }
   }
 
-
   /** Lightweight config refresh — only re-fetches AI config, no loading spinner. */
   async refreshConfig() {
     try {
       const config = await invoke<AIConfigOverview>("get_ai_config");
       if (config?.configured_providers) {
         config.configured_providers = config.configured_providers.filter(
-          (p) => p.name !== "onestop"
+          (p) => p.name !== "onestop",
         );
       }
       this.aiConfig = config;
@@ -249,12 +346,14 @@ export class CustomProvidersView extends LitElement {
     try {
       // 检查当前被删除的 provider 是否包含当前正在使用的全局主模型
       const primaryModel = this.aiConfig?.primary_model;
-      const isDeletingPrimary = primaryModel && (primaryModel === providerName || primaryModel.startsWith(`${providerName}/`));
+      const isDeletingPrimary =
+        primaryModel &&
+        (primaryModel === providerName || primaryModel.startsWith(`${providerName}/`));
 
       await invoke("delete_provider", { providerName: providerName });
       this.deleteConfirmProvider = null;
       await this.loadData();
-      
+
       // 如果被删除的是当前正在使用的主模型，通知父组件清除状态栏高亮显示
       if (isDeletingPrimary) {
         this.dispatchEvent(
@@ -302,11 +401,11 @@ export class CustomProvidersView extends LitElement {
     this.formProviderName = provider.name;
     this.formBaseUrl = provider.base_url;
     this.formApiType = provider.models[0]?.api_type || "openai-completions";
-    this.formSelectedModels = provider.models.map(m => m.id);
+    this.formSelectedModels = provider.models.map((m) => m.id);
 
-    this.selectedOfficial = this.officialProviders.find(p =>
-      provider.name.includes(p.id) || p.id === provider.name
-    ) || null;
+    this.selectedOfficial =
+      this.officialProviders.find((p) => provider.name.includes(p.id) || p.id === provider.name) ||
+      null;
   }
 
   selectOfficialProvider(provider: OfficialProvider) {
@@ -314,8 +413,9 @@ export class CustomProvidersView extends LitElement {
     this.formProviderName = provider.id;
     this.formBaseUrl = provider.default_base_url || "";
     this.formApiType = provider.api_type;
-    const recommended = provider.suggested_models.filter(m => m.recommended).map(m => m.id);
-    this.formSelectedModels = recommended.length > 0 ? recommended : [provider.suggested_models[0]?.id].filter(Boolean);
+    const recommended = provider.suggested_models.filter((m) => m.recommended).map((m) => m.id);
+    this.formSelectedModels =
+      recommended.length > 0 ? recommended : [provider.suggested_models[0]?.id].filter(Boolean);
     this.formError = null;
     this.addStep = "configure";
   }
@@ -332,7 +432,7 @@ export class CustomProvidersView extends LitElement {
 
   toggleModel(modelId: string) {
     if (this.formSelectedModels.includes(modelId)) {
-      this.formSelectedModels = this.formSelectedModels.filter(id => id !== modelId);
+      this.formSelectedModels = this.formSelectedModels.filter((id) => id !== modelId);
     } else {
       this.formSelectedModels = [...this.formSelectedModels, modelId];
     }
@@ -358,9 +458,9 @@ export class CustomProvidersView extends LitElement {
     this.formSaving = true;
 
     try {
-      const models = this.formSelectedModels.map(modelId => {
-        const suggested = this.selectedOfficial?.suggested_models.find(m => m.id === modelId);
-        const existingModel = this.editingProvider?.models.find(m => m.id === modelId);
+      const models = this.formSelectedModels.map((modelId) => {
+        const suggested = this.selectedOfficial?.suggested_models.find((m) => m.id === modelId);
+        const existingModel = this.editingProvider?.models.find((m) => m.id === modelId);
         return {
           id: modelId,
           name: suggested?.name || existingModel?.name || modelId,
@@ -463,21 +563,31 @@ export class CustomProvidersView extends LitElement {
         <div class="onestop-custom-field">
           <label class="onestop-custom-label">
             API Key
-            ${!this.selectedOfficial?.requires_api_key ? html`<span class="onestop-custom-label__hint">(可选)</span>` : nothing}
+            ${
+              !this.selectedOfficial?.requires_api_key
+                ? html`
+                    <span class="onestop-custom-label__hint">(可选)</span>
+                  `
+                : nothing
+            }
           </label>
-          ${isEditing && this.editingProvider?.has_api_key
-            ? html`<div class="onestop-custom-apikey-current">
+          ${
+            isEditing && this.editingProvider?.has_api_key
+              ? html`<div class="onestop-custom-apikey-current">
                 <span class="onestop-custom-label__hint">当前:</span>
                 <code class="onestop-custom-code">${this.editingProvider.api_key_masked}</code>
               </div>`
-            : nothing}
+              : nothing
+          }
           <div class="onestop-apikey__field">
             <input
               type=${this.formShowApiKey ? "text" : "password"}
               class="onestop-apikey__input"
-              placeholder=${isEditing && this.editingProvider?.has_api_key
-                ? "留空保持原有 Key，或输入新的 Key"
-                : "sk-..."}
+              placeholder=${
+                isEditing && this.editingProvider?.has_api_key
+                  ? "留空保持原有 Key，或输入新的 Key"
+                  : "sk-..."
+              }
               .value=${this.formApiKey}
               @input=${(e: Event) => {
                 this.formApiKey = (e.target as HTMLInputElement).value;
@@ -485,7 +595,7 @@ export class CustomProvidersView extends LitElement {
             />
             <button
               class="onestop-apikey__toggle"
-              @click=${() => this.formShowApiKey = !this.formShowApiKey}
+              @click=${() => (this.formShowApiKey = !this.formShowApiKey)}
               title=${this.formShowApiKey ? "隐藏" : "显示"}
             >
               ${this.formShowApiKey ? icons.eyeOff : icons.eye}
@@ -515,8 +625,9 @@ export class CustomProvidersView extends LitElement {
             <span class="onestop-custom-label__hint">(已选 ${this.formSelectedModels.length} 个)</span>
           </label>
 
-          ${this.selectedOfficial
-            ? html`
+          ${
+            this.selectedOfficial
+              ? html`
                 <div class="onestop-custom-model-list">
                   ${this.selectedOfficial.suggested_models.map(
                     (model) => html`
@@ -527,23 +638,32 @@ export class CustomProvidersView extends LitElement {
                         <div class="onestop-custom-model-item__info">
                           <span class="onestop-custom-model-item__name">
                             ${model.name}
-                            ${model.recommended
-                              ? html`<span class="onestop-custom-model-item__badge">推荐</span>`
-                              : nothing}
+                            ${
+                              model.recommended
+                                ? html`
+                                    <span class="onestop-custom-model-item__badge">推荐</span>
+                                  `
+                                : nothing
+                            }
                           </span>
-                          ${model.description
-                            ? html`<span class="onestop-custom-model-item__desc">${model.description}</span>`
-                            : nothing}
+                          ${
+                            model.description
+                              ? html`<span class="onestop-custom-model-item__desc">${model.description}</span>`
+                              : nothing
+                          }
                         </div>
-                        ${this.formSelectedModels.includes(model.id)
-                          ? html`<span class="onestop-custom-model-item__check">${icons.check}</span>`
-                          : nothing}
+                        ${
+                          this.formSelectedModels.includes(model.id)
+                            ? html`<span class="onestop-custom-model-item__check">${icons.check}</span>`
+                            : nothing
+                        }
                       </button>
                     `,
                   )}
                 </div>
               `
-            : nothing}
+              : nothing
+          }
 
           <!-- 自定义模型输入 -->
           <div class="onestop-custom-model-add">
@@ -569,11 +689,16 @@ export class CustomProvidersView extends LitElement {
           </div>
 
           <!-- 已添加的自定义模型标签 -->
-          ${this.formSelectedModels.filter(id => !this.selectedOfficial?.suggested_models.find(m => m.id === id)).length > 0
-            ? html`
+          ${
+            this.formSelectedModels.filter(
+              (id) => !this.selectedOfficial?.suggested_models.find((m) => m.id === id),
+            ).length > 0
+              ? html`
                 <div class="onestop-custom-model-tags">
                   ${this.formSelectedModels
-                    .filter(id => !this.selectedOfficial?.suggested_models.find(m => m.id === id))
+                    .filter(
+                      (id) => !this.selectedOfficial?.suggested_models.find((m) => m.id === id),
+                    )
                     .map(
                       (modelId) => html`
                         <span class="onestop-custom-model-tag">
@@ -584,12 +709,14 @@ export class CustomProvidersView extends LitElement {
                     )}
                 </div>
               `
-            : nothing}
+              : nothing
+          }
         </div>
 
         <!-- 文档链接 -->
-        ${this.selectedOfficial?.docs_url
-          ? html`
+        ${
+          this.selectedOfficial?.docs_url
+            ? html`
               <a
                 href=${this.selectedOfficial.docs_url}
                 target="_blank"
@@ -600,20 +727,23 @@ export class CustomProvidersView extends LitElement {
                 查看官方文档
               </a>
             `
-          : nothing}
+            : nothing
+        }
 
         <!-- 错误提示 -->
-        ${this.formError
-          ? html`<div class="onestop-custom-error">${this.formError}</div>`
-          : nothing}
+        ${
+          this.formError ? html`<div class="onestop-custom-error">${this.formError}</div>` : nothing
+        }
 
         <!-- 操作按钮 -->
         <div class="onestop-custom-form-actions">
-          ${!isEditing
-            ? html`<button class="onestop-custom-btn-secondary" @click=${() => {
-                this.addStep = "select";
-              }}>${icons.arrowLeft} 返回</button>`
-            : nothing}
+          ${
+            !isEditing
+              ? html`<button class="onestop-custom-btn-secondary" @click=${() => {
+                  this.addStep = "select";
+                }}>${icons.arrowLeft} 返回</button>`
+              : nothing
+          }
           <div class="onestop-custom-form-actions__right">
             <button class="onestop-custom-btn-secondary" @click=${() => this.resetForm()}>取消</button>
             <button
@@ -632,8 +762,8 @@ export class CustomProvidersView extends LitElement {
 
   renderProviderCard(provider: ConfiguredProvider) {
     const expanded = this.expandedProviders.has(provider.name);
-    const officialInfo = this.officialProviders.find(p =>
-      provider.name.includes(p.id) || p.id === provider.name
+    const officialInfo = this.officialProviders.find(
+      (p) => provider.name.includes(p.id) || p.id === provider.name,
     );
     const isDeleting = this.deleteConfirmProvider === provider.name;
 
@@ -652,9 +782,13 @@ export class CustomProvidersView extends LitElement {
           <div class="onestop-custom-card__info">
             <div class="onestop-custom-card__name-row">
               <span class="onestop-custom-card__name">${provider.name}</span>
-              ${provider.has_api_key
-                ? html`<span class="onestop-custom-tag onestop-custom-tag--ok">已配置</span>`
-                : nothing}
+              ${
+                provider.has_api_key
+                  ? html`
+                      <span class="onestop-custom-tag onestop-custom-tag--ok">已配置</span>
+                    `
+                  : nothing
+              }
             </div>
             <span class="onestop-custom-card__url">${provider.base_url}</span>
           </div>
@@ -665,17 +799,20 @@ export class CustomProvidersView extends LitElement {
         </div>
 
         <!-- 展开内容 -->
-        ${expanded
-          ? html`
+        ${
+          expanded
+            ? html`
               <div class="onestop-custom-card__body">
-                ${provider.api_key_masked
-                  ? html`
+                ${
+                  provider.api_key_masked
+                    ? html`
                       <div class="onestop-custom-card__detail">
                         <span class="onestop-custom-label__hint">API Key:</span>
                         <code class="onestop-custom-code">${provider.api_key_masked}</code>
                       </div>
                     `
-                  : nothing}
+                    : nothing
+                }
 
                 <!-- 模型列表 (当前模型置顶) -->
               <div class="onestop-custom-card__models">
@@ -689,9 +826,11 @@ export class CustomProvidersView extends LitElement {
                           <div>
                             <span class="onestop-custom-model-row__name">
                               ${model.name}
-                              ${model.is_primary
-                                ? html`<span class="onestop-custom-model-row__star">${icons.star} 主模型</span>`
-                                : nothing}
+                              ${
+                                model.is_primary
+                                  ? html`<span class="onestop-custom-model-row__star">${icons.star} 主模型</span>`
+                                  : nothing
+                              }
                             </span>
                             <span class="onestop-custom-model-row__id">${model.full_id}</span>
                           </div>
@@ -712,8 +851,9 @@ export class CustomProvidersView extends LitElement {
                 </div>
 
                 <!-- 删除确认 -->
-                ${isDeleting
-                  ? html`
+                ${
+                  isDeleting
+                    ? html`
                       <div class="onestop-custom-delete-confirm">
                         <p>⚠️ 确定要删除供应商 "${provider.name}" 吗？这将同时删除其下所有模型配置。</p>
                         <div class="onestop-custom-delete-confirm__actions">
@@ -727,12 +867,12 @@ export class CustomProvidersView extends LitElement {
                           </button>
                           <button
                             class="onestop-custom-btn-secondary"
-                            @click=${() => this.deleteConfirmProvider = null}
+                            @click=${() => (this.deleteConfirmProvider = null)}
                           >取消</button>
                         </div>
                       </div>
                     `
-                  : html`
+                    : html`
                       <div class="onestop-custom-card__actions">
                         <button
                           class="onestop-custom-btn-text"
@@ -749,10 +889,12 @@ export class CustomProvidersView extends LitElement {
                           }}
                         >${icons.trash} 删除供应商</button>
                       </div>
-                    `}
+                    `
+                }
               </div>
             `
-          : nothing}
+            : nothing
+        }
       </div>
     `;
   }
@@ -770,10 +912,10 @@ export class CustomProvidersView extends LitElement {
               <p class="onestop-section__desc">${this.loadingStatus}</p>
             </div>
             <button class="onestop-custom-btn-secondary" @click=${() => {
-              this.loading = false; 
-              this.aiConfig = null; 
-              this.error = null; 
- 
+              this.loading = false;
+              this.aiConfig = null;
+              this.error = null;
+
               this.loadData();
             }}>强制刷新</button>
           </div>
@@ -849,39 +991,48 @@ export class CustomProvidersView extends LitElement {
           </div>
 
           <!-- 测试结果 -->
-          ${this.testResult
-            ? html`
+          ${
+            this.testResult
+              ? html`
                 <div class="onestop-custom-test-result ${this.testResult.success ? "success" : "error"}">
                   <div class="onestop-custom-test-result__compact-info">
                     <span class="onestop-custom-test-result__status">
                       ${this.testResult.success ? icons.check : icons.close}
                       ${this.testResult.success ? "测试连接成功" : "测试连接失败"}
                     </span>
-                    ${this.testResult.latency_ms
-                      ? html`<span class="onestop-custom-label__hint" style="font-family: var(--mono); margin-left: -4px;">${this.testResult.latency_ms}ms</span>`
-                      : nothing}
-                    ${this.testResult.error || this.testResult.response
-                      ? html`<span class="onestop-custom-test-result__compact-msg" title=${this.testResult.error || this.testResult.response}>${this.testResult.error || this.testResult.response}</span>`
-                      : nothing}
+                    ${
+                      this.testResult.latency_ms
+                        ? html`<span class="onestop-custom-label__hint" style="font-family: var(--mono); margin-left: -4px;">${this.testResult.latency_ms}ms</span>`
+                        : nothing
+                    }
+                    ${
+                      this.testResult.error || this.testResult.response
+                        ? html`<span class="onestop-custom-test-result__compact-msg" title=${this.testResult.error || this.testResult.response}>${this.testResult.error || this.testResult.response}</span>`
+                        : nothing
+                    }
                   </div>
                   <button class="onestop-custom-btn-text" @click=${() => {
                     this.testResult = null;
                   }} style="flex-shrink: 0;">关闭</button>
                 </div>
               `
-            : nothing}
+              : nothing
+          }
 
           <!-- 添加/编辑供应商表单 -->
-          ${this.showAddForm
-            ? html`
+          ${
+            this.showAddForm
+              ? html`
                 <div class="onestop-custom-add-section">
                   <div class="onestop-custom-add-section__header">
                     <span class="onestop-custom-add-section__title">
-                      ${this.editingProvider
-                        ? `编辑供应商: ${this.editingProvider.name}`
-                        : this.addStep === "select"
-                          ? "添加 AI 供应商"
-                          : `配置 ${this.selectedOfficial?.name || "自定义供应商"}`}
+                      ${
+                        this.editingProvider
+                          ? `编辑供应商: ${this.editingProvider.name}`
+                          : this.addStep === "select"
+                            ? "添加 AI 供应商"
+                            : `配置 ${this.selectedOfficial?.name || "自定义供应商"}`
+                      }
                     </span>
                     <button class="onestop-custom-btn-icon" @click=${() => {
                       this.resetForm();
@@ -890,20 +1041,22 @@ export class CustomProvidersView extends LitElement {
                   ${this.addStep === "select" ? this.renderProviderSelect() : this.renderConfigureForm()}
                 </div>
               `
-            : nothing}
+              : nothing
+          }
 
           <!-- 已配置的供应商列表 -->
-          ${this.aiConfig && this.aiConfig.configured_providers.length > 0
-            ? html`
+          ${
+            this.aiConfig && this.aiConfig.configured_providers.length > 0
+              ? html`
                 <div class="onestop-custom-providers-list">
                   <h4 class="onestop-custom-providers-list__title">
                     ${icons.server} 已配置的供应商
                   </h4>
-                  ${this.aiConfig.configured_providers.map(provider => this.renderProviderCard(provider))}
+                  ${this.aiConfig.configured_providers.map((provider) => this.renderProviderCard(provider))}
                 </div>
               `
-            : !this.showAddForm
-              ? html`
+              : !this.showAddForm
+                ? html`
                   <div class="onestop-custom-empty">
                     <span class="onestop-custom-empty__icon">${icons.plus}</span>
                     <p>还没有配置任何自定义 AI 供应商</p>
@@ -912,12 +1065,15 @@ export class CustomProvidersView extends LitElement {
                     </button>
                   </div>
                 `
-              : nothing}
+                : nothing
+          }
 
           <!-- 错误提示 -->
-          ${this.error && this.aiConfig
-            ? html`<div class="onestop-custom-error">${this.error}</div>`
-            : nothing}
+          ${
+            this.error && this.aiConfig
+              ? html`<div class="onestop-custom-error">${this.error}</div>`
+              : nothing
+          }
         </div>
       </div>
     `;
@@ -929,5 +1085,7 @@ export type CustomProvidersProps = {
 };
 
 export function renderCustomProviders(_props: CustomProvidersProps) {
-  return html`<openclaw-custom-providers></openclaw-custom-providers>`;
+  return html`
+    <openclaw-custom-providers></openclaw-custom-providers>
+  `;
 }

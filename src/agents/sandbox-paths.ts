@@ -55,7 +55,10 @@ export function resolveSandboxPath(params: {
       for (const allowPath of params.allowPaths) {
         const allowResolved = path.resolve(allowPath);
         const allowRelative = path.relative(allowResolved, resolved);
-        if (allowRelative === "" || (!allowRelative.startsWith("..") && !path.isAbsolute(allowRelative))) {
+        if (
+          allowRelative === "" ||
+          (!allowRelative.startsWith("..") && !path.isAbsolute(allowRelative))
+        ) {
           return { resolved, relative: allowRelative, appliedRoot: allowResolved };
         }
       }

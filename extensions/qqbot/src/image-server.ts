@@ -3,10 +3,10 @@
  * 提供安全的图片存储和访问服务
  */
 
-import http from "node:http";
-import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import http from "node:http";
+import path from "node:path";
 
 export interface ImageServerConfig {
   /** 监听端口 */
@@ -291,7 +291,7 @@ export function stopImageServer(): Promise<void> {
 export function saveImage(
   imageData: Buffer | string,
   mimeType: string = "image/png",
-  ttlSeconds?: number
+  ttlSeconds?: number,
 ): string {
   // 转换 base64 为 Buffer
   let buffer: Buffer;
@@ -347,7 +347,7 @@ export function saveImage(
 export function saveImageFromPath(filePath: string, ttlSeconds?: number): string | null {
   try {
     console.log(`[image-server] saveImageFromPath: ${filePath}`);
-    
+
     // 检查文件是否存在
     if (!fs.existsSync(filePath)) {
       console.log(`[image-server] File not found: ${filePath}`);
@@ -357,13 +357,13 @@ export function saveImageFromPath(filePath: string, ttlSeconds?: number): string
     // 读取文件
     const buffer = fs.readFileSync(filePath);
     console.log(`[image-server] File size: ${buffer.length}`);
-    
+
     // 根据扩展名获取 MIME 类型
     const ext = path.extname(filePath).toLowerCase().replace(".", "");
     console.log(`[image-server] Extension: "${ext}"`);
     const mimeType = getMimeType(ext);
     console.log(`[image-server] MIME type: ${mimeType}`);
-    
+
     // 只处理图片文件
     if (!mimeType.startsWith("image/")) {
       console.log(`[image-server] Not an image file`);
@@ -423,7 +423,7 @@ export async function ensureImageServer(publicBaseUrl?: string): Promise<string 
 export async function downloadFile(
   url: string,
   destDir: string,
-  originalFilename?: string
+  originalFilename?: string,
 ): Promise<string | null> {
   try {
     // 确保目录存在
@@ -439,7 +439,7 @@ export async function downloadFile(
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    
+
     // 确定文件名
     let finalFilename: string;
     if (originalFilename) {
@@ -452,13 +452,13 @@ export async function downloadFile(
       // 没有原始文件名，生成随机名
       finalFilename = `${generateImageId()}.bin`;
     }
-    
+
     const filePath = path.join(destDir, finalFilename);
 
     // 保存文件
     fs.writeFileSync(filePath, buffer);
     console.log(`[image-server] Downloaded file: ${filePath}`);
-    
+
     return filePath;
   } catch (err) {
     console.error(`[image-server] Download error:`, err);

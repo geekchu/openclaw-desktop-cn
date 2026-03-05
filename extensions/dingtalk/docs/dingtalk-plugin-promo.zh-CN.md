@@ -40,10 +40,10 @@ openclaw plugins install @soimy/dingtalk
 
 ```json5
 {
-  "plugins": {
-    "enabled": true,
-    "allow": ["dingtalk"]
-  }
+  plugins: {
+    enabled: true,
+    allow: ["dingtalk"],
+  },
 }
 ```
 
@@ -121,29 +121,29 @@ openclaw configure --section channels
 
 ```json5
 {
-  "plugins": {
-    "enabled": true,
-    "allow": ["dingtalk"]
+  plugins: {
+    enabled: true,
+    allow: ["dingtalk"],
   },
-  "channels": {
-    "dingtalk": {
-      "enabled": true,
-      "clientId": "dingxxxxxx",
-      "clientSecret": "your-app-secret",
-      "robotCode": "dingxxxxxx",
-      "corpId": "dingxxxxxx",
-      "agentId": "123456789",
-      "dmPolicy": "open",
-      "groupPolicy": "open",
-      "allowFrom": [],
-      "debug": false,
-      "messageType": "markdown"
+  channels: {
+    dingtalk: {
+      enabled: true,
+      clientId: "dingxxxxxx",
+      clientSecret: "your-app-secret",
+      robotCode: "dingxxxxxx",
+      corpId: "dingxxxxxx",
+      agentId: "123456789",
+      dmPolicy: "open",
+      groupPolicy: "open",
+      allowFrom: [],
+      debug: false,
+      messageType: "markdown",
 
       // 当 messageType = "card" 时再加下面两项：
       // "cardTemplateId": "你复制的模板ID",
       // "cardTemplateKey": "你模板的内容变量"
-    }
-  }
+    },
+  },
 }
 ```
 

@@ -31,6 +31,7 @@ openclaw plugins install @sunnoy/wecom
 ```
 
 This command will automatically:
+
 - Download the plugin from npm
 - Install to `~/.openclaw/extensions/`
 - Update your OpenClaw configuration
@@ -66,13 +67,13 @@ Add to your OpenClaw configuration file (`~/.openclaw/openclaw.json`):
 
 ### Configuration Options
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `plugins.entries.wecom.enabled` | boolean | Yes | Enable the plugin |
-| `channels.wecom.token` | string | Yes | WeCom bot Token |
-| `channels.wecom.encodingAesKey` | string | Yes | WeCom message encryption key (43 chars) |
-| `channels.wecom.adminUsers` | array | No | Admin user IDs (bypass command allowlist and dynamic routing) |
-| `channels.wecom.commands.allowlist` | array | No | Command allowlist |
+| Option                              | Type    | Required | Description                                                   |
+| ----------------------------------- | ------- | -------- | ------------------------------------------------------------- |
+| `plugins.entries.wecom.enabled`     | boolean | Yes      | Enable the plugin                                             |
+| `channels.wecom.token`              | string  | Yes      | WeCom bot Token                                               |
+| `channels.wecom.encodingAesKey`     | string  | Yes      | WeCom message encryption key (43 chars)                       |
+| `channels.wecom.adminUsers`         | array   | No       | Admin user IDs (bypass command allowlist and dynamic routing) |
+| `channels.wecom.commands.allowlist` | array   | No       | Command allowlist                                             |
 
 ## Enterprise WeChat Configuration
 
@@ -86,15 +87,15 @@ Add to your OpenClaw configuration file (`~/.openclaw/openclaw.json`):
 
 ## Supported Message Types
 
-| Type | Direction | Description |
-|------|-----------|-------------|
-| Text | Inbound/Outbound | Plain text messages |
-| Image | Inbound/Outbound | Encrypted images (inbound are auto-decrypted); outbound via `msg_item` base64 |
-| Voice | Inbound | Auto-transcribed by WeCom, processed as text (DM only) |
-| Mixed | Inbound | Text + image combination messages |
-| File | Inbound | File attachments (downloaded and passed to AI for analysis) |
-| Location | Inbound | Location shares (converted to text description) |
-| Link | Inbound | Shared links (title, description, URL extracted as text) |
+| Type     | Direction        | Description                                                                   |
+| -------- | ---------------- | ----------------------------------------------------------------------------- |
+| Text     | Inbound/Outbound | Plain text messages                                                           |
+| Image    | Inbound/Outbound | Encrypted images (inbound are auto-decrypted); outbound via `msg_item` base64 |
+| Voice    | Inbound          | Auto-transcribed by WeCom, processed as text (DM only)                        |
+| Mixed    | Inbound          | Text + image combination messages                                             |
+| File     | Inbound          | File attachments (downloaded and passed to AI for analysis)                   |
+| Location | Inbound          | Location shares (converted to text description)                               |
+| Link     | Inbound          | Shared links (title, description, URL extracted as text)                      |
 
 ## Admin Users
 
@@ -148,12 +149,12 @@ Configure under `channels.wecom`:
 }
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `dynamicAgents.enabled` | boolean | `true` | Enable dynamic agents |
-| `dm.createAgentOnFirstMessage` | boolean | `true` | Use dynamic agents for DMs |
-| `groupChat.enabled` | boolean | `true` | Enable group chat processing |
-| `groupChat.requireMention` | boolean | `true` | Require @mention in groups |
+| Option                         | Type    | Default | Description                  |
+| ------------------------------ | ------- | ------- | ---------------------------- |
+| `dynamicAgents.enabled`        | boolean | `true`  | Enable dynamic agents        |
+| `dm.createAgentOnFirstMessage` | boolean | `true`  | Use dynamic agents for DMs   |
+| `groupChat.enabled`            | boolean | `true`  | Enable group chat processing |
+| `groupChat.requireMention`     | boolean | `true`  | Require @mention in groups   |
 
 ### Disable Dynamic Agents
 
@@ -188,12 +189,12 @@ Prevent regular users from executing sensitive Gateway management commands throu
 
 ### Recommended Allowlist Commands
 
-| Command | Description | Safety Level |
-|---------|-------------|--------------|
-| `/new` | Reset conversation, start new session | User-level |
-| `/compact` | Compress current session context | User-level |
-| `/help` | Show help information | User-level |
-| `/status` | Show Agent status | User-level |
+| Command    | Description                           | Safety Level |
+| ---------- | ------------------------------------- | ------------ |
+| `/new`     | Reset conversation, start new session | User-level   |
+| `/compact` | Compress current session context      | User-level   |
+| `/help`    | Show help information                 | User-level   |
+| `/status`  | Show Agent status                     | User-level   |
 
 > **Security Note**: Do not add `/gateway`, `/plugins`, or other management commands to the allowlist to prevent regular users from gaining Gateway instance admin privileges. Admin users configured in `adminUsers` bypass this restriction.
 
@@ -210,6 +211,7 @@ When a user sends multiple messages in rapid succession (within 2 seconds), the 
 ### Q: How does inbound image handling work?
 
 **A:** WeCom encrypts images sent by users with AES-256-CBC. The plugin automatically:
+
 1. Downloads the encrypted image from WeCom's URL
 2. Decrypts it using the configured `encodingAesKey`
 3. Saves it locally and passes it to the AI for vision analysis
@@ -250,6 +252,7 @@ If an image fails to process (size limit, invalid format), the text response wil
   - OpenClaw plugin system automatically handles webhook routing
 
 **Deployment suggestions:**
+
 1. If using a reverse proxy (e.g., Nginx), configure authentication exemption for `/webhooks/wecom` path
 2. Or expose the webhook endpoint on a separate port without Gateway Auth
 
@@ -258,6 +261,7 @@ If an image fails to process (size limit, invalid format), the text response wil
 **A:** Common causes and solutions:
 
 1. **Check configuration key name**: Ensure correct key name `encodingAesKey` (case-sensitive)
+
    ```json
    {
      "channels": {
@@ -269,6 +273,7 @@ If an image fails to process (size limit, invalid format), the text response wil
    ```
 
 2. **Check key length**: EncodingAESKey must be exactly 43 characters
+
    ```bash
    # Check length
    echo -n "your-key" | wc -c

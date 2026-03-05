@@ -37,39 +37,39 @@ Current architecture is modularized by responsibility. `src/channel.ts` is now a
 
 ## WHERE TO LOOK
 
-| Task | Location | Notes |
-| --- | --- | --- |
-| Plugin registration | `index.ts` | Exports default plugin object |
-| Channel assembly | `src/channel.ts` | Defines `dingtalkPlugin`; wires gateway/outbound/status |
-| Inbound message handling | `src/inbound-handler.ts` | `handleDingTalkMessage`, `downloadMedia` |
-| Text/media sending | `src/send-service.ts` | `sendBySession`, `sendProactive*`, `sendMessage` |
-| AI Card operations | `src/card-service.ts` | `createAICard`, `streamAICard`, `finishAICard` |
-| Token management | `src/auth.ts` | `getAccessToken` with clientId-scoped cache |
-| Access control | `src/access-control.ts` | DM/group allowlist helpers |
-| Message parsing | `src/message-utils.ts` | quote parsing + richText/media extraction |
-| Config/path helpers | `src/config.ts` | `getConfig`, `resolveRelativePath`, `stripTargetPrefix` |
-| Deduplication | `src/dedup.ts` | message retry dedup keys |
-| Type definitions | `src/types.ts` | DingTalk and plugin types/constants |
+| Task                     | Location                 | Notes                                                   |
+| ------------------------ | ------------------------ | ------------------------------------------------------- |
+| Plugin registration      | `index.ts`               | Exports default plugin object                           |
+| Channel assembly         | `src/channel.ts`         | Defines `dingtalkPlugin`; wires gateway/outbound/status |
+| Inbound message handling | `src/inbound-handler.ts` | `handleDingTalkMessage`, `downloadMedia`                |
+| Text/media sending       | `src/send-service.ts`    | `sendBySession`, `sendProactive*`, `sendMessage`        |
+| AI Card operations       | `src/card-service.ts`    | `createAICard`, `streamAICard`, `finishAICard`          |
+| Token management         | `src/auth.ts`            | `getAccessToken` with clientId-scoped cache             |
+| Access control           | `src/access-control.ts`  | DM/group allowlist helpers                              |
+| Message parsing          | `src/message-utils.ts`   | quote parsing + richText/media extraction               |
+| Config/path helpers      | `src/config.ts`          | `getConfig`, `resolveRelativePath`, `stripTargetPrefix` |
+| Deduplication            | `src/dedup.ts`           | message retry dedup keys                                |
+| Type definitions         | `src/types.ts`           | DingTalk and plugin types/constants                     |
 
 ## CODE MAP
 
-| Symbol | Type | Location | Role |
-| --- | --- | --- | --- |
-| `dingtalkPlugin` | const | `src/channel.ts` | Main channel plugin definition |
-| `handleDingTalkMessage` | function | `src/inbound-handler.ts` | Process inbound messages end-to-end |
-| `downloadMedia` | function | `src/inbound-handler.ts` | Download inbound media via runtime media service |
-| `sendBySession` | function | `src/send-service.ts` | Send replies via session webhook |
-| `sendMessage` | function | `src/send-service.ts` | Auto send (card/text/markdown fallback) |
-| `sendProactiveMedia` | function | `src/send-service.ts` | Proactive media send |
-| `createAICard` | function | `src/card-service.ts` | Create and cache AI Card |
-| `streamAICard` | function | `src/card-service.ts` | Stream updates to AI Card |
-| `finishAICard` | function | `src/card-service.ts` | Finalize AI Card |
-| `getAccessToken` | function | `src/auth.ts` | Get/cached DingTalk token |
-| `extractMessageContent` | function | `src/message-utils.ts` | Normalize inbound msg payload |
-| `normalizeAllowFrom` | function | `src/access-control.ts` | Normalize allowlist entries |
-| `isMessageProcessed` | function | `src/dedup.ts` | Message dedup check |
-| `DingTalkConfigSchema` | const | `src/config-schema.ts` | Zod validation schema |
-| `AICardStatus` | const | `src/types.ts` | AI Card state constants |
+| Symbol                  | Type     | Location                 | Role                                             |
+| ----------------------- | -------- | ------------------------ | ------------------------------------------------ |
+| `dingtalkPlugin`        | const    | `src/channel.ts`         | Main channel plugin definition                   |
+| `handleDingTalkMessage` | function | `src/inbound-handler.ts` | Process inbound messages end-to-end              |
+| `downloadMedia`         | function | `src/inbound-handler.ts` | Download inbound media via runtime media service |
+| `sendBySession`         | function | `src/send-service.ts`    | Send replies via session webhook                 |
+| `sendMessage`           | function | `src/send-service.ts`    | Auto send (card/text/markdown fallback)          |
+| `sendProactiveMedia`    | function | `src/send-service.ts`    | Proactive media send                             |
+| `createAICard`          | function | `src/card-service.ts`    | Create and cache AI Card                         |
+| `streamAICard`          | function | `src/card-service.ts`    | Stream updates to AI Card                        |
+| `finishAICard`          | function | `src/card-service.ts`    | Finalize AI Card                                 |
+| `getAccessToken`        | function | `src/auth.ts`            | Get/cached DingTalk token                        |
+| `extractMessageContent` | function | `src/message-utils.ts`   | Normalize inbound msg payload                    |
+| `normalizeAllowFrom`    | function | `src/access-control.ts`  | Normalize allowlist entries                      |
+| `isMessageProcessed`    | function | `src/dedup.ts`           | Message dedup check                              |
+| `DingTalkConfigSchema`  | const    | `src/config-schema.ts`   | Zod validation schema                            |
+| `AICardStatus`          | const    | `src/types.ts`           | AI Card state constants                          |
 
 ## CONVENTIONS
 

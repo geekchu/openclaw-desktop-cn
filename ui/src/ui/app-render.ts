@@ -55,6 +55,7 @@ import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./na
 import { renderAgents } from "./views/agents.ts";
 import { renderChannels } from "./views/channels.ts";
 import { renderChat } from "./views/chat.ts";
+import { saveOnestopConfig } from "./views/config-onestop.ts";
 import { renderConfig } from "./views/config.ts";
 import { renderCron } from "./views/cron.ts";
 import { renderDebug } from "./views/debug.ts";
@@ -62,10 +63,8 @@ import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
-
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
-import { saveOnestopConfig } from "./views/config-onestop.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
 import { renderTerminal } from "./views/terminal.ts";
@@ -109,10 +108,20 @@ export function renderApp(state: AppViewState) {
 
   // 仅在配置已成功加载且确认无主模型时才提示；
   // 如果配置加载失败（lastError）或尚未加载（configSnapshot 为 null），不显示此提示
-  if (state.connected && !primaryModel && !state.configLoading && !state.lastError && state.configSnapshot) {
+  if (
+    state.connected &&
+    !primaryModel &&
+    !state.configLoading &&
+    !state.lastError &&
+    state.configSnapshot
+  ) {
     chatDisabledReason = html`
       尚未配置大模型。请前往
-      <a href="#" @click=${(e: Event) => { e.preventDefault(); state.configActiveSection = "onestop"; state.setTab("config"); }}>AI大模型接入页</a>
+      <a href="#" @click=${(e: Event) => {
+        e.preventDefault();
+        state.configActiveSection = "onestop";
+        state.setTab("config");
+      }}>AI大模型接入页</a>
       进行配置。
     `;
   }
@@ -925,10 +934,19 @@ export function renderApp(state: AppViewState) {
                   showApiKey: state.onestopShowApiKey,
                   activeCategory: state.onestopActiveCategory,
                   saving: state.onestopSaving,
-                  onApiKeyChange: (value) => { state.onestopApiKey = value; },
-                  onModelSelect: (modelId) => { state.onestopSelectedModel = modelId; void loadConfig(state); },
-                  onToggleShowApiKey: () => { state.onestopShowApiKey = !state.onestopShowApiKey; },
-                  onCategoryChange: (cat) => { state.onestopActiveCategory = cat; },
+                  onApiKeyChange: (value) => {
+                    state.onestopApiKey = value;
+                  },
+                  onModelSelect: (modelId) => {
+                    state.onestopSelectedModel = modelId;
+                    void loadConfig(state);
+                  },
+                  onToggleShowApiKey: () => {
+                    state.onestopShowApiKey = !state.onestopShowApiKey;
+                  },
+                  onCategoryChange: (cat) => {
+                    state.onestopActiveCategory = cat;
+                  },
                   onSave: async () => {
                     state.onestopSaving = true;
                     try {
@@ -940,8 +958,12 @@ export function renderApp(state: AppViewState) {
                       state.onestopSaving = false;
                     }
                   },
-                  onNavigateToCustom: () => { state.configActiveSection = null; },
-                  requestUpdate: () => { (state as unknown as LitElement).requestUpdate(); },
+                  onNavigateToCustom: () => {
+                    state.configActiveSection = null;
+                  },
+                  requestUpdate: () => {
+                    (state as unknown as LitElement).requestUpdate();
+                  },
                 },
               })
             : nothing

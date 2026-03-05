@@ -198,9 +198,9 @@ describe("exec approval forwarder", () => {
 
   it("sends telegram inline buttons with approval request", async () => {
     vi.useFakeTimers();
-    const deliver = vi.fn().mockResolvedValue([
-      { channel: "telegram", messageId: "msg-42", chatId: "123" },
-    ]);
+    const deliver = vi
+      .fn()
+      .mockResolvedValue([{ channel: "telegram", messageId: "msg-42", chatId: "123" }]);
     const cfg = {
       approvals: {
         exec: {

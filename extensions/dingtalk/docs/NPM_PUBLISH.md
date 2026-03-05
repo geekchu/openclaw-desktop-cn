@@ -7,9 +7,11 @@
 仓库已提供自动发布工作流：`.github/workflows/npm-publish.yml`
 
 触发条件：
+
 - 推送任意新 tag 时触发
 
 自动执行内容：
+
 - 安装依赖
 - 校验 tag 与 `package.json` 的 `version` 同步（支持 `v2.7.0` 与 `2.7.0` 两种 tag 形式）
 - 当 tag 版本为标准 semver 预发布格式（如 `v2.8.0-beta.0`）时，自动发布到 npm `beta` dist-tag
@@ -17,6 +19,7 @@
 - 通过后自动执行 `npm publish --access public`
 
 需要在 npm 与 GitHub 完成 Trusted publisher 绑定：
+
 1. 在 npm 包设置中配置 GitHub Actions Trusted publisher
 2. 确保工作流具备 `id-token: write` 权限（已在本仓库 workflow 配置）
 
@@ -54,6 +57,7 @@ git push origin main --follow-tags
 ```
 
 CI 行为：
+
 - tag（去掉可选 `v` 前缀）必须与 `package.json.version` 完全一致
 - 版本包含 `-beta.*` 时，自动执行 `npm publish --access public --tag beta`
 - 非预发布版本自动发布到 `latest`
@@ -65,6 +69,7 @@ CI 行为：
    - 需要有 `@soimy` scope 的发布权限（或你本人的账号可发布该 scope）
 
 2. **认证登录**
+
    ```bash
    npm login
    ```
@@ -99,6 +104,7 @@ npm pack --dry-run
 ```
 
 这会显示哪些文件会被包含在 npm 包中。确保：
+
 - ✅ 包含必要文件：`index.ts`, `src/`, `utils.ts`, `package.json`, `README.md`, `openclaw.plugin.json`
 - ❌ 排除开发文件：`node_modules/`, `docs/`, `.git/`, 配置文件等
 
@@ -167,6 +173,7 @@ npm install @soimy/dingtalk
 通过 `.npmignore` 控制哪些文件会被发布：
 
 **包含的文件：**
+
 - `index.ts` - 插件入口
 - `src/` - 源代码目录
 - `package.json` - 包配置
@@ -175,6 +182,7 @@ npm install @soimy/dingtalk
 - `clawbot.plugin.json` - 兼容配置
 
 **排除的文件：**
+
 - `node_modules/` - 依赖包
 - `docs/` - 开发文档
 - `.git/` - Git 仓库
@@ -186,6 +194,7 @@ npm install @soimy/dingtalk
 ### Q: 发布失败，提示权限错误
 
 **A:** 确保：
+
 1. 已登录正确的 npm 账号：`npm whoami`
 2. 该账号有 `@soimy` scope 的发布权限
 3. 使用了 `--access public` 标志

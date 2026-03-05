@@ -452,11 +452,7 @@ function renderExecApprovalsPolicy(state: ExecApprovalsState) {
         <div class="list-main">
           <div class="list-title">询问回退</div>
           <div class="list-sub">
-            ${
-              isDefaults
-                ? "UI 提示不可用时应用。"
-                : `默认：${defaults.askFallback}。`
-            }
+            ${isDefaults ? "UI 提示不可用时应用。" : `默认：${defaults.askFallback}。`}
           </div>
         </div>
         <div class="list-meta">

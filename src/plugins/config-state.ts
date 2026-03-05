@@ -169,7 +169,11 @@ export function resolveEnableState(
     return { enabled: false, reason: "blocked by denylist" };
   }
   const isDesktop = process.env.OPENCLAW_DESKTOP === "1";
-  if (config.allow.length > 0 && !config.allow.includes(id) && !(isDesktop && origin === "bundled")) {
+  if (
+    config.allow.length > 0 &&
+    !config.allow.includes(id) &&
+    !(isDesktop && origin === "bundled")
+  ) {
     return { enabled: false, reason: "not in allowlist" };
   }
   if (config.slots.memory === id) {

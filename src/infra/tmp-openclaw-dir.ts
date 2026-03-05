@@ -66,6 +66,10 @@ export function resolvePreferredOpenClawTmpDir(
     return path.join(base, suffix);
   };
 
+  if (os.platform() === "win32") {
+    return fallback();
+  }
+
   try {
     const preferred = lstatSync(POSIX_OPENCLAW_TMP_DIR);
     if (!preferred.isDirectory() || preferred.isSymbolicLink()) {

@@ -5,11 +5,11 @@ import {
   createWriteTool,
   readTool,
 } from "@mariozechner/pi-coding-agent";
+import nodePath from "node:path";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelAuthMode } from "./model-auth.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
 import type { SandboxContext } from "./sandbox.js";
-import nodePath from "node:path";
 import { logWarn } from "../logger.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
 import { isSubagentSessionKey } from "../routing/session-key.js";
@@ -295,11 +295,29 @@ export function createOpenClawCodingTools(options?: {
           root: sandboxRoot,
           bridge: sandboxFsBridge!,
         });
-        return [workspaceOnly ? wrapToolWorkspaceRootGuard(sandboxed, sandboxRoot, fsConfig.allowedDirs, selfProtectDirs) : sandboxed];
+        return [
+          workspaceOnly
+            ? wrapToolWorkspaceRootGuard(
+                sandboxed,
+                sandboxRoot,
+                fsConfig.allowedDirs,
+                selfProtectDirs,
+              )
+            : sandboxed,
+        ];
       }
       const freshReadTool = createReadTool(workspaceRoot);
       const wrapped = createOpenClawReadTool(freshReadTool);
-      return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot, fsConfig.allowedDirs, selfProtectDirs) : wrapped];
+      return [
+        workspaceOnly
+          ? wrapToolWorkspaceRootGuard(
+              wrapped,
+              workspaceRoot,
+              fsConfig.allowedDirs,
+              selfProtectDirs,
+            )
+          : wrapped,
+      ];
     }
     if (tool.name === "bash" || tool.name === execToolName) {
       return [];
@@ -313,7 +331,16 @@ export function createOpenClawCodingTools(options?: {
         createWriteTool(workspaceRoot),
         CLAUDE_PARAM_GROUPS.write,
       );
-      return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot, fsConfig.allowedDirs, selfProtectDirs) : wrapped];
+      return [
+        workspaceOnly
+          ? wrapToolWorkspaceRootGuard(
+              wrapped,
+              workspaceRoot,
+              fsConfig.allowedDirs,
+              selfProtectDirs,
+            )
+          : wrapped,
+      ];
     }
     if (tool.name === "edit") {
       if (sandboxRoot) {
@@ -324,9 +351,22 @@ export function createOpenClawCodingTools(options?: {
         createEditTool(workspaceRoot),
         CLAUDE_PARAM_GROUPS.edit,
       );
-      return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot, fsConfig.allowedDirs, selfProtectDirs) : wrapped];
+      return [
+        workspaceOnly
+          ? wrapToolWorkspaceRootGuard(
+              wrapped,
+              workspaceRoot,
+              fsConfig.allowedDirs,
+              selfProtectDirs,
+            )
+          : wrapped,
+      ];
     }
-    return [workspaceOnly ? wrapToolWorkspaceRootGuard(tool, workspaceRoot, fsConfig.allowedDirs, selfProtectDirs) : tool];
+    return [
+      workspaceOnly
+        ? wrapToolWorkspaceRootGuard(tool, workspaceRoot, fsConfig.allowedDirs, selfProtectDirs)
+        : tool,
+    ];
   });
   const { cleanupMs: cleanupMsOverride, ...execDefaults } = options?.exec ?? {};
   const execSecurity = options?.exec?.security ?? execConfig.security;
@@ -400,11 +440,31 @@ export function createOpenClawCodingTools(options?: {
           ]
         : []
       : []),
-    ...(applyPatchTool ? [workspaceOnly ? wrapToolWorkspaceRootGuard(applyPatchTool as unknown as AnyAgentTool, workspaceRoot, fsConfig.allowedDirs, selfProtectDirs) : applyPatchTool as unknown as AnyAgentTool] : []),
-    ...(execSecurity !== "deny" ? [
-      (workspaceOnly ? wrapExecToolPathGuard(execTool as unknown as AnyAgentTool, workspaceRoot, fsConfig.allowedDirs, selfProtectDirs) : execTool as unknown as AnyAgentTool),
-      processTool as unknown as AnyAgentTool,
-    ] : []),
+    ...(applyPatchTool
+      ? [
+          workspaceOnly
+            ? wrapToolWorkspaceRootGuard(
+                applyPatchTool as unknown as AnyAgentTool,
+                workspaceRoot,
+                fsConfig.allowedDirs,
+                selfProtectDirs,
+              )
+            : (applyPatchTool as unknown as AnyAgentTool),
+        ]
+      : []),
+    ...(execSecurity !== "deny"
+      ? [
+          workspaceOnly
+            ? wrapExecToolPathGuard(
+                execTool as unknown as AnyAgentTool,
+                workspaceRoot,
+                fsConfig.allowedDirs,
+                selfProtectDirs,
+              )
+            : (execTool as unknown as AnyAgentTool),
+          processTool as unknown as AnyAgentTool,
+        ]
+      : []),
     // Channel docking: include channel-defined agent tools (login, etc.).
     ...listChannelAgentTools({ cfg: options?.config }),
     ...createOpenClawTools({

@@ -24,12 +24,7 @@ export interface SessionState {
 }
 
 // Session 文件目录
-const SESSION_DIR = path.join(
-  process.env.HOME || "/tmp",
-  ".openclaw",
-  "qqbot",
-  "sessions"
-);
+const SESSION_DIR = path.join(process.env.HOME || "/tmp", ".openclaw", "qqbot", "sessions");
 
 // Session 过期时间（5分钟）- Resume 要求在断开后一定时间内恢复
 const SESSION_EXPIRE_TIME = 5 * 60 * 1000;
@@ -38,11 +33,14 @@ const SESSION_EXPIRE_TIME = 5 * 60 * 1000;
 const SAVE_THROTTLE_MS = 1000;
 
 // 每个账户的节流状态
-const throttleState = new Map<string, {
-  pendingState: SessionState | null;
-  lastSaveTime: number;
-  throttleTimer: ReturnType<typeof setTimeout> | null;
-}>();
+const throttleState = new Map<
+  string,
+  {
+    pendingState: SessionState | null;
+    lastSaveTime: number;
+    throttleTimer: ReturnType<typeof setTimeout> | null;
+  }
+>();
 
 /**
  * 确保目录存在
@@ -69,19 +67,21 @@ function getSessionPath(accountId: string): string {
  */
 export function loadSession(accountId: string): SessionState | null {
   const filePath = getSessionPath(accountId);
-  
+
   try {
     if (!fs.existsSync(filePath)) {
       return null;
     }
-    
+
     const data = fs.readFileSync(filePath, "utf-8");
     const state = JSON.parse(data) as SessionState;
-    
+
     // 检查是否过期
     const now = Date.now();
     if (now - state.savedAt > SESSION_EXPIRE_TIME) {
-      console.log(`[session-store] Session expired for ${accountId}, age: ${Math.round((now - state.savedAt) / 1000)}s`);
+      console.log(
+        `[session-store] Session expired for ${accountId}, age: ${Math.round((now - state.savedAt) / 1000)}s`,
+      );
       // 删除过期文件
       try {
         fs.unlinkSync(filePath);
@@ -90,14 +90,16 @@ export function loadSession(accountId: string): SessionState | null {
       }
       return null;
     }
-    
+
     // 验证必要字段
     if (!state.sessionId || state.lastSeq === null || state.lastSeq === undefined) {
       console.log(`[session-store] Invalid session data for ${accountId}`);
       return null;
     }
-    
-    console.log(`[session-store] Loaded session for ${accountId}: sessionId=${state.sessionId}, lastSeq=${state.lastSeq}, age=${Math.round((now - state.savedAt) / 1000)}s`);
+
+    console.log(
+      `[session-store] Loaded session for ${accountId}: sessionId=${state.sessionId}, lastSeq=${state.lastSeq}, age=${Math.round((now - state.savedAt) / 1000)}s`,
+    );
     return state;
   } catch (err) {
     console.error(`[session-store] Failed to load session for ${accountId}: ${err}`);
@@ -111,7 +113,7 @@ export function loadSession(accountId: string): SessionState | null {
  */
 export function saveSession(state: SessionState): void {
   const { accountId } = state;
-  
+
   // 获取或初始化节流状态
   let throttle = throttleState.get(accountId);
   if (!throttle) {
@@ -122,16 +124,16 @@ export function saveSession(state: SessionState): void {
     };
     throttleState.set(accountId, throttle);
   }
-  
+
   const now = Date.now();
   const timeSinceLastSave = now - throttle.lastSaveTime;
-  
+
   // 如果距离上次保存时间足够长，立即保存
   if (timeSinceLastSave >= SAVE_THROTTLE_MS) {
     doSaveSession(state);
     throttle.lastSaveTime = now;
     throttle.pendingState = null;
-    
+
     // 清除待定的节流定时器
     if (throttle.throttleTimer) {
       clearTimeout(throttle.throttleTimer);
@@ -140,7 +142,7 @@ export function saveSession(state: SessionState): void {
   } else {
     // 记录待保存的状态
     throttle.pendingState = state;
-    
+
     // 如果没有设置定时器，设置一个
     if (!throttle.throttleTimer) {
       const delay = SAVE_THROTTLE_MS - timeSinceLastSave;
@@ -164,18 +166,20 @@ export function saveSession(state: SessionState): void {
  */
 function doSaveSession(state: SessionState): void {
   const filePath = getSessionPath(state.accountId);
-  
+
   try {
     ensureDir();
-    
+
     // 更新保存时间
     const stateToSave: SessionState = {
       ...state,
       savedAt: Date.now(),
     };
-    
+
     fs.writeFileSync(filePath, JSON.stringify(stateToSave, null, 2), "utf-8");
-    console.log(`[session-store] Saved session for ${state.accountId}: sessionId=${state.sessionId}, lastSeq=${state.lastSeq}`);
+    console.log(
+      `[session-store] Saved session for ${state.accountId}: sessionId=${state.sessionId}, lastSeq=${state.lastSeq}`,
+    );
   } catch (err) {
     console.error(`[session-store] Failed to save session for ${state.accountId}: ${err}`);
   }
@@ -187,7 +191,7 @@ function doSaveSession(state: SessionState): void {
  */
 export function clearSession(accountId: string): void {
   const filePath = getSessionPath(accountId);
-  
+
   // 清除节流状态
   const throttle = throttleState.get(accountId);
   if (throttle) {
@@ -196,7 +200,7 @@ export function clearSession(accountId: string): void {
     }
     throttleState.delete(accountId);
   }
-  
+
   try {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
@@ -227,11 +231,11 @@ export function updateLastSeq(accountId: string, lastSeq: number): void {
  */
 export function getAllSessions(): SessionState[] {
   const sessions: SessionState[] = [];
-  
+
   try {
     ensureDir();
     const files = fs.readdirSync(SESSION_DIR);
-    
+
     for (const file of files) {
       if (file.startsWith("session-") && file.endsWith(".json")) {
         const filePath = path.join(SESSION_DIR, file);
@@ -247,7 +251,7 @@ export function getAllSessions(): SessionState[] {
   } catch {
     // 目录不存在等错误
   }
-  
+
   return sessions;
 }
 
@@ -256,19 +260,19 @@ export function getAllSessions(): SessionState[] {
  */
 export function cleanupExpiredSessions(): number {
   let cleaned = 0;
-  
+
   try {
     ensureDir();
     const files = fs.readdirSync(SESSION_DIR);
     const now = Date.now();
-    
+
     for (const file of files) {
       if (file.startsWith("session-") && file.endsWith(".json")) {
         const filePath = path.join(SESSION_DIR, file);
         try {
           const data = fs.readFileSync(filePath, "utf-8");
           const state = JSON.parse(data) as SessionState;
-          
+
           if (now - state.savedAt > SESSION_EXPIRE_TIME) {
             fs.unlinkSync(filePath);
             cleaned++;
@@ -288,6 +292,6 @@ export function cleanupExpiredSessions(): number {
   } catch {
     // 目录不存在等错误
   }
-  
+
   return cleaned;
 }

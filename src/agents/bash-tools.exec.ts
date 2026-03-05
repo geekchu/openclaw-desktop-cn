@@ -1,6 +1,7 @@
 import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
 import crypto from "node:crypto";
 import type { BashSandboxConfig } from "./bash-tools.shared.js";
+import { resolveCommandResolution } from "../infra/exec-approvals-analysis.js";
 import {
   type ExecAsk,
   type ExecHost,
@@ -18,7 +19,6 @@ import {
   buildSafeShellCommand,
   buildSafeBinsShellCommand,
 } from "../infra/exec-approvals.js";
-import { resolveCommandResolution } from "../infra/exec-approvals-analysis.js";
 import { buildNodeShellCommand } from "../infra/node-shell.js";
 import {
   getShellPathFromLoginShell,
@@ -686,8 +686,8 @@ export function createExecTool(
 
             logInfo(
               `[exec-approval] decision=${decision}, hostSecurity=${hostSecurity}, ` +
-              `segmentCount=${allowlistEval.segments.length}, analysisOk=${analysisOk}, ` +
-              `command=${commandText}`,
+                `segmentCount=${allowlistEval.segments.length}, analysisOk=${analysisOk}, ` +
+                `command=${commandText}`,
             );
 
             if (decision === "deny") {
@@ -708,28 +708,29 @@ export function createExecTool(
               approvedByAsk = true;
             } else if (decision === "allow-always") {
               approvedByAsk = true;
-               if (hostSecurity === "allowlist") {
+              if (hostSecurity === "allowlist") {
                 // Known shell launchers that are too broad to allowlist directly.
                 // When the resolved executable is one of these, we try to resolve
                 // the actual target program instead.
                 const SHELL_LAUNCHERS = new Set([
-                  "start", "start.exe",               // Windows cmd built-in
-                  "start-process",                     // PowerShell cmdlet
-                  "invoke-item", "ii",                 // PowerShell cmdlet
-                  "open",                              // macOS /usr/bin/open
-                  "xdg-open",                          // Linux freedesktop
-                  "gnome-open", "kde-open",            // Linux desktop-specific
+                  "start",
+                  "start.exe", // Windows cmd built-in
+                  "start-process", // PowerShell cmdlet
+                  "invoke-item",
+                  "ii", // PowerShell cmdlet
+                  "open", // macOS /usr/bin/open
+                  "xdg-open", // Linux freedesktop
+                  "gnome-open",
+                  "kde-open", // Linux desktop-specific
                 ]);
 
                 // Given argv tokens, find the first non-flag argument after the
                 // launcher command itself (the actual program being launched).
-                const resolveTargetFromArgv = (
-                  argv: string[],
-                ): string | undefined => {
+                const resolveTargetFromArgv = (argv: string[]): string | undefined => {
                   // Skip the launcher (argv[0]) and any flags
-                  const target = argv.slice(1).find(
-                    (t) => t && !t.startsWith("-") && !t.startsWith("/"),
-                  );
+                  const target = argv
+                    .slice(1)
+                    .find((t) => t && !t.startsWith("-") && !t.startsWith("/"));
                   if (!target) return undefined;
                   const res = resolveCommandResolution(target, workdir, env);
                   return res?.resolvedPath ?? undefined;
@@ -746,7 +747,7 @@ export function createExecTool(
                     const targetPath = resolveTargetFromArgv(segment.argv);
                     logInfo(
                       `[exec-approval] allow-always launcher-redirect: ` +
-                      `launcher=${exeName}, targetPath=${targetPath ?? "(none)"}`,
+                        `launcher=${exeName}, targetPath=${targetPath ?? "(none)"}`,
                     );
                     if (targetPath) {
                       pattern = targetPath;
@@ -754,9 +755,9 @@ export function createExecTool(
                       // Launcher has no resolvedPath AND target not found via PATH.
                       // Use the raw target token as the allowlist pattern so the
                       // user's "allow-always" choice is still persisted.
-                      const rawTarget = segment.argv.slice(1).find(
-                        (t) => t && !t.startsWith("-") && !t.startsWith("/"),
-                      );
+                      const rawTarget = segment.argv
+                        .slice(1)
+                        .find((t) => t && !t.startsWith("-") && !t.startsWith("/"));
                       if (rawTarget) {
                         pattern = rawTarget;
                       }
@@ -764,7 +765,7 @@ export function createExecTool(
                   }
                   logInfo(
                     `[exec-approval] allow-always segment: resolvedPath=${pattern}, ` +
-                    `rawExe=${segment.resolution?.rawExecutable}`,
+                      `rawExe=${segment.resolution?.rawExecutable}`,
                   );
                   if (pattern) {
                     addAllowlistEntry(approvals.file, agentId, pattern);
@@ -776,16 +777,12 @@ export function createExecTool(
                 // directly from the raw command so the user's "allow-always"
                 // choice is still persisted.
                 if (!added) {
-                  const fallbackResolution = resolveCommandResolution(
-                    commandText,
-                    workdir,
-                    env,
-                  );
+                  const fallbackResolution = resolveCommandResolution(commandText, workdir, env);
                   const fallbackPath = fallbackResolution?.resolvedPath ?? "";
                   const fallbackExe = fallbackResolution?.executableName?.toLowerCase() ?? "";
                   logInfo(
                     `[exec-approval] allow-always fallback: resolvedPath=${fallbackPath}, ` +
-                    `rawExe=${fallbackResolution?.rawExecutable}`,
+                      `rawExe=${fallbackResolution?.rawExecutable}`,
                   );
                   if (fallbackPath && !SHELL_LAUNCHERS.has(fallbackExe)) {
                     addAllowlistEntry(approvals.file, agentId, fallbackPath);
@@ -800,29 +797,21 @@ export function createExecTool(
                   const firstToken = (tokens[0] ?? "").toLowerCase();
                   if (
                     (SHELL_LAUNCHERS.has(firstToken) ||
-                     SHELL_LAUNCHERS.has(firstToken.replace(/\.exe$/i, ""))) &&
+                      SHELL_LAUNCHERS.has(firstToken.replace(/\.exe$/i, ""))) &&
                     tokens.length > 1
                   ) {
-                    const programToken = tokens.slice(1).find(
-                      (t) => t && !t.startsWith("-") && !t.startsWith("/"),
-                    );
+                    const programToken = tokens
+                      .slice(1)
+                      .find((t) => t && !t.startsWith("-") && !t.startsWith("/"));
                     if (programToken) {
-                      const launcherFallback = resolveCommandResolution(
-                        programToken,
-                        workdir,
-                        env,
-                      );
+                      const launcherFallback = resolveCommandResolution(programToken, workdir, env);
                       const launcherPath = launcherFallback?.resolvedPath ?? "";
                       logInfo(
                         `[exec-approval] allow-always launcher-fallback: resolvedPath=${launcherPath}, ` +
-                        `program=${programToken}`,
+                          `program=${programToken}`,
                       );
                       // Use resolved path if found, otherwise use raw program name
-                      addAllowlistEntry(
-                        approvals.file,
-                        agentId,
-                        launcherPath || programToken,
-                      );
+                      addAllowlistEntry(approvals.file, agentId, launcherPath || programToken);
                     }
                   }
                 }

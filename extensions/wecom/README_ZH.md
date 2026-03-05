@@ -31,6 +31,7 @@ openclaw plugins install @sunnoy/wecom
 ```
 
 此命令会自动：
+
 - 从 npm 下载插件
 - 安装到 `~/.openclaw/extensions/` 目录
 - 更新 OpenClaw 配置
@@ -66,13 +67,13 @@ openclaw plugins install @sunnoy/wecom
 
 ### 配置说明
 
-| 配置项 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| `plugins.entries.wecom.enabled` | boolean | 是 | 启用插件 |
-| `channels.wecom.token` | string | 是 | 企业微信机器人 Token |
-| `channels.wecom.encodingAesKey` | string | 是 | 企业微信消息加密密钥（43 位） |
-| `channels.wecom.adminUsers` | array | 否 | 管理员用户 ID 列表（绕过指令白名单和动态路由） |
-| `channels.wecom.commands.allowlist` | array | 否 | 允许的指令白名单 |
+| 配置项                              | 类型    | 必填 | 说明                                           |
+| ----------------------------------- | ------- | ---- | ---------------------------------------------- |
+| `plugins.entries.wecom.enabled`     | boolean | 是   | 启用插件                                       |
+| `channels.wecom.token`              | string  | 是   | 企业微信机器人 Token                           |
+| `channels.wecom.encodingAesKey`     | string  | 是   | 企业微信消息加密密钥（43 位）                  |
+| `channels.wecom.adminUsers`         | array   | 否   | 管理员用户 ID 列表（绕过指令白名单和动态路由） |
+| `channels.wecom.commands.allowlist` | array   | 否   | 允许的指令白名单                               |
 
 ## 企业微信后台配置
 
@@ -86,15 +87,15 @@ openclaw plugins install @sunnoy/wecom
 
 ## 支持的消息类型
 
-| 类型 | 方向 | 说明 |
-|------|------|------|
-| 文本 (text) | 收/发 | 纯文本消息 |
-| 图片 (image) | 收/发 | 入站图片自动解密；出站通过 `msg_item` base64 发送 |
-| 语音 (voice) | 收 | 企业微信自动转文字后处理（仅限私聊） |
-| 图文混排 (mixed) | 收 | 文本 + 图片混合消息 |
-| 文件 (file) | 收 | 文件附件（下载后传给 AI 分析） |
-| 位置 (location) | 收 | 位置分享（转换为文本描述） |
-| 链接 (link) | 收 | 分享链接（提取标题、描述、URL 为文本） |
+| 类型             | 方向  | 说明                                              |
+| ---------------- | ----- | ------------------------------------------------- |
+| 文本 (text)      | 收/发 | 纯文本消息                                        |
+| 图片 (image)     | 收/发 | 入站图片自动解密；出站通过 `msg_item` base64 发送 |
+| 语音 (voice)     | 收    | 企业微信自动转文字后处理（仅限私聊）              |
+| 图文混排 (mixed) | 收    | 文本 + 图片混合消息                               |
+| 文件 (file)      | 收    | 文件附件（下载后传给 AI 分析）                    |
+| 位置 (location)  | 收    | 位置分享（转换为文本描述）                        |
+| 链接 (link)      | 收    | 分享链接（提取标题、描述、URL 为文本）            |
 
 ## 管理员用户
 
@@ -148,12 +149,12 @@ openclaw plugins install @sunnoy/wecom
 }
 ```
 
-| 配置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `dynamicAgents.enabled` | boolean | `true` | 是否启用动态 Agent |
-| `dm.createAgentOnFirstMessage` | boolean | `true` | 私聊使用动态 Agent |
-| `groupChat.enabled` | boolean | `true` | 启用群聊处理 |
-| `groupChat.requireMention` | boolean | `true` | 群聊必须 @ 提及才响应 |
+| 配置项                         | 类型    | 默认值 | 说明                  |
+| ------------------------------ | ------- | ------ | --------------------- |
+| `dynamicAgents.enabled`        | boolean | `true` | 是否启用动态 Agent    |
+| `dm.createAgentOnFirstMessage` | boolean | `true` | 私聊使用动态 Agent    |
+| `groupChat.enabled`            | boolean | `true` | 启用群聊处理          |
+| `groupChat.requireMention`     | boolean | `true` | 群聊必须 @ 提及才响应 |
 
 ### 禁用动态 Agent
 
@@ -188,12 +189,12 @@ openclaw plugins install @sunnoy/wecom
 
 ### 推荐白名单指令
 
-| 指令 | 说明 | 安全级别 |
-|------|------|----------|
-| `/new` | 重置当前对话，开启全新会话 | 用户级 |
-| `/compact` | 压缩当前会话上下文 | 用户级 |
-| `/help` | 查看帮助信息 | 用户级 |
-| `/status` | 查看当前 Agent 状态 | 用户级 |
+| 指令       | 说明                       | 安全级别 |
+| ---------- | -------------------------- | -------- |
+| `/new`     | 重置当前对话，开启全新会话 | 用户级   |
+| `/compact` | 压缩当前会话上下文         | 用户级   |
+| `/help`    | 查看帮助信息               | 用户级   |
+| `/status`  | 查看当前 Agent 状态        | 用户级   |
 
 > **安全提示**：不要将 `/gateway`、`/plugins` 等管理指令添加到白名单，避免普通用户获得 Gateway 实例的管理权限。配置在 `adminUsers` 中的管理员不受此限制。
 
@@ -210,6 +211,7 @@ openclaw plugins install @sunnoy/wecom
 ### Q: 入站图片是怎么处理的？
 
 **A:** 企业微信使用 AES-256-CBC 加密用户发送的图片。插件会自动：
+
 1. 从企业微信的 URL 下载加密图片
 2. 使用配置的 `encodingAesKey` 解密
 3. 保存到本地并传给 AI 进行视觉分析
@@ -250,6 +252,7 @@ openclaw plugins install @sunnoy/wecom
   - OpenClaw 插件系统会自动处理 webhook 路由
 
 **部署建议：**
+
 1. 如果使用反向代理（如 Nginx），可以为 `/webhooks/wecom` 路径配置豁免认证
 2. 或者将 webhook 端点暴露在独立端口，不经过 Gateway Auth
 
@@ -258,6 +261,7 @@ openclaw plugins install @sunnoy/wecom
 **A:** 常见原因和解决方法：
 
 1. **检查配置键名**：确保使用正确的键名 `encodingAesKey`（注意大小写）
+
    ```json
    {
      "channels": {
@@ -269,6 +273,7 @@ openclaw plugins install @sunnoy/wecom
    ```
 
 2. **检查密钥长度**：EncodingAESKey 必须是 43 位字符
+
    ```bash
    # 检查长度
    echo -n "你的密钥" | wc -c

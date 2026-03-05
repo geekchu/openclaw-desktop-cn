@@ -1,6 +1,13 @@
 import { html, nothing } from "lit";
 import type { ConfigUiHints } from "../types.ts";
-import { hintForPath, humanize, resolveHelp, resolveLabel, schemaType, type JsonSchema } from "./config-form.shared.ts";
+import {
+  hintForPath,
+  humanize,
+  resolveHelp,
+  resolveLabel,
+  schemaType,
+  type JsonSchema,
+} from "./config-form.shared.ts";
 import { analyzeConfigSchema, renderConfigForm, SECTION_META } from "./config-form.ts";
 import { renderOnestop, type OnestopProps } from "./config-onestop.ts";
 import "./config-system-settings.ts";
@@ -516,11 +523,11 @@ export function renderConfig(props: ConfigProps) {
             <span class="config-nav__icon">${sidebarIcons.all}</span>
             <span class="config-nav__label">所有设置</span>
           </button>
-          ${allSections.map(
-            (section, idx) => {
-              const isLastVirtual = VIRTUAL_SECTIONS.has(section.key) &&
-                (idx + 1 >= allSections.length || !VIRTUAL_SECTIONS.has(allSections[idx + 1].key));
-              return html`
+          ${allSections.map((section, idx) => {
+            const isLastVirtual =
+              VIRTUAL_SECTIONS.has(section.key) &&
+              (idx + 1 >= allSections.length || !VIRTUAL_SECTIONS.has(allSections[idx + 1].key));
+            return html`
                 <button
                   class="config-nav__item ${props.activeSection === section.key ? "active" : ""}"
                   @click=${() => props.onSectionChange(section.key)}
@@ -530,14 +537,24 @@ export function renderConfig(props: ConfigProps) {
                   >
                   <span class="config-nav__label">${section.label}</span>
                 </button>
-                ${isLastVirtual ? html`<hr class="config-nav__divider" style="border:none;border-top:1px solid var(--border);margin:6px 0" />` : nothing}
+                ${
+                  isLastVirtual
+                    ? html`
+                        <hr
+                          class="config-nav__divider"
+                          style="border: none; border-top: 1px solid var(--border); margin: 6px 0"
+                        />
+                      `
+                    : nothing
+                }
               `;
-            },
-          )}
+          })}
         </nav>
 
         <!-- Mode toggle at bottom (hidden for virtual sections) -->
-        ${!isVirtualSection ? html`
+        ${
+          !isVirtualSection
+            ? html`
         <div class="config-sidebar__footer">
           <div class="config-mode-toggle">
             <button
@@ -555,23 +572,31 @@ export function renderConfig(props: ConfigProps) {
             </button>
           </div>
         </div>
-        ` : nothing}
+        `
+            : nothing
+        }
       </aside>
 
       <!-- Main content -->
       <main class="config-main">
-        ${isVirtualSection
-          ? html`
-            <div style="${isOnestop || isChannelsConfig ? 'padding: 20px 24px; overflow-y: auto; flex: 1' : 'display: flex; flex-direction: column; height: 100%;'}">
-              ${isOnestop
-                ? renderOnestop(props.onestop)
-                : isChannelsConfig
-                  ? html`<openclaw-config-channels></openclaw-config-channels>`
-                  : html`<openclaw-system-settings></openclaw-system-settings>`
+        ${
+          isVirtualSection
+            ? html`
+            <div style="${isOnestop || isChannelsConfig ? "padding: 20px 24px; overflow-y: auto; flex: 1" : "display: flex; flex-direction: column; height: 100%;"}">
+              ${
+                isOnestop
+                  ? renderOnestop(props.onestop)
+                  : isChannelsConfig
+                    ? html`
+                        <openclaw-config-channels></openclaw-config-channels>
+                      `
+                    : html`
+                        <openclaw-system-settings></openclaw-system-settings>
+                      `
               }
             </div>
           `
-          : html`
+            : html`
         <!-- Action bar -->
         <div class="config-actions">
           <div class="config-actions__left">
@@ -758,7 +783,8 @@ export function renderConfig(props: ConfigProps) {
               `
           }
         </div>
-        `}
+        `
+        }
 
         ${
           props.issues.length > 0

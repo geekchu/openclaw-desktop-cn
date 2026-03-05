@@ -221,7 +221,9 @@ async function deliverToTargets(params: {
       return;
     }
     try {
-      const payload: { text: string; channelData?: Record<string, unknown> } = { text: params.text };
+      const payload: { text: string; channelData?: Record<string, unknown> } = {
+        text: params.text,
+      };
       if (params.channelData) {
         payload.channelData = params.channelData;
       }
@@ -266,10 +268,7 @@ function collectSentMessages(results: OutboundDeliveryResult[]): SentMessage[] {
   return messages;
 }
 
-async function editTelegramSentMessages(
-  sentMessages: SentMessage[],
-  text: string,
-) {
+async function editTelegramSentMessages(sentMessages: SentMessage[], text: string) {
   const telegramMessages = sentMessages.filter((m) => m.channel === "telegram");
   if (telegramMessages.length === 0) {
     return;

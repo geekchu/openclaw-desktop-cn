@@ -30,15 +30,28 @@ function fixFile(filePath) {
   const newLines = [];
 
   for (const line of lines) {
-    if (line.includes("__exportAll") && line.trimStart().startsWith("import ") && line.includes(" from ")) {
+    if (
+      line.includes("__exportAll") &&
+      line.trimStart().startsWith("import ") &&
+      line.includes(" from ")
+    ) {
       const importMatch = line.match(/^(import\s*\{)(.*)\}\s*from\s*(".*");?\s*$/);
-      if (!importMatch) { newLines.push(line); continue; }
+      if (!importMatch) {
+        newLines.push(line);
+        continue;
+      }
 
       const [, , bindingsStr, moduleSpec] = importMatch;
-      const bindings = bindingsStr.split(",").map(b => b.trim()).filter(b => b.length > 0);
-      const remaining = bindings.filter(b => !/ as __exportAll\b/.test(b) && b !== "__exportAll");
+      const bindings = bindingsStr
+        .split(",")
+        .map((b) => b.trim())
+        .filter((b) => b.length > 0);
+      const remaining = bindings.filter((b) => !/ as __exportAll\b/.test(b) && b !== "__exportAll");
 
-      if (remaining.length === bindings.length) { newLines.push(line); continue; }
+      if (remaining.length === bindings.length) {
+        newLines.push(line);
+        continue;
+      }
       modified = true;
 
       if (remaining.length > 0) {
@@ -66,7 +79,12 @@ function processDir(dir) {
   try {
     for (const file of readdirSync(dir)) {
       if (!file.endsWith(".js")) continue;
-      try { if (fixFile(join(dir, file))) { console.log(`  Fixed: ${file}`); fixed++; } } catch {}
+      try {
+        if (fixFile(join(dir, file))) {
+          console.log(`  Fixed: ${file}`);
+          fixed++;
+        }
+      } catch {}
     }
   } catch {}
   return fixed;

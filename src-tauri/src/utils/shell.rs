@@ -793,7 +793,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
         let mut cmd = Command::new(&node_path);
         cmd.arg(&entry_point);
-        cmd.args(["gateway", "--port", "18789", "--bind", "loopback", "--desktop-internal"]);
+        cmd.args(["gateway", "--port", "18789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         cmd.current_dir(&bundle_dir);
 
         for (key, value) in &user_env_vars {
@@ -802,6 +802,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         cmd.env("PATH", &extended_path);
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
         cmd.env("OPENCLAW_DESKTOP", "1");
+        cmd.env("OPENCLAW_NO_RESPAWN", "1");
         cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
@@ -810,18 +811,39 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
 
-        // OPENCLAW_GATEWAY_LOG_DIR handling
-        if let Ok(log_dir) = std::env::var("OPENCLAW_GATEWAY_LOG_DIR") {
-             if let Ok(std_out_file) = std::fs::File::create(std::path::Path::new(&log_dir).join("gateway.stdout.log")) {
-                cmd.stdout(std_out_file);
-             }
-             if let Ok(std_err_file) = std::fs::File::create(std::path::Path::new(&log_dir).join("gateway.stderr.log")) {
-                cmd.stderr(std_err_file);
-             }
-        } else {
-             // 避免 Node.js 写入失效的控制台句柄时触发 `EBADF` 或 `stdout is not a tty` 崩溃
-             cmd.stdout(std::process::Stdio::null());
-             cmd.stderr(std::process::Stdio::null());
+        // Gateway 日志始终写入文件，便于诊断启动问题
+        // 使用 append 模式保留历史日志（方便排查重启前的崩溃原因）
+        cmd.stdin(std::process::Stdio::null());
+        let log_dir = std::env::var("OPENCLAW_GATEWAY_LOG_DIR")
+            .unwrap_or_else(|_| {
+                let default_dir = std::path::PathBuf::from(platform::get_config_dir()).join("logs");
+                let _ = std::fs::create_dir_all(&default_dir);
+                default_dir.to_string_lossy().to_string()
+            });
+        info!("[Shell] Gateway 日志目录: {}", log_dir);
+        let log_path = std::path::Path::new(&log_dir);
+        let separator = format!("\n--- gateway start {} ---\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+        match std::fs::OpenOptions::new().create(true).append(true).open(log_path.join("gateway.stdout.log")) {
+            Ok(mut f) => {
+                use std::io::Write;
+                let _ = f.write_all(separator.as_bytes());
+                cmd.stdout(f);
+            }
+            Err(e) => {
+                warn!("[Shell] 无法创建 stdout 日志: {}", e);
+                cmd.stdout(std::process::Stdio::null());
+            }
+        }
+        match std::fs::OpenOptions::new().create(true).append(true).open(log_path.join("gateway.stderr.log")) {
+            Ok(mut f) => {
+                use std::io::Write;
+                let _ = f.write_all(separator.as_bytes());
+                cmd.stderr(f);
+            }
+            Err(e) => {
+                warn!("[Shell] 无法创建 stderr 日志: {}", e);
+                cmd.stderr(std::process::Stdio::null());
+            }
         }
 
         info!("[Shell] 启动 gateway 进程: {:?}", cmd);
@@ -869,11 +891,11 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
     let mut cmd = if openclaw_path.ends_with(".cmd") {
         let mut c = Command::new("cmd");
-        c.args(["/c", &openclaw_path, "gateway", "--port", "18789", "--bind", "loopback", "--desktop-internal"]);
+        c.args(["/c", &openclaw_path, "gateway", "--port", "18789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         c
     } else {
         let mut c = Command::new(&openclaw_path);
-        c.args(["gateway", "--port", "18789", "--bind", "loopback", "--desktop-internal"]);
+        c.args(["gateway", "--port", "18789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         c
     };
 
@@ -883,6 +905,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
     cmd.env("PATH", &extended_path);
     cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
     cmd.env("OPENCLAW_DESKTOP", "1");
+    cmd.env("OPENCLAW_NO_RESPAWN", "1");
     cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
     if let Some(ref prefix) = npm_prefix {
         cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());

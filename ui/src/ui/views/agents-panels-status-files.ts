@@ -230,9 +230,7 @@ export function renderAgentChannels(params: {
                     const status = summary.total
                       ? `${summary.connected}/${summary.total} 已连接`
                       : "无账户";
-                    const config = summary.configured
-                      ? `${summary.configured} 已配置`
-                      : "未配置";
+                    const config = summary.configured ? `${summary.configured} 已配置` : "未配置";
                     const enabled = summary.total ? `${summary.enabled} 已启用` : "已禁用";
                     const extras = resolveChannelExtras(params.configForm, entry.id);
                     return html`
@@ -403,9 +401,7 @@ export function renderAgentFiles(params: {
       ${
         !list
           ? html`
-              <div class="callout info" style="margin-top: 12px">
-                加载代理工作区文件以编辑核心指令。
-              </div>
+              <div class="callout info" style="margin-top: 12px">加载代理工作区文件以编辑核心指令。</div>
             `
           : html`
               <div class="agent-files-grid" style="margin-top: 16px;">

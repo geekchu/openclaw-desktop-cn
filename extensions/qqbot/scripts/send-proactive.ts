@@ -1,39 +1,39 @@
 #!/usr/bin/env npx ts-node
 /**
  * QQBot 主动消息 CLI 工具
- * 
+ *
  * 使用示例：
  *   # 发送私聊消息
  *   npx ts-node scripts/send-proactive.ts --to "用户openid" --text "你好！"
- *   
+ *
  *   # 发送群聊消息
  *   npx ts-node scripts/send-proactive.ts --to "群组openid" --type group --text "群公告"
- *   
+ *
  *   # 列出已知用户
  *   npx ts-node scripts/send-proactive.ts --list
- *   
+ *
  *   # 列出群聊用户
  *   npx ts-node scripts/send-proactive.ts --list --type group
- *   
+ *
  *   # 广播消息
  *   npx ts-node scripts/send-proactive.ts --broadcast --text "系统公告" --type c2c --limit 10
  */
 
-import { 
+import * as fs from "node:fs";
+import * as path from "node:path";
+import type { ResolvedQQBotAccount } from "../src/types.js";
+import {
   sendProactiveMessageDirect,
-  listKnownUsers, 
+  listKnownUsers,
   getKnownUsersStats,
   broadcastMessage,
 } from "../src/proactive.js";
-import type { ResolvedQQBotAccount } from "../src/types.js";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 // 解析命令行参数
 function parseArgs(): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
   const argv = process.argv.slice(2);
-  
+
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg.startsWith("--")) {
@@ -47,20 +47,20 @@ function parseArgs(): Record<string, string | boolean> {
       }
     }
   }
-  
+
   return args;
 }
 
 // 从配置文件加载账户信息
 function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
   const configPath = path.join(process.env.HOME || "/home/ubuntu", "clawd", "config.json");
-  
+
   try {
     if (!fs.existsSync(configPath)) {
       // 尝试从环境变量获取
       const appId = process.env.QQBOT_APP_ID;
       const clientSecret = process.env.QQBOT_CLIENT_SECRET;
-      
+
       if (appId && clientSecret) {
         return {
           accountId,
@@ -70,19 +70,19 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
           secretSource: "env",
         };
       }
-      
+
       console.error("配置文件不存在且环境变量未设置");
       return null;
     }
-    
+
     const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     const qqbot = config.channels?.qqbot;
-    
+
     if (!qqbot) {
       console.error("配置中没有 qqbot 配置");
       return null;
     }
-    
+
     // 解析账户配置
     if (accountId === "default") {
       return {
@@ -93,18 +93,19 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
         secretSource: qqbot.clientSecret ? "config" : "env",
       };
     }
-    
+
     const accountConfig = qqbot.accounts?.[accountId];
     if (accountConfig) {
       return {
         accountId,
         appId: accountConfig.appId || qqbot.appId || process.env.QQBOT_APP_ID,
-        clientSecret: accountConfig.clientSecret || qqbot.clientSecret || process.env.QQBOT_CLIENT_SECRET,
+        clientSecret:
+          accountConfig.clientSecret || qqbot.clientSecret || process.env.QQBOT_CLIENT_SECRET,
         enabled: accountConfig.enabled ?? true,
         secretSource: accountConfig.clientSecret ? "config" : "env",
       };
     }
-    
+
     console.error(`账户 ${accountId} 不存在`);
     return null;
   } catch (err) {
@@ -115,7 +116,7 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
 
 async function main() {
   const args = parseArgs();
-  
+
   // 显示帮助
   if (args.help || args.h) {
     console.log(`
@@ -152,35 +153,37 @@ QQBot 主动消息 CLI 工具
 `);
     return;
   }
-  
+
   const accountId = (args.account as string) || "default";
   const type = (args.type as "c2c" | "group") || "c2c";
   const limit = args.limit ? parseInt(args.limit as string, 10) : undefined;
-  
+
   // 列出已知用户
   if (args.list) {
-    const users = listKnownUsers({ 
+    const users = listKnownUsers({
       type: args.type as "c2c" | "group" | "channel" | undefined,
       accountId: args.account as string | undefined,
       limit,
     });
-    
+
     if (users.length === 0) {
       console.log("没有已知用户");
       return;
     }
-    
+
     console.log(`\n已知用户列表 (共 ${users.length} 个):\n`);
     console.log("类型\t\tOpenID\t\t\t\t\t\t昵称\t\t最后交互时间");
     console.log("─".repeat(100));
-    
+
     for (const user of users) {
       const lastTime = new Date(user.lastInteractionAt).toLocaleString();
-      console.log(`${user.type}\t\t${user.openid.slice(0, 20)}...\t${user.nickname || "-"}\t\t${lastTime}`);
+      console.log(
+        `${user.type}\t\t${user.openid.slice(0, 20)}...\t${user.nickname || "-"}\t\t${lastTime}`,
+      );
     }
     return;
   }
-  
+
   // 显示统计
   if (args.stats) {
     const stats = getKnownUsersStats(args.account as string | undefined);
@@ -191,14 +194,14 @@ QQBot 主动消息 CLI 工具
     console.log(`  频道: ${stats.channel}`);
     return;
   }
-  
+
   // 广播消息
   if (args.broadcast) {
     if (!args.text) {
       console.error("请指定消息内容 (--text)");
       process.exit(1);
     }
-    
+
     // 加载配置用于广播
     const configPath = path.join(process.env.HOME || "/home/ubuntu", "clawd", "config.json");
     let cfg: Record<string, unknown> = {};
@@ -207,19 +210,19 @@ QQBot 主动消息 CLI 工具
         cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       }
     } catch {}
-    
+
     console.log(`\n开始广播消息...\n`);
     const result = await broadcastMessage(args.text as string, cfg as any, {
       type,
       accountId,
       limit,
     });
-    
+
     console.log(`\n广播完成:`);
     console.log(`  发送总数: ${result.total}`);
     console.log(`  成功: ${result.success}`);
     console.log(`  失败: ${result.failed}`);
-    
+
     if (result.failed > 0) {
       console.log(`\n失败详情:`);
       for (const r of result.results) {
@@ -230,7 +233,7 @@ QQBot 主动消息 CLI 工具
     }
     return;
   }
-  
+
   // 发送单条消息
   if (args.to && args.text) {
     const account = loadAccount(accountId);
@@ -238,19 +241,19 @@ QQBot 主动消息 CLI 工具
       console.error("无法加载账户配置");
       process.exit(1);
     }
-    
+
     console.log(`\n发送消息...`);
     console.log(`  目标: ${args.to}`);
     console.log(`  类型: ${type}`);
     console.log(`  内容: ${args.text}`);
-    
+
     const result = await sendProactiveMessageDirect(
       account,
       args.to as string,
       args.text as string,
-      type
+      type,
     );
-    
+
     if (result.success) {
       console.log(`\n✅ 发送成功!`);
       console.log(`  消息ID: ${result.messageId}`);
@@ -261,7 +264,7 @@ QQBot 主动消息 CLI 工具
     }
     return;
   }
-  
+
   // 没有有效参数
   console.error("请指定操作。使用 --help 查看帮助。");
   process.exit(1);

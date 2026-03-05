@@ -64,7 +64,7 @@ async function spawnAndWaitForSpawn(
   argv: string[],
   options: SpawnOptions,
 ): Promise<ChildProcess> {
-  const child = spawnImpl(argv[0], argv.slice(1), options);
+  const child = spawnImpl(argv[0], argv.slice(1), { ...options, windowsHide: true });
 
   return await new Promise((resolve, reject) => {
     let settled = false;

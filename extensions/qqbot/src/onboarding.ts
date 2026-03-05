@@ -1,9 +1,9 @@
 /**
  * QQBot CLI Onboarding Adapter
- * 
+ *
  * 提供 openclaw onboard 命令的交互式配置支持
  */
-import type { 
+import type {
   ChannelOnboardingAdapter,
   ChannelOnboardingStatus,
   ChannelOnboardingStatusContext,
@@ -23,24 +23,36 @@ interface QQBotChannelConfig {
   imageServerBaseUrl?: string;
   markdownSupport?: boolean;
   allowFrom?: string[];
-  accounts?: Record<string, {
-    enabled?: boolean;
-    appId?: string;
-    clientSecret?: string;
-    clientSecretFile?: string;
-    name?: string;
-    imageServerBaseUrl?: string;
-    markdownSupport?: boolean;
-    allowFrom?: string[];
-  }>;
+  accounts?: Record<
+    string,
+    {
+      enabled?: boolean;
+      appId?: string;
+      clientSecret?: string;
+      clientSecretFile?: string;
+      name?: string;
+      imageServerBaseUrl?: string;
+      markdownSupport?: boolean;
+      allowFrom?: string[];
+    }
+  >;
 }
 
 // Prompter 类型定义
 interface Prompter {
   note: (message: string, title?: string) => Promise<void>;
   confirm: (opts: { message: string; initialValue?: boolean }) => Promise<boolean>;
-  text: (opts: { message: string; placeholder?: string; initialValue?: string; validate?: (value: string) => string | undefined }) => Promise<string>;
-  select: <T>(opts: { message: string; options: Array<{ value: T; label: string }>; initialValue?: T }) => Promise<T>;
+  text: (opts: {
+    message: string;
+    placeholder?: string;
+    initialValue?: string;
+    validate?: (value: string) => string | undefined;
+  }) => Promise<string>;
+  select: <T>(opts: {
+    message: string;
+    options: Array<{ value: T; label: string }>;
+    initialValue?: T;
+  }) => Promise<T>;
 }
 
 /**
@@ -67,7 +79,7 @@ export const qqbotOnboardingAdapter: ChannelOnboardingAdapter = {
     return {
       channel: "qqbot" as any,
       configured,
-statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecret"}`],
+      statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecret"}`],
       selectionHint: configured ? "已配置" : "支持 QQ 群聊和私聊（流式消息）",
       quickstartScore: configured ? 1 : 20,
     };
@@ -78,7 +90,7 @@ statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecr
     const prompter = ctx.prompter as Prompter;
     const accountOverrides = ctx.accountOverrides as Record<string, string> | undefined;
     const shouldPromptAccountIds = ctx.shouldPromptAccountIds;
-    
+
     const qqbotOverride = accountOverrides?.qqbot?.trim();
     const defaultAccountId = resolveDefaultQQBotAccountId(cfg);
     let accountId = qqbotOverride ?? defaultAccountId;
@@ -103,9 +115,12 @@ statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecr
     const accountConfigured = Boolean(resolvedAccount.appId && resolvedAccount.clientSecret);
     const allowEnv = accountId === DEFAULT_ACCOUNT_ID;
     const envAppId = typeof process !== "undefined" ? process.env?.QQBOT_APP_ID?.trim() : undefined;
-    const envSecret = typeof process !== "undefined" ? process.env?.QQBOT_CLIENT_SECRET?.trim() : undefined;
+    const envSecret =
+      typeof process !== "undefined" ? process.env?.QQBOT_CLIENT_SECRET?.trim() : undefined;
     const canUseEnv = allowEnv && Boolean(envAppId && envSecret);
-    const hasConfigCredentials = Boolean(resolvedAccount.config.appId && resolvedAccount.config.clientSecret);
+    const hasConfigCredentials = Boolean(
+      resolvedAccount.config.appId && resolvedAccount.config.clientSecret,
+    );
 
     let appId: string | null = null;
     let clientSecret: string | null = null;
@@ -123,7 +138,7 @@ statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecr
           "",
           "此版本支持流式消息发送！",
         ].join("\n"),
-"QQ Bot 配置",
+        "QQ Bot 配置",
       );
     }
 
@@ -139,7 +154,7 @@ statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecr
           channels: {
             ...next.channels,
             qqbot: {
-              ...(next.channels?.qqbot as Record<string, unknown> || {}),
+              ...((next.channels?.qqbot as Record<string, unknown>) || {}),
               enabled: true,
               allowFrom: resolvedAccount.config?.allowFrom ?? ["*"],
             },
@@ -222,7 +237,7 @@ statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecr
           channels: {
             ...next.channels,
             qqbot: {
-              ...(next.channels?.qqbot as Record<string, unknown> || {}),
+              ...((next.channels?.qqbot as Record<string, unknown>) || {}),
               enabled: true,
               appId,
               clientSecret,
@@ -237,7 +252,7 @@ statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecr
           channels: {
             ...next.channels,
             qqbot: {
-              ...(next.channels?.qqbot as Record<string, unknown> || {}),
+              ...((next.channels?.qqbot as Record<string, unknown>) || {}),
               enabled: true,
               accounts: {
                 ...((next.channels?.qqbot as QQBotChannelConfig)?.accounts || {}),
@@ -265,7 +280,7 @@ statusLines: [`QQ Bot: ${configured ? "已配置" : "需要 AppID 和 ClientSecr
       ...config,
       channels: {
         ...config.channels,
-        qqbot: { ...(config.channels?.qqbot as Record<string, unknown> || {}), enabled: false },
+        qqbot: { ...((config.channels?.qqbot as Record<string, unknown>) || {}), enabled: false },
       },
     } as any;
   },

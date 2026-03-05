@@ -23,6 +23,7 @@ function execLoginShellEnvZero(params: {
     maxBuffer: DEFAULT_MAX_BUFFER_BYTES,
     env: params.env,
     stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
   });
 }
 

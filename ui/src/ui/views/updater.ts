@@ -104,7 +104,10 @@ async function doUpdate(version: string) {
         case "Progress":
           downloadedBytes += event.data.chunkLength || 0;
           if (totalBytes > 0) {
-            showDownloading(version, Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)));
+            showDownloading(
+              version,
+              Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)),
+            );
           }
           break;
         case "Finished":
@@ -223,7 +226,7 @@ export function initAutoUpdater() {
   }
 
   const CHECK_INTERVAL = 4 * 60 * 60 * 1000; // 4 小时
-  const RETRY_DELAY = 30 * 60 * 1000;         // 30 分钟
+  const RETRY_DELAY = 30 * 60 * 1000; // 30 分钟
   let _retried = false;
 
   async function doCheck() {
@@ -233,7 +236,9 @@ export function initAutoUpdater() {
       if (_updateRid != null) {
         try {
           await tauri.core.invoke("plugin:updater|close", { rid: _updateRid });
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         _updateRid = null;
       }
 

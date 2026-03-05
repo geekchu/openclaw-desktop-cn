@@ -2,9 +2,7 @@
   "id": "wecom",
   "name": "OpenClaw WeCom",
   "description": "Enterprise WeChat (WeCom) messaging channel plugin for OpenClaw",
-  "channels": [
-    "wecom"
-  ],
+  "channels": ["wecom"],
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

@@ -8,25 +8,30 @@ export async function execFileUtf8(
   options: Omit<ExecFileOptionsWithStringEncoding, "encoding"> = {},
 ): Promise<ExecResult> {
   return await new Promise<ExecResult>((resolve) => {
-    execFile(command, args, { ...options, encoding: "utf8" }, (error, stdout, stderr) => {
-      if (!error) {
+    execFile(
+      command,
+      args,
+      { ...options, encoding: "utf8", windowsHide: true },
+      (error, stdout, stderr) => {
+        if (!error) {
+          resolve({
+            stdout: String(stdout ?? ""),
+            stderr: String(stderr ?? ""),
+            code: 0,
+          });
+          return;
+        }
+
+        const e = error as { code?: unknown; message?: unknown };
+        const stderrText = String(stderr ?? "");
         resolve({
           stdout: String(stdout ?? ""),
-          stderr: String(stderr ?? ""),
-          code: 0,
+          stderr:
+            stderrText ||
+            (typeof e.message === "string" ? e.message : typeof error === "string" ? error : ""),
+          code: typeof e.code === "number" ? e.code : 1,
         });
-        return;
-      }
-
-      const e = error as { code?: unknown; message?: unknown };
-      const stderrText = String(stderr ?? "");
-      resolve({
-        stdout: String(stdout ?? ""),
-        stderr:
-          stderrText ||
-          (typeof e.message === "string" ? e.message : typeof error === "string" ? error : ""),
-        code: typeof e.code === "number" ? e.code : 1,
-      });
-    });
+      },
+    );
   });
 }

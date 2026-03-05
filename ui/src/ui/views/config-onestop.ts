@@ -8,10 +8,7 @@ import { renderCustomProviders } from "./config-custom-providers.js";
 
 // ─── Tauri invoke helper ─────────────────────────────────────
 
-function invoke<T = unknown>(
-  cmd: string,
-  args?: Record<string, unknown>,
-): Promise<T> {
+function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const t = (window as any).__TAURI__;
   if (t?.core?.invoke) {
     return t.core.invoke(cmd, args) as Promise<T>;
@@ -34,15 +31,17 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
   // 只保存选中的模型到配置，不保存全部缓存模型（避免配置膨胀）
   let modelsToSave: OnestopModel[] = [];
   if (selectedModel) {
-    const found = _cachedModels.find(m => m.id === selectedModel);
+    const found = _cachedModels.find((m) => m.id === selectedModel);
     modelsToSave = found
       ? [found]
-      : [{
-          id: selectedModel,
-          name: formatModelName(selectedModel),
-          provider: inferProvider(selectedModel).name,
-          providerKey: inferProvider(selectedModel).key,
-        }];
+      : [
+          {
+            id: selectedModel,
+            name: formatModelName(selectedModel),
+            provider: inferProvider(selectedModel).name,
+            providerKey: inferProvider(selectedModel).key,
+          },
+        ];
   }
 
   // 单次原子写入：get_config → 修改全部字段 → save_config
@@ -216,13 +215,15 @@ function inferProvider(modelId: string): { name: string; key: string } {
   if (id.startsWith("deepseek")) return { name: "DeepSeek", key: "deepseek" };
   if (id.startsWith("doubao") || id.startsWith("seed")) return { name: "豆包", key: "doubao" };
   if (id.startsWith("glm")) return { name: "智谱 GLM", key: "glm" };
-  if (id.startsWith("hunyuan") || id.startsWith("tencent")) return { name: "腾讯混元", key: "hunyuan" };
+  if (id.startsWith("hunyuan") || id.startsWith("tencent"))
+    return { name: "腾讯混元", key: "hunyuan" };
   if (id.startsWith("kimi")) return { name: "Kimi", key: "kimi" };
   if (id.startsWith("longcat")) return { name: "Longcat", key: "longcat" };
   if (id.startsWith("mimo")) return { name: "Mimo", key: "mimo" };
   if (id.startsWith("minimax")) return { name: "MiniMax", key: "minimax" };
   if (id.startsWith("qwen")) return { name: "通义千问", key: "qwen" };
-  if (id.startsWith("gpt") || id.startsWith("o1") || id.startsWith("o3") || id.startsWith("o4")) return { name: "OpenAI", key: "openai" };
+  if (id.startsWith("gpt") || id.startsWith("o1") || id.startsWith("o3") || id.startsWith("o4"))
+    return { name: "OpenAI", key: "openai" };
   if (id.startsWith("claude")) return { name: "Anthropic", key: "anthropic" };
   if (id.startsWith("gemini")) return { name: "Google", key: "google" };
   return { name: modelId.split("-")[0] || "其他", key: "other" };
@@ -285,19 +286,214 @@ export function refetchModels(requestUpdate: () => void): void {
 // ─── Provider Logos (内联 SVG) ──────────────────────────────
 
 const providerLogos: Record<string, ReturnType<typeof html>> = {
-  deepseek: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#4d6bfe"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">D</text></svg>`,
-  doubao: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#ff6154"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">豆</text></svg>`,
-  glm: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#3366ff"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">智</text></svg>`,
-  hunyuan: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#06b4fd"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">混</text></svg>`,
-  kimi: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#0066ff"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">K</text></svg>`,
-  longcat: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#8b5cf6"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">L</text></svg>`,
-  mimo: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#e74c3c"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">M</text></svg>`,
-  minimax: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#ff9500"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="12" font-weight="bold" font-family="sans-serif">MM</text></svg>`,
-  qwen: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#ff6a00"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">千</text></svg>`,
-  openai: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#10a37f"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">G</text></svg>`,
-  anthropic: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#d4a27f"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">C</text></svg>`,
-  google: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#4285f4"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">G</text></svg>`,
-  other: html`<svg viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#666"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="sans-serif">?</text></svg>`,
+  deepseek: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#4d6bfe" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        D
+      </text>
+    </svg>
+  `,
+  doubao: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#ff6154" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        豆
+      </text>
+    </svg>
+  `,
+  glm: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#3366ff" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        智
+      </text>
+    </svg>
+  `,
+  hunyuan: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#06b4fd" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        混
+      </text>
+    </svg>
+  `,
+  kimi: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#0066ff" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        K
+      </text>
+    </svg>
+  `,
+  longcat: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#8b5cf6" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        L
+      </text>
+    </svg>
+  `,
+  mimo: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#e74c3c" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        M
+      </text>
+    </svg>
+  `,
+  minimax: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#ff9500" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="12"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        MM
+      </text>
+    </svg>
+  `,
+  qwen: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#ff6a00" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        千
+      </text>
+    </svg>
+  `,
+  openai: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#10a37f" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        G
+      </text>
+    </svg>
+  `,
+  anthropic: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#d4a27f" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        C
+      </text>
+    </svg>
+  `,
+  google: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#4285f4" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        G
+      </text>
+    </svg>
+  `,
+  other: html`
+    <svg viewBox="0 0 32 32" width="32" height="32">
+      <circle cx="16" cy="16" r="15" fill="#666" />
+      <text
+        x="16"
+        y="21"
+        text-anchor="middle"
+        fill="white"
+        font-size="14"
+        font-weight="bold"
+        font-family="sans-serif"
+      >
+        ?
+      </text>
+    </svg>
+  `,
 };
 
 const providerColors: Record<string, string> = {
@@ -338,15 +534,21 @@ export type OnestopProps = {
 const icons = {
   rocket: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path>
-      <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path>
+      <path
+        d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"
+      ></path>
+      <path
+        d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+      ></path>
       <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path>
       <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path>
     </svg>
   `,
   key: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+      <path
+        d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"
+      ></path>
     </svg>
   `,
   eye: html`
@@ -377,7 +579,9 @@ const icons = {
   `,
   sparkles: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path>
+      <path
+        d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"
+      ></path>
       <path d="M5 3v4"></path>
       <path d="M19 17v4"></path>
       <path d="M3 5h4"></path>
@@ -435,8 +639,9 @@ export function renderOnestop(props: OnestopProps) {
   return html`
     <div class="onestop">
       <!-- 全局状态栏：始终显示当前接入的模型 -->
-      ${showOnestopModel
-        ? html`
+      ${
+        showOnestopModel
+          ? html`
           <div class="onestop-status-bar">
             <div class="onestop-status-bar__info">
               <span class="onestop-status-bar__dot"></span>
@@ -454,13 +659,14 @@ export function renderOnestop(props: OnestopProps) {
               </button>
             </div>
           </div>
-          ${_testResult
-            ? html`<div class="onestop-result ${_testResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_testResult.message}</div>`
-            : nothing
+          ${
+            _testResult
+              ? html`<div class="onestop-result ${_testResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_testResult.message}</div>`
+              : nothing
           }
         `
-        : showCustomModel
-        ? html`
+          : showCustomModel
+            ? html`
           <div class="onestop-status-bar">
             <div class="onestop-status-bar__info">
               <span class="onestop-status-bar__dot"></span>
@@ -477,17 +683,19 @@ export function renderOnestop(props: OnestopProps) {
               </button>
             </div>
           </div>
-          ${_testResult
-            ? html`<div class="onestop-result ${_testResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_testResult.message}</div>`
-            : nothing
+          ${
+            _testResult
+              ? html`<div class="onestop-result ${_testResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_testResult.message}</div>`
+              : nothing
           }
         `
-        : nothing
+            : nothing
       }
 
-      ${_saveResult
-        ? html`<div class="onestop-result ${_saveResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_saveResult.message}</div>`
-        : nothing
+      ${
+        _saveResult
+          ? html`<div class="onestop-result ${_saveResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_saveResult.message}</div>`
+          : nothing
       }
 
 
@@ -574,7 +782,11 @@ function renderOnestopContent(props: OnestopProps) {
       // 立即更新 UI 显示
       props.onModelSelect(modelId);
       _customPrimaryModel = null;
-      showSaveResult(true, `✓ 已切换为 ${formatModelName(modelId)}，请在聊天中发送 /new 开启新会话`, props.requestUpdate);
+      showSaveResult(
+        true,
+        `✓ 已切换为 ${formatModelName(modelId)}，请在聊天中发送 /new 开启新会话`,
+        props.requestUpdate,
+      );
     } catch (e) {
       showSaveResult(false, `切换失败: ${String(e)}`, props.requestUpdate);
     }
@@ -595,14 +807,18 @@ function renderOnestopContent(props: OnestopProps) {
           <div class="onestop-hero__status">
             ${
               hasApiKey
-                ? html`<span class="onestop-badge onestop-badge--ok">
-                    <span class="onestop-badge__dot"></span>
-                    已接入
-                  </span>`
-                : html`<span class="onestop-badge onestop-badge--pending">
-                    <span class="onestop-badge__dot"></span>
-                    未配置
-                  </span>`
+                ? html`
+                    <span class="onestop-badge onestop-badge--ok">
+                      <span class="onestop-badge__dot"></span>
+                      已接入
+                    </span>
+                  `
+                : html`
+                    <span class="onestop-badge onestop-badge--pending">
+                      <span class="onestop-badge__dot"></span>
+                      未配置
+                    </span>
+                  `
             }
           </div>
         </div>
@@ -637,8 +853,7 @@ function renderOnestopContent(props: OnestopProps) {
               class="onestop-apikey__input"
               placeholder=${_existingMaskedKey ? `已配置: ${_existingMaskedKey}` : "请输入您的 API Key"}
               .value=${props.apiKey}
-              @input=${(e: Event) =>
-                props.onApiKeyChange((e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => props.onApiKeyChange((e.target as HTMLInputElement).value)}
             />
             <button
               class="onestop-apikey__toggle"
@@ -655,9 +870,12 @@ function renderOnestopContent(props: OnestopProps) {
               ${props.saving ? "保存中…" : props.apiKey?.trim() ? "保存配置" : _existingMaskedKey ? "已配置" : "请先填写 API Key"}
             </button>
           </div>
-          ${_existingMaskedKey && !props.apiKey?.trim()
-            ? html`<div class="onestop-apikey__hint">✓ API Key 已配置，输入新 Key 可更换</div>`
-            : nothing
+          ${
+            _existingMaskedKey && !props.apiKey?.trim()
+              ? html`
+                  <div class="onestop-apikey__hint">✓ API Key 已配置，输入新 Key 可更换</div>
+                `
+              : nothing
           }
         </div>
       </div>
@@ -685,21 +903,22 @@ function renderOnestopContent(props: OnestopProps) {
           </button>
         </div>
 
-        ${_modelsLoading
-          ? html`
-            <div class="onestop-loading">
-              <div class="onestop-loading__spinner"></div>
-              <span>正在获取模型列表…</span>
-            </div>
-          `
-          : _modelsError
-          ? html`
+        ${
+          _modelsLoading
+            ? html`
+                <div class="onestop-loading">
+                  <div class="onestop-loading__spinner"></div>
+                  <span>正在获取模型列表…</span>
+                </div>
+              `
+            : _modelsError
+              ? html`
             <div class="onestop-error">
               <span>获取模型列表失败: ${_modelsError}</span>
               <button class="onestop-error__retry" @click=${() => refetchModels(props.requestUpdate)}>重试</button>
             </div>
           `
-          : html`
+              : html`
             <!-- Provider filter -->
             <div class="onestop-categories">
               <button
@@ -725,11 +944,13 @@ function renderOnestopContent(props: OnestopProps) {
             <div class="onestop-models">
               ${[...filteredModels]
                 .sort((a, b) =>
-                  (!_customPrimaryModel && a.id === props.selectedModel) ? -1
-                  : (!_customPrimaryModel && b.id === props.selectedModel) ? 1
-                  : 0)
-                .map(
-                (model) => {
+                  !_customPrimaryModel && a.id === props.selectedModel
+                    ? -1
+                    : !_customPrimaryModel && b.id === props.selectedModel
+                      ? 1
+                      : 0,
+                )
+                .map((model) => {
                   const isCurrent = !_customPrimaryModel && props.selectedModel === model.id;
                   return html`
                   <div
@@ -762,7 +983,8 @@ function renderOnestopContent(props: OnestopProps) {
                       title="切换后请发送 /new 开启新会话"
                     >${isCurrent ? "✓ 当前" : "切换"}</button>
                   </div>
-                `})}
+                `;
+                })}
             </div>
           `
         }

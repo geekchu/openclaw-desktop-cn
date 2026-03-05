@@ -165,15 +165,14 @@ git push && git push --tags
 
 #### Windows（在 Windows 机器上执行）
 
-```powershell
-# 设置签名环境变量（每次新开终端都需要）
-# ⚠️ 用 [System.IO.File] 读取避免 PowerShell 的 Get-Content 添加 BOM/换行导致签名失败
-$env:TAURI_SIGNING_PRIVATE_KEY = [System.IO.File]::ReadAllText("$HOME\.tauri\openclaw.key").Trim()
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "123"
+#### Windows（由于集成了构建脚本，无需每次设置环境）
 
-# 构建
-pnpm installer:build
-```
+有两种便捷方式：
+
+1. **直接双击** 项目根目录下的 `build.bat`。
+2. 或在 PowerShell/Terminal 中执行 `.\build.ps1`。
+
+> 💡 **提示**：这几个脚本会自动从 `~/.tauri/openclaw.key` 读取私钥设置环境变量，并自带 `cargo clean` 机制以确保产物完全无幽灵缓存。
 
 #### macOS（在 Mac 机器上执行）
 
@@ -529,9 +528,9 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 
 | 问题                                          | 原因                                               | 解决                                                                                                     |
 | --------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 构建成功但没有 `.sig` 文件                    | 未设置 `TAURI_SIGNING_PRIVATE_KEY`                 | 设置环境变量后重新构建                                                                                   |
-| NSIS 打包后报 "Wrong password"                | 签名密钥密码不对或 PowerShell 读取密钥时添加了 BOM | 用 `[System.IO.File]::ReadAllText().Trim()` 读取密钥                                                     |
-| NSIS 打包后报 "no private key"                | 只设了 `TAURI_SIGNING_PRIVATE_KEY_PATH`            | Tauri v2 需用 `TAURI_SIGNING_PRIVATE_KEY`（内容）                                                        |
+| 构建成功但没有 `.sig` 文件                    | 未设置私钥环境变量                                 | 请使用根目录提供的 `build.bat` 或 `build.ps1` 脚本进行一键构建，它们会自动读取并设置密钥。               |
+| NSIS 打包后报 "Wrong password"                | 签名密钥密码不对或 PowerShell 读取密钥时添加了 BOM | 使用 `build.ps1` 脚本可以自动规避由于 BOM 或者编码错误导致的密码截断等故障。                             |
+| NSIS 打包后报 "no private key"                | 未读取到私钥内容或路径设置错误                     | 推荐直接运行 `build.bat` 或 `build.ps1` 以自动完成配置绑定。                                             |
 | 构建卡住在 `Running makensis`                 | gateway-bundle 太大（>1GB）                        | 检查 `prepare-gateway-bundle.js` 的去重和清理步骤是否正常执行                                            |
 | 构建卡住在 WebView2 下载                      | 网络无法访问 Microsoft CDN                         | `tauri.conf.json` 已设置 `webviewInstallMode: skip`                                                      |
 | `cargo-lock` 文件锁定错误                     | Windows Defender 实时监控                          | 将项目目录加入排除列表                                                                                   |
@@ -557,13 +556,13 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 
 ### 安装后 Gateway 启动相关
 
-| 问题                                        | 原因                                                                  | 解决                                                      |
-| ------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
-| 白屏 + "Gateway 启动超时"                   | Gateway 进程崩溃，多种可能原因                                        | 手动运行 gateway 看报错（见下方）                         |
-| `EISDIR: lstat 'C:'`                        | Tauri `resource_dir()` 返回 `\\?\` 前缀路径，Node.js 无法解析         | `main.rs` 已修复：strip `\\?\` 前缀                       |
-| `Cannot find module 'xxx'` (extension 依赖) | extension 的 npm 依赖未安装到 `gateway-bundle/node_modules/`          | `prepare-gateway-bundle.js` 已修复：合并到根 package.json |
-| `Cannot find module '../doc/xxx'`           | Step 7 清理误删了 npm 包内的 `doc/` 目录                              | 已修复：`doc` 从 `dirsToRemove` 中移除                    |
-| matrix extension 加载失败                   | `@matrix-org/matrix-sdk-crypto-nodejs` 是原生模块，`--ignore-scripts` | 已知限制，不影响核心功能                                  |
+| 问题                                        | 原因                                                             | 解决                                                                                                                                       |
+| ------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 白屏 + "Gateway 启动超时"                   | Gateway 进程崩渍或启动过慢（>60秒），多种可能原因                | 桌面端已宽限到 60 秒启动，若仍复现请运行 gateway 看报错                                                                                    |
+| `EISDIR: lstat 'C:'`                        | Tauri `resource_dir()` 返回 `\\?\` 前缀路径，Node.js 无法解析    | `main.rs` 已修复：strip `\\?\` 前缀                                                                                                        |
+| `Cannot find module 'xxx'` (extension 依赖) | extension 的 npm 依赖未安装到 `gateway-bundle/node_modules/`     | `prepare-gateway-bundle.js` 已修复：合并到根 package.json                                                                                  |
+| `Cannot find module '../doc/xxx'`           | Step 7 清理误删了 npm 包内的 `doc/` 目录                         | 已修复：`doc` 从 `dirsToRemove` 中移除                                                                                                     |
+| 扩展原生模块加载失败 (如缺失 .node 二进制)  | 打包时 npm 遵循了 `.npmrc` 中 `allow-build-scripts` 的白名单限制 | **必须补充：**在项目根目录 `.npmrc` 的 `allow-build-scripts` 字段，手动将该依赖包名加入白名单，以允许其执行 `postinstall` 脚本下载底层文件 |
 
 **诊断命令**：手动启动 gateway 查看完整错误输出：
 
@@ -572,7 +571,7 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "openclaw-desktop.exe" -Recurse -ErrorAction SilentlyContinue | Select -First 1).DirectoryName
 
 # 手动运行 gateway
-& "$appDir\node-runtime\win-x64\node.exe" "$appDir\gateway-bundle\openclaw.mjs" gateway --port 18789
+& "$appDir\node-runtime\win-x64\node.exe" "$appDir\gateway-bundle\openclaw.mjs" gateway --port 18789 --force
 ```
 
 ---

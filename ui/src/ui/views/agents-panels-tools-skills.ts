@@ -32,11 +32,7 @@ export function renderAgentTools(params: {
   const agentTools = config.entry?.tools ?? {};
   const globalTools = config.globalTools ?? {};
   const profile = agentTools.profile ?? globalTools.profile ?? "full";
-  const profileSource = agentTools.profile
-    ? "代理覆盖"
-    : globalTools.profile
-      ? "全局默认"
-      : "默认";
+  const profileSource = agentTools.profile ? "代理覆盖" : globalTools.profile ? "全局默认" : "默认";
   const hasAgentAllow = Array.isArray(agentTools.allow) && agentTools.allow.length > 0;
   const hasGlobalAllow = Array.isArray(globalTools.allow) && globalTools.allow.length > 0;
   const editable =
@@ -142,9 +138,7 @@ export function renderAgentTools(params: {
       ${
         !params.configForm
           ? html`
-              <div class="callout info" style="margin-top: 12px">
-                加载网关配置以调整工具配置模板。
-              </div>
+              <div class="callout info" style="margin-top: 12px">加载网关配置以调整工具配置模板。</div>
             `
           : nothing
       }
@@ -331,9 +325,7 @@ export function renderAgentSkills(params: {
       ${
         !params.configForm
           ? html`
-              <div class="callout info" style="margin-top: 12px">
-                加载网关配置以设置代理技能。
-              </div>
+              <div class="callout info" style="margin-top: 12px">加载网关配置以设置代理技能。</div>
             `
           : nothing
       }
@@ -351,9 +343,7 @@ export function renderAgentSkills(params: {
       ${
         !reportReady && !params.loading
           ? html`
-              <div class="callout info" style="margin-top: 12px">
-                加载此代理的技能以查看工作区特定条目。
-              </div>
+              <div class="callout info" style="margin-top: 12px">加载此代理的技能以查看工作区特定条目。</div>
             `
           : nothing
       }

@@ -64,7 +64,7 @@
   padding-top: 0;
 }
 
-.shell--chat-focus .content>*+* {
+.shell--chat-focus .content > * + * {
   margin-top: 0;
 }
 
@@ -437,7 +437,7 @@ button.nav-item {
   overflow-x: hidden;
 }
 
-.content>*+* {
+.content > * + * {
   margin-top: 24px;
 }
 
@@ -453,8 +453,6 @@ button.nav-item {
   padding-bottom: 0;
 }
 
-
-
 .content--terminal {
   display: flex;
   flex-direction: column;
@@ -467,7 +465,7 @@ button.nav-item {
   margin: 0;
 }
 
-.content--terminal>*+* {
+.content--terminal > * + * {
   margin-top: 0;
 }
 
@@ -615,15 +613,13 @@ button.nav-item {
 }
 
 /* 禁止 xterm v6 overlay 滚动条自动淡出 */
-.terminal-container .xterm .xterm-scrollable-element>.invisible,
-.terminal-container .xterm .xterm-scrollable-element>.invisible.fade {
+.terminal-container .xterm .xterm-scrollable-element > .invisible,
+.terminal-container .xterm .xterm-scrollable-element > .invisible.fade {
   opacity: 1 !important;
   pointer-events: auto !important;
 }
 
-
-
-.content--chat>*+* {
+.content--chat > * + * {
   margin-top: 0;
 }
 
@@ -683,7 +679,7 @@ button.nav-item {
   padding: 4px 8px 0;
 }
 
-.content--chat .content-header>div:first-child {
+.content--chat .content-header > div:first-child {
   text-align: left;
 }
 

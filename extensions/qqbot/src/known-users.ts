@@ -28,12 +28,7 @@ export interface KnownUser {
 }
 
 // 存储文件路径
-const KNOWN_USERS_DIR = path.join(
-  process.env.HOME || "/tmp",
-  ".openclaw",
-  "qqbot",
-  "data"
-);
+const KNOWN_USERS_DIR = path.join(process.env.HOME || "/tmp", ".openclaw", "qqbot", "data");
 
 const KNOWN_USERS_FILE = path.join(KNOWN_USERS_DIR, "known-users.json");
 
@@ -61,27 +56,27 @@ function loadUsersFromFile(): Map<string, KnownUser> {
   if (usersCache !== null) {
     return usersCache;
   }
-  
+
   usersCache = new Map();
-  
+
   try {
     if (fs.existsSync(KNOWN_USERS_FILE)) {
       const data = fs.readFileSync(KNOWN_USERS_FILE, "utf-8");
       const users = JSON.parse(data) as KnownUser[];
-      
+
       for (const user of users) {
         // 使用复合键：accountId + type + openid（群组还要加 groupOpenid）
         const key = makeUserKey(user);
         usersCache.set(key, user);
       }
-      
+
       console.log(`[known-users] Loaded ${usersCache.size} users from file`);
     }
   } catch (err) {
     console.error(`[known-users] Failed to load users: ${err}`);
     usersCache = new Map();
   }
-  
+
   return usersCache;
 }
 
@@ -90,11 +85,11 @@ function loadUsersFromFile(): Map<string, KnownUser> {
  */
 function saveUsersToFile(): void {
   if (!isDirty) return;
-  
+
   if (saveTimer) {
     return; // 已有定时器在等待
   }
-  
+
   saveTimer = setTimeout(() => {
     saveTimer = null;
     doSaveUsersToFile();
@@ -106,7 +101,7 @@ function saveUsersToFile(): void {
  */
 function doSaveUsersToFile(): void {
   if (!usersCache || !isDirty) return;
-  
+
   try {
     ensureDir();
     const users = Array.from(usersCache.values());
@@ -154,9 +149,9 @@ export function recordKnownUser(user: {
   const cache = loadUsersFromFile();
   const key = makeUserKey(user);
   const now = Date.now();
-  
+
   const existing = cache.get(key);
-  
+
   if (existing) {
     // 更新已存在的用户
     existing.lastSeenAt = now;
@@ -164,7 +159,9 @@ export function recordKnownUser(user: {
     if (user.nickname && user.nickname !== existing.nickname) {
       existing.nickname = user.nickname;
     }
-    console.log(`[known-users] Updated user ${user.openid}, interactions: ${existing.interactionCount}`);
+    console.log(
+      `[known-users] Updated user ${user.openid}, interactions: ${existing.interactionCount}`,
+    );
   } else {
     // 新用户
     const newUser: KnownUser = {
@@ -180,7 +177,7 @@ export function recordKnownUser(user: {
     cache.set(key, newUser);
     console.log(`[known-users] New user recorded: ${user.openid} (${user.type})`);
   }
-  
+
   isDirty = true;
   saveUsersToFile();
 }
@@ -196,7 +193,7 @@ export function getKnownUser(
   accountId: string,
   openid: string,
   type: "c2c" | "group" = "c2c",
-  groupOpenid?: string
+  groupOpenid?: string,
 ): KnownUser | undefined {
   const cache = loadUsersFromFile();
   const key = makeUserKey({ accountId, openid, type, groupOpenid });
@@ -223,19 +220,19 @@ export function listKnownUsers(options?: {
 }): KnownUser[] {
   const cache = loadUsersFromFile();
   let users = Array.from(cache.values());
-  
+
   // 筛选
   if (options?.accountId) {
-    users = users.filter(u => u.accountId === options.accountId);
+    users = users.filter((u) => u.accountId === options.accountId);
   }
   if (options?.type) {
-    users = users.filter(u => u.type === options.type);
+    users = users.filter((u) => u.type === options.type);
   }
   if (options?.activeWithin) {
     const cutoff = Date.now() - options.activeWithin;
-    users = users.filter(u => u.lastSeenAt >= cutoff);
+    users = users.filter((u) => u.lastSeenAt >= cutoff);
   }
-  
+
   // 排序
   const sortBy = options?.sortBy ?? "lastSeenAt";
   const sortOrder = options?.sortOrder ?? "desc";
@@ -244,12 +241,12 @@ export function listKnownUsers(options?: {
     const bVal = b[sortBy] ?? 0;
     return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
   });
-  
+
   // 限制数量
   if (options?.limit && options.limit > 0) {
     users = users.slice(0, options.limit);
   }
-  
+
   return users;
 }
 
@@ -265,16 +262,16 @@ export function getKnownUsersStats(accountId?: string): {
   activeIn7d: number;
 } {
   let users = listKnownUsers({ accountId });
-  
+
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
-  
+
   return {
     totalUsers: users.length,
-    c2cUsers: users.filter(u => u.type === "c2c").length,
-    groupUsers: users.filter(u => u.type === "group").length,
-    activeIn24h: users.filter(u => now - u.lastSeenAt < day).length,
-    activeIn7d: users.filter(u => now - u.lastSeenAt < 7 * day).length,
+    c2cUsers: users.filter((u) => u.type === "c2c").length,
+    groupUsers: users.filter((u) => u.type === "group").length,
+    activeIn24h: users.filter((u) => now - u.lastSeenAt < day).length,
+    activeIn7d: users.filter((u) => now - u.lastSeenAt < 7 * day).length,
   };
 }
 
@@ -289,11 +286,11 @@ export function removeKnownUser(
   accountId: string,
   openid: string,
   type: "c2c" | "group" = "c2c",
-  groupOpenid?: string
+  groupOpenid?: string,
 ): boolean {
   const cache = loadUsersFromFile();
   const key = makeUserKey({ accountId, openid, type, groupOpenid });
-  
+
   if (cache.has(key)) {
     cache.delete(key);
     isDirty = true;
@@ -301,7 +298,7 @@ export function removeKnownUser(
     console.log(`[known-users] Removed user ${openid}`);
     return true;
   }
-  
+
   return false;
 }
 
@@ -312,7 +309,7 @@ export function removeKnownUser(
 export function clearKnownUsers(accountId?: string): number {
   const cache = loadUsersFromFile();
   let count = 0;
-  
+
   if (accountId) {
     // 只清除指定账户的用户
     for (const [key, user] of cache.entries()) {
@@ -326,13 +323,13 @@ export function clearKnownUsers(accountId?: string): number {
     count = cache.size;
     cache.clear();
   }
-  
+
   if (count > 0) {
     isDirty = true;
     doSaveUsersToFile(); // 立即保存
     console.log(`[known-users] Cleared ${count} users`);
   }
-  
+
   return count;
 }
 
@@ -343,9 +340,7 @@ export function clearKnownUsers(accountId?: string): number {
  */
 export function getUserGroups(accountId: string, openid: string): string[] {
   const users = listKnownUsers({ accountId, type: "group" });
-  return users
-    .filter(u => u.openid === openid && u.groupOpenid)
-    .map(u => u.groupOpenid!);
+  return users.filter((u) => u.openid === openid && u.groupOpenid).map((u) => u.groupOpenid!);
 }
 
 /**
@@ -354,6 +349,5 @@ export function getUserGroups(accountId: string, openid: string): string[] {
  * @param groupOpenid 群组 openid
  */
 export function getGroupMembers(accountId: string, groupOpenid: string): KnownUser[] {
-  return listKnownUsers({ accountId, type: "group" })
-    .filter(u => u.groupOpenid === groupOpenid);
+  return listKnownUsers({ accountId, type: "group" }).filter((u) => u.groupOpenid === groupOpenid);
 }

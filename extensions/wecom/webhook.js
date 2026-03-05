@@ -335,7 +335,11 @@ export class WecomWebhook {
         return WecomWebhook.DUPLICATE;
       }
 
-      logger.info("Received file message", { fromUser, fileName, fileUrl: fileUrl.substring(0, 80) });
+      logger.info("Received file message", {
+        fromUser,
+        fileName,
+        fileUrl: fileUrl.substring(0, 80),
+      });
 
       return {
         message: {

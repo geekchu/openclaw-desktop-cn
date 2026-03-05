@@ -9,10 +9,7 @@ import { customElement, state } from "lit/decorators.js";
 import { checkForUpdate, downloadAndInstallUpdate } from "./updater.js";
 
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
-function invoke<T = unknown>(
-  cmd: string,
-  args?: Record<string, unknown>,
-): Promise<T> {
+function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const t = (window as any).__TAURI__;
   if (t?.core?.invoke) {
     return t.core.invoke(cmd, args) as Promise<T>;
@@ -21,10 +18,7 @@ function invoke<T = unknown>(
 }
 
 /* ── helpers ──────────────────────────────────────────────── */
-function getNestedValue(
-  obj: Record<string, unknown>,
-  path: string[],
-): unknown {
+function getNestedValue(obj: Record<string, unknown>, path: string[]): unknown {
   let cur: unknown = obj;
   for (const k of path) {
     if (cur == null || typeof cur !== "object") return undefined;
@@ -52,7 +46,11 @@ export class SystemSettingsView extends LitElement {
   @state() private toolProfile: "minimal" | "coding" | "messaging" | "full" = "full";
   @state() private fsWorkspaceOnly = false;
   @state() private fsAllowedDirs: string[] = [];
-  @state() private allowlistEntries: Array<{ id?: string; pattern: string; lastUsedCommand?: string }> = [];
+  @state() private allowlistEntries: Array<{
+    id?: string;
+    pattern: string;
+    lastUsedCommand?: string;
+  }> = [];
   private _execApprovalsData: Record<string, unknown> | null = null;
 
   @state() private botName = "Clawd";
@@ -84,11 +82,19 @@ export class SystemSettingsView extends LitElement {
     try {
       const cfg = (await invoke<Record<string, unknown>>("get_config")) ?? {};
       const secMode = getNestedValue(cfg, ["tools", "exec", "security"]);
-      if (secMode === "deny" || secMode === "allowlist" || secMode === "full") this.execSecurity = secMode;
+      if (secMode === "deny" || secMode === "allowlist" || secMode === "full")
+        this.execSecurity = secMode;
       const askMode = getNestedValue(cfg, ["tools", "exec", "ask"]);
-      if (askMode === "off" || askMode === "on-miss" || askMode === "always") this.execAsk = askMode;
+      if (askMode === "off" || askMode === "on-miss" || askMode === "always")
+        this.execAsk = askMode;
       const profile = getNestedValue(cfg, ["tools", "profile"]);
-      if (profile === "minimal" || profile === "coding" || profile === "messaging" || profile === "full") this.toolProfile = profile;
+      if (
+        profile === "minimal" ||
+        profile === "coding" ||
+        profile === "messaging" ||
+        profile === "full"
+      )
+        this.toolProfile = profile;
       const fsMode = getNestedValue(cfg, ["tools", "fs", "workspaceOnly"]);
       if (typeof fsMode === "boolean") this.fsWorkspaceOnly = fsMode;
       const fsDirs = getNestedValue(cfg, ["tools", "fs", "allowedDirs"]);
@@ -101,8 +107,14 @@ export class SystemSettingsView extends LitElement {
           this.userName = (ident.userName as string) || "主人";
           this.timezone = (ident.timezone as string) || "Asia/Shanghai";
         }
-      } catch { /* ignore */ }
-      try { this.autoStart = await invoke<boolean>("autostart_is_enabled"); } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
+      try {
+        this.autoStart = await invoke<boolean>("autostart_is_enabled");
+      } catch {
+        /* ignore */
+      }
       try {
         const approvals = (await invoke<Record<string, unknown>>("get_exec_approvals")) ?? {};
         this._execApprovalsData = approvals;
@@ -110,11 +122,25 @@ export class SystemSettingsView extends LitElement {
         const mainAgent = agents.main ?? {};
         const allowlist = Array.isArray(mainAgent.allowlist) ? mainAgent.allowlist : [];
         this.allowlistEntries = allowlist
-          .filter((e: unknown): e is Record<string, unknown> => !!e && typeof e === "object" && typeof (e as Record<string,unknown>).pattern === "string")
-          .map((e: Record<string, unknown>) => ({ id: e.id as string | undefined, pattern: e.pattern as string, lastUsedCommand: e.lastUsedCommand as string | undefined }));
-      } catch { /* ignore */ }
-    } catch (e) { console.error("加载配置失败:", e); }
-    finally { this.loading = false; }
+          .filter(
+            (e: unknown): e is Record<string, unknown> =>
+              !!e &&
+              typeof e === "object" &&
+              typeof (e as Record<string, unknown>).pattern === "string",
+          )
+          .map((e: Record<string, unknown>) => ({
+            id: e.id as string | undefined,
+            pattern: e.pattern as string,
+            lastUsedCommand: e.lastUsedCommand as string | undefined,
+          }));
+      } catch {
+        /* ignore */
+      }
+    } catch (e) {
+      console.error("加载配置失败:", e);
+    } finally {
+      this.loading = false;
+    }
   }
 
   /* ── save ── */
@@ -131,7 +157,9 @@ export class SystemSettingsView extends LitElement {
         ensurePath(cfg, path);
         (getNestedValue(cfg, path) as Record<string, unknown>)[key] = value;
         await invoke("save_config", { config: cfg });
-      } catch (e) { console.error("保存失败:", e); }
+      } catch (e) {
+        console.error("保存失败:", e);
+      }
     });
   }
 
@@ -141,7 +169,10 @@ export class SystemSettingsView extends LitElement {
     clearTimeout(this._securityTimer);
     // 切换到非 allowlist 模式时，取消待执行的 ask 保存定时器
     if (mode !== "allowlist") clearTimeout(this._askTimer);
-    this._securityTimer = setTimeout(() => this._saveField(["tools", "exec"], "security", mode), 300);
+    this._securityTimer = setTimeout(
+      () => this._saveField(["tools", "exec"], "security", mode),
+      300,
+    );
   }
   private _handleAskChange(mode: typeof this.execAsk) {
     if (mode === this.execAsk) return;
@@ -160,7 +191,10 @@ export class SystemSettingsView extends LitElement {
     if (workspaceOnly === this.fsWorkspaceOnly) return;
     this.fsWorkspaceOnly = workspaceOnly;
     clearTimeout(this._fsTimer);
-    this._fsTimer = setTimeout(() => this._saveField(["tools", "fs"], "workspaceOnly", workspaceOnly), 300);
+    this._fsTimer = setTimeout(
+      () => this._saveField(["tools", "fs"], "workspaceOnly", workspaceOnly),
+      300,
+    );
   }
 
   private async _handleAddAllowedDir() {
@@ -196,10 +230,12 @@ export class SystemSettingsView extends LitElement {
       const freshData = (await invoke<Record<string, unknown>>("get_exec_approvals")) ?? {};
       const agents = { ...((freshData.agents ?? {}) as Record<string, Record<string, unknown>>) };
       const mainAgent = { ...(agents.main ?? {}) };
-      const currentList = Array.isArray(mainAgent.allowlist) ? [...mainAgent.allowlist] as Array<Record<string, unknown>> : [];
+      const currentList = Array.isArray(mainAgent.allowlist)
+        ? ([...mainAgent.allowlist] as Array<Record<string, unknown>>)
+        : [];
       // Remove by id if available, otherwise by pattern
       const matchIdx = currentList.findIndex((e) =>
-        removed.id ? e.id === removed.id : e.pattern === removed.pattern
+        removed.id ? e.id === removed.id : e.pattern === removed.pattern,
       );
       if (matchIdx >= 0) {
         currentList.splice(matchIdx, 1);
@@ -218,7 +254,7 @@ export class SystemSettingsView extends LitElement {
   private _triggerDirsSave() {
     clearTimeout(this._dirsTimer);
     this._dirsTimer = setTimeout(() => {
-      const valid = this.fsAllowedDirs.map(d => d.trim()).filter(d => d.length > 0);
+      const valid = this.fsAllowedDirs.map((d) => d.trim()).filter((d) => d.length > 0);
       this._saveField(["tools", "fs"], "allowedDirs", valid);
     }, 500);
   }
@@ -228,7 +264,9 @@ export class SystemSettingsView extends LitElement {
     this.saveStatus = "idle";
     try {
       await invoke("save_desktop_config", {
-        config: { identity: { botName: this.botName, userName: this.userName, timezone: this.timezone } },
+        config: {
+          identity: { botName: this.botName, userName: this.userName, timezone: this.timezone },
+        },
       });
       this.saveStatus = "success";
       setTimeout(() => (this.saveStatus = "idle"), 2000);
@@ -236,21 +274,35 @@ export class SystemSettingsView extends LitElement {
       console.error("保存失败:", e);
       this.saveStatus = "error";
       setTimeout(() => (this.saveStatus = "idle"), 3000);
-    } finally { this.saving = false; }
+    } finally {
+      this.saving = false;
+    }
   }
 
   private async _toggleAutoStart() {
     if (this.autoStartBusy) return;
     this.autoStartBusy = true;
     try {
-      if (this.autoStart) { await invoke("autostart_disable"); this.autoStart = false; }
-      else { await invoke("autostart_enable"); this.autoStart = true; }
-    } catch (e) { console.error("切换开机自启失败:", e); }
-    finally { this.autoStartBusy = false; }
+      if (this.autoStart) {
+        await invoke("autostart_disable");
+        this.autoStart = false;
+      } else {
+        await invoke("autostart_enable");
+        this.autoStart = true;
+      }
+    } catch (e) {
+      console.error("切换开机自启失败:", e);
+    } finally {
+      this.autoStartBusy = false;
+    }
   }
 
   private async _openConfigDir() {
-    try { await invoke("open_config_dir"); } catch (e) { console.error("打开目录失败:", e); }
+    try {
+      await invoke("open_config_dir");
+    } catch (e) {
+      console.error("打开目录失败:", e);
+    }
   }
 
   /* ───────────────────────────────────────────────
@@ -262,7 +314,7 @@ export class SystemSettingsView extends LitElement {
       flex-direction: column;
       height: 100%;
       color: var(--text, #e4e4e7);
-      font-family: var(--font-body, 'Space Grotesk', system-ui, sans-serif);
+      font-family: var(--font-body, "Space Grotesk", system-ui, sans-serif);
       overflow: hidden;
     }
 
@@ -335,16 +387,28 @@ export class SystemSettingsView extends LitElement {
       justify-content: center;
       flex-shrink: 0;
     }
-    .card-title-icon.amber { background: rgba(245, 158, 11, 0.15); }
-    .card-title-icon.blue  { background: rgba(59, 130, 246, 0.15); }
-    .card-title-icon.gray  { background: rgba(113, 113, 122, 0.15); }
+    .card-title-icon.amber {
+      background: rgba(245, 158, 11, 0.15);
+    }
+    .card-title-icon.blue {
+      background: rgba(59, 130, 246, 0.15);
+    }
+    .card-title-icon.gray {
+      background: rgba(113, 113, 122, 0.15);
+    }
     .card-title-icon svg {
       width: 20px;
       height: 20px;
     }
-    .card-title-icon.amber svg { color: var(--warn, #f59e0b); }
-    .card-title-icon.blue svg  { color: var(--info, #3b82f6); }
-    .card-title-icon.gray svg  { color: var(--muted, #71717a); }
+    .card-title-icon.amber svg {
+      color: var(--warn, #f59e0b);
+    }
+    .card-title-icon.blue svg {
+      color: var(--info, #3b82f6);
+    }
+    .card-title-icon.gray svg {
+      color: var(--muted, #71717a);
+    }
     .title-text {
       font-size: 18px;
       font-weight: 600;
@@ -382,8 +446,12 @@ export class SystemSettingsView extends LitElement {
       gap: 8px;
       margin-top: 8px;
     }
-    .btn-group.g3 { grid-template-columns: repeat(3, 1fr); }
-    .btn-group.g4 { grid-template-columns: repeat(4, 1fr); }
+    .btn-group.g3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .btn-group.g4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
 
     .opt {
       padding: 10px 8px;
@@ -451,12 +519,16 @@ export class SystemSettingsView extends LitElement {
       font-size: 14px;
       outline: none;
       box-sizing: border-box;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
       font-family: inherit;
     }
     .input-base:focus {
       border-color: var(--accent, #ff5c5c);
-      box-shadow: 0 0 0 2px var(--panel, #12141a), 0 0 0 4px var(--ring, #ff5c5c);
+      box-shadow:
+        0 0 0 2px var(--panel, #12141a),
+        0 0 0 4px var(--ring, #ff5c5c);
     }
     .input-base::placeholder {
       color: var(--muted, #71717a);
@@ -510,7 +582,11 @@ export class SystemSettingsView extends LitElement {
       height: 24px;
       flex-shrink: 0;
     }
-    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
     .switch-track {
       position: absolute;
       inset: 0;
@@ -550,7 +626,9 @@ export class SystemSettingsView extends LitElement {
       cursor: pointer;
       text-align: left;
       font: inherit;
-      transition: background 0.15s ease, border-color 0.15s ease;
+      transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
     }
     .click-row:hover {
       background: var(--bg-hover, #262a35);
@@ -581,8 +659,13 @@ export class SystemSettingsView extends LitElement {
       transition: all 0.15s ease;
       font-family: inherit;
     }
-    .btn-primary:hover { opacity: 0.9; }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 
     /* ── action bar (matches channels pt-4 border-t) ── */
     .action-bar {
@@ -597,8 +680,12 @@ export class SystemSettingsView extends LitElement {
       font-size: 14px;
       margin-left: auto;
     }
-    .save-msg.ok { color: #4ade80; }
-    .save-msg.err { color: #f87171; }
+    .save-msg.ok {
+      color: #4ade80;
+    }
+    .save-msg.err {
+      color: #f87171;
+    }
 
     /* ── loading ── */
     .loading {
@@ -610,7 +697,11 @@ export class SystemSettingsView extends LitElement {
       font-size: 14px;
       gap: 8px;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
     .spinner {
       display: inline-block;
       width: 16px;
@@ -647,7 +738,7 @@ export class SystemSettingsView extends LitElement {
     .update-progress-bar {
       flex: 1;
       height: 6px;
-      background: var(--mg-border, rgba(255,255,255,0.08));
+      background: var(--mg-border, rgba(255, 255, 255, 0.08));
       border-radius: 3px;
       overflow: hidden;
     }
@@ -674,29 +765,42 @@ export class SystemSettingsView extends LitElement {
   /* ── SVG icons ── */
   private _settingsIcon = html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+      <path
+        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+      ></path>
       <circle cx="12" cy="12" r="3"></circle>
-    </svg>`;
+    </svg>
+  `;
   private _shieldIcon = html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-    </svg>`;
+    </svg>
+  `;
   private _userIcon = html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
       <circle cx="12" cy="7" r="4"></circle>
-    </svg>`;
+    </svg>
+  `;
   private _cpuIcon = html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="4" y="4" width="16" height="16" rx="2"></rect>
       <rect x="9" y="9" width="6" height="6"></rect>
-      <path d="M15 2v2"></path><path d="M15 20v2"></path>
-      <path d="M2 15h2"></path><path d="M2 9h2"></path>
-      <path d="M20 15h2"></path><path d="M20 9h2"></path>
-      <path d="M9 2v2"></path><path d="M9 20v2"></path>
-    </svg>`;
+      <path d="M15 2v2"></path>
+      <path d="M15 20v2"></path>
+      <path d="M2 15h2"></path>
+      <path d="M2 9h2"></path>
+      <path d="M20 15h2"></path>
+      <path d="M20 9h2"></path>
+      <path d="M9 2v2"></path>
+      <path d="M9 20v2"></path>
+    </svg>
+  `;
   private _chevronRight = html`
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>`;
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  `;
 
   /* ── render ── */
   override render() {
@@ -758,7 +862,9 @@ export class SystemSettingsView extends LitElement {
           </div>
         </div>
 
-        ${this.execSecurity === "allowlist" ? html`
+        ${
+          this.execSecurity === "allowlist"
+            ? html`
           <div class="section">
             <label class="section-label">
               命令审批
@@ -776,20 +882,37 @@ export class SystemSettingsView extends LitElement {
               </button>
             </div>
           </div>
-        ` : nothing}
+        `
+            : nothing
+        }
 
-        ${this.execSecurity === "allowlist" ? html`
+        ${
+          this.execSecurity === "allowlist"
+            ? html`
           <div class="section">
             <label class="section-label">
               命令白名单
               <span class="section-hint">&nbsp;— 已批准的可执行程序路径</span>
             </label>
             <div style="margin-top: 4px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px; max-height: 300px; overflow-y: auto;">
-              ${this.allowlistEntries.length === 0 ? html`
-                <div style="font-size: 12px; color: var(--muted, #71717a); text-align: center; padding: 12px 0; border: 1px dashed var(--border, #27272a); border-radius: 8px; opacity: 0.7;">
-                  暂无白名单条目，点击"始终允许"后自动添加
-                </div>
-              ` : html`
+              ${
+                this.allowlistEntries.length === 0
+                  ? html`
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--muted, #71717a);
+                          text-align: center;
+                          padding: 12px 0;
+                          border: 1px dashed var(--border, #27272a);
+                          border-radius: 8px;
+                          opacity: 0.7;
+                        "
+                      >
+                        暂无白名单条目，点击"始终允许"后自动添加
+                      </div>
+                    `
+                  : html`
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; max-width: 960px;">
                   ${this.allowlistEntries.map((entry, idx) => {
                     // Show the executable name as primary, full path as tooltip
@@ -818,18 +941,29 @@ export class SystemSettingsView extends LitElement {
                             font-size: 11px; line-height: 1; padding: 0;
                             flex-shrink: 0; transition: all 0.15s ease;
                           "
-                          @mouseover=${(e: Event) => { (e.target as HTMLElement).style.background = "rgba(239,68,68,0.15)"; (e.target as HTMLElement).style.color = "#ef4444"; (e.target as HTMLElement).style.borderColor = "#ef4444"; }}
-                          @mouseout=${(e: Event) => { (e.target as HTMLElement).style.background = "transparent"; (e.target as HTMLElement).style.color = "var(--muted, #71717a)"; (e.target as HTMLElement).style.borderColor = "var(--border, #27272a)"; }}
+                          @mouseover=${(e: Event) => {
+                            (e.target as HTMLElement).style.background = "rgba(239,68,68,0.15)";
+                            (e.target as HTMLElement).style.color = "#ef4444";
+                            (e.target as HTMLElement).style.borderColor = "#ef4444";
+                          }}
+                          @mouseout=${(e: Event) => {
+                            (e.target as HTMLElement).style.background = "transparent";
+                            (e.target as HTMLElement).style.color = "var(--muted, #71717a)";
+                            (e.target as HTMLElement).style.borderColor = "var(--border, #27272a)";
+                          }}
                           title="移除此白名单条目"
                         >✕</button>
                       </div>
                     `;
                   })}
                 </div>
-              `}
+              `
+              }
             </div>
           </div>
-        ` : nothing}
+        `
+            : nothing
+        }
 
         <div class="section">
           <label class="section-label">
@@ -872,19 +1006,35 @@ export class SystemSettingsView extends LitElement {
             </label>
           </div>
 
-          ${this.fsWorkspaceOnly ? html`
+          ${
+            this.fsWorkspaceOnly
+              ? html`
             <div style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div style="font-size: 12px; color: var(--muted, #71717a); font-weight: 500;">允许访问的额外目录</div>
                 <button class="opt" style="padding: 4px 10px; font-size: 11px; white-space: nowrap; border-radius: 12px;" @click=${this._handleAddAllowedDir}>+ 添加目录</button>
               </div>
-              ${this.fsAllowedDirs.length === 0 ? html`
-                <div style="font-size: 12px; color: var(--muted, #71717a); text-align: center; padding: 12px 0; border: 1px dashed var(--border, #27272a); border-radius: 8px; opacity: 0.7;">
-                  AI 当前仅能访问工作区目录
-                </div>
-              ` : html`
+              ${
+                this.fsAllowedDirs.length === 0
+                  ? html`
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--muted, #71717a);
+                          text-align: center;
+                          padding: 12px 0;
+                          border: 1px dashed var(--border, #27272a);
+                          border-radius: 8px;
+                          opacity: 0.7;
+                        "
+                      >
+                        AI 当前仅能访问工作区目录
+                      </div>
+                    `
+                  : html`
                 <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                  ${this.fsAllowedDirs.map((dir, idx) => html`
+                  ${this.fsAllowedDirs.map(
+                    (dir, idx) => html`
                     <span style="
                       display: inline-flex; align-items: center; gap: 5px;
                       padding: 5px 8px 5px 10px;
@@ -907,11 +1057,15 @@ export class SystemSettingsView extends LitElement {
                         title="移除目录"
                       >✕</button>
                     </span>
-                  `)}
+                  `,
+                  )}
                 </div>
-              `}
+              `
+              }
             </div>
-          ` : nothing}
+          `
+              : nothing
+          }
         </div>
 
       </div>`;
@@ -956,12 +1110,26 @@ export class SystemSettingsView extends LitElement {
 
         <div class="action-bar">
           <button class="btn-primary" ?disabled=${this.saving} @click=${this._handleSaveIdentity}>
-            ${this.saving ? html`<span class="spinner spinner-sm"></span>` : nothing}
+            ${
+              this.saving
+                ? html`
+                    <span class="spinner spinner-sm"></span>
+                  `
+                : nothing
+            }
             保存配置
           </button>
-          ${this.saveStatus === "success" ? html`<span class="save-msg ok">✓ 已保存</span>`
-            : this.saveStatus === "error" ? html`<span class="save-msg err">保存失败</span>`
-            : nothing}
+          ${
+            this.saveStatus === "success"
+              ? html`
+                  <span class="save-msg ok">✓ 已保存</span>
+                `
+              : this.saveStatus === "error"
+                ? html`
+                    <span class="save-msg err">保存失败</span>
+                  `
+                : nothing
+          }
         </div>
       </div>`;
   }
@@ -1012,7 +1180,9 @@ export class SystemSettingsView extends LitElement {
       try {
         const t = (window as any).__TAURI__;
         await t?.core?.invoke("plugin:updater|close", { rid: this._updateRid });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     this._updateRid = null;
     this.updateChecking = true;
@@ -1074,14 +1244,18 @@ export class SystemSettingsView extends LitElement {
           </div>
         </div>
 
-        ${this.updateInstalled ? html`
+        ${
+          this.updateInstalled
+            ? html`
           <div class="update-row">
             <div class="update-info">
               <div class="toggle-text-primary">✅ 更新已下载完成，重启后生效</div>
             </div>
             <button class="btn-primary" @click=${this._handleRestart}>重启应用</button>
           </div>
-        ` : this.updateDownloading ? html`
+        `
+            : this.updateDownloading
+              ? html`
           <div class="update-row">
             <div class="update-info">
               <div class="toggle-text-primary">正在下载 v${this.updateVersion}...</div>
@@ -1093,7 +1267,9 @@ export class SystemSettingsView extends LitElement {
               </div>
             </div>
           </div>
-        ` : this.updateAvailable ? html`
+        `
+              : this.updateAvailable
+                ? html`
           <div class="update-row">
             <div class="update-info">
               <div class="toggle-text-primary">🎉 发现新版本 v${this.updateVersion}</div>
@@ -1102,24 +1278,52 @@ export class SystemSettingsView extends LitElement {
             </div>
             <button class="btn-primary" @click=${this._handleDownloadUpdate}>下载并安装</button>
           </div>
-        ` : html`
+        `
+                : html`
           <div class="update-row">
             <div class="update-info">
-              ${this.updateDone
-                ? html`<div class="toggle-text-primary">✅ 当前已是最新版本</div>`
-                : html`<div class="toggle-text-primary">点击按钮检查是否有新版本可用</div>`
+              ${
+                this.updateDone
+                  ? html`
+                      <div class="toggle-text-primary">✅ 当前已是最新版本</div>
+                    `
+                  : html`
+                      <div class="toggle-text-primary">点击按钮检查是否有新版本可用</div>
+                    `
               }
               ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
             </div>
             <button class="btn-primary" ?disabled=${this.updateChecking} @click=${this._handleCheckUpdate}>
-              ${this.updateChecking ? html`<span class="spinner spinner-sm"></span> 检查中…` : "检查更新"}
+              ${
+                this.updateChecking
+                  ? html`
+                      <span class="spinner spinner-sm"></span> 检查中…
+                    `
+                  : "检查更新"
+              }
             </button>
           </div>
-        `}
+        `
+        }
       </div>`;
   }
 
   private get _updateIcon() {
-    return html`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+    return html`
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    `;
   }
 }

@@ -131,12 +131,6 @@ const AUTH_CHOICE_GROUP_DEFS: {
     choices: ["together-api-key"],
   },
   {
-    value: "huggingface",
-    label: "Hugging Face",
-    hint: "Inference API (HF token)",
-    choices: ["huggingface-api-key"],
-  },
-  {
     value: "venice",
     label: "Venice AI",
     hint: "Privacy-focused (uncensored models)",
@@ -222,11 +216,7 @@ const BASE_AUTH_CHOICE_OPTIONS: ReadonlyArray<AuthChoiceOption> = [
     label: "Together AI API key",
     hint: "Access to Llama, DeepSeek, Qwen, and more open models",
   },
-  {
-    value: "huggingface-api-key",
-    label: "Hugging Face API key (HF token)",
-    hint: "Inference Providers — OpenAI-compatible chat",
-  },
+
   {
     value: "github-copilot",
     label: "GitHub Copilot (GitHub device login)",

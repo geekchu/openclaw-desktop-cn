@@ -1,5 +1,4 @@
 import { LitElement, html } from "lit";
-import { initAutoUpdater } from "./views/updater.ts";
 import { customElement, state } from "lit/decorators.js";
 import type { EventLogEntry } from "./app-events.ts";
 import type { AppViewState } from "./app-view-state.ts";
@@ -57,7 +56,6 @@ import {
   handleUpdated,
 } from "./app-lifecycle.ts";
 import { renderApp } from "./app-render.ts";
-import "./views/config-channels.ts";
 import {
   exportLogs as exportLogsInternal,
   handleChatScroll as handleChatScrollInternal,
@@ -65,6 +63,7 @@ import {
   resetChatScroll as resetChatScrollInternal,
   scheduleChatScroll as scheduleChatScrollInternal,
 } from "./app-scroll.ts";
+import "./views/config-channels.ts";
 import {
   applySettings as applySettingsInternal,
   loadCron as loadCronInternal,
@@ -82,6 +81,7 @@ import { resolveInjectedAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
+import { initAutoUpdater } from "./views/updater.ts";
 
 declare global {
   interface Window {

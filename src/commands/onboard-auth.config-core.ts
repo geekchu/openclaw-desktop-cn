@@ -1,11 +1,6 @@
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelApi } from "../config/types.models.js";
 import {
-  buildHuggingfaceModelDefinition,
-  HUGGINGFACE_BASE_URL,
-  HUGGINGFACE_MODEL_CATALOG,
-} from "../agents/huggingface-models.js";
-import {
   buildQianfanProvider,
   buildXiaomiProvider,
   QIANFAN_DEFAULT_MODEL_ID,
@@ -29,7 +24,6 @@ import {
   VENICE_MODEL_CATALOG,
 } from "../agents/venice-models.js";
 import {
-  HUGGINGFACE_DEFAULT_MODEL_REF,
   OPENROUTER_DEFAULT_MODEL_REF,
   TOGETHER_DEFAULT_MODEL_REF,
   XIAOMI_DEFAULT_MODEL_REF,
@@ -462,51 +456,6 @@ export function applyTogetherConfig(cfg: OpenClawConfig): OpenClawConfig {
               }
             : undefined),
           primary: TOGETHER_DEFAULT_MODEL_REF,
-        },
-      },
-    },
-  };
-}
-
-/**
- * Apply Hugging Face (Inference Providers) provider configuration without changing the default model.
- */
-export function applyHuggingfaceProviderConfig(cfg: OpenClawConfig): OpenClawConfig {
-  const models = { ...cfg.agents?.defaults?.models };
-  models[HUGGINGFACE_DEFAULT_MODEL_REF] = {
-    ...models[HUGGINGFACE_DEFAULT_MODEL_REF],
-    alias: models[HUGGINGFACE_DEFAULT_MODEL_REF]?.alias ?? "Hugging Face",
-  };
-
-  const hfModels = HUGGINGFACE_MODEL_CATALOG.map(buildHuggingfaceModelDefinition);
-  return applyProviderConfigWithModelCatalog(cfg, {
-    agentModels: models,
-    providerId: "huggingface",
-    api: "openai-completions",
-    baseUrl: HUGGINGFACE_BASE_URL,
-    catalogModels: hfModels,
-  });
-}
-
-/**
- * Apply Hugging Face provider configuration AND set Hugging Face as the default model.
- */
-export function applyHuggingfaceConfig(cfg: OpenClawConfig): OpenClawConfig {
-  const next = applyHuggingfaceProviderConfig(cfg);
-  const existingModel = next.agents?.defaults?.model;
-  return {
-    ...next,
-    agents: {
-      ...next.agents,
-      defaults: {
-        ...next.agents?.defaults,
-        model: {
-          ...(existingModel && "fallbacks" in (existingModel as Record<string, unknown>)
-            ? {
-                fallbacks: (existingModel as { fallbacks?: string[] }).fallbacks,
-              }
-            : undefined),
-          primary: HUGGINGFACE_DEFAULT_MODEL_REF,
         },
       },
     },

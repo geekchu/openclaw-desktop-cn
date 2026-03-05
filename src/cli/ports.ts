@@ -30,11 +30,48 @@ export function parseLsofOutput(output: string): PortProcess[] {
   return results;
 }
 
+export function listPortListenersWindows(port: number): PortProcess[] {
+  try {
+    const out = execFileSync("netstat", ["-ano", "-p", "TCP"], {
+      encoding: "utf-8",
+      windowsHide: true,
+    });
+    const lines = out.split(/\r?\n/).filter(Boolean);
+    const results: PortProcess[] = [];
+    const portStr = `:${port}`;
+
+    for (const line of lines) {
+      const parts = line.trim().split(/\s+/);
+      // netstat -ano output format: Proto Local Address Foreign Address State PID
+      // TCP    0.0.0.0:18789      0.0.0.0:0              LISTENING       12345
+      if (
+        parts.length >= 5 &&
+        parts[0] === "TCP" &&
+        parts[1].endsWith(portStr) &&
+        parts[3] === "LISTENING"
+      ) {
+        const pid = Number.parseInt(parts[4], 10);
+        if (!Number.isNaN(pid) && pid > 0 && !results.some((p) => p.pid === pid)) {
+          results.push({ pid });
+        }
+      }
+    }
+    return results;
+  } catch (_err) {
+    return [];
+  }
+}
+
 export function listPortListeners(port: number): PortProcess[] {
+  if (process.platform === "win32") {
+    return listPortListenersWindows(port);
+  }
+
   try {
     const lsof = resolveLsofCommandSync();
     const out = execFileSync(lsof, ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-FpFc"], {
       encoding: "utf-8",
+      windowsHide: true,
     });
     return parseLsofOutput(out);
   } catch (err: unknown) {

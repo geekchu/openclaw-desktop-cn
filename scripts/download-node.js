@@ -163,7 +163,6 @@ async function downloadAndExtractPlatform(platformKey) {
     execSync(`tar -xzf "${archivePath}" -C "${tempDir}"`, { stdio: "inherit" });
   }
 
-
   // 解压后有一层目录（如 node-v24.13.0-win-x64/），需要提取内层
   const innerDirName = findFirstSubdir(tempDir);
   const innerDir = join(tempDir, innerDirName);

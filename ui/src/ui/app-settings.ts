@@ -51,7 +51,8 @@ if (typeof window !== "undefined") {
   if (!_isDesktopWebView) {
     const ua = navigator.userAgent;
     const isEdgeWebView = ua.includes("Edg/") && !ua.includes("Electron");
-    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const isLocalhost =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
     if (isEdgeWebView && isLocalhost) {
       _isDesktopWebView = true;
     }

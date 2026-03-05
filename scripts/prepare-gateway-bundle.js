@@ -33,7 +33,7 @@ const bundleDir = join(projectRoot, "src-tauri", "gateway-bundle");
 
 function run(cmd, opts = {}) {
   console.log(`[bundle] $ ${cmd}`);
-  execSync(cmd, { stdio: "inherit", cwd: projectRoot, ...opts });
+  execSync(cmd, { stdio: "inherit", cwd: projectRoot, windowsHide: true, ...opts });
 }
 
 function copyIfExists(src, dest) {
@@ -50,6 +50,7 @@ function copyIfExists(src, dest) {
           `robocopy "${src}" "${dest}" /E /NFL /NDL /NJH /NJS /NP /XD node_modules .git .github __tests__ test .nyc_output /XF .gitignore .gitattributes .npmignore`,
           {
             stdio: "inherit",
+            windowsHide: true,
           },
         );
       } catch (err) {
@@ -123,6 +124,44 @@ copyIfExists(join(projectRoot, "skills"), join(bundleDir, "skills"));
 // 复制 extensions/ 目录
 copyIfExists(join(projectRoot, "extensions"), join(bundleDir, "extensions"));
 
+// [FIX] 很多 extension 源码（特别是未编译直接由 jiti 运行的 .ts 文件，如 twitch, llm-task）
+// 会直接引用 ../../../src/...，但在生产 target bundle 中 src/ 被剔除，导致 Cannot find module 崩溃。
+// 我们在打包阶段将这些引用原地替换为 ../../../dist/... 来劫持到已编译的安全产物。
+{
+  function rewriteSrcToDist(dir) {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        rewriteSrcToDist(fullPath);
+      } else if (entry.name.endsWith(".ts") || entry.name.endsWith(".js")) {
+        const content = readFileSync(fullPath, "utf-8");
+        let replaced = content;
+
+        // 特殊处理 twitch 扩展：它引用了未公开的 session-key.js
+        replaced = replaced.replace(
+          /(['"])\.\.\/\.\.\/\.\.\/src\/routing\/session-key\.js(['"])/g,
+          "$1openclaw/plugin-sdk/account-id$2",
+        );
+
+        // 特殊处理 llm-task/lobster 扩展：它们动态引入 pi-embedded-runner
+        replaced = replaced.replace(
+          /(['"])\.\.\/\.\.\/\.\.\/src\/agents\/pi-embedded-runner\.js(['"])/g,
+          "$1openclaw/dist/extensionAPI.js$2",
+        );
+
+        // TypeScript 会擦除只包含 type 的 import，但以防万一直接映射到 dist/
+        replaced = replaced.replace(/(['"])\.\.\/\.\.\/\.\.\/src\//g, "$1../../../dist/");
+
+        if (content !== replaced) {
+          writeFileSync(fullPath, replaced, "utf-8");
+        }
+      }
+    }
+  }
+  rewriteSrcToDist(join(bundleDir, "extensions"));
+}
+
 // 复制 docs/reference/templates/ 目录（workspace 模板，如 AGENTS.md）
 copyIfExists(
   join(projectRoot, "docs", "reference", "templates"),
@@ -183,7 +222,7 @@ console.log(
 
 // Step 5: 安装依赖（一次性安装根 + 所有 extension 的依赖）
 console.log("\n[bundle] === Step 5: 安装生产依赖（含 extension 依赖）===");
-run("npm install --omit=dev --install-strategy=hoisted --ignore-scripts", { cwd: bundleDir });
+run("npm install --omit=dev --install-strategy=hoisted", { cwd: bundleDir });
 
 // Step 6.6: 删除桌面版不需要的重量级包
 console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ===");
@@ -198,8 +237,7 @@ console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ==
     "bun-types", // Bun 运行时类型 (~3.2MB)
     "@types", // TypeScript 类型声明 (~2.8MB)
     "@anthropic-ai/bedrock-sdk", // AWS Bedrock SDK（桌面版直接用 API）
-    "@opentelemetry", // 遥测（桌面版不需要，~15MB）
-    "@mariozechner", // 开发工具（~14MB）
+    // 注意：@mariozechner 不能删除，包含 pi-ai 等核心运行时依赖
     // 注意：以下包不能删除，运行时会 import
     // - discord-api-types: Discord 渠道运行时依赖（dist/send-*.js import）
     // - web-streams-polyfill: openai 等 SDK 依赖

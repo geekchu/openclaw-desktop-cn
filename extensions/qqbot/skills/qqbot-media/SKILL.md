@@ -1,7 +1,7 @@
 ---
 name: qqbot-media
 description: QQ Bot 媒体发送指南。教 AI 如何发送图片给用户。【重要】当用户要求发送图片时必须使用 <qqimg> 标签。
-metadata: {"clawdbot":{"emoji":"📸"}}
+metadata: { "clawdbot": { "emoji": "📸" } }
 triggers:
   - qqbot
   - qq
@@ -84,11 +84,11 @@ priority: 90
 
 ### 📝 标签说明
 
-| 格式 | 说明 |
-|------|------|
+| 格式                      | 说明                     |
+| ------------------------- | ------------------------ |
 | `<qqimg>本地路径</qqimg>` | 发送本地图片（绝对路径） |
-| `<qqimg>网络URL</qqimg>` | 发送网络图片 |
-| `<qqimg>路径</img>` | 也支持此闭合方式 |
+| `<qqimg>网络URL</qqimg>`  | 发送网络图片             |
+| `<qqimg>路径</img>`       | 也支持此闭合方式         |
 
 ### ⚠️ 注意事项
 
@@ -144,13 +144,13 @@ QQBOT_PAYLOAD:
 
 ### JSON 字段说明
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `type` | string | ✅ | 固定为 `"media"` |
-| `mediaType` | string | ✅ | 媒体类型：`"image"` |
-| `source` | string | ✅ | 来源：`"file"`（本地）或 `"url"`（网络） |
-| `path` | string | ✅ | 图片路径或 URL |
-| `caption` | string | ❌ | 图片描述，会作为单独消息发送 |
+| 字段        | 类型   | 必填 | 说明                                     |
+| ----------- | ------ | ---- | ---------------------------------------- |
+| `type`      | string | ✅   | 固定为 `"media"`                         |
+| `mediaType` | string | ✅   | 媒体类型：`"image"`                      |
+| `source`    | string | ✅   | 来源：`"file"`（本地）或 `"url"`（网络） |
+| `path`      | string | ✅   | 图片路径或 URL                           |
+| `caption`   | string | ❌   | 图片描述，会作为单独消息发送             |
 
 > 💡 **提示**：对于简单的图片发送，推荐使用 `<qqimg>` 标签，更简洁易用。
 
@@ -158,9 +158,9 @@ QQBOT_PAYLOAD:
 
 ## 🎯 快速参考
 
-| 场景 | 使用方式 |
-|------|----------|
-| 发送本地图片 | `<qqimg>/path/to/image.jpg</qqimg>` |
-| 发送网络图片 | `<qqimg>https://example.com/image.png</qqimg>` |
-| 发送多张图片 | 多个 `<qqimg>` 标签 |
-| 告知路径（不发送） | 直接写路径文本 |
+| 场景               | 使用方式                                       |
+| ------------------ | ---------------------------------------------- |
+| 发送本地图片       | `<qqimg>/path/to/image.jpg</qqimg>`            |
+| 发送网络图片       | `<qqimg>https://example.com/image.png</qqimg>` |
+| 发送多张图片       | 多个 `<qqimg>` 标签                            |
+| 告知路径（不发送） | 直接写路径文本                                 |

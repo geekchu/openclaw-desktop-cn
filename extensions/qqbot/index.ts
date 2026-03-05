@@ -1,6 +1,5 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
-
 import { qqbotPlugin } from "./src/channel.js";
 import { setQQBotRuntime } from "./src/runtime.js";
 

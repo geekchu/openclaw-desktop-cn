@@ -312,11 +312,7 @@ function renderTextInput(params: {
   const placeholder =
     hint?.placeholder ??
     // oxlint-disable typescript/no-base-to-string
-    (isSensitive
-      ? "••••"
-      : schema.default !== undefined
-        ? `默认: ${String(schema.default)}`
-        : "");
+    (isSensitive ? "••••" : schema.default !== undefined ? `默认: ${String(schema.default)}` : "");
   const displayValue = value ?? "";
 
   return html`

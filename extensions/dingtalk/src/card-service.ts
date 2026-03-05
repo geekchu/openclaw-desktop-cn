@@ -1,9 +1,5 @@
-import { randomUUID } from "node:crypto";
 import axios from "axios";
-import { getAccessToken } from "./auth";
-import { stripTargetPrefix } from "./config";
-import { resolveOriginalPeerId } from "./peer-id-registry";
-import { formatDingTalkErrorPayloadLog } from "./utils";
+import { randomUUID } from "node:crypto";
 import type {
   AICardInstance,
   AICardStreamingRequest,
@@ -11,7 +7,11 @@ import type {
   DingTalkInboundMessage,
   Logger,
 } from "./types";
+import { getAccessToken } from "./auth";
+import { stripTargetPrefix } from "./config";
+import { resolveOriginalPeerId } from "./peer-id-registry";
 import { AICardStatus } from "./types";
+import { formatDingTalkErrorPayloadLog } from "./utils";
 
 const DINGTALK_API = "https://api.dingtalk.com";
 // Card cache TTL (1 hour) for terminal states.
@@ -341,9 +341,7 @@ export async function streamAICard(
 
     card.state = AICardStatus.FAILED;
     card.lastUpdated = Date.now();
-    log?.error?.(
-      `[DingTalk][AICard] Streaming update failed: ${err.message}`,
-    );
+    log?.error?.(`[DingTalk][AICard] Streaming update failed: ${err.message}`);
     if (err.response?.data !== undefined) {
       log?.error?.(
         formatDingTalkErrorPayloadLog("card.stream", err.response.data, "[DingTalk][AICard]"),

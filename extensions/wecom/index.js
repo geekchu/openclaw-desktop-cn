@@ -91,7 +91,11 @@ function getWecomAdminUsers(config) {
     return [];
   }
   return raw
-    .map((u) => String(u ?? "").trim().toLowerCase())
+    .map((u) =>
+      String(u ?? "")
+        .trim()
+        .toLowerCase(),
+    )
     .filter(Boolean);
 }
 
@@ -139,7 +143,11 @@ async function downloadAndDecryptImage(imageUrl, encodingAesKey, token) {
   writeFileSync(localPath, decryptedBuffer);
 
   const mimeType = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
-  logger.info("Image decrypted and saved", { path: localPath, size: decryptedBuffer.length, mimeType });
+  logger.info("Image decrypted and saved", {
+    path: localPath,
+    size: decryptedBuffer.length,
+    mimeType,
+  });
   return { localPath, mimeType };
 }
 
@@ -170,7 +178,9 @@ async function downloadWecomFile(fileUrl, fileName, encodingAesKey, token) {
     const contentDisposition = response.headers.get("content-disposition");
     if (contentDisposition) {
       // Match: filename="xxx.pdf" or filename*=UTF-8''xxx.pdf
-      const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\n]+)["']?/i);
+      const filenameMatch = contentDisposition.match(
+        /filename\*?=(?:UTF-8'')?["']?([^"';\n]+)["']?/i,
+      );
       if (filenameMatch && filenameMatch[1]) {
         effectiveFileName = decodeURIComponent(filenameMatch[1]);
         logger.info("Extracted filename from Content-Disposition", { name: effectiveFileName });
@@ -732,7 +742,11 @@ const wecomChannelPlugin = {
       const streamId = ctx?.streamId ?? resolveActiveStream(userId);
 
       // Layer 1: Active stream (normal path)
-      if (streamId && streamManager.hasStream(streamId) && !streamManager.getStream(streamId)?.finished) {
+      if (
+        streamId &&
+        streamManager.hasStream(streamId) &&
+        !streamManager.getStream(streamId)?.finished
+      ) {
         logger.debug("Appending outbound text to stream", {
           userId,
           streamId,
@@ -756,9 +770,9 @@ const wecomChannelPlugin = {
         saved.used = true;
         try {
           await fetch(saved.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ msgtype: 'text', text: { content: text } }),
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ msgtype: "text", text: { content: text } }),
           });
           logger.info("WeCom: sent via response_url fallback", { userId });
           return {
@@ -771,7 +785,10 @@ const wecomChannelPlugin = {
       }
 
       // Layer 3: Log warning (extreme boundary case)
-      logger.warn("WeCom outbound: no delivery channel available (stream closed + response_url unavailable)", { userId });
+      logger.warn(
+        "WeCom outbound: no delivery channel available (stream closed + response_url unavailable)",
+        { userId },
+      );
 
       return {
         channel: "wecom",
@@ -982,7 +999,13 @@ async function wecomHttpHandler(req, res) {
 
       // Passive reply: return stream id immediately in the sync response.
       // Include the placeholder so the client displays it right away.
-      const streamResponse = webhook.buildStreamResponse(streamId, THINKING_PLACEHOLDER, false, timestamp, nonce);
+      const streamResponse = webhook.buildStreamResponse(
+        streamId,
+        THINKING_PLACEHOLDER,
+        false,
+        timestamp,
+        nonce,
+      );
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(streamResponse);
@@ -1191,7 +1214,10 @@ function flushMessageBuffer(streamKey, target) {
 
   // Merge content from all buffered messages.
   if (messages.length > 1) {
-    const mergedContent = messages.map((m) => m.content || "").filter(Boolean).join("\n");
+    const mergedContent = messages
+      .map((m) => m.content || "")
+      .filter(Boolean)
+      .join("\n");
     primaryMsg.content = mergedContent;
 
     // Merge image attachments.
@@ -1211,7 +1237,9 @@ function flushMessageBuffer(streamKey, target) {
     for (let i = 1; i < streamIds.length; i++) {
       const extraStreamId = streamIds[i];
       streamManager.replaceIfPlaceholder(
-        extraStreamId, "消息已合并到第一条回复中。", THINKING_PLACEHOLDER,
+        extraStreamId,
+        "消息已合并到第一条回复中。",
+        THINKING_PLACEHOLDER,
       );
       streamManager.finishStream(extraStreamId).then(() => {
         unregisterActiveStream(streamKey, extraStreamId);
@@ -1292,9 +1320,7 @@ async function processInboundMessage({
     if (!shouldTriggerGroupResponse(rawContent, config)) {
       logger.debug("WeCom: group message ignored (no mention)", { chatId, senderId });
       if (streamId) {
-        streamManager.replaceIfPlaceholder(
-          streamId, "请@提及我以获取回复。", THINKING_PLACEHOLDER,
-        );
+        streamManager.replaceIfPlaceholder(streamId, "请@提及我以获取回复。", THINKING_PLACEHOLDER);
         await streamManager.finishStream(streamId);
         unregisterActiveStream(streamKey, streamId);
       }
@@ -1456,7 +1482,10 @@ async function processInboundMessage({
         mediaPaths.push(result.localPath);
         mediaTypes.push(result.mimeType);
       } catch (e) {
-        logger.warn("Image decryption failed, using URL fallback", { error: e.message, url: url.substring(0, 80) });
+        logger.warn("Image decryption failed, using URL fallback", {
+          error: e.message,
+          url: url.substring(0, 80),
+        });
         fallbackUrls.push(url);
         mediaTypes.push("image/jpeg");
       }
@@ -1478,9 +1507,7 @@ async function processInboundMessage({
     // For image-only messages (no text), set a placeholder body.
     if (!rawBody.trim()) {
       const count = allImageUrls.length;
-      ctxBase.Body = count > 1
-        ? `[用户发送了${count}张图片]`
-        : "[用户发送了一张图片]";
+      ctxBase.Body = count > 1 ? `[用户发送了${count}张图片]` : "[用户发送了一张图片]";
       ctxBase.RawBody = "[图片]";
       ctxBase.CommandBody = "";
     }
@@ -1489,7 +1516,12 @@ async function processInboundMessage({
   // Handle file attachment.
   if (fileUrl) {
     try {
-      const { localPath: localFilePath, effectiveFileName } = await downloadWecomFile(fileUrl, fileName, account.encodingAesKey, account.token);
+      const { localPath: localFilePath, effectiveFileName } = await downloadWecomFile(
+        fileUrl,
+        fileName,
+        account.encodingAesKey,
+        account.token,
+      );
       ctxBase.MediaPaths = [...(ctxBase.MediaPaths || []), localFilePath];
       ctxBase.MediaTypes = [...(ctxBase.MediaTypes || []), guessMimeType(effectiveFileName)];
       logger.info("File attachment prepared", { path: localFilePath, name: effectiveFileName });
@@ -1527,79 +1559,86 @@ async function processInboundMessage({
   // Serialize dispatches per user/group. Each message gets its own full dispatch
   // cycle with proper deliver callbacks.
   const prevLock = dispatchLocks.get(streamKey) ?? Promise.resolve();
-  const currentDispatch = prevLock.then(async () => {
-    // Dispatch reply with AI processing.
-    // Wrap in streamContext so outbound adapters resolve the correct stream.
-    await streamContext.run({ streamId, streamKey }, async () => {
-      await core.reply.dispatchReplyWithBufferedBlockDispatcher({
-        ctx: ctxPayload,
-        cfg: config,
-        dispatcherOptions: {
-          deliver: async (payload, info) => {
-            logger.info("Dispatcher deliver called", {
-              kind: info.kind,
-              hasText: !!(payload.text && payload.text.trim()),
-              textPreview: (payload.text || "").substring(0, 50),
-            });
-
-            await deliverWecomReply({
-              payload,
-              senderId: streamKey,
-              streamId,
-            });
-
-            // Mark stream meta when main response is done.
-            // Actual stream finish is deferred to stream refresh handler,
-            // which is driven by WeCom client polling.
-            if (streamId && info.kind === "final") {
-              streamMeta.set(streamId, {
-                mainResponseDone: true,
-                doneAt: Date.now(),
+  const currentDispatch = prevLock
+    .then(async () => {
+      // Dispatch reply with AI processing.
+      // Wrap in streamContext so outbound adapters resolve the correct stream.
+      await streamContext.run({ streamId, streamKey }, async () => {
+        await core.reply.dispatchReplyWithBufferedBlockDispatcher({
+          ctx: ctxPayload,
+          cfg: config,
+          dispatcherOptions: {
+            deliver: async (payload, info) => {
+              logger.info("Dispatcher deliver called", {
+                kind: info.kind,
+                hasText: !!(payload.text && payload.text.trim()),
+                textPreview: (payload.text || "").substring(0, 50),
               });
-              logger.info("WeCom main response complete, keeping stream open for late messages", { streamId });
-            }
-          },
-          onError: async (err, info) => {
-            logger.error("WeCom reply failed", { error: err.message, kind: info.kind });
-            await handleStreamError(streamId, streamKey, "处理消息时出错，请稍后再试。");
-          },
-        },
-      });
-    });
 
-    // Safety net: ensure stream finishes after dispatch.
-    // Note: Stream closing is now handled by stream refresh handler via WeCom polling.
-    // This safety net only cleans up if refresh handler never fires (edge case).
-    if (streamId) {
-      const stream = streamManager.getStream(streamId);
-      if (!stream || stream.finished) {
-        unregisterActiveStream(streamKey, streamId);
-      } else {
-        // Stream is still open; refresh handler will close it when idle.
-        // Add a safety timeout to prevent leaks if refresh never fires.
-        setTimeout(async () => {
-          const checkStream = streamManager.getStream(streamId);
-          if (checkStream && !checkStream.finished) {
-            const meta = streamMeta.get(streamId);
-            const idleMs = Date.now() - checkStream.updatedAt;
-            // Close if idle for > 30s (extreme fallback, refresh should handle this)
-            if (idleMs > 30000) {
-              logger.warn("WeCom safety net: closing idle stream", { streamId, idleMs });
-              try {
-                await streamManager.finishStream(streamId);
-                unregisterActiveStream(streamKey, streamId);
-              } catch (err) {
-                logger.error("WeCom safety net: failed to close stream", { streamId, error: err.message });
+              await deliverWecomReply({
+                payload,
+                senderId: streamKey,
+                streamId,
+              });
+
+              // Mark stream meta when main response is done.
+              // Actual stream finish is deferred to stream refresh handler,
+              // which is driven by WeCom client polling.
+              if (streamId && info.kind === "final") {
+                streamMeta.set(streamId, {
+                  mainResponseDone: true,
+                  doneAt: Date.now(),
+                });
+                logger.info("WeCom main response complete, keeping stream open for late messages", {
+                  streamId,
+                });
+              }
+            },
+            onError: async (err, info) => {
+              logger.error("WeCom reply failed", { error: err.message, kind: info.kind });
+              await handleStreamError(streamId, streamKey, "处理消息时出错，请稍后再试。");
+            },
+          },
+        });
+      });
+
+      // Safety net: ensure stream finishes after dispatch.
+      // Note: Stream closing is now handled by stream refresh handler via WeCom polling.
+      // This safety net only cleans up if refresh handler never fires (edge case).
+      if (streamId) {
+        const stream = streamManager.getStream(streamId);
+        if (!stream || stream.finished) {
+          unregisterActiveStream(streamKey, streamId);
+        } else {
+          // Stream is still open; refresh handler will close it when idle.
+          // Add a safety timeout to prevent leaks if refresh never fires.
+          setTimeout(async () => {
+            const checkStream = streamManager.getStream(streamId);
+            if (checkStream && !checkStream.finished) {
+              const meta = streamMeta.get(streamId);
+              const idleMs = Date.now() - checkStream.updatedAt;
+              // Close if idle for > 30s (extreme fallback, refresh should handle this)
+              if (idleMs > 30000) {
+                logger.warn("WeCom safety net: closing idle stream", { streamId, idleMs });
+                try {
+                  await streamManager.finishStream(streamId);
+                  unregisterActiveStream(streamKey, streamId);
+                } catch (err) {
+                  logger.error("WeCom safety net: failed to close stream", {
+                    streamId,
+                    error: err.message,
+                  });
+                }
               }
             }
-          }
-        }, 35000); // 35s total timeout
+          }, 35000); // 35s total timeout
+        }
       }
-    }
-  }).catch(async (err) => {
-    logger.error("WeCom dispatch chain error", { streamId, streamKey, error: err.message });
-    await handleStreamError(streamId, streamKey, "处理消息时出错，请稍后再试。");
-  });
+    })
+    .catch(async (err) => {
+      logger.error("WeCom dispatch chain error", { streamId, streamKey, error: err.message });
+      await handleStreamError(streamId, streamKey, "处理消息时出错，请稍后再试。");
+    });
 
   dispatchLocks.set(streamKey, currentDispatch);
   await currentDispatch;
@@ -1711,7 +1750,10 @@ async function deliverWecomReply({ payload, senderId, streamId }) {
   }
 
   if (!streamManager.hasStream(streamId)) {
-    logger.warn("WeCom: stream not found, attempting response_url fallback", { streamId, senderId });
+    logger.warn("WeCom: stream not found, attempting response_url fallback", {
+      streamId,
+      senderId,
+    });
 
     // Layer 2: Fallback via response_url (stream closed, but response_url may still be valid)
     const saved = responseUrls.get(senderId);
@@ -1719,9 +1761,9 @@ async function deliverWecomReply({ payload, senderId, streamId }) {
       saved.used = true;
       try {
         await fetch(saved.url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ msgtype: 'text', text: { content: processedText } }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ msgtype: "text", text: { content: processedText } }),
         });
         logger.info("WeCom: sent via response_url fallback (deliverWecomReply)", {
           senderId,

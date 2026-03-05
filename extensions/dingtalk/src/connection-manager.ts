@@ -279,10 +279,7 @@ export class ConnectionManager {
 
       this.consecutiveUnhealthyChecks += 1;
       this.runtimeCounters.healthUnhealthyChecks += 1;
-      if (
-        this.consecutiveUnhealthyChecks <
-        ConnectionManager.HEALTH_CHECK_UNHEALTHY_THRESHOLD
-      ) {
+      if (this.consecutiveUnhealthyChecks < ConnectionManager.HEALTH_CHECK_UNHEALTHY_THRESHOLD) {
         this.log?.debug?.(
           `[${this.accountId}] Connection health check unhealthy (${this.consecutiveUnhealthyChecks}/${ConnectionManager.HEALTH_CHECK_UNHEALTHY_THRESHOLD}) connected=${String(client.connected)} socketReadyState=${socketReadyState ?? "unknown"}`,
         );

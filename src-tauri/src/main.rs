@@ -308,6 +308,7 @@ fn main() {
 
                 // 发送状态：正在启动
                 let _ = handle.emit("gateway-status", "正在启动 Gateway...");
+                let mut startup_navigated = false;
 
                 match gm.start() {
                     Ok(_) => {
@@ -324,6 +325,7 @@ fn main() {
                             if let Some(window) = handle.get_webview_window("main") {
                                 let _ = window.navigate(url.parse().unwrap());
                             }
+                            startup_navigated = true;
                         } else {
                             let _ = handle.emit("gateway-status", "Gateway 启动超时");
                             gateway::send_startup_timeout_notification(&handle);
@@ -335,7 +337,7 @@ fn main() {
                 }
 
                 // 启动健康检查循环（阻塞当前线程）
-                gateway::health_check_loop(&handle);
+                gateway::health_check_loop(&handle, startup_navigated);
             });
 
             Ok(())

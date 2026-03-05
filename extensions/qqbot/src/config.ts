@@ -1,5 +1,5 @@
-import type { ResolvedQQBotAccount, QQBotAccountConfig } from "./types.js";
 import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import type { ResolvedQQBotAccount, QQBotAccountConfig } from "./types.js";
 
 export const DEFAULT_ACCOUNT_ID = "default";
 
@@ -53,7 +53,7 @@ export function resolveDefaultQQBotAccountId(cfg: OpenClawConfig): string {
  */
 export function resolveQQBotAccount(
   cfg: OpenClawConfig,
-  accountId?: string | null
+  accountId?: string | null,
 ): ResolvedQQBotAccount {
   const resolvedAccountId = accountId ?? DEFAULT_ACCOUNT_ID;
   const qqbot = cfg.channels?.qqbot as QQBotChannelConfig | undefined;
@@ -123,7 +123,13 @@ export function resolveQQBotAccount(
 export function applyQQBotAccountConfig(
   cfg: OpenClawConfig,
   accountId: string,
-  input: { appId?: string; clientSecret?: string; clientSecretFile?: string; name?: string; imageServerBaseUrl?: string }
+  input: {
+    appId?: string;
+    clientSecret?: string;
+    clientSecretFile?: string;
+    name?: string;
+    imageServerBaseUrl?: string;
+  },
 ): OpenClawConfig {
   const next = { ...cfg };
 
@@ -131,11 +137,11 @@ export function applyQQBotAccountConfig(
     // 如果没有设置过 allowFrom，默认设置为 ["*"]
     const existingConfig = (next.channels?.qqbot as QQBotChannelConfig) || {};
     const allowFrom = existingConfig.allowFrom ?? ["*"];
-    
+
     next.channels = {
       ...next.channels,
       qqbot: {
-        ...(next.channels?.qqbot as Record<string, unknown> || {}),
+        ...((next.channels?.qqbot as Record<string, unknown>) || {}),
         enabled: true,
         allowFrom,
         ...(input.appId ? { appId: input.appId } : {}),
@@ -150,13 +156,14 @@ export function applyQQBotAccountConfig(
     };
   } else {
     // 如果没有设置过 allowFrom，默认设置为 ["*"]
-    const existingAccountConfig = (next.channels?.qqbot as QQBotChannelConfig)?.accounts?.[accountId] || {};
+    const existingAccountConfig =
+      (next.channels?.qqbot as QQBotChannelConfig)?.accounts?.[accountId] || {};
     const allowFrom = existingAccountConfig.allowFrom ?? ["*"];
-    
+
     next.channels = {
       ...next.channels,
       qqbot: {
-        ...(next.channels?.qqbot as Record<string, unknown> || {}),
+        ...((next.channels?.qqbot as Record<string, unknown>) || {}),
         enabled: true,
         accounts: {
           ...((next.channels?.qqbot as QQBotChannelConfig)?.accounts || {}),

@@ -1,7 +1,15 @@
-import { randomUUID } from "node:crypto";
-import { DWClient, TOPIC_ROBOT } from "dingtalk-stream";
 import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import { DWClient, TOPIC_ROBOT } from "dingtalk-stream";
+import { randomUUID } from "node:crypto";
 import { buildChannelConfigSchema } from "openclaw/plugin-sdk";
+import type {
+  DingTalkInboundMessage,
+  GatewayStartContext,
+  GatewayStopResult,
+  ConnectionManagerConfig,
+  DingTalkChannelPlugin,
+  ResolvedAccount,
+} from "./types";
 import { getAccessToken } from "./auth";
 import { createAICard, streamAICard, finishAICard } from "./card-service";
 import { getConfig, isConfigured, resolveRelativePath, stripTargetPrefix } from "./config";
@@ -19,16 +27,12 @@ import {
   sendBySession,
   uploadMedia,
 } from "./send-service";
-import type {
-  DingTalkInboundMessage,
-  GatewayStartContext,
-  GatewayStopResult,
-  ConnectionManagerConfig,
-  DingTalkChannelPlugin,
-  ResolvedAccount,
-} from "./types";
 import { ConnectionState } from "./types";
-import { cleanupOrphanedTempFiles, formatDingTalkErrorPayloadLog, getCurrentTimestamp } from "./utils";
+import {
+  cleanupOrphanedTempFiles,
+  formatDingTalkErrorPayloadLog,
+  getCurrentTimestamp,
+} from "./utils";
 
 const processingDedupKeys = new Set<string>();
 const inboundCountersByAccount = new Map<

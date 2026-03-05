@@ -1,6 +1,6 @@
+import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import type { DingTalkConfig } from "./types";
 
 /**

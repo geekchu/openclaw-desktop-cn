@@ -20,7 +20,12 @@ function isSilkFile(filePath: string): boolean {
  * 将 PCM (s16le) 数据封装为 WAV 文件格式
  * WAV = 44 字节 RIFF 头 + PCM 原始数据
  */
-function pcmToWav(pcmData: Uint8Array, sampleRate: number, channels: number = 1, bitsPerSample: number = 16): Buffer {
+function pcmToWav(
+  pcmData: Uint8Array,
+  sampleRate: number,
+  channels: number = 1,
+  bitsPerSample: number = 16,
+): Buffer {
   const byteRate = sampleRate * channels * (bitsPerSample / 8);
   const blockAlign = channels * (bitsPerSample / 8);
   const dataSize = pcmData.length;
@@ -36,8 +41,8 @@ function pcmToWav(pcmData: Uint8Array, sampleRate: number, channels: number = 1,
 
   // fmt sub-chunk
   buffer.write("fmt ", 12);
-  buffer.writeUInt32LE(16, 16);         // sub-chunk size
-  buffer.writeUInt16LE(1, 20);          // PCM format
+  buffer.writeUInt32LE(16, 16); // sub-chunk size
+  buffer.writeUInt16LE(1, 20); // PCM format
   buffer.writeUInt16LE(channels, 22);
   buffer.writeUInt32LE(sampleRate, 24);
   buffer.writeUInt32LE(byteRate, 28);
@@ -86,7 +91,11 @@ export async function convertSilkToWav(
   const strippedBuf = stripAmrHeader(fileBuf);
 
   // 转为 Uint8Array 以兼容 silk-wasm 类型要求
-  const rawData = new Uint8Array(strippedBuf.buffer, strippedBuf.byteOffset, strippedBuf.byteLength);
+  const rawData = new Uint8Array(
+    strippedBuf.buffer,
+    strippedBuf.byteOffset,
+    strippedBuf.byteLength,
+  );
 
   // 验证是否为 SILK 格式
   if (!isSilk(rawData)) {

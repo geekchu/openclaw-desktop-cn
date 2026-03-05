@@ -249,6 +249,12 @@ function redactRawText(raw: string, config: unknown, hints?: ConfigUiHints): str
   sensitiveValues.sort((a, b) => b.length - a.length);
   let result = raw;
   for (const value of sensitiveValues) {
+    // Skip values that are too short — replaceAll on common short substrings
+    // causes exponential string growth that can exceed V8's string length limit.
+    // Also skip the sentinel itself to avoid replacing already-redacted markers.
+    if (value.length <= 3 || value === REDACTED_SENTINEL) {
+      continue;
+    }
     result = result.replaceAll(value, REDACTED_SENTINEL);
   }
   return result;
