@@ -27,7 +27,7 @@ import {
   writeRestartSentinel,
 } from "../../infra/restart-sentinel.js";
 import { scheduleGatewaySigusr1Restart } from "../../infra/restart.js";
-import { loadOpenClawPluginsAsync } from "../../plugins/loader.js";
+import { loadOpenClawPlugins } from "../../plugins/loader.js";
 import {
   ErrorCodes,
   errorShape,
@@ -114,12 +114,12 @@ function parseRawConfigOrRespond(
   return rawValue;
 }
 
-async function parseValidateConfigFromRawOrRespond(
+function parseValidateConfigFromRawOrRespond(
   params: unknown,
   requestName: string,
   snapshot: Awaited<ReturnType<typeof readConfigFileSnapshot>>,
   respond: RespondFn,
-): Promise<{ config: OpenClawConfig; schema: ConfigSchemaResponse } | null> {
+): { config: OpenClawConfig; schema: ConfigSchemaResponse } | null {
   const rawValue = parseRawConfigOrRespond(params, requestName, respond);
   if (!rawValue) {
     return null;
@@ -129,7 +129,7 @@ async function parseValidateConfigFromRawOrRespond(
     respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, parsedRes.error));
     return null;
   }
-  const schema = await loadSchemaWithPluginsAsync();
+  const schema = loadSchemaWithPlugins();
   const restored = restoreRedactedValues(parsedRes.parsed, snapshot.config, schema.uiHints);
   if (!restored.ok) {
     respond(
@@ -221,10 +221,10 @@ async function tryWriteRestartSentinelPayload(
   }
 }
 
-async function loadSchemaWithPluginsAsync(): Promise<ConfigSchemaResponse> {
+function loadSchemaWithPlugins(): ConfigSchemaResponse {
   const cfg = loadConfig();
   const workspaceDir = resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg));
-  const pluginRegistry = await loadOpenClawPluginsAsync({
+  const pluginRegistry = loadOpenClawPlugins({
     config: cfg,
     cache: true,
     workspaceDir,
@@ -271,7 +271,7 @@ export const configHandlers: GatewayRequestHandlers = {
     }
     try {
       const snapshot = await readConfigFileSnapshot();
-      const schema = await loadSchemaWithPluginsAsync();
+      const schema = loadSchemaWithPlugins();
       const redacted = redactConfigSnapshot(snapshot, schema.uiHints);
       // Strip server-only fields that the UI never reads.
       const { parsed: _p, resolved: _r, ...slim } = redacted;
@@ -312,7 +312,7 @@ export const configHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      respond(true, await loadSchemaWithPluginsAsync(), undefined);
+      respond(true, loadSchemaWithPlugins(), undefined);
     } catch (err) {
       respond(
         false,
@@ -340,7 +340,7 @@ export const configHandlers: GatewayRequestHandlers = {
     if (!requireConfigBaseHash(params, snapshot, respond)) {
       return;
     }
-    const parsed = await parseValidateConfigFromRawOrRespond(
+    const parsed = parseValidateConfigFromRawOrRespond(
       params,
       "config.set",
       snapshot,
@@ -416,7 +416,7 @@ export const configHandlers: GatewayRequestHandlers = {
     const merged = applyMergePatch(snapshot.config, parsedRes.parsed, {
       mergeObjectArraysById: true,
     });
-    const schemaPatch = await loadSchemaWithPluginsAsync();
+    const schemaPatch = loadSchemaWithPlugins();
     const restoredMerge = restoreRedactedValues(merged, snapshot.config, schemaPatch.uiHints);
     if (!restoredMerge.ok) {
       respond(
@@ -490,7 +490,7 @@ export const configHandlers: GatewayRequestHandlers = {
     if (!requireConfigBaseHash(params, snapshot, respond)) {
       return;
     }
-    const parsed = await parseValidateConfigFromRawOrRespond(
+    const parsed = parseValidateConfigFromRawOrRespond(
       params,
       "config.apply",
       snapshot,

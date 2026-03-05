@@ -126,7 +126,7 @@ impl GatewayManager {
         let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
         let mut last_child_check = std::time::Instant::now();
         // 需要连续 2 次检测成功（间隔 500ms）才认为真正就绪，
-        // 渠道插件已改为懒加载，HTTP 响应即表示核心就绪
+        // 避免在 HTTP 端口绑定后、WebSocket handler 注册前的短暂窗口误判
         let required_consecutive = 2;
         let mut consecutive_ready = 0u32;
         let sustained_check_interval = Duration::from_millis(500);
