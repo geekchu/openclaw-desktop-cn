@@ -187,7 +187,7 @@ function renderAttachmentPreview(props: ChatProps) {
 }
 
 export function renderChat(props: ChatProps) {
-  const canCompose = props.connected;
+  const canCompose = props.connected && !props.disabledReason;
   const isBusy = props.sending || props.stream !== null;
   const canAbort = Boolean(props.canAbort && props.onAbort);
   const activeSession = props.sessions?.sessions?.find((row) => row.key === props.sessionKey);
@@ -199,11 +199,13 @@ export function renderChat(props: ChatProps) {
   };
 
   const hasAttachments = (props.attachments?.length ?? 0) > 0;
-  const composePlaceholder = props.connected
-    ? hasAttachments
-      ? "添加消息或粘贴更多图片..."
-      : "消息 (↩ 发送, Shift+↩ 换行, 可粘贴图片)"
-    : "连接到网关以开始聊天…";
+  const composePlaceholder = !props.connected
+    ? "连接到网关以开始聊天…"
+    : props.disabledReason
+      ? "请先配置大模型…"
+      : hasAttachments
+        ? "添加消息或粘贴更多图片..."
+        : "消息 (↩ 发送, Shift+↩ 换行, 可粘贴图片)";
 
   const splitRatio = props.splitRatio ?? 0.6;
   const sidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
@@ -377,7 +379,7 @@ export function renderChat(props: ChatProps) {
               ${ref((el) => el && adjustTextareaHeight(el as HTMLTextAreaElement))}
               .value=${props.draft}
               dir=${detectTextDirection(props.draft)}
-              ?disabled=${!props.connected}
+              ?disabled=${!canCompose}
               @keydown=${(e: KeyboardEvent) => {
                 if (e.key !== "Enter") {
                   return;
@@ -388,7 +390,7 @@ export function renderChat(props: ChatProps) {
                 if (e.shiftKey) {
                   return;
                 } // Allow Shift+Enter for line breaks
-                if (!props.connected) {
+                if (!canCompose) {
                   return;
                 }
                 e.preventDefault();
@@ -408,14 +410,14 @@ export function renderChat(props: ChatProps) {
           <div class="chat-compose__actions">
             <button
               class="btn"
-              ?disabled=${!props.connected || (!canAbort && props.sending)}
+              ?disabled=${canAbort ? false : (!canCompose || props.sending)}
               @click=${canAbort ? props.onAbort : props.onNewSession}
             >
               ${canAbort ? "停止" : "新会话"}
             </button>
             <button
               class="btn primary"
-              ?disabled=${!props.connected}
+              ?disabled=${!canCompose}
               @click=${props.onSend}
             >
               ${isBusy ? "排队" : "发送"}<kbd class="btn-kbd">↵</kbd>

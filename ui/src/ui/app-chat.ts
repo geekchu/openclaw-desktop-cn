@@ -17,6 +17,8 @@ export type ChatHost = {
   chatQueue: ChatQueueItem[];
   chatRunId: string | null;
   chatSending: boolean;
+  chatStream: string | null;
+  chatStreamStartedAt: number | null;
   sessionKey: string;
   basePath: string;
   hello: GatewayHelloOk | null;
@@ -62,10 +64,35 @@ function isChatResetCommand(text: string) {
 
 export async function handleAbortChat(host: ChatHost) {
   if (!host.connected) {
+    // 即使断连也要清除本地状态，避免 UI 卡住
+    host.chatRunId = null;
+    host.chatSending = false;
+    host.chatStream = null;
+    host.chatStreamStartedAt = null;
+    host.chatMessage = "";
     return;
   }
   host.chatMessage = "";
-  await abortChatRun(host as unknown as OpenClawApp);
+  const runIdBefore = host.chatRunId;
+  const ok = await abortChatRun(host as unknown as OpenClawApp);
+  if (!ok) {
+    // abort 请求失败（如大模型已断开），强制清除本地状态
+    host.chatRunId = null;
+    host.chatSending = false;
+    host.chatStream = null;
+    host.chatStreamStartedAt = null;
+  } else if (runIdBefore) {
+    // abort 请求成功，但 gateway 可能不会发回 aborted 事件
+    // 5 秒后如果状态仍未清除，强制清除
+    setTimeout(() => {
+      if (host.chatRunId === runIdBefore) {
+        host.chatRunId = null;
+        host.chatSending = false;
+        host.chatStream = null;
+        host.chatStreamStartedAt = null;
+      }
+    }, 5000);
+  }
 }
 
 function enqueueChatMessage(
