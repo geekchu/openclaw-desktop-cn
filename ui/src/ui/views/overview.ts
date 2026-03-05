@@ -97,7 +97,7 @@ export function renderOverview(props: OverviewProps) {
     return html`
       <div class="muted" style="margin-top: 8px">
         当前页面为 HTTP，浏览器阻止了设备身份验证。请使用 HTTPS（Tailscale Serve）或在网关主机上打开
-        <span class="mono">http://127.0.0.1:18789</span>。
+        <span class="mono">http://127.0.0.1:28789</span>。
         <div style="margin-top: 6px">
           如果必须使用 HTTP，请设置
           <span class="mono">gateway.controlUi.allowInsecureAuth: true</span>（仅限令牌模式）。
@@ -139,7 +139,7 @@ export function renderOverview(props: OverviewProps) {
                 const v = (e.target as HTMLInputElement).value;
                 props.onSettingsChange({ ...props.settings, gatewayUrl: v });
               }}
-              placeholder="ws://100.x.y.z:18789"
+              placeholder="ws://100.x.y.z:28789"
             />
           </label>
           ${
