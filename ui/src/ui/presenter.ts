@@ -1,5 +1,5 @@
-import type { CronJob, GatewaySessionRow, PresenceEntry } from "./types.ts";
 import { formatAgo, formatRelativeTimestamp, formatDurationHuman, formatMs } from "./format.ts";
+import type { CronJob, GatewaySessionRow, PresenceEntry } from "./types.ts";
 
 export function formatPresenceSummary(entry: PresenceEntry): string {
   const host = entry.host ?? "未知";
@@ -18,7 +18,8 @@ export function formatNextRun(ms?: number | null) {
   if (!ms) {
     return "无";
   }
-  return `${formatMs(ms)} (${formatRelativeTimestamp(ms)})`;
+  const weekday = new Date(ms).toLocaleDateString(undefined, { weekday: "short" });
+  return `${weekday}, ${formatMs(ms)} (${formatRelativeTimestamp(ms)})`;
 }
 
 export function formatSessionTokens(row: GatewaySessionRow) {
@@ -71,9 +72,13 @@ export function formatCronPayload(job: CronJob) {
   const delivery = job.delivery;
   if (delivery && delivery.mode !== "none") {
     const target =
-      delivery.channel || delivery.to
-        ? ` (${delivery.channel ?? "上次"}${delivery.to ? ` -> ${delivery.to}` : ""})`
-        : "";
+      delivery.mode === "webhook"
+        ? delivery.to
+          ? ` (${delivery.to})`
+          : ""
+        : delivery.channel || delivery.to
+          ? ` (${delivery.channel ?? "上次"}${delivery.to ? ` -> ${delivery.to}` : ""})`
+          : "";
     return `${base} · ${delivery.mode}${target}`;
   }
   return base;

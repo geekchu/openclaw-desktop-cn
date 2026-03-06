@@ -1,5 +1,6 @@
 import { normalizeGoogleModelId } from "../../../agents/models-config.providers.js";
-import { fetchWithTimeoutGuarded, normalizeBaseUrl, readErrorResponse } from "../shared.js";
+import { parseGeminiAuth } from "../../../infra/gemini-auth.js";
+import { assertOkOrThrowHttpError, normalizeBaseUrl, postJsonRequest } from "../shared.js";
 
 export async function generateGeminiInlineDataText(params: {
   buffer: Buffer;
@@ -30,12 +31,12 @@ export async function generateGeminiInlineDataText(params: {
   })();
   const url = `${baseUrl}/models/${model}:generateContent`;
 
+  const authHeaders = parseGeminiAuth(params.apiKey);
   const headers = new Headers(params.headers);
-  if (!headers.has("content-type")) {
-    headers.set("content-type", "application/json");
-  }
-  if (!headers.has("x-goog-api-key")) {
-    headers.set("x-goog-api-key", params.apiKey);
+  for (const [key, value] of Object.entries(authHeaders.headers)) {
+    if (!headers.has(key)) {
+      headers.set(key, value);
+    }
   }
 
   const prompt = (() => {
@@ -60,24 +61,17 @@ export async function generateGeminiInlineDataText(params: {
     ],
   };
 
-  const { response: res, release } = await fetchWithTimeoutGuarded(
+  const { response: res, release } = await postJsonRequest({
     url,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    },
-    params.timeoutMs,
+    headers,
+    body,
+    timeoutMs: params.timeoutMs,
     fetchFn,
-    allowPrivate ? { ssrfPolicy: { allowPrivateNetwork: true } } : undefined,
-  );
+    allowPrivateNetwork: allowPrivate,
+  });
 
   try {
-    if (!res.ok) {
-      const detail = await readErrorResponse(res);
-      const suffix = detail ? `: ${detail}` : "";
-      throw new Error(`${params.httpErrorLabel} (HTTP ${res.status})${suffix}`);
-    }
+    await assertOkOrThrowHttpError(res, params.httpErrorLabel);
 
     const payload = (await res.json()) as {
       candidates?: Array<{

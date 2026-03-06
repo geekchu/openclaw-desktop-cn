@@ -92,31 +92,22 @@ public final class GatewayDiscoveryModel {
         if !self.browsers.isEmpty { return }
 
         for domain in OpenClawBonjour.gatewayServiceDomains {
-            let params = NWParameters.tcp
-            params.includePeerToPeer = true
-            let browser = NWBrowser(
-                for: .bonjour(type: OpenClawBonjour.gatewayServiceType, domain: domain),
-                using: params)
-
-            browser.stateUpdateHandler = { [weak self] state in
-                Task { @MainActor in
+            let browser = GatewayDiscoveryBrowserSupport.makeBrowser(
+                serviceType: OpenClawBonjour.gatewayServiceType,
+                domain: domain,
+                queueLabelPrefix: "ai.openclaw.macos.gateway-discovery",
+                onState: { [weak self] state in
                     guard let self else { return }
                     self.statesByDomain[domain] = state
                     self.updateStatusText()
-                }
-            }
-
-            browser.browseResultsChangedHandler = { [weak self] results, _ in
-                Task { @MainActor in
+                },
+                onResults: { [weak self] results in
                     guard let self else { return }
                     self.resultsByDomain[domain] = results
                     self.updateGateways(for: domain)
                     self.recomputeGateways()
-                }
-            }
-
+                })
             self.browsers[domain] = browser
-            browser.start(queue: DispatchQueue(label: "ai.openclaw.macos.gateway-discovery.\(domain)"))
         }
 
         self.scheduleWideAreaFallback()
@@ -329,43 +320,9 @@ public final class GatewayDiscoveryModel {
     }
 
     private func updateStatusText() {
-        let states = Array(self.statesByDomain.values)
-        if states.isEmpty {
-            self.statusText = self.browsers.isEmpty ? "Idle" : "Setup"
-            return
-        }
-
-        if let failed = states.first(where: { state in
-            if case .failed = state { return true }
-            return false
-        }) {
-            if case let .failed(err) = failed {
-                self.statusText = "Failed: \(err)"
-                return
-            }
-        }
-
-        if let waiting = states.first(where: { state in
-            if case .waiting = state { return true }
-            return false
-        }) {
-            if case let .waiting(err) = waiting {
-                self.statusText = "Waiting: \(err)"
-                return
-            }
-        }
-
-        if states.contains(where: { if case .ready = $0 { true } else { false } }) {
-            self.statusText = "Searching…"
-            return
-        }
-
-        if states.contains(where: { if case .setup = $0 { true } else { false } }) {
-            self.statusText = "Setup"
-            return
-        }
-
-        self.statusText = "Searching…"
+        self.statusText = GatewayDiscoveryStatusText.make(
+            states: Array(self.statesByDomain.values),
+            hasBrowsers: !self.browsers.isEmpty)
     }
 
     private static func txtDictionary(from result: NWBrowser.Result) -> [String: String] {
@@ -651,8 +608,7 @@ final class GatewayServiceResolver: NSObject, NetServiceDelegate {
     }
 
     func start(timeout: TimeInterval = 2.0) {
-        self.service.schedule(in: .main, forMode: .common)
-        self.service.resolve(withTimeout: timeout)
+        BonjourServiceResolverSupport.start(self.service, timeout: timeout)
     }
 
     func cancel() {
@@ -698,9 +654,7 @@ final class GatewayServiceResolver: NSObject, NetServiceDelegate {
     }
 
     private static func normalizeHost(_ raw: String?) -> String? {
-        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if trimmed.isEmpty { return nil }
-        return trimmed.hasSuffix(".") ? String(trimmed.dropLast()) : trimmed
+        BonjourServiceResolverSupport.normalizeHost(raw)
     }
 
     private func formatTXT(_ txt: [String: String]) -> String {

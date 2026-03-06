@@ -1,14 +1,15 @@
+import { t } from "../i18n/index.ts";
 import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
-  { label: "聊天", tabs: ["chat"] },
+  { label: "chat", tabs: ["chat"] },
   {
-    label: "控制",
-    tabs: ["overview", "instances", "sessions", "cron"],
+    label: "control",
+    tabs: ["overview", "channels", "instances", "sessions", "usage", "cron"],
   },
-  { label: "代理", tabs: ["agents", "skills", "nodes"] },
-  { label: "设置", tabs: ["config", "debug", "logs"] },
-  { label: "工具", tabs: ["terminal"] },
+  { label: "agent", tabs: ["agents", "skills", "nodes"] },
+  { label: "settings", tabs: ["config", "debug", "logs"] },
+  { label: "tools", tabs: ["terminal"] },
 ] as const;
 
 export type Tab =
@@ -162,69 +163,9 @@ export function iconForTab(tab: Tab): IconName {
 }
 
 export function titleForTab(tab: Tab) {
-  switch (tab) {
-    case "agents":
-      return "代理";
-    case "overview":
-      return "概览";
-    case "channels":
-      return "频道";
-    case "instances":
-      return "实例";
-    case "sessions":
-      return "会话";
-    case "cron":
-      return "定时任务";
-    case "skills":
-      return "技能";
-    case "nodes":
-      return "节点";
-    case "chat":
-      return "聊天";
-    case "config":
-      return "配置";
-    case "debug":
-      return "调试";
-    case "logs":
-      return "日志";
-
-    case "terminal":
-      return "终端";
-    default:
-      return "控制";
-  }
+  return t(`tabs.${tab}`);
 }
 
 export function subtitleForTab(tab: Tab) {
-  switch (tab) {
-    case "agents":
-      return "管理代理工作区、工具和身份。";
-    case "overview":
-      return "网关状态、入口点和快速健康检查。";
-    case "channels":
-      return "管理频道和设置。";
-    case "instances":
-      return "来自已连接客户端和节点的存在信标。";
-    case "sessions":
-      return "检查活动会话并调整每个会话的默认设置。";
-    case "cron":
-      return "安排唤醒和定期代理运行。";
-    case "skills":
-      return "管理技能可用性和 API 密钥注入。";
-    case "nodes":
-      return "已配对设备、功能和命令暴露。";
-    case "chat":
-      return "直接网关聊天会话，用于快速干预。";
-    case "config":
-      return "安全编辑 ~/.openclawcn/openclaw.json。";
-    case "debug":
-      return "网关快照、事件和手动 RPC 调用。";
-    case "logs":
-      return "网关文件日志的实时跟踪。";
-
-    case "terminal":
-      return "内嵌命令行终端，运行 openclaw 命令。";
-    default:
-      return "";
-  }
+  return t(`subtitles.${tab}`);
 }

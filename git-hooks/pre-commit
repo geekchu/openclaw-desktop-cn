@@ -1,73 +1,49 @@
-#!/bin/sh
-#
-# bd (beads) pre-commit hook (chained)
-#
-# This hook chains bd functionality with your existing pre-commit hook.
+#!/usr/bin/env bash
 
-# Run existing hook first
-if [ -x "F:\openclaw-desktop-cn\git-hooks\pre-commit.old" ]; then
-    "F:\openclaw-desktop-cn\git-hooks\pre-commit.old" "$@"
-    EXIT_CODE=$?
-    if [ $EXIT_CODE -ne 0 ]; then
-        exit $EXIT_CODE
-    fi
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+RUN_NODE_TOOL="$ROOT_DIR/scripts/pre-commit/run-node-tool.sh"
+FILTER_FILES="$ROOT_DIR/scripts/pre-commit/filter-staged-files.mjs"
+
+if [[ ! -x "$RUN_NODE_TOOL" ]]; then
+  echo "Missing helper: $RUN_NODE_TOOL" >&2
+  exit 1
 fi
 
-# Check if bd is available
-if ! command -v bd >/dev/null 2>&1; then
-    echo "Warning: bd command not found, skipping pre-commit flush" >&2
-    exit 0
+if [[ ! -f "$FILTER_FILES" ]]; then
+  echo "Missing helper: $FILTER_FILES" >&2
+  exit 1
 fi
 
-# Check if we're in a bd workspace
-# For worktrees, .beads is in the main repository root, not the worktree
-BEADS_DIR=""
-if git rev-parse --git-dir >/dev/null 2>&1; then
-    # Check if we're in a worktree
-    if [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ]; then
-        # Worktree: .beads is in main repo root
-        MAIN_REPO_ROOT="$(git rev-parse --git-common-dir)"
-        MAIN_REPO_ROOT="$(dirname "$MAIN_REPO_ROOT")"
-        if [ -d "$MAIN_REPO_ROOT/.beads" ]; then
-            BEADS_DIR="$MAIN_REPO_ROOT/.beads"
-        fi
-    else
-        # Regular repo: check current directory
-        if [ -d .beads ]; then
-            BEADS_DIR=".beads"
-        fi
-    fi
+# Security: avoid option-injection from malicious file names (e.g. "--all", "--force").
+# Robustness: NUL-delimited file list handles spaces/newlines safely.
+# Compatibility: use read loops instead of `mapfile` so this runs on macOS Bash 3.x.
+files=()
+while IFS= read -r -d '' file; do
+  files+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+if [ "${#files[@]}" -eq 0 ]; then
+  exit 0
 fi
 
-if [ -z "$BEADS_DIR" ]; then
-    exit 0
+lint_files=()
+while IFS= read -r -d '' file; do
+  lint_files+=("$file")
+done < <(node "$FILTER_FILES" lint -- "${files[@]}")
+
+format_files=()
+while IFS= read -r -d '' file; do
+  format_files+=("$file")
+done < <(node "$FILTER_FILES" format -- "${files[@]}")
+
+if [ "${#lint_files[@]}" -gt 0 ]; then
+  "$RUN_NODE_TOOL" oxlint --type-aware --fix -- "${lint_files[@]}"
 fi
 
-# Skip for Dolt backend (uses its own sync mechanism, not JSONL)
-if [ -f "$BEADS_DIR/metadata.json" ]; then
-    if grep -q '"backend"[[:space:]]*:[[:space:]]*"dolt"' "$BEADS_DIR/metadata.json" 2>/dev/null; then
-        exit 0
-    fi
+if [ "${#format_files[@]}" -gt 0 ]; then
+  "$RUN_NODE_TOOL" oxfmt --write -- "${format_files[@]}"
 fi
 
-# Flush pending changes to JSONL
-if ! bd sync --flush-only >/dev/null 2>&1; then
-    echo "Error: Failed to flush bd changes to storage" >&2
-    echo "Run 'bd sync --flush-only' manually to diagnose" >&2
-    exit 1
-fi
-
-# If the JSONL file was modified, stage it
-# For worktrees, the JSONL is in the main repo's working tree, not the worktree,
-# so we can't use git add. Skip this step for worktrees.
-if [ -f "$BEADS_DIR/issues.jsonl" ]; then
-    if [ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ]; then
-        # Regular repo: file is in the working tree, safe to add
-        git add "$BEADS_DIR/issues.jsonl" 2>/dev/null || true
-    fi
-    # For worktrees: .beads is in the main repo's working tree, not this worktree
-    # Git rejects adding files outside the worktree, so we skip it.
-    # The main repo will see the changes on the next pull/sync.
-fi
-
-exit 0
+git add -- "${files[@]}"

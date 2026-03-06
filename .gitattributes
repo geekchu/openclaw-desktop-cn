@@ -1,4 +1,7 @@
 * text=auto eol=lf
 
+
 # Use bd merge for beads JSONL files
 .beads/issues.jsonl merge=beads
+CLAUDE.md -text
+src/gateway/server-methods/CLAUDE.md -text

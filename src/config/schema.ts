@@ -1,7 +1,8 @@
-import type { ConfigUiHint, ConfigUiHints } from "./schema.hints.js";
 import { CHANNEL_IDS } from "../channels/registry.js";
 import { VERSION } from "../version.js";
+import type { ConfigUiHint, ConfigUiHints } from "./schema.hints.js";
 import { applySensitiveHints, buildBaseHints, mapSensitivePaths } from "./schema.hints.js";
+import { applyDerivedTags } from "./schema.tags.js";
 import { OpenClawSchema } from "./zod-schema.js";
 
 export type { ConfigUiHint, ConfigUiHints } from "./schema.hints.js";
@@ -23,7 +24,7 @@ export type PluginUiMetadata = {
   description?: string;
   configUiHints?: Record<
     string,
-    Pick<ConfigUiHint, "label" | "help" | "advanced" | "sensitive" | "placeholder">
+    Pick<ConfigUiHint, "label" | "help" | "tags" | "advanced" | "sensitive" | "placeholder">
   >;
   configSchema?: JsonSchemaNode;
 };
@@ -735,6 +736,28 @@ function mergeObjectSchema(base: JsonSchemaObject, extension: JsonSchemaObject):
   return merged;
 }
 
+function collectExtensionHintKeys(
+  hints: ConfigUiHints,
+  plugins: PluginUiMetadata[],
+  channels: ChannelUiMetadata[],
+): Set<string> {
+  const pluginPrefixes = plugins
+    .map((plugin) => plugin.id.trim())
+    .filter(Boolean)
+    .map((id) => `plugins.entries.${id}`);
+  const channelPrefixes = channels
+    .map((channel) => channel.id.trim())
+    .filter(Boolean)
+    .map((id) => `channels.${id}`);
+  const prefixes = [...pluginPrefixes, ...channelPrefixes];
+
+  return new Set(
+    Object.keys(hints).filter((key) =>
+      prefixes.some((prefix) => key === prefix || key.startsWith(`${prefix}.`)),
+    ),
+  );
+}
+
 function applyPluginHints(hints: ConfigUiHints, plugins: PluginUiMetadata[]): ConfigUiHints {
   const next: ConfigUiHints = { ...hints };
   for (const plugin of plugins) {
@@ -959,6 +982,43 @@ function applyChannelSchemas(schema: ConfigSchema, channels: ChannelUiMetadata[]
 }
 
 let cachedBase: ConfigSchemaResponse | null = null;
+const mergedSchemaCache = new Map<string, ConfigSchemaResponse>();
+const MERGED_SCHEMA_CACHE_MAX = 64;
+
+function buildMergedSchemaCacheKey(params: {
+  plugins: PluginUiMetadata[];
+  channels: ChannelUiMetadata[];
+}): string {
+  const plugins = params.plugins
+    .map((plugin) => ({
+      id: plugin.id,
+      name: plugin.name,
+      description: plugin.description,
+      configSchema: plugin.configSchema ?? null,
+      configUiHints: plugin.configUiHints ?? null,
+    }))
+    .toSorted((a, b) => a.id.localeCompare(b.id));
+  const channels = params.channels
+    .map((channel) => ({
+      id: channel.id,
+      label: channel.label,
+      description: channel.description,
+      configSchema: channel.configSchema ?? null,
+      configUiHints: channel.configUiHints ?? null,
+    }))
+    .toSorted((a, b) => a.id.localeCompare(b.id));
+  return JSON.stringify({ plugins, channels });
+}
+
+function setMergedSchemaCache(key: string, value: ConfigSchemaResponse): void {
+  if (mergedSchemaCache.size >= MERGED_SCHEMA_CACHE_MAX) {
+    const oldest = mergedSchemaCache.keys().next();
+    if (!oldest.done) {
+      mergedSchemaCache.delete(oldest.value);
+    }
+  }
+  mergedSchemaCache.set(key, value);
+}
 
 function stripChannelSchema(schema: ConfigSchema): ConfigSchema {
   const next = cloneSchema(schema);
@@ -990,7 +1050,7 @@ function buildBaseConfigSchema(): ConfigSchemaResponse {
     unrepresentable: "any",
   });
   schema.title = "OpenClawConfig";
-  const hints = mapSensitivePaths(OpenClawSchema, "", buildBaseHints());
+  const hints = applyDerivedTags(mapSensitivePaths(OpenClawSchema, "", buildBaseHints()));
   const next = {
     schema: stripChannelSchema(schema),
     uiHints: hints,
@@ -1011,6 +1071,11 @@ export function buildConfigSchema(params?: {
   if (plugins.length === 0 && channels.length === 0) {
     return base;
   }
+  const cacheKey = buildMergedSchemaCacheKey({ plugins, channels });
+  const cached = mergedSchemaCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
   const mergedWithoutSensitiveHints = applyHeartbeatTargetHints(
     applyChannelHints(applyPluginHints(base.uiHints, plugins), channels),
     channels,
@@ -1020,11 +1085,15 @@ export function buildConfigSchema(params?: {
     plugins,
     channels,
   );
-  const mergedHints = applySensitiveHints(mergedWithoutSensitiveHints, extensionHintKeys);
+  const mergedHints = applyDerivedTags(
+    applySensitiveHints(mergedWithoutSensitiveHints, extensionHintKeys),
+  );
   const mergedSchema = applyChannelSchemas(applyPluginSchemas(base.schema, plugins), channels);
-  return {
+  const merged = {
     ...base,
     schema: mergedSchema,
     uiHints: mergedHints,
   };
+  setMergedSchemaCache(cacheKey, merged);
+  return merged;
 }
