@@ -1,6 +1,7 @@
 use std::net::TcpStream;
 use std::process::Child;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use log::{info, warn, error};
 use tauri::AppHandle;
@@ -16,6 +17,8 @@ use crate::TrayState;
 pub struct GatewayManager {
     child: Mutex<Option<Child>>,
     port: u16,
+    /// 更新期间设置为 true，阻止健康检查线程自动重启 gateway
+    suppress_restart: AtomicBool,
 }
 
 impl GatewayManager {
@@ -23,7 +26,18 @@ impl GatewayManager {
         Self {
             child: Mutex::new(None),
             port,
+            suppress_restart: AtomicBool::new(false),
         }
+    }
+
+    /// 设置抑制自动重启标志（更新前调用）
+    pub fn set_suppress_restart(&self, val: bool) {
+        self.suppress_restart.store(val, Ordering::SeqCst);
+    }
+
+    /// 检查是否抑制自动重启
+    pub fn is_restart_suppressed(&self) -> bool {
+        self.suppress_restart.load(Ordering::SeqCst)
     }
 
     /// 启动 gateway 子进程
@@ -252,6 +266,12 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
         if gm.is_child_alive() {
             // 子进程还在但端口不通——可能正在重启，等一轮再看
             info!("[Gateway] 子进程仍在运行，等待下一轮检查");
+            continue;
+        }
+
+        // 更新期间不自动重启，避免与安装程序冲突
+        if gm.is_restart_suppressed() {
+            info!("[Gateway] 自动重启已抑制（更新中），跳过");
             continue;
         }
 

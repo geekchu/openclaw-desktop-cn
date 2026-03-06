@@ -354,6 +354,7 @@ fn main() {
             service::get_service_status,
             service::start_service,
             service::stop_service,
+            service::stop_gateway,
             service::restart_service,
             service::get_logs,
             // 进程管理

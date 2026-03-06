@@ -3,7 +3,7 @@ use crate::utils::shell;
 use crate::gateway::GatewayManager;
 use tauri::{command, AppHandle, Emitter, Manager};
 use std::process::Command;
-use log::{info, debug};
+use log::{info, warn, debug};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -227,6 +227,44 @@ pub async fn stop_service() -> Result<String, String> {
         info!("[服务] ✓ 已停止");
         Ok("服务已停止".to_string())
     }
+}
+
+/// 强制杀死占用指定端口的进程
+fn force_kill_port_holder(port: u16) {
+    if let Some(pid) = check_port_listening(port) {
+        warn!("[服务] 端口 {} 仍被 PID {} 占用，强制终止", port, pid);
+        #[cfg(windows)]
+        {
+            let _ = Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(CREATE_NO_WINDOW)
+                .status();
+        }
+        #[cfg(unix)]
+        {
+            let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+        }
+        // 等待进程退出、端口释放
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+}
+
+/// 停止 Gateway 子进程（用于更新前清理）
+/// 先通过 GatewayManager 优雅停止，再检查端口确保无残留进程
+#[command]
+pub async fn stop_gateway(app: AppHandle) -> Result<(), String> {
+    info!("[服务] 更新前停止 Gateway...");
+    let gm = app.state::<GatewayManager>();
+    // 抑制健康检查线程自动重启，防止安装期间 gateway 被拉起
+    gm.set_suppress_restart(true);
+    gm.stop();
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    // 兜底：如果端口仍被占用（孤儿进程、上次崩溃残留等），强制杀掉
+    force_kill_port_holder(SERVICE_PORT);
+
+    info!("[服务] Gateway 已停止，可以安全更新");
+    Ok(())
 }
 
 /// 重启服务 — 通过 GatewayManager 管理子进程

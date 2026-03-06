@@ -6,8 +6,10 @@
  */
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { checkForUpdate, downloadAndInstallUpdate } from "./updater.js";
+import { TaskLogsElement } from "./task-logs";
+import { checkForUpdate, downloadUpdate, installUpdate } from "./updater.js";
 
+export const CLAW_CONFIG_SYSTEM = "claw-config-system";
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
 function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const t = (window as any).__TAURI__;
@@ -70,6 +72,7 @@ export class SystemSettingsView extends LitElement {
   @state() private updateDone = false;
   @state() private updateInstalled = false;
   private _updateRid: number | null = null;
+  private _downloadedBytesRid: number | null = null;
 
   /* ── lifecycle ── */
   override connectedCallback() {
@@ -1185,6 +1188,7 @@ export class SystemSettingsView extends LitElement {
       }
     }
     this._updateRid = null;
+    this._downloadedBytesRid = null;
     this.updateChecking = true;
     this.updateError = "";
     this.updateAvailable = false;
@@ -1216,10 +1220,10 @@ export class SystemSettingsView extends LitElement {
     this.updateProgress = 0;
     this.updateError = "";
     try {
-      await downloadAndInstallUpdate(this._updateRid, (percent) => {
+      this._downloadedBytesRid = await downloadUpdate(this._updateRid, (percent) => {
         this.updateProgress = percent;
       });
-      // 安装完成，显示重启按钮
+      // 下载完成，显示重启按钮
       this.updateInstalled = true;
       this.updateDownloading = false;
     } catch (e: any) {
@@ -1228,9 +1232,30 @@ export class SystemSettingsView extends LitElement {
     }
   }
 
-  private _handleRestart() {
+  private async _handleRestart() {
     const t = (window as any).__TAURI__;
-    t?.core?.invoke("plugin:process|restart");
+    if (!t?.core?.invoke) return;
+    // 先彻底关闭 Gateway 子进程，释放文件锁，防止安装更新时冲突
+    try {
+      await t.core.invoke("stop_gateway");
+    } catch {
+      /* best-effort */
+    }
+
+    if (this._updateRid != null && this._downloadedBytesRid != null) {
+      try {
+        await installUpdate(this._updateRid, this._downloadedBytesRid);
+        // Windows NSIS 默认会在此步骤抛弃 Promise 直接强杀重启，代码执行不到这里。
+        // 而在 macOS/Linux 设备上，该过程只在后台提取替换文件，随后秒返回成功。
+        // 我们必须主动触发 Tauri 重启以使新版本生效。
+        t.core.invoke("plugin:process|restart");
+        return;
+      } catch (e) {
+        console.error("更新安装失败", e);
+      }
+    }
+    // 普通用户手动重启、或者更新失败兜底
+    t.core.invoke("plugin:process|restart");
   }
 
   private _renderUpdateCard() {
