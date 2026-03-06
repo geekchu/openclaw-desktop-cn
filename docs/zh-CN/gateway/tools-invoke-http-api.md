@@ -81,7 +81,7 @@ OpenClaw 的 Gateway 网关暴露了一个简单的 HTTP 端点用于直接调�
 ## 示例
 
 ```bash
-curl -sS http://127.0.0.1:18789/tools/invoke \
+curl -sS http://127.0.0.1:28789/tools/invoke \
   -H 'Authorization: Bearer YOUR_TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{

@@ -89,7 +89,7 @@ import Testing
             debugID: "debug",
             lanHost: "test.local",
             tailnetDns: nil,
-            gatewayPort: 18789,
+            gatewayPort: 28789,
             canvasPort: nil,
             tlsEnabled: true,
             tlsFingerprintSha256: nil,

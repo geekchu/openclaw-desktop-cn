@@ -34,27 +34,27 @@ describe("ports helpers", () => {
 
   it("classifies ssh and gateway listeners", () => {
     expect(
-      classifyPortListener({ commandLine: "ssh -N -L 18789:127.0.0.1:18789 user@host" }, 18789),
+      classifyPortListener({ commandLine: "ssh -N -L 28789:127.0.0.1:28789 user@host" }, 28789),
     ).toBe("ssh");
     expect(
       classifyPortListener(
         {
           commandLine: "node /Users/me/Projects/openclaw/dist/entry.js gateway",
         },
-        18789,
+        28789,
       ),
     ).toBe("gateway");
   });
 
   it("formats port diagnostics with hints", () => {
     const diagnostics = {
-      port: 18789,
+      port: 28789,
       status: "busy" as const,
-      listeners: [{ pid: 123, commandLine: "ssh -N -L 18789:127.0.0.1:18789" }],
-      hints: buildPortHints([{ pid: 123, commandLine: "ssh -N -L 18789:127.0.0.1:18789" }], 18789),
+      listeners: [{ pid: 123, commandLine: "ssh -N -L 28789:127.0.0.1:28789" }],
+      hints: buildPortHints([{ pid: 123, commandLine: "ssh -N -L 28789:127.0.0.1:28789" }], 28789),
     };
     const lines = formatPortDiagnostics(diagnostics);
-    expect(lines[0]).toContain("Port 18789 is already in use");
+    expect(lines[0]).toContain("Port 28789 is already in use");
     expect(lines.some((line) => line.includes("SSH tunnel"))).toBe(true);
   });
 });

@@ -123,7 +123,7 @@ clawdbot channels add --channel qqbot --token "AppID:AppSecret"
 clawdbot gateway restart
 
 # 前台启动（查看日志）
-clawdbot gateway --port 18789 --verbose
+clawdbot gateway --port 28789 --verbose
 ```
 
 ### CLI 配置向导

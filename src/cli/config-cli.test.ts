@@ -64,7 +64,7 @@ describe("config cli", () => {
         agents: {
           list: [{ id: "main" }, { id: "oracle", workspace: "~/oracle-workspace" }],
         },
-        gateway: { port: 18789 },
+        gateway: { port: 28789 },
         tools: { allow: ["group:fs"] },
         logging: { level: "debug" },
       };
@@ -91,7 +91,7 @@ describe("config cli", () => {
       expect(mockWriteConfigFile).toHaveBeenCalledTimes(1);
       const written = mockWriteConfigFile.mock.calls[0]?.[0];
       expect(written.gateway?.auth).toEqual({ mode: "token" });
-      expect(written.gateway?.port).toBe(18789);
+      expect(written.gateway?.port).toBe(28789);
       expect(written.agents).toEqual(resolved.agents);
       expect(written.tools).toEqual(resolved.tools);
       expect(written.logging).toEqual(resolved.logging);
@@ -100,7 +100,7 @@ describe("config cli", () => {
 
     it("does not inject runtime defaults into the written config", async () => {
       const resolved: OpenClawConfig = {
-        gateway: { port: 18789 },
+        gateway: { port: 28789 },
       };
       const runtimeMerged: OpenClawConfig = {
         ...resolved,
@@ -132,7 +132,7 @@ describe("config cli", () => {
       expect(written).not.toHaveProperty("agents.defaults.maxTokens");
       expect(written).not.toHaveProperty("messages.ackReaction");
       expect(written).not.toHaveProperty("sessions.persistence");
-      expect(written.gateway?.port).toBe(18789);
+      expect(written.gateway?.port).toBe(28789);
       expect(written.gateway?.auth).toEqual({ mode: "token" });
     });
   });
@@ -141,7 +141,7 @@ describe("config cli", () => {
     it("preserves existing config keys when unsetting a value", async () => {
       const resolved: OpenClawConfig = {
         agents: { list: [{ id: "main" }] },
-        gateway: { port: 18789 },
+        gateway: { port: 28789 },
         tools: {
           profile: "coding",
           alsoAllow: ["agents_list"],

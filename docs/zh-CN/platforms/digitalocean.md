@@ -114,9 +114,9 @@ Gateway 网关默认绑定到 loopback。要访问控制界面：
 
 ```bash
 # From your local machine
-ssh -L 18789:localhost:18789 root@YOUR_DROPLET_IP
+ssh -L 28789:localhost:28789 root@YOUR_DROPLET_IP
 
-# Then open: http://localhost:18789
+# Then open: http://localhost:28789
 ```
 
 **选项 B：Tailscale Serve（HTTPS，仅 loopback）**
@@ -145,7 +145,7 @@ openclaw config set gateway.bind tailnet
 openclaw gateway restart
 ```
 
-打开：`http://<tailscale-ip>:18789`（需要令牌）。
+打开：`http://<tailscale-ip>:28789`（需要令牌）。
 
 ## 7) 连接你的渠道
 
@@ -245,7 +245,7 @@ journalctl -u openclaw --no-pager -n 50
 ### 端口已被使用
 
 ```bash
-lsof -i :18789
+lsof -i :28789
 kill <PID>
 ```
 

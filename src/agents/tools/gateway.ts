@@ -2,7 +2,7 @@ import { loadConfig, resolveGatewayPort } from "../../config/config.js";
 import { callGateway } from "../../gateway/call.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../../utils/message-channel.js";
 
-export const DEFAULT_GATEWAY_URL = "ws://127.0.0.1:18789";
+export const DEFAULT_GATEWAY_URL = "ws://127.0.0.1:28789";
 
 export type GatewayCallOptions = {
   gatewayUrl?: string;

@@ -17,19 +17,19 @@ describe("gateway discover routing helpers", () => {
     const beacon: GatewayBonjourBeacon = {
       instanceName: "Test",
       host: "10.0.0.2",
-      port: 18789,
+      port: 28789,
       gatewayPort: 12345,
     };
-    expect(pickGatewayPort(beacon)).toBe(18789);
+    expect(pickGatewayPort(beacon)).toBe(28789);
   });
 
   it("falls back to TXT host/port when resolve data is missing", () => {
     const beacon: GatewayBonjourBeacon = {
       instanceName: "Test",
       lanHost: "test-host.local",
-      gatewayPort: 18789,
+      gatewayPort: 28789,
     };
     expect(pickBeaconHost(beacon)).toBe("test-host.local");
-    expect(pickGatewayPort(beacon)).toBe(18789);
+    expect(pickGatewayPort(beacon)).toBe(28789);
   });
 });

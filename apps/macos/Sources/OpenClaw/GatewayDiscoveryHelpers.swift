@@ -39,7 +39,7 @@ enum GatewayDiscoveryHelpers {
 
         // Legacy fallback (best-effort): keep existing behavior when we couldn't resolve SRV.
         guard let lanHost = self.trimmed(lanHost), !lanHost.isEmpty else { return nil }
-        let port = gatewayPort ?? 18789
+        let port = gatewayPort ?? 28789
         return "ws://\(lanHost):\(port)"
     }
 

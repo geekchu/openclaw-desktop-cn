@@ -13,7 +13,7 @@ class ConnectionManagerTest {
         stableId = "_openclaw-gw._tcp.|local.|Test",
         name = "Test",
         host = "10.0.0.2",
-        port = 18789,
+        port = 28789,
         tlsEnabled = true,
         tlsFingerprintSha256 = "attacker",
       )
@@ -36,7 +36,7 @@ class ConnectionManagerTest {
         stableId = "_openclaw-gw._tcp.|local.|Test",
         name = "Test",
         host = "10.0.0.2",
-        port = 18789,
+        port = 28789,
         tlsEnabled = true,
         tlsFingerprintSha256 = "attacker",
       )

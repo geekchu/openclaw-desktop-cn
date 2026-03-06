@@ -43,7 +43,7 @@ export function listPortListenersWindows(port: number): PortProcess[] {
     for (const line of lines) {
       const parts = line.trim().split(/\s+/);
       // netstat -ano output format: Proto Local Address Foreign Address State PID
-      // TCP    0.0.0.0:18789      0.0.0.0:0              LISTENING       12345
+      // TCP    0.0.0.0:28789      0.0.0.0:0              LISTENING       12345
       if (
         parts.length >= 5 &&
         parts[0] === "TCP" &&

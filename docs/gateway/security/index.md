@@ -344,7 +344,7 @@ Keep config + state private on the gateway host:
 
 The Gateway multiplexes **WebSocket + HTTP** on a single port:
 
-- Default: `18789`
+- Default: `28789`
 - Config/flags/env: `gateway.port`, `--port`, `OPENCLAW_GATEWAY_PORT`
 
 This HTTP surface includes the Control UI and the canvas host:
@@ -591,7 +591,7 @@ One “safe default” config that keeps the Gateway private, requires DM pairin
   gateway: {
     mode: "local",
     bind: "loopback",
-    port: 18789,
+    port: 28789,
     auth: { mode: "token", token: "your-long-random-token" },
   },
   channels: {

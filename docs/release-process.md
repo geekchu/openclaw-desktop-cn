@@ -571,7 +571,7 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "openclaw-desktop.exe" -Recurse -ErrorAction SilentlyContinue | Select -First 1).DirectoryName
 
 # 手动运行 gateway
-& "$appDir\node-runtime\win-x64\node.exe" "$appDir\gateway-bundle\openclaw.mjs" gateway --port 18789 --force
+& "$appDir\node-runtime\win-x64\node.exe" "$appDir\gateway-bundle\openclaw.mjs" gateway --port 28789 --force
 ```
 
 ---

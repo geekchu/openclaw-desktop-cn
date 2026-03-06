@@ -33,7 +33,7 @@ describe("resolveGatewayConnection", () => {
     resolveGatewayPort.mockReset();
     pickPrimaryTailnetIPv4.mockReset();
     pickPrimaryLanIPv4.mockReset();
-    resolveGatewayPort.mockReturnValue(18789);
+    resolveGatewayPort.mockReturnValue(28789);
     pickPrimaryTailnetIPv4.mockReturnValue(undefined);
     pickPrimaryLanIPv4.mockReturnValue(undefined);
     delete process.env.OPENCLAW_GATEWAY_TOKEN;

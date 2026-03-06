@@ -49,10 +49,10 @@ import { promptGatewayConfig } from "./configure.gateway.js";
 
 describe("promptGatewayConfig", () => {
   it("generates a token when the prompt returns undefined", async () => {
-    mocks.resolveGatewayPort.mockReturnValue(18789);
+    mocks.resolveGatewayPort.mockReturnValue(28789);
     const selectQueue = ["loopback", "token", "off"];
     mocks.select.mockImplementation(async () => selectQueue.shift());
-    const textQueue = ["18789", undefined];
+    const textQueue = ["28789", undefined];
     mocks.text.mockImplementation(async () => textQueue.shift());
     mocks.randomToken.mockReturnValue("generated-token");
     mocks.buildGatewayAuthConfig.mockImplementation(({ mode, token, password }) => ({
@@ -72,12 +72,12 @@ describe("promptGatewayConfig", () => {
   });
   it("does not set password to literal 'undefined' when prompt returns undefined", async () => {
     vi.clearAllMocks();
-    mocks.resolveGatewayPort.mockReturnValue(18789);
+    mocks.resolveGatewayPort.mockReturnValue(28789);
     // Flow: loopback bind → password auth → tailscale off
     const selectQueue = ["loopback", "password", "off"];
     mocks.select.mockImplementation(async () => selectQueue.shift());
     // Port prompt → OK, then password prompt → returns undefined (simulating prompter edge case)
-    const textQueue = ["18789", undefined];
+    const textQueue = ["28789", undefined];
     mocks.text.mockImplementation(async () => textQueue.shift());
     mocks.randomToken.mockReturnValue("unused");
     mocks.buildGatewayAuthConfig.mockImplementation(({ mode, token, password }) => ({
@@ -100,13 +100,13 @@ describe("promptGatewayConfig", () => {
 
   it("prompts for trusted-proxy configuration when trusted-proxy mode selected", async () => {
     vi.clearAllMocks();
-    mocks.resolveGatewayPort.mockReturnValue(18789);
+    mocks.resolveGatewayPort.mockReturnValue(28789);
     // Flow: loopback bind → trusted-proxy auth → tailscale off
     const selectQueue = ["loopback", "trusted-proxy", "off"];
     mocks.select.mockImplementation(async () => selectQueue.shift());
     // Port prompt, userHeader, requiredHeaders, allowUsers, trustedProxies
     const textQueue = [
-      "18789",
+      "28789",
       "x-forwarded-user",
       "x-forwarded-proto,x-forwarded-host",
       "nick@example.com",
@@ -139,11 +139,11 @@ describe("promptGatewayConfig", () => {
 
   it("handles trusted-proxy with no optional fields", async () => {
     vi.clearAllMocks();
-    mocks.resolveGatewayPort.mockReturnValue(18789);
+    mocks.resolveGatewayPort.mockReturnValue(28789);
     const selectQueue = ["loopback", "trusted-proxy", "off"];
     mocks.select.mockImplementation(async () => selectQueue.shift());
     // Port prompt, userHeader (only required), empty requiredHeaders, empty allowUsers, trustedProxies
-    const textQueue = ["18789", "x-remote-user", "", "", "10.0.0.1"];
+    const textQueue = ["28789", "x-remote-user", "", "", "10.0.0.1"];
     mocks.text.mockImplementation(async () => textQueue.shift());
     mocks.buildGatewayAuthConfig.mockImplementation(({ mode, trustedProxy }) => ({
       mode,
@@ -170,10 +170,10 @@ describe("promptGatewayConfig", () => {
 
   it("forces tailscale off when trusted-proxy is selected", async () => {
     vi.clearAllMocks();
-    mocks.resolveGatewayPort.mockReturnValue(18789);
+    mocks.resolveGatewayPort.mockReturnValue(28789);
     const selectQueue = ["loopback", "trusted-proxy", "serve"];
     mocks.select.mockImplementation(async () => selectQueue.shift());
-    const textQueue = ["18789", "x-forwarded-user", "", "", "10.0.0.1"];
+    const textQueue = ["28789", "x-forwarded-user", "", "", "10.0.0.1"];
     mocks.text.mockImplementation(async () => textQueue.shift());
     mocks.confirm.mockResolvedValue(true);
     mocks.buildGatewayAuthConfig.mockImplementation(({ mode, trustedProxy }) => ({

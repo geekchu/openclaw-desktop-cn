@@ -94,7 +94,7 @@ function resolveNodeDefaults(
   if (opts.port !== undefined && portOverride === null) {
     return { host, port: null };
   }
-  const port = portOverride ?? config?.gateway?.port ?? 18789;
+  const port = portOverride ?? config?.gateway?.port ?? 28789;
   return { host, port };
 }
 
@@ -149,7 +149,7 @@ export async function runNodeDaemonInstall(opts: NodeDaemonInstallOptions) {
     await buildNodeInstallPlan({
       env: process.env,
       host,
-      port: port ?? 18789,
+      port: port ?? 28789,
       tls,
       tlsFingerprint: tlsFingerprint || undefined,
       nodeId: opts.nodeId,

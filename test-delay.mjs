@@ -5,7 +5,7 @@ import { createDefaultRuntime } from "./dist/runtime.js";
 
 async function main() {
   console.time("port-kill");
-  const { killed } = await forceFreePortAndWait(18789);
+  const { killed } = await forceFreePortAndWait(28789);
   console.timeEnd("port-kill");
 
   if (killed.length > 0) {
@@ -13,7 +13,7 @@ async function main() {
   }
 
   console.time("gateway-start");
-  const server = await startGatewayServer(18789, {
+  const server = await startGatewayServer(28789, {
     bind: "loopback",
   });
   console.timeEnd("gateway-start");

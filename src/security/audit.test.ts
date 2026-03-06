@@ -1154,7 +1154,7 @@ describe("security audit", () => {
       includeChannelSecurity: false,
       probeGatewayFn: async () => ({
         ok: false,
-        url: "ws://127.0.0.1:18789",
+        url: "ws://127.0.0.1:28789",
         connectLatencyMs: null,
         error: "connect failed",
         close: null,
@@ -1948,7 +1948,7 @@ description: test skill
           mode: "remote",
           auth: { token: "local-token-should-not-use" },
           remote: {
-            url: "ws://remote.example.com:18789",
+            url: "ws://remote.example.com:28789",
             token: "remote-token-xyz789",
           },
         },
@@ -1987,7 +1987,7 @@ description: test skill
           mode: "remote",
           auth: { token: "local-token-should-not-use" },
           remote: {
-            url: "ws://remote.example.com:18789",
+            url: "ws://remote.example.com:28789",
             token: "remote-token",
           },
         },
@@ -2024,7 +2024,7 @@ description: test skill
         gateway: {
           mode: "remote",
           remote: {
-            url: "ws://remote.example.com:18789",
+            url: "ws://remote.example.com:28789",
             password: "remote-pass",
           },
         },
@@ -2062,7 +2062,7 @@ description: test skill
         gateway: {
           mode: "remote",
           remote: {
-            url: "ws://remote.example.com:18789",
+            url: "ws://remote.example.com:28789",
             password: "remote-pass",
           },
         },

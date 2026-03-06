@@ -191,6 +191,7 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
     // 传递 gateway token 和配置目录
     let token = crate::utils::shell::session_gateway_token();
     cmd.env("OPENCLAW_GATEWAY_TOKEN", token);
+    cmd.env("OPENCLAW_GATEWAY_PORT", "28789");
     cmd.env("OPENCLAW_DESKTOP", "1");
     cmd.env("OPENCLAW_DESKTOP_TERMINAL", "1");
     cmd.env("OPENCLAW_STATE_DIR", crate::utils::platform::get_config_dir());
