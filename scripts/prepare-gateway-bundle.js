@@ -31,6 +31,55 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 const bundleDir = join(projectRoot, "src-tauri", "gateway-bundle");
 
+// Windows: cargo tauri build 的子进程可能丢失用户 PATH，导致找不到 pnpm/bash 等工具。
+// 从系统环境变量重新拼接完整 PATH 以确保工具可用。
+if (process.platform === "win32") {
+  try {
+    const fullPath = execSync(
+      'powershell -NoProfile -Command "[System.Environment]::GetEnvironmentVariable(\'Path\',\'Machine\') + \';\' + [System.Environment]::GetEnvironmentVariable(\'Path\',\'User\')"',
+      { encoding: "utf-8", windowsHide: true },
+    ).trim();
+    if (fullPath) {
+      // 合并：原始 PATH 优先，再追加系统环境变量中缺失的条目
+      const origParts = process.env.PATH.split(";").filter(Boolean);
+      const origLower = new Set(origParts.map((p) => p.toLowerCase()));
+      const newParts = fullPath.split(";").filter(Boolean);
+      for (const p of newParts) {
+        if (!origLower.has(p.toLowerCase())) {
+          origParts.push(p);
+        }
+      }
+      process.env.PATH = origParts.join(";");
+    }
+  } catch {
+    // ignore — keep existing PATH
+  }
+
+  // 确保当前 node 可执行文件的目录在 PATH 最前面。
+  const nodeDir = dirname(process.execPath);
+  if (!process.env.PATH.split(";").some((p) => p.toLowerCase() === nodeDir.toLowerCase())) {
+    process.env.PATH = `${nodeDir};${process.env.PATH}`;
+  }
+
+  // 确保 Git for Windows 的 bash 路径在 WSL bash (C:\Windows\System32\bash.exe) 之前。
+  // pnpm 运行 "bash scripts/..." 时会搜索 PATH，如果先找到 WSL bash，
+  // 脚本会在 WSL 环境中执行，导致 node 等工具不可用。
+  const gitBashCandidates = [
+    "C:\\Program Files\\Git\\usr\\bin",
+    "C:\\Program Files\\Git\\bin",
+    "C:\\Program Files (x86)\\Git\\usr\\bin",
+    "C:\\Program Files (x86)\\Git\\bin",
+  ];
+  const gitBashDir = gitBashCandidates.find((d) => existsSync(join(d, "bash.exe")));
+  if (gitBashDir) {
+    const parts = process.env.PATH.split(";").filter(Boolean);
+    const lowerGit = gitBashDir.toLowerCase();
+    // 移除已有的同路径条目，然后插到最前面
+    const filtered = parts.filter((p) => p.toLowerCase() !== lowerGit);
+    process.env.PATH = `${gitBashDir};${filtered.join(";")}`;
+  }
+}
+
 function run(cmd, opts = {}) {
   console.log(`[bundle] $ ${cmd}`);
   execSync(cmd, { stdio: "inherit", cwd: projectRoot, windowsHide: true, ...opts });

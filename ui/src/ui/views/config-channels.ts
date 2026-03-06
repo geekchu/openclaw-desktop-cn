@@ -504,6 +504,26 @@ const channelInfo: Record<
           { value: "false", label: "否" },
         ],
       },
+      {
+        key: "dmPolicy",
+        label: "私聊策略",
+        type: "select",
+        options: [
+          { value: "pairing", label: "配对模式" },
+          { value: "open", label: "开放模式" },
+          { value: "disabled", label: "禁用" },
+        ],
+      },
+      {
+        key: "groupPolicy",
+        label: "群组策略",
+        type: "select",
+        options: [
+          { value: "allowlist", label: "白名单" },
+          { value: "open", label: "开放" },
+          { value: "disabled", label: "禁用" },
+        ],
+      },
     ],
     helpText: "需要安装并启用开放平台的机器人能力",
   },
@@ -1473,8 +1493,11 @@ export class OpenClawConfigChannels extends LitElement {
       }
       this.configForm = form;
 
-      // Start pairing poll if dmPolicy is 'pairing'
-      if (form.dmPolicy === "pairing") {
+      // Start pairing poll if dmPolicy is 'pairing' (or naturally defaults to pairing)
+      if (
+        form.dmPolicy === "pairing" ||
+        (!form.dmPolicy && info?.fields?.some((f) => f.key === "dmPolicy"))
+      ) {
         this._startPairingPoll(channelId);
       }
     } else {
@@ -1544,7 +1567,9 @@ export class OpenClawConfigChannels extends LitElement {
 
     // dmPolicy 切换时启动/停止配对轮询
     if (key === "dmPolicy" && this.selectedChannel) {
-      if (v === "pairing") {
+      const channelConfig = this.channels.find((c) => c.id === this.selectedChannel);
+      const info = channelConfig ? channelInfo[channelConfig.channel_type] : null;
+      if (v === "pairing" || (!v && info?.fields?.some((f) => f.key === "dmPolicy"))) {
         this._startPairingPoll(this.selectedChannel);
       } else {
         this._stopPairingPoll();
@@ -1726,9 +1751,11 @@ export class OpenClawConfigChannels extends LitElement {
                   : nothing
               }
 
-              <!-- Pairing requests block (when dmPolicy is 'pairing') -->
+              <!-- Pairing requests block (when dmPolicy is 'pairing' or default) -->
               ${
-                this.configForm.dmPolicy === "pairing"
+                this.configForm.dmPolicy === "pairing" ||
+                (!this.configForm.dmPolicy &&
+                  currentInfo?.fields?.some((f: ChannelField) => f.key === "dmPolicy"))
                   ? html`
                 <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border, #27272a);">
                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">

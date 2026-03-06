@@ -144,17 +144,20 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
                 .map(|(_, entry)| entry);
 
             if let Some(entry) = entry_point {
+                cmd.env("OPENCLAW_INTERNAL_NODE", &node_path);
+                cmd.env("OPENCLAW_INTERNAL_ENTRY", &entry);
+
                 #[cfg(target_os = "windows")]
                 {
                     let bat_path = wrapper_dir.join("openclaw.cmd");
-                    let bat_content = format!("@echo off\r\n\"{}\" \"{}\" %*\r\n", node_path, entry);
+                    let bat_content = "@echo off\r\n\"%OPENCLAW_INTERNAL_NODE%\" \"%OPENCLAW_INTERNAL_ENTRY%\" %*\r\n";
                     let _ = std::fs::write(&bat_path, bat_content);
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
                     let sh_path = wrapper_dir.join("openclaw");
-                    let sh_content = format!("#!/bin/sh\nexec \"{}\" \"{}\" \"$@\"\n", node_path, entry);
-                    let _ = std::fs::write(&sh_path, &sh_content);
+                    let sh_content = "#!/bin/sh\nexec \"$OPENCLAW_INTERNAL_NODE\" \"$OPENCLAW_INTERNAL_ENTRY\" \"$@\"\n";
+                    let _ = std::fs::write(&sh_path, sh_content);
                     let _ = std::fs::set_permissions(&sh_path, std::fs::Permissions::from_mode(0o755));
                 }
             }

@@ -12,7 +12,7 @@ console.log("Starting test gateway at:", entry);
 
 const child = spawn(
   process.execPath,
-  [entry, "gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force"],
+  [entry, "gateway", "--port", "28789", "--bind", "lan", "--desktop-internal", "--force"],
   {
     cwd: bundleDir,
     env: {

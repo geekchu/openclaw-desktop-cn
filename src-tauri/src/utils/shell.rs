@@ -793,7 +793,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
         let mut cmd = Command::new(&node_path);
         cmd.arg(&entry_point);
-        cmd.args(["gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
+        cmd.args(["gateway", "--port", "28789", "--bind", "lan", "--desktop-internal", "--force", "--allow-unconfigured"]);
         cmd.current_dir(&bundle_dir);
 
         for (key, value) in &user_env_vars {
@@ -892,11 +892,11 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
     let mut cmd = if openclaw_path.ends_with(".cmd") {
         let mut c = Command::new("cmd");
-        c.args(["/c", &openclaw_path, "gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
+        c.args(["/c", &openclaw_path, "gateway", "--port", "28789", "--bind", "lan", "--desktop-internal", "--force", "--allow-unconfigured"]);
         c
     } else {
         let mut c = Command::new(&openclaw_path);
-        c.args(["gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
+        c.args(["gateway", "--port", "28789", "--bind", "lan", "--desktop-internal", "--force", "--allow-unconfigured"]);
         c
     };
 
