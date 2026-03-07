@@ -36,7 +36,7 @@ const bundleDir = join(projectRoot, "src-tauri", "gateway-bundle");
 if (process.platform === "win32") {
   try {
     const fullPath = execSync(
-      'powershell -NoProfile -Command "[System.Environment]::GetEnvironmentVariable(\'Path\',\'Machine\') + \';\' + [System.Environment]::GetEnvironmentVariable(\'Path\',\'User\')"',
+      "powershell -NoProfile -Command \"[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')\"",
       { encoding: "utf-8", windowsHide: true },
     ).trim();
     if (fullPath) {
@@ -104,7 +104,9 @@ function copyIfExists(src, dest) {
         );
       } catch (err) {
         // robocopy exit codes: 0-7 = success (bitmask), >=8 = error
-        if (err.status >= 8) throw err;
+        if (err.status >= 8) {
+          throw err;
+        }
       }
     } else {
       cpSync(src, dest, { recursive: true });
@@ -147,6 +149,12 @@ run("pnpm build");
 console.log("\n[bundle] === Step 2: 编译 Control UI ===");
 run("pnpm ui:build");
 
+if (process.env.BUILD_CONFIG === "release") {
+  console.log("\n[bundle] === DETECTED RELEASE CONFIG: Running ESBuild Single-File Optimizer ===");
+  run("node scripts/build-gateway-bundle.mjs");
+  process.exit(0);
+}
+
 // Step 3: 清理并创建 bundle 目录
 console.log("\n[bundle] === Step 3: 创建 gateway-bundle ===");
 if (existsSync(bundleDir)) {
@@ -178,7 +186,9 @@ copyIfExists(join(projectRoot, "extensions"), join(bundleDir, "extensions"));
 // 我们在打包阶段将这些引用原地替换为 ../../../dist/... 来劫持到已编译的安全产物。
 {
   function rewriteSrcToDist(dir) {
-    if (!existsSync(dir)) return;
+    if (!existsSync(dir)) {
+      return;
+    }
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const fullPath = join(dir, entry.name);
       if (entry.isDirectory()) {
@@ -236,10 +246,14 @@ const extDir = join(bundleDir, "extensions");
 if (existsSync(extDir)) {
   for (const name of readdirSync(extDir)) {
     const extPkgPath = join(extDir, name, "package.json");
-    if (!existsSync(extPkgPath)) continue;
+    if (!existsSync(extPkgPath)) {
+      continue;
+    }
     const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
     const deps = extPkg.dependencies;
-    if (!deps) continue;
+    if (!deps) {
+      continue;
+    }
     let merged = 0;
     for (const [depName, depVer] of Object.entries(deps)) {
       if (typeof depVer === "string" && depVer.startsWith("workspace:")) {
