@@ -610,8 +610,24 @@ export function discoverOpenClawPlugins(params: {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bundledExtensions = (globalThis as any).__BUNDLED_EXTENSIONS__ as
+    | Record<string, unknown>
+    | undefined;
+
   const bundledDir = resolveBundledPluginsDir();
-  if (bundledDir) {
+  if (bundledExtensions) {
+    // Fast path: esbuild single-file optimization injected these extensions statically.
+    for (const idHint of Object.keys(bundledExtensions)) {
+      candidates.push({
+        idHint,
+        source: `bundled://${idHint}`,
+        rootDir: bundledDir ?? "",
+        origin: "bundled",
+        packageManifest: {},
+      });
+    }
+  } else if (bundledDir) {
     discoverInDirectory({
       dir: bundledDir,
       origin: "bundled",

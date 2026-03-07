@@ -55,6 +55,11 @@ When the operator says “release”, immediately do this preflight (no extra qu
   - `pnpm test:install:e2e` (requires both keys; runs both providers)
 - [ ] (Optional) Spot-check the web gateway if your changes affect send/receive paths.
 
+> [!NOTE]
+> During final production builds for release, the Windows package is highly optimized using `esbuild`. The Node.js backend (including `node_modules` and all extensions) is compiled into a single `openclaw.mjs` file to drastically improve startup time.
+>
+> If you need to test the exact binary that users will run, you MUST prefix the build command with `BUILD_CONFIG=release` (for example: `BUILD_CONFIG=release pnpm tauri build`).
+
 5. **macOS app (Sparkle)**
 
 - [ ] Build + sign the macOS app, then zip it for distribution.
