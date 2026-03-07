@@ -164,7 +164,7 @@ git push && git push --tags
 
 #### Windows（由于集成了构建脚本，无需每次设置环境）
 
-有两种便捷方式：
+执行方式：
 
 1. 在 PowerShell/Terminal 中执行 `.\build.ps1`。
 

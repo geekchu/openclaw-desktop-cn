@@ -74,6 +74,7 @@ function formatSize(bytes) {
 function checkEnvironment() {
   logStep(0, "环境检查");
   let ok = true;
+  const requiresSigning = !isDebug;
 
   // Node.js
   const nodeVersion = getCommandVersion("node");
@@ -130,17 +131,31 @@ function checkEnvironment() {
 
   // Signing key check
   if (!process.env.TAURI_SIGNING_PRIVATE_KEY) {
-    log("⚠ 未设置 TAURI_SIGNING_PRIVATE_KEY 环境变量");
-    log("  构建产物将不包含 .sig 签名文件，无法用于自动更新发布");
+    if (requiresSigning) {
+      log("✗ release 构建必须设置 TAURI_SIGNING_PRIVATE_KEY 环境变量");
+      log("  否则不会生成 .sig，无法用于自动更新发布");
+    } else {
+      log("⚠ 未设置 TAURI_SIGNING_PRIVATE_KEY 环境变量");
+      log("  debug 构建可继续，但不会生成 .sig 签名文件");
+    }
     log(
       "  设置方法 (PowerShell): $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content ~/.tauri/openclaw.key -Raw",
     );
+    if (requiresSigning) {
+      ok = false;
+    }
   } else if (
     process.env.TAURI_SIGNING_PRIVATE_KEY.includes("ENCRYPTED") &&
     !process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD
   ) {
-    log("⚠ 签名私钥已加密，但未设置 TAURI_SIGNING_PRIVATE_KEY_PASSWORD");
-    log("  构建过程可能会卡住等待密码输入");
+    if (requiresSigning) {
+      log("✗ release 构建必须设置 TAURI_SIGNING_PRIVATE_KEY_PASSWORD");
+      log("  否则签名步骤可能卡住或失败");
+      ok = false;
+    } else {
+      log("⚠ 签名私钥已加密，但未设置 TAURI_SIGNING_PRIVATE_KEY_PASSWORD");
+      log("  构建过程可能会卡住等待密码输入");
+    }
     log("  设置方法 (PowerShell): $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '你的密码'");
   }
 
