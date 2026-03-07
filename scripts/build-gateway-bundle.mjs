@@ -93,6 +93,7 @@ try {
       "fsevents",
       "ffmpeg-static",
       "@node-llama-cpp/*",
+      "node-llama-cpp",
       "playwright-core",
     ],
   });
@@ -147,21 +148,6 @@ const bundlePkg = {
   },
   optionalDependencies: {},
 };
-
-// Intelligently resolve the dynamic @node-llama-cpp OS-specific binaries
-try {
-  const nlcPkgInfo = JSON.parse(
-    readFileSync(join(projectRoot, "node_modules", "node-llama-cpp", "package.json"), "utf-8"),
-  );
-  if (nlcPkgInfo.optionalDependencies) {
-    bundlePkg.optionalDependencies = { ...nlcPkgInfo.optionalDependencies };
-  }
-} catch (error) {
-  console.warn(
-    "[build-bundle] Warning: Could not resolve node-llama-cpp bindings dynamically:",
-    error,
-  );
-}
 
 // Clean out any wildcard externals that we couldn't properly resolve a single exact package for
 for (const key of Object.keys(bundlePkg.dependencies)) {

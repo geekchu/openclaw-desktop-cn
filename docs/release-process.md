@@ -166,10 +166,11 @@ git push && git push --tags
 
 有两种便捷方式：
 
-1. **直接双击** 项目根目录下的 `build.bat`。
-2. 或在 PowerShell/Terminal 中执行 `.\build.ps1`。
+1. 在 PowerShell/Terminal 中执行 `.\build.ps1`。
 
-> 💡 **提示**：这几个脚本会自动设置 `BUILD_CONFIG=release` 环境变量（触发极速单文件后端打包优化），并从 `~/.tauri/openclaw.key` 读取私钥设置环境变量，同时自带 `cargo clean` 机制以确保产物完全无幽灵缓存。
+> 💡 **提示**：`build.ps1` 会自动设置 `BUILD_CONFIG=release` 环境变量（触发极速单文件后端打包优化），并从 `~/.tauri/openclaw.key` 读取私钥设置环境变量，同时自带 `cargo clean` 机制以确保产物完全无幽灵缓存。
+>
+> 说明：请统一使用 `build.ps1`；它会通过 PowerShell 的 `ReadAllText()` 读取完整的多行私钥，避免批处理脚本读取首行导致签名失败。
 
 #### macOS（在 Mac 机器上执行）
 
@@ -184,6 +185,8 @@ pnpm installer:build
 ```
 
 **构建脚本自动完成：** 环境检查 → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 Vite UI 构建 + `esbuild` 极速单文件 `gateway-bundle` 打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
+
+> ⚠️ `pnpm installer:build` 在 **release** 模式下会对签名环境变量做 fail-fast 检查；如果缺少 `TAURI_SIGNING_PRIVATE_KEY`（或加密私钥缺少 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`），脚本会直接退出，而不是继续产出无法发布自动更新的半成品。
 
 > ⚠️ **首次构建或修改前端代码/配置后**，建议先清除 Cargo 编译缓存再构建：
 >
@@ -531,9 +534,9 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 
 | 问题                                          | 原因                                               | 解决                                                                                                     |
 | --------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 构建成功但没有 `.sig` 文件                    | 未设置私钥环境变量                                 | 请使用根目录提供的 `build.bat` 或 `build.ps1` 脚本进行一键构建，它们会自动读取并设置密钥。               |
+| 构建成功但没有 `.sig` 文件                    | 未设置私钥环境变量                                 | 请使用根目录提供的 `build.ps1` 脚本进行一键构建，它会自动读取并设置密钥。                                |
 | NSIS 打包后报 "Wrong password"                | 签名密钥密码不对或 PowerShell 读取密钥时添加了 BOM | 使用 `build.ps1` 脚本可以自动规避由于 BOM 或者编码错误导致的密码截断等故障。                             |
-| NSIS 打包后报 "no private key"                | 未读取到私钥内容或路径设置错误                     | 推荐直接运行 `build.bat` 或 `build.ps1` 以自动完成配置绑定。                                             |
+| NSIS 打包后报 "no private key"                | 未读取到私钥内容或路径设置错误                     | 推荐直接运行 `build.ps1` 以自动完成配置绑定。                                                            |
 | 构建卡住在 `Running makensis`                 | gateway-bundle 太大（>1GB）                        | 检查 `prepare-gateway-bundle.js` 的去重和清理步骤是否正常执行                                            |
 | 构建卡住在 WebView2 下载                      | 网络无法访问 Microsoft CDN                         | `tauri.conf.json` 已设置 `webviewInstallMode: skip`                                                      |
 | `cargo-lock` 文件锁定错误                     | Windows Defender 实时监控                          | 将项目目录加入排除列表                                                                                   |
