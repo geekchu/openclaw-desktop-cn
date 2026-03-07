@@ -48,10 +48,7 @@ const __BUNDLED_EXTENSIONS__ = {};\n`;
 for (let i = 0; i < extensions.length; i++) {
   const ext = extensions[i];
   // resolve absolute path for extension entry
-  const absEntry = join(projectRoot, "extensions", ext.name, ext.entry.split("/").pop()).replace(
-    /\\/g,
-    "/",
-  );
+  const absEntry = resolve(artifactsDir, ext.entry).replace(/\\/g, "/");
   syntheticContent += `import * as ext_${i} from '${absEntry}';\n`;
   syntheticContent += `__BUNDLED_EXTENSIONS__['${ext.name}'] = ext_${i};\n`;
 }
