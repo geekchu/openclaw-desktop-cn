@@ -80,6 +80,10 @@ try {
     format: "esm",
     platform: "node",
     target: "node22",
+    banner: {
+      // Polyfill `require`, `__filename`, and `__dirname` in ESM format so CJS modules don't crash
+      js: "import * as __esm_banner_module from 'module'; import * as __esm_banner_url from 'url'; import * as __esm_banner_path from 'path'; const require = __esm_banner_module.createRequire(import.meta.url); const __filename = __esm_banner_url.fileURLToPath(import.meta.url); const __dirname = __esm_banner_path.dirname(__filename);",
+    },
     // Keep names to try to preserve __dirname as best as possible,
     // though realistically we depend on config dir resolution.
     keepNames: true,
@@ -92,6 +96,7 @@ try {
       "fsevents",
       "ffmpeg-static",
       "@node-llama-cpp/*",
+      "playwright-core",
     ],
   });
   console.log("[build-bundle] Bundle generated successfully.");
@@ -103,33 +108,72 @@ try {
 // 5. Copy necessary runtime assets that aren't JS modules
 console.log("[build-bundle] Copying runtime assets...");
 // Ex: docs/reference/templates which is expected by the daemon/init
-const templatesDir = join(projectRoot, "docs", "reference", "templates");
-const targetTemplatesDir = join(bundleDir, "docs", "reference", "templates");
-if (existsSync(templatesDir)) {
-  mkdirSync(dirname(targetTemplatesDir), { recursive: true });
-  if (process.platform === "win32") {
-    try {
-      execSync(`robocopy "${templatesDir}" "${targetTemplatesDir}" /E /NFL /NDL /NJH /NJS /NP`, {
-        windowsHide: true,
-      });
-    } catch {
-      /* robocopy exit codes */
+const copyTargets = ["docs/reference/templates", "assets", "skills"];
+
+for (const target of copyTargets) {
+  const srcDir = join(projectRoot, ...target.split("/"));
+  const dstDir = join(bundleDir, ...target.split("/"));
+  if (existsSync(srcDir)) {
+    mkdirSync(dirname(dstDir), { recursive: true });
+    if (process.platform === "win32") {
+      try {
+        execSync(`robocopy "${srcDir}" "${dstDir}" /E /NFL /NDL /NJH /NJS /NP`, {
+          windowsHide: true,
+        });
+      } catch {
+        /* robocopy exit codes */
+      }
+    } else {
+      execSync(`cp -R "${srcDir}" "${dstDir}"`);
     }
-  } else {
-    // Implement cpSync for linux/mac if needed, but our target is mostly windows right now
-    execSync(`cp -R "${templatesDir}" "${targetTemplatesDir}"`);
+    console.log(`[build-bundle] Copied ${target}`);
   }
 }
 
 // We also need a fake package.json in the bundle folder so that OpenClaw's internal package.json reader doesn't crash
+// Crucially, we MUST also define our external dependencies here so they can be installed separately for the bundle.
 const rootPkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf-8"));
+
+// Fetch versions for external dependencies from the root package.json or dependencies
+const resolveVersion = (pkgName) => {
+  return rootPkg.dependencies?.[pkgName] || rootPkg.devDependencies?.[pkgName] || "*";
+};
+
 const bundlePkg = {
   name: rootPkg.name,
   version: rootPkg.version,
   type: "module",
   main: "openclaw.mjs",
-  dependencies: {}, // Empty because it's bundled
+  dependencies: {
+    "playwright-core": resolveVersion("playwright-core"),
+    "ffmpeg-static": resolveVersion("ffmpeg-static"),
+  },
+  optionalDependencies: {},
 };
+
+// Intelligently resolve the dynamic @node-llama-cpp OS-specific binaries
+try {
+  const nlcPkgInfo = JSON.parse(
+    readFileSync(join(projectRoot, "node_modules", "node-llama-cpp", "package.json"), "utf-8"),
+  );
+  if (nlcPkgInfo.optionalDependencies) {
+    bundlePkg.optionalDependencies = { ...nlcPkgInfo.optionalDependencies };
+  }
+} catch (error) {
+  console.warn(
+    "[build-bundle] Warning: Could not resolve node-llama-cpp bindings dynamically:",
+    error,
+  );
+}
+
+// Clean out any wildcard externals that we couldn't properly resolve a single exact package for
+for (const key of Object.keys(bundlePkg.dependencies)) {
+  if (bundlePkg.dependencies[key] === "*") {
+    // Attempt to parse out of pnpm-lock if strictly required, but usually these wildcard modules are implicitly provided.
+    // For safety, we keep them as '*' so `npm install` gracefully pulls the latest compatible or skips.
+  }
+}
+
 writeFileSync(join(bundleDir, "package.json"), JSON.stringify(bundlePkg, null, 2));
 
 console.log("[build-bundle] === Finished Single-File Backend Bundling ===");

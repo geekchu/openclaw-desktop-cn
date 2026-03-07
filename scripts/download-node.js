@@ -63,11 +63,21 @@ function getCurrentPlatform() {
   const platform = process.platform;
   const arch = process.arch;
 
-  if (platform === "win32" && arch === "x64") return "win-x64";
-  if (platform === "darwin" && arch === "x64") return "darwin-x64";
-  if (platform === "darwin" && arch === "arm64") return "darwin-arm64";
-  if (platform === "linux" && arch === "x64") return "linux-x64";
-  if (platform === "linux" && arch === "arm64") return "linux-arm64";
+  if (platform === "win32" && arch === "x64") {
+    return "win-x64";
+  }
+  if (platform === "darwin" && arch === "x64") {
+    return "darwin-x64";
+  }
+  if (platform === "darwin" && arch === "arm64") {
+    return "darwin-arm64";
+  }
+  if (platform === "linux" && arch === "x64") {
+    return "linux-x64";
+  }
+  if (platform === "linux" && arch === "arm64") {
+    return "linux-arm64";
+  }
 
   console.warn(`[download-node] 当前平台 ${platform}-${arch} 不在支持列表中`);
   return null;
@@ -102,7 +112,9 @@ function parseArgs() {
 }
 
 function isVersionMatch() {
-  if (!existsSync(VERSION_FILE)) return false;
+  if (!existsSync(VERSION_FILE)) {
+    return false;
+  }
   const existing = readFileSync(VERSION_FILE, "utf-8").trim();
   return existing === NODE_VERSION;
 }
@@ -121,7 +133,9 @@ async function downloadFile(url, destPath) {
 function findFirstSubdir(dir) {
   const entries = readdirSync(dir, { withFileTypes: true });
   const firstDir = entries.find((e) => e.isDirectory());
-  if (!firstDir) throw new Error(`解压后未找到子目录: ${dir}`);
+  if (!firstDir) {
+    throw new Error(`解压后未找到子目录: ${dir}`);
+  }
   return firstDir.name;
 }
 
@@ -146,7 +160,9 @@ async function downloadAndExtractPlatform(platformKey) {
 
   // 解压到临时目录
   const tempDir = join(nodeRuntimeDir, "_extract_tmp");
-  if (existsSync(tempDir)) rmSync(tempDir, { recursive: true, force: true });
+  if (existsSync(tempDir)) {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
   mkdirSync(tempDir, { recursive: true });
 
   if (config.archiveExt === "zip") {
@@ -167,7 +183,9 @@ async function downloadAndExtractPlatform(platformKey) {
   const innerDirName = findFirstSubdir(tempDir);
   const innerDir = join(tempDir, innerDirName);
 
-  if (existsSync(destDir)) rmSync(destDir, { recursive: true, force: true });
+  if (existsSync(destDir)) {
+    rmSync(destDir, { recursive: true, force: true });
+  }
 
   // 移动到目标目录
   if (process.platform === "win32") {

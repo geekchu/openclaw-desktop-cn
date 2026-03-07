@@ -24,10 +24,10 @@ const distInstallersDir = join(projectRoot, "dist", "installers");
 
 // -- 参数解析 --
 
-const args = process.argv.slice(2);
-const isDebug = args.includes("--debug");
-const skipDeps = args.includes("--skip-deps");
-const verbose = args.includes("--verbose");
+const args = new Set(process.argv.slice(2));
+const isDebug = args.has("--debug");
+const skipDeps = args.has("--skip-deps");
+const verbose = args.has("--verbose");
 const buildProfile = isDebug ? "debug" : "release";
 
 function log(msg) {
@@ -41,11 +41,13 @@ function logStep(step, title) {
 }
 
 function run(cmd, opts = {}) {
-  if (verbose) log(`$ ${cmd}`);
+  if (verbose) {
+    log(`$ ${cmd}`);
+  }
   try {
     execSync(cmd, { stdio: "inherit", cwd: projectRoot, ...opts });
   } catch (err) {
-    throw new Error(`命令执行失败: ${cmd}`);
+    throw new Error(`命令执行失败: ${cmd}`, { cause: err });
   }
 }
 
@@ -58,8 +60,12 @@ function getCommandVersion(cmd, flag = "--version") {
 }
 
 function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
@@ -205,7 +211,9 @@ function collectArtifacts() {
   const artifacts = [];
 
   function scanDir(dir, depth = 0) {
-    if (!existsSync(dir) || depth > 4) return;
+    if (!existsSync(dir) || depth > 4) {
+      return;
+    }
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const fullPath = join(dir, entry.name);
       if (entry.isDirectory()) {
@@ -308,6 +316,8 @@ try {
   main();
 } catch (err) {
   console.error(`\n[build] 构建失败: ${err.message}`);
-  if (verbose && err.stack) console.error(err.stack);
+  if (verbose && err.stack) {
+    console.error(err.stack);
+  }
   process.exit(1);
 }

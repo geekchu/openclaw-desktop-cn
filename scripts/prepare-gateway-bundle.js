@@ -152,6 +152,11 @@ run("pnpm ui:build");
 if (process.env.BUILD_CONFIG === "release") {
   console.log("\n[bundle] === DETECTED RELEASE CONFIG: Running ESBuild Single-File Optimizer ===");
   run("node scripts/build-gateway-bundle.mjs");
+
+  // Create a minimal `node_modules` folder inside the bundle containing ONLY the externalized native binaries
+  console.log("\n[bundle] Installing external dependencies for release bundle...");
+  run("npm install --omit=dev --no-package-lock", { cwd: bundleDir });
+
   process.exit(0);
 }
 
