@@ -199,9 +199,6 @@ pnpm installer:build
 > 原因：Tauri 的 `generate_context!()` proc macro 会在编译时嵌入 `frontendDist` 目录中的所有文件。
 > Cargo 增量编译可能复用旧的宏展开结果，导致前端资源未更新。
 
-> ⚠️ 如果忘记设置 `TAURI_SIGNING_PRIVATE_KEY` 或 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，构建会在 NSIS 打包后签名阶段失败。
-> 可以在构建完成后手动签名：`cargo tauri signer sign <exe路径> --private-key-path "$HOME\.tauri\openclaw.key" --password 123`
-
 #### 构建产物
 
 | 平台    | 原始路径                                    | 产物文件                   |
@@ -532,17 +529,17 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 
 ### 构建相关
 
-| 问题                                          | 原因                                               | 解决                                                                                                     |
-| --------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 构建成功但没有 `.sig` 文件                    | 未设置私钥环境变量                                 | 请使用根目录提供的 `build.ps1` 脚本进行一键构建，它会自动读取并设置密钥。                                |
-| NSIS 打包后报 "Wrong password"                | 签名密钥密码不对或 PowerShell 读取密钥时添加了 BOM | 使用 `build.ps1` 脚本可以自动规避由于 BOM 或者编码错误导致的密码截断等故障。                             |
-| NSIS 打包后报 "no private key"                | 未读取到私钥内容或路径设置错误                     | 推荐直接运行 `build.ps1` 以自动完成配置绑定。                                                            |
-| 构建卡住在 `Running makensis`                 | gateway-bundle 太大（>1GB）                        | 检查 `prepare-gateway-bundle.js` 的去重和清理步骤是否正常执行                                            |
-| 构建卡住在 WebView2 下载                      | 网络无法访问 Microsoft CDN                         | `tauri.conf.json` 已设置 `webviewInstallMode: skip`                                                      |
-| `cargo-lock` 文件锁定错误                     | Windows Defender 实时监控                          | 将项目目录加入排除列表                                                                                   |
-| `beforeBuildCommand` 失败                     | `pnpm install` 未执行                              | 先运行 `pnpm install`                                                                                    |
-| 安装后白屏 "No resource with given URL found" | Cargo 增量编译跳过前端资源嵌入                     | `build.rs` 已添加 `rerun-if-changed=../dist/control-ui`；如仍复现可 `cargo clean` 后重建                 |
-| 安装后白屏但 Gateway 手动可启动               | `frontendDist` 指向的目录缺少 UI 构建产物          | 已修复：`frontendDist` 直接指向 `../dist/control-ui`（Vite 输出），splash 通过 Rust `window.eval()` 注入 |
+| 问题                                                 | 原因                                               | 解决                                                                                                     |
+| ---------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 构建在环境检查初筛阶段直接报错退出，提示"未设置私钥" | 未设置私钥环境变量                                 | 请使用根目录提供的 `build.ps1` 脚本进行一键构建，它会自动读取并设置密钥。                                |
+| NSIS 打包后报 "Wrong password"                       | 签名密钥密码不对或 PowerShell 读取密钥时添加了 BOM | 使用 `build.ps1` 脚本可以自动规避由于 BOM 或者编码错误导致的密码截断等故障。                             |
+| NSIS 打包后报 "no private key"                       | 未读取到私钥内容或路径设置错误                     | 推荐直接运行 `build.ps1` 以自动完成配置绑定。                                                            |
+| 构建卡住在 `Running makensis`                        | gateway-bundle 太大（>1GB）                        | 检查 `prepare-gateway-bundle.js` 的去重和清理步骤是否正常执行                                            |
+| 构建卡住在 WebView2 下载                             | 网络无法访问 Microsoft CDN                         | `tauri.conf.json` 已设置 `webviewInstallMode: skip`                                                      |
+| `cargo-lock` 文件锁定错误                            | Windows Defender 实时监控                          | 将项目目录加入排除列表                                                                                   |
+| `beforeBuildCommand` 失败                            | `pnpm install` 未执行                              | 先运行 `pnpm install`                                                                                    |
+| 安装后白屏 "No resource with given URL found"        | Cargo 增量编译跳过前端资源嵌入                     | `build.rs` 已添加 `rerun-if-changed=../dist/control-ui`；如仍复现可 `cargo clean` 后重建                 |
+| 安装后白屏但 Gateway 手动可启动                      | `frontendDist` 指向的目录缺少 UI 构建产物          | 已修复：`frontendDist` 直接指向 `../dist/control-ui`（Vite 输出），splash 通过 Rust `window.eval()` 注入 |
 
 ### 发布相关
 
@@ -598,6 +595,7 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 | ----------------------------------- | --------------------------------------------------------------------------- |
 | `scripts/build-installer.js`        | 统一构建入口（环境检查→依赖→构建→收集产物）                                 |
 | `scripts/prepare-gateway-bundle.js` | beforeBuildCommand，打包 gateway 代码（含 UI 构建、依赖去重、文件清理优化） |
+| `scripts/build-gateway-bundle.mjs`  | esbuild 单文件打包（release 模式，由 prepare-gateway-bundle.js 调用）       |
 | `scripts/download-node.js`          | 下载 Node.js 运行时嵌入安装包                                               |
 | `.npmrc`                            | npm 注册表镜像（`registry.npmmirror.com`）+ 允许构建脚本列表                |
 
