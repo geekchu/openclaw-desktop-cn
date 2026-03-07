@@ -23,7 +23,7 @@ async function withTempStateDir<T>(fn: (dir: string) => Promise<T>) {
           return override;
         }
         const resolveHome = homedir ?? os.homedir;
-        return path.join(resolveHome(), ".openclaw");
+        return path.join(resolveHome(), ".openclawcn");
       },
     },
   } as PluginRuntime);

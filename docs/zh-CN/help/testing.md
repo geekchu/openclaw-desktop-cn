@@ -306,8 +306,8 @@ OPENCLAW_LIVE_CLI_BACKEND=1 \
 - 如果 CLI 能工作，实时测试应该能找到相同的密钥。
 - 如果实时测试说"无凭证"，用调试 `openclaw models list`/模型选择相同的方式调试。
 
-- 配置文件存储：`~/.openclaw/credentials/`（首选；测试中"配置文件密钥"的含义）
-- 配置：`~/.openclaw/openclaw.json`（或 `OPENCLAW_CONFIG_PATH`）
+- 配置文件存储：`~/.openclawcn/credentials/`（首选；测试中"配置文件密钥"的含义）
+- 配置：`~/.openclawcn/openclaw.json`（或 `OPENCLAW_CONFIG_PATH`）
 
 如果你想依赖环境变量密钥（例如在 `~/.profile` 中导出的），在 `source ~/.profile` 后运行本地测试，或使用下面的 Docker 运行器（它们可以将 `~/.profile` 挂载到容器中）。
 
@@ -328,8 +328,8 @@ OPENCLAW_LIVE_CLI_BACKEND=1 \
 
 有用的环境变量：
 
-- `OPENCLAW_CONFIG_DIR=...`（默认：`~/.openclaw`）挂载到 `/home/node/.openclaw`
-- `OPENCLAW_WORKSPACE_DIR=...`（默认：`~/.openclaw/workspace`）挂载到 `/home/node/.openclaw/workspace`
+- `OPENCLAW_CONFIG_DIR=...`（默认：`~/.openclawcn`）挂载到 `/home/node/.openclawcn`
+- `OPENCLAW_WORKSPACE_DIR=...`（默认：`~/.openclawcn/workspace`）挂载到 `/home/node/.openclawcn/workspace`
 - `OPENCLAW_PROFILE_FILE=...`（默认：`~/.profile`）挂载到 `/home/node/.profile` 并在运行测试前加载
 - `OPENCLAW_LIVE_GATEWAY_MODELS=...` / `OPENCLAW_LIVE_MODELS=...` 用于缩小运行范围
 - `OPENCLAW_LIVE_REQUIRE_PROFILE_KEYS=1` 确保凭证来自配置文件存储（而非环境变量）

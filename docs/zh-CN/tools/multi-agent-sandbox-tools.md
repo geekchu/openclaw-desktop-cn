@@ -32,7 +32,7 @@ x-i18n:
 认证是按智能体的：每个智能体从其自己的 `agentDir` 认证存储读取：
 
 ```
-~/.openclaw/agents/<agentId>/agent/auth-profiles.json
+~/.openclawcn/agents/<agentId>/agent/auth-profiles.json
 ```
 
 凭证**不会**在智能体之间共享。切勿在智能体之间重用 `agentDir`。
@@ -55,13 +55,13 @@ x-i18n:
         "id": "main",
         "default": true,
         "name": "Personal Assistant",
-        "workspace": "~/.openclaw/workspace",
+        "workspace": "~/.openclawcn/workspace",
         "sandbox": { "mode": "off" }
       },
       {
         "id": "family",
         "name": "Family Bot",
-        "workspace": "~/.openclaw/workspace-family",
+        "workspace": "~/.openclawcn/workspace-family",
         "sandbox": {
           "mode": "all",
           "scope": "agent"
@@ -104,12 +104,12 @@ x-i18n:
     "list": [
       {
         "id": "personal",
-        "workspace": "~/.openclaw/workspace-personal",
+        "workspace": "~/.openclawcn/workspace-personal",
         "sandbox": { "mode": "off" }
       },
       {
         "id": "work",
-        "workspace": "~/.openclaw/workspace-work",
+        "workspace": "~/.openclawcn/workspace-work",
         "sandbox": {
           "mode": "all",
           "scope": "shared",
@@ -164,14 +164,14 @@ x-i18n:
     "list": [
       {
         "id": "main",
-        "workspace": "~/.openclaw/workspace",
+        "workspace": "~/.openclawcn/workspace",
         "sandbox": {
           "mode": "off" // 覆盖：main 永不沙箱隔离
         }
       },
       {
         "id": "public",
-        "workspace": "~/.openclaw/workspace-public",
+        "workspace": "~/.openclawcn/workspace-public",
         "sandbox": {
           "mode": "all", // 覆盖：public 始终沙箱隔离
           "scope": "agent"
@@ -263,7 +263,7 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 {
   "agents": {
     "defaults": {
-      "workspace": "~/.openclaw/workspace",
+      "workspace": "~/.openclawcn/workspace",
       "sandbox": {
         "mode": "non-main"
       }
@@ -289,7 +289,7 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
       {
         "id": "main",
         "default": true,
-        "workspace": "~/.openclaw/workspace",
+        "workspace": "~/.openclawcn/workspace",
         "sandbox": { "mode": "off" }
       }
     ]
@@ -369,7 +369,7 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 
 4. **监控日志：**
    ```exec
-   tail -f "${OPENCLAW_STATE_DIR:-$HOME/.openclaw}/logs/gateway.log" | grep -E "routing|sandbox|tools"
+   tail -f "${OPENCLAW_STATE_DIR:-$HOME/.openclawcn}/logs/gateway.log" | grep -E "routing|sandbox|tools"
    ```
 
 ---

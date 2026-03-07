@@ -137,8 +137,8 @@ To reduce impact if the CLI process is compromised, the compose config drops
 
 It writes config/workspace on the host:
 
-- `~/.openclaw/`
-- `~/.openclaw/workspace`
+- `~/.openclawcn/`
+- `~/.openclawcn/workspace`
 
 Running on a VPS? See [Hetzner (Docker VPS)](/install/hetzner).
 
@@ -362,7 +362,7 @@ If you need Playwright to install system deps, rebuild the image with
 ### Permissions + EACCES
 
 The image runs as `node` (uid 1000). If you see permission errors on
-`/home/node/.openclaw`, make sure your host bind mounts are owned by uid 1000.
+`/home/node/.openclawcn`, make sure your host bind mounts are owned by uid 1000.
 
 Example (Linux host):
 
@@ -500,7 +500,7 @@ docker compose run --rm openclaw-cli devices list --url ws://127.0.0.1:18789
 
 - Gateway bind defaults to `lan` for container use (`OPENCLAW_GATEWAY_BIND`).
 - Dockerfile CMD uses `--allow-unconfigured`; mounted config with `gateway.mode` not `local` will still start. Override CMD to enforce the guard.
-- The gateway container is the source of truth for sessions (`~/.openclaw/agents/<agentId>/sessions/`).
+- The gateway container is the source of truth for sessions (`~/.openclawcn/agents/<agentId>/sessions/`).
 
 ## Agent Sandbox (host gateway + Docker tools)
 
@@ -538,7 +538,7 @@ precedence, and troubleshooting.
 
 - Image: `openclaw-sandbox:bookworm-slim`
 - One container per agent
-- Agent workspace access: `workspaceAccess: "none"` (default) uses `~/.openclaw/sandboxes`
+- Agent workspace access: `workspaceAccess: "none"` (default) uses `~/.openclawcn/sandboxes`
   - `"ro"` keeps the sandbox workspace at `/workspace` and mounts the agent workspace read-only at `/agent` (disables `write`/`edit`/`apply_patch`)
   - `"rw"` mounts the agent workspace read/write at `/workspace`
 - Auto-prune: idle > 24h OR age > 7d
@@ -570,7 +570,7 @@ If you plan to install packages in `setupCommand`, note:
         mode: "non-main", // off | non-main | all
         scope: "agent", // session | agent | shared (agent is default)
         workspaceAccess: "none", // none | ro | rw
-        workspaceRoot: "~/.openclaw/sandboxes",
+        workspaceRoot: "~/.openclawcn/sandboxes",
         docker: {
           image: "openclaw-sandbox:bookworm-slim",
           workdir: "/workspace",

@@ -52,7 +52,7 @@ openclaw gateway uninstall
 3. 删除状态 + 配置：
 
 ```bash
-rm -rf "${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+rm -rf "${OPENCLAW_STATE_DIR:-$HOME/.openclawcn}"
 ```
 
 如果你将 `OPENCLAW_CONFIG_PATH` 设置为状态目录外的自定义位置，也请删除该文件。
@@ -60,7 +60,7 @@ rm -rf "${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
 4. 删除你的工作区（可选，移除智能体文件）：
 
 ```bash
-rm -rf ~/.openclaw/workspace
+rm -rf ~/.openclawcn/workspace
 ```
 
 5. 移除 CLI 安装（选择你使用的那个）：
@@ -114,7 +114,7 @@ systemctl --user daemon-reload
 
 ```powershell
 schtasks /Delete /F /TN "OpenClaw Gateway"
-Remove-Item -Force "$env:USERPROFILE\.openclaw\gateway.cmd"
+Remove-Item -Force "$env:USERPROFILE\.openclawcn\gateway.cmd"
 ```
 
 如果你使用了配置文件，请删除匹配的任务名称和 `~\.openclaw-<profile>\gateway.cmd`。

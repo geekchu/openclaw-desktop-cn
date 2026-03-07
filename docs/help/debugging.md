@@ -119,19 +119,19 @@ pnpm gateway:watch --raw-stream
 Optional path override:
 
 ```bash
-pnpm gateway:watch --raw-stream --raw-stream-path ~/.openclaw/logs/raw-stream.jsonl
+pnpm gateway:watch --raw-stream --raw-stream-path ~/.openclawcn/logs/raw-stream.jsonl
 ```
 
 Equivalent env vars:
 
 ```bash
 OPENCLAW_RAW_STREAM=1
-OPENCLAW_RAW_STREAM_PATH=~/.openclaw/logs/raw-stream.jsonl
+OPENCLAW_RAW_STREAM_PATH=~/.openclawcn/logs/raw-stream.jsonl
 ```
 
 Default file:
 
-`~/.openclaw/logs/raw-stream.jsonl`
+`~/.openclawcn/logs/raw-stream.jsonl`
 
 ## Raw chunk logging (pi-mono)
 

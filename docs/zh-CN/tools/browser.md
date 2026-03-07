@@ -55,7 +55,7 @@ openclaw browser --browser-profile openclaw snapshot
 
 ## 配置
 
-浏览器设置位于 `~/.openclaw/openclaw.json`。
+浏览器设置位于 `~/.openclawcn/openclaw.json`。
 
 ```json5
 {

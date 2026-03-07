@@ -25,7 +25,7 @@ describe("config identity defaults", () => {
   });
 
   const writeAndLoadConfig = async (home: string, config: Record<string, unknown>) => {
-    const configDir = path.join(home, ".openclaw");
+    const configDir = path.join(home, ".openclawcn");
     await fs.mkdir(configDir, { recursive: true });
     await fs.writeFile(
       path.join(configDir, "openclaw.json"),

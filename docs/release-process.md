@@ -176,7 +176,7 @@ git push && git push --tags
 
 ```bash
 # 设置签名环境变量及打包优化变量
-export TAURI_SIGNING_PRIVATE_KEY=$(cat ~/.tauri/openclaw.key)
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/openclaw.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="123"
 export BUILD_CONFIG="release"
 
@@ -246,15 +246,17 @@ DEPLOY_SSH_PASSWORD=xxx python scripts/publish-update.py 0.3.0
 **1) 上传安装包到服务器**
 
 ```powershell
-scp src-tauri\target\release\bundle\nsis\*setup.exe root@47.57.241.17:/var/www/openclaw-update/artifacts/
+scp "src-tauri\target\release\bundle\nsis\OpenClaw桌面版_0.3.0_x64-setup.exe" root@47.57.241.17:/var/www/openclaw-update/artifacts/
 ```
 
 **2) 读取签名内容**
 
 ```powershell
-$sig = Get-Content "src-tauri\target\release\bundle\nsis\*setup.exe.sig" -Raw
+$sig = Get-Content "src-tauri\target\release\bundle\nsis\OpenClaw桌面版_0.3.0_x64-setup.exe.sig" -Raw
 Write-Host $sig
 ```
+
+> ⚠️ 这里请使用**精确文件名**，不要用 `*setup.exe` 或 `*setup.exe.sig` 这类通配符；如果目录里残留旧版本产物，通配符很容易读错文件。
 
 **3) 在服务器上写入 latest.json**
 

@@ -81,7 +81,7 @@ SHARP_IGNORE_GLOBAL_LIBVIPS=0 curl -fsSL https://openclaw.ai/install.sh | bash
 
 ## install-cli.sh（无需 root 权限的 CLI 安装器）
 
-此脚本将 `openclaw` 安装到前缀目录（默认：`~/.openclaw`），同时在该前缀下安装专用的 Node 运行时，因此可以在不想改动系统 Node/npm 的机器上使用。
+此脚本将 `openclaw` 安装到前缀目录（默认：`~/.openclawcn`），同时在该前缀下安装专用的 Node 运行时，因此可以在不想改动系统 Node/npm 的机器上使用。
 
 帮助：
 

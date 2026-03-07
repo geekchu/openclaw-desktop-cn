@@ -101,11 +101,11 @@ openclaw --profile rescue gateway install
 ## 手动环境变量示例
 
 ```bash
-OPENCLAW_CONFIG_PATH=~/.openclaw/main.json \
+OPENCLAW_CONFIG_PATH=~/.openclawcn/main.json \
 OPENCLAW_STATE_DIR=~/.openclaw-main \
 openclaw gateway --port 28789
 
-OPENCLAW_CONFIG_PATH=~/.openclaw/rescue.json \
+OPENCLAW_CONFIG_PATH=~/.openclawcn/rescue.json \
 OPENCLAW_STATE_DIR=~/.openclaw-rescue \
 openclaw gateway --port 19001
 ```

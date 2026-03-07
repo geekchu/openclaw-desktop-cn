@@ -46,7 +46,7 @@ async function writeInboundMedia(
   fileName: string,
   payload: string | Buffer,
 ): Promise<string> {
-  const inboundDir = join(home, ".openclaw", "media", "inbound");
+  const inboundDir = join(home, ".openclawcn", "media", "inbound");
   await fs.mkdir(inboundDir, { recursive: true });
   const mediaPath = join(inboundDir, fileName);
   await fs.writeFile(mediaPath, payload);

@@ -117,7 +117,7 @@ openclaw configure --section channels
 > 【截图占位：OpenClaw DingTalk 配置向导-安全策略(dmPolicy/groupPolicy)】
 > 【截图占位：OpenClaw DingTalk 配置向导-消息类型(messageType=markdown/card)】
 
-#### 方式 2：手动编辑 `~/.openclaw/openclaw.json`
+#### 方式 2：手动编辑 `~/.openclawcn/openclaw.json`
 
 ```json5
 {

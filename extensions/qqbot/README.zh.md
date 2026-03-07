@@ -94,7 +94,7 @@ openclaw channels add --channel qqbot --token "AppID:AppSecret"
 
 ## 方式二：通过配置文件配置
 
-编辑 ~/.openclaw/openclaw.json:
+编辑 ~/.openclawcn/openclaw.json:
 
 ```json
 {

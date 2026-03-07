@@ -50,8 +50,8 @@ hooks 系统允许你：
 
 OpenClaw 附带三个自动发现的捆绑 hooks：
 
-- **💾 session-memory**：当你发出 `/new` 时将会话上下文保存到智能体工作区（默认 `~/.openclaw/workspace/memory/`）
-- **📝 command-logger**：将所有命令事件记录到 `~/.openclaw/logs/commands.log`
+- **💾 session-memory**：当你发出 `/new` 时将会话上下文保存到智能体工作区（默认 `~/.openclawcn/workspace/memory/`）
+- **📝 command-logger**：将所有命令事件记录到 `~/.openclawcn/logs/commands.log`
 - **🚀 boot-md**：当 Gateway 网关启动时运行 `BOOT.md`（需要启用内部 hooks）
 
 列出可用的 hooks：
@@ -87,7 +87,7 @@ openclaw hooks info session-memory
 Hooks 从三个目录自动发现（按优先级顺序）：
 
 1. **工作区 hooks**：`<workspace>/hooks/`（每智能体，最高优先级）
-2. **托管 hooks**：`~/.openclaw/hooks/`（用户安装，跨工作区共享）
+2. **托管 hooks**：`~/.openclawcn/hooks/`（用户安装，跨工作区共享）
 3. **捆绑 hooks**：`<openclaw>/dist/hooks/bundled/`（随 OpenClaw 附带）
 
 托管 hook 目录可以是**单个 hook** 或 **hook 包**（包目录）。
@@ -121,7 +121,7 @@ openclaw hooks install <path-or-spec>
 ```
 
 每个条目指向包含 `HOOK.md` 和 `handler.ts`（或 `index.ts`）的 hook 目录。
-Hook 包可以附带依赖；它们将安装在 `~/.openclaw/hooks/<id>` 下。
+Hook 包可以附带依赖；它们将安装在 `~/.openclawcn/hooks/<id>` 下。
 
 ## Hook 结构
 
@@ -266,13 +266,13 @@ export default myHandler;
 ### 1. 选择位置
 
 - **工作区 hooks**（`<workspace>/hooks/`）：每智能体，最高优先级
-- **托管 hooks**（`~/.openclaw/hooks/`）：跨工作区共享
+- **托管 hooks**（`~/.openclawcn/hooks/`）：跨工作区共享
 
 ### 2. 创建目录结构
 
 ```bash
-mkdir -p ~/.openclaw/hooks/my-hook
-cd ~/.openclaw/hooks/my-hook
+mkdir -p ~/.openclawcn/hooks/my-hook
+cd ~/.openclawcn/hooks/my-hook
 ```
 
 ### 3. 创建 HOOK.md
@@ -459,7 +459,7 @@ openclaw hooks disable command-logger
 
 **要求**：必须配置 `workspace.dir`
 
-**输出**：`<workspace>/memory/YYYY-MM-DD-slug.md`（默认为 `~/.openclaw/workspace`）
+**输出**：`<workspace>/memory/YYYY-MM-DD-slug.md`（默认为 `~/.openclawcn/workspace`）
 
 **功能**：
 
@@ -498,7 +498,7 @@ openclaw hooks enable session-memory
 
 **要求**：无
 
-**输出**：`~/.openclaw/logs/commands.log`
+**输出**：`~/.openclawcn/logs/commands.log`
 
 **功能**：
 
@@ -517,13 +517,13 @@ openclaw hooks enable session-memory
 
 ```bash
 # View recent commands
-tail -n 20 ~/.openclaw/logs/commands.log
+tail -n 20 ~/.openclawcn/logs/commands.log
 
 # Pretty-print with jq
-cat ~/.openclaw/logs/commands.log | jq .
+cat ~/.openclawcn/logs/commands.log | jq .
 
 # Filter by action
-grep '"action":"new"' ~/.openclaw/logs/commands.log | jq .
+grep '"action":"new"' ~/.openclawcn/logs/commands.log | jq .
 ```
 
 **启用**：
@@ -668,7 +668,7 @@ openclaw hooks info my-hook
 ./scripts/clawlog.sh -f
 
 # Other platforms
-tail -f ~/.openclaw/gateway.log
+tail -f ~/.openclawcn/gateway.log
 ```
 
 ### 直接测试 Hooks
@@ -744,14 +744,14 @@ Gateway 网关启动
 1. 检查目录结构：
 
    ```bash
-   ls -la ~/.openclaw/hooks/my-hook/
+   ls -la ~/.openclawcn/hooks/my-hook/
    # Should show: HOOK.md, handler.ts
    ```
 
 2. 验证 HOOK.md 格式：
 
    ```bash
-   cat ~/.openclaw/hooks/my-hook/HOOK.md
+   cat ~/.openclawcn/hooks/my-hook/HOOK.md
    # Should have YAML frontmatter with name and metadata
    ```
 
@@ -827,8 +827,8 @@ node -e "import('./path/to/handler.ts').then(console.log)"
 1. 创建 hook 目录：
 
    ```bash
-   mkdir -p ~/.openclaw/hooks/my-hook
-   mv ./hooks/handlers/my-handler.ts ~/.openclaw/hooks/my-hook/handler.ts
+   mkdir -p ~/.openclawcn/hooks/my-hook
+   mv ./hooks/handlers/my-handler.ts ~/.openclawcn/hooks/my-hook/handler.ts
    ```
 
 2. 创建 HOOK.md：

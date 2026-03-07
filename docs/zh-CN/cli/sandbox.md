@@ -127,7 +127,7 @@ openclaw sandbox recreate --agent alfred
 
 ## 配置
 
-沙箱设置位于 `~/.openclaw/openclaw.json` 的 `agents.defaults.sandbox` 下（每个智能体的覆盖设置在 `agents.list[].sandbox` 中）：
+沙箱设置位于 `~/.openclawcn/openclaw.json` 的 `agents.defaults.sandbox` 下（每个智能体的覆盖设置在 `agents.list[].sandbox` 中）：
 
 ```jsonc
 {

@@ -48,7 +48,7 @@ Confirm in logs you see something like:
 
 For tailnet-only setups (recommended for Vienna ⇄ London), bind the gateway to the tailnet IP:
 
-- Set `gateway.bind: "tailnet"` in `~/.openclaw/openclaw.json` on the gateway host.
+- Set `gateway.bind: "tailnet"` in `~/.openclawcn/openclaw.json` on the gateway host.
 - Restart the Gateway / macOS menubar app.
 
 ### 2) Verify discovery (optional)
@@ -126,7 +126,7 @@ If you want the node to show real HTML/CSS/JS that the agent can edit on disk, p
 
 Note: nodes load canvas from the Gateway HTTP server (same port as `gateway.port`, default `28789`).
 
-1. Create `~/.openclaw/workspace/canvas/index.html` on the gateway host.
+1. Create `~/.openclawcn/workspace/canvas/index.html` on the gateway host.
 
 2. Navigate the node to it (LAN):
 

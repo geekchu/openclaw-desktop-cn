@@ -15,7 +15,7 @@ async function withTempHome(run: (home: string) => Promise<void>): Promise<void>
 
 async function writeConfig(
   home: string,
-  dirname: ".openclaw",
+  dirname: ".openclawcn",
   port: number,
   filename: string = "openclaw.json",
 ) {
@@ -34,19 +34,19 @@ function createIoForHome(home: string, env: NodeJS.ProcessEnv = {} as NodeJS.Pro
 }
 
 describe("config io paths", () => {
-  it("uses ~/.openclaw/openclaw.json when config exists", async () => {
+  it("uses ~/.openclawcn/openclaw.json when config exists", async () => {
     await withTempHome(async (home) => {
-      const configPath = await writeConfig(home, ".openclaw", 19001);
+      const configPath = await writeConfig(home, ".openclawcn", 19001);
       const io = createIoForHome(home);
       expect(io.configPath).toBe(configPath);
       expect(io.loadConfig().gateway?.port).toBe(19001);
     });
   });
 
-  it("defaults to ~/.openclaw/openclaw.json when config is missing", async () => {
+  it("defaults to ~/.openclawcn/openclaw.json when config is missing", async () => {
     await withTempHome(async (home) => {
       const io = createIoForHome(home);
-      expect(io.configPath).toBe(path.join(home, ".openclaw", "openclaw.json"));
+      expect(io.configPath).toBe(path.join(home, ".openclawcn", "openclaw.json"));
     });
   });
 
@@ -56,13 +56,13 @@ describe("config io paths", () => {
         env: { OPENCLAW_HOME: path.join(home, "svc-home") } as NodeJS.ProcessEnv,
         homedir: () => path.join(home, "ignored-home"),
       });
-      expect(io.configPath).toBe(path.join(home, "svc-home", ".openclaw", "openclaw.json"));
+      expect(io.configPath).toBe(path.join(home, "svc-home", ".openclawcn", "openclaw.json"));
     });
   });
 
   it("honors explicit OPENCLAW_CONFIG_PATH override", async () => {
     await withTempHome(async (home) => {
-      const customPath = await writeConfig(home, ".openclaw", 20002, "custom.json");
+      const customPath = await writeConfig(home, ".openclawcn", 20002, "custom.json");
       const io = createIoForHome(home, { OPENCLAW_CONFIG_PATH: customPath } as NodeJS.ProcessEnv);
       expect(io.configPath).toBe(customPath);
       expect(io.loadConfig().gateway?.port).toBe(20002);
@@ -71,7 +71,7 @@ describe("config io paths", () => {
 
   it("honors legacy CLAWDBOT_CONFIG_PATH override", async () => {
     await withTempHome(async (home) => {
-      const customPath = await writeConfig(home, ".openclaw", 20003, "legacy-custom.json");
+      const customPath = await writeConfig(home, ".openclawcn", 20003, "legacy-custom.json");
       const io = createIoForHome(home, { CLAWDBOT_CONFIG_PATH: customPath } as NodeJS.ProcessEnv);
       expect(io.configPath).toBe(customPath);
       expect(io.loadConfig().gateway?.port).toBe(20003);
@@ -80,7 +80,7 @@ describe("config io paths", () => {
 
   it("normalizes safe-bin config entries at config load time", async () => {
     await withTempHome(async (home) => {
-      const configDir = path.join(home, ".openclaw");
+      const configDir = path.join(home, ".openclawcn");
       await fs.mkdir(configDir, { recursive: true });
       const configPath = path.join(configDir, "openclaw.json");
       await fs.writeFile(
@@ -140,7 +140,7 @@ describe("config io paths", () => {
 
   it("logs invalid config path details and returns empty config", async () => {
     await withTempHome(async (home) => {
-      const configDir = path.join(home, ".openclaw");
+      const configDir = path.join(home, ".openclawcn");
       await fs.mkdir(configDir, { recursive: true });
       const configPath = path.join(configDir, "openclaw.json");
       await fs.writeFile(

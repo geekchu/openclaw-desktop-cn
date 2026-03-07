@@ -19,7 +19,7 @@ x-i18n:
 
 ## 太长不看
 
-- **个性化设置存放在仓库之外：** `~/.openclaw/workspace`（工作区）+ `~/.openclaw/openclaw.json`（配置）。
+- **个性化设置存放在仓库之外：** `~/.openclawcn/workspace`（工作区）+ `~/.openclawcn/openclaw.json`（配置）。
 - **稳定工作流：** 安装 macOS 应用；让它运行内置的 Gateway 网关。
 - **前沿工作流：** 通过 `pnpm gateway:watch` 自己运行 Gateway 网关，然后让 macOS 应用以本地模式连接。
 
@@ -33,8 +33,8 @@ x-i18n:
 
 如果你想要"100% 为我定制"*并且*易于更新，将你的自定义内容保存在：
 
-- **配置：** `~/.openclaw/openclaw.json`（JSON/JSON5 格式）
-- **工作区：** `~/.openclaw/workspace`（Skills、提示、记忆；将其设为私有 git 仓库）
+- **配置：** `~/.openclawcn/openclaw.json`（JSON/JSON5 格式）
+- **工作区：** `~/.openclawcn/workspace`（Skills、提示、记忆；将其设为私有 git 仓库）
 
 引导一次：
 
@@ -112,26 +112,26 @@ openclaw health
 
 - **端口错误：** Gateway 网关 WS 默认为 `ws://127.0.0.1:28789`；保持应用 + CLI 在同一端口上。
 - **状态存储位置：**
-  - 凭证：`~/.openclaw/credentials/`
-  - 会话：`~/.openclaw/agents/<agentId>/sessions/`
+  - 凭证：`~/.openclawcn/credentials/`
+  - 会话：`~/.openclawcn/agents/<agentId>/sessions/`
   - 日志：`/tmp/openclaw/`
 
 ## 凭证存储映射
 
 在调试认证或决定备份什么时使用此映射：
 
-- **WhatsApp**：`~/.openclaw/credentials/whatsapp/<accountId>/creds.json`
+- **WhatsApp**：`~/.openclawcn/credentials/whatsapp/<accountId>/creds.json`
 - **Telegram bot token**：配置/环境变量或 `channels.telegram.tokenFile`
 - **Discord bot token**：配置/环境变量（尚不支持令牌文件）
 - **Slack tokens**：配置/环境变量（`channels.slack.*`）
-- **配对允许列表**：`~/.openclaw/credentials/<channel>-allowFrom.json`
-- **模型认证配置文件**：`~/.openclaw/agents/<agentId>/agent/auth-profiles.json`
-- **旧版 OAuth 导入**：`~/.openclaw/credentials/oauth.json`
+- **配对允许列表**：`~/.openclawcn/credentials/<channel>-allowFrom.json`
+- **模型认证配置文件**：`~/.openclawcn/agents/<agentId>/agent/auth-profiles.json`
+- **旧版 OAuth 导入**：`~/.openclawcn/credentials/oauth.json`
   更多详情：[安全](/gateway/security#credential-storage-map)。
 
 ## 更新（不破坏你的设置）
 
-- 将 `~/.openclaw/workspace` 和 `~/.openclaw/` 保持为"你的东西"；不要将个人提示/配置放入 `openclaw` 仓库。
+- 将 `~/.openclawcn/workspace` 和 `~/.openclawcn/` 保持为"你的东西"；不要将个人提示/配置放入 `openclaw` 仓库。
 - 更新源码：`git pull` + `pnpm install`（当锁文件更改时）+ 继续使用 `pnpm gateway:watch`。
 
 ## Linux（systemd 用户服务）

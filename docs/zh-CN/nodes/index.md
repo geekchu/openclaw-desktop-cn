@@ -58,7 +58,7 @@ openclaw nodes describe --node <idOrNameOrIp>
 
 - **Gateway 网关主机**：接收消息，运行模型，路由工具调用。
 - **节点主机**：在节点机器上执行 `system.run`/`system.which`。
-- **批准**：通过 `~/.openclaw/exec-approvals.json` 在节点主机上执行。
+- **批准**：通过 `~/.openclawcn/exec-approvals.json` 在节点主机上执行。
 
 ### 启动节点主机（前台）
 
@@ -87,7 +87,7 @@ openclaw node run --host 127.0.0.1 --port 18790 --display-name "Build Node"
 
 注意事项：
 
-- 令牌是 Gateway 网关配置中的 `gateway.auth.token`（Gateway 网关主机上的 `~/.openclaw/openclaw.json`）。
+- 令牌是 Gateway 网关配置中的 `gateway.auth.token`（Gateway 网关主机上的 `~/.openclawcn/openclaw.json`）。
 - `openclaw node run` 读取 `OPENCLAW_GATEWAY_TOKEN` 进行认证。
 
 ### 启动节点主机（服务）
@@ -109,7 +109,7 @@ openclaw nodes list
 
 命名选项：
 
-- 在 `openclaw node run` / `openclaw node install` 上使用 `--display-name`（持久化在节点上的 `~/.openclaw/node.json` 中）。
+- 在 `openclaw node run` / `openclaw node install` 上使用 `--display-name`（持久化在节点上的 `~/.openclawcn/node.json` 中）。
 - `openclaw nodes rename --node <id|name|ip> --name "Build Node"`（Gateway 网关覆盖）。
 
 ### 将命令加入允许列表
@@ -121,7 +121,7 @@ openclaw approvals allowlist add --node <id|name|ip> "/usr/bin/uname"
 openclaw approvals allowlist add --node <id|name|ip> "/usr/bin/sw_vers"
 ```
 
-批准存储在节点主机的 `~/.openclaw/exec-approvals.json` 中。
+批准存储在节点主机的 `~/.openclawcn/exec-approvals.json` 中。
 
 ### 将 exec 指向节点
 
@@ -288,7 +288,7 @@ openclaw nodes notify --node <idOrNameOrIp> --title "Ping" --body "Gateway ready
 - macOS 节点会丢弃 `PATH` 覆盖；无头节点主机仅在 `PATH` 前置到节点主机 PATH 时才接受它。
 - 在 macOS 节点模式下，`system.run` 受 macOS 应用中的 exec 批准限制（设置 → Exec 批准）。
   Ask/allowlist/full 的行为与无头节点主机相同；被拒绝的提示返回 `SYSTEM_RUN_DENIED`。
-- 在无头节点主机上，`system.run` 受 exec 批准限制（`~/.openclaw/exec-approvals.json`）。
+- 在无头节点主机上，`system.run` 受 exec 批准限制（`~/.openclawcn/exec-approvals.json`）。
 
 ## Exec 节点绑定
 
@@ -334,8 +334,8 @@ openclaw node run --host <gateway-host> --port 28789
 注意事项：
 
 - 仍然需要配对（Gateway 网关会显示节点批准提示）。
-- 节点主机将其节点 id、令牌、显示名称和 Gateway 网关连接信息存储在 `~/.openclaw/node.json` 中。
-- Exec 批准通过 `~/.openclaw/exec-approvals.json` 在本地执行
+- 节点主机将其节点 id、令牌、显示名称和 Gateway 网关连接信息存储在 `~/.openclawcn/node.json` 中。
+- Exec 批准通过 `~/.openclawcn/exec-approvals.json` 在本地执行
   （参见 [Exec 批准](/tools/exec-approvals)）。
 - 在 macOS 上，当配套应用 exec 主机可达时，无头节点主机优先使用它，
   如果应用不可用则回退到本地执行。设置 `OPENCLAW_NODE_EXEC_HOST=app` 要求

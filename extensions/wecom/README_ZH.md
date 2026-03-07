@@ -33,13 +33,13 @@ openclaw plugins install @sunnoy/wecom
 此命令会自动：
 
 - 从 npm 下载插件
-- 安装到 `~/.openclaw/extensions/` 目录
+- 安装到 `~/.openclawcn/extensions/` 目录
 - 更新 OpenClaw 配置
 - 注册插件
 
 ## 配置
 
-在 OpenClaw 配置文件（`~/.openclaw/openclaw.json`）中添加：
+在 OpenClaw 配置文件（`~/.openclawcn/openclaw.json`）中添加：
 
 ```json
 {
@@ -222,7 +222,7 @@ openclaw plugins install @sunnoy/wecom
 
 **A:** 插件会自动处理 OpenClaw 生成的图片（如浏览器截图）：
 
-- **本地图片**（来自 `~/.openclaw/media/`）会自动进行 base64 编码，通过企业微信 `msg_item` API 发送
+- **本地图片**（来自 `~/.openclawcn/media/`）会自动进行 base64 编码，通过企业微信 `msg_item` API 发送
 - **图片限制**：单张图片最大 2MB，支持 JPG 和 PNG 格式，每条消息最多 10 张图片
 - **无需配置**：开箱即用，配合浏览器截图等工具自动生效
 - 图片会在 AI 完成回复后显示（流式输出不支持增量发送图片）

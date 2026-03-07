@@ -58,12 +58,12 @@ function restoreHomeEnv(snapshot: HomeEnvSnapshot) {
 
 async function withTempHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
   const home = path.join(suiteTempHomeRoot, `case-${suiteTempHomeCaseId++}`);
-  await fs.mkdir(path.join(home, ".openclaw", "agents", "main", "sessions"), { recursive: true });
+  await fs.mkdir(path.join(home, ".openclawcn", "agents", "main", "sessions"), { recursive: true });
   const snapshot = snapshotHomeEnv();
   process.env.HOME = home;
   process.env.USERPROFILE = home;
   delete process.env.OPENCLAW_HOME;
-  process.env.OPENCLAW_STATE_DIR = path.join(home, ".openclaw");
+  process.env.OPENCLAW_STATE_DIR = path.join(home, ".openclawcn");
   if (process.platform === "win32") {
     const parsed = path.parse(home);
     if (parsed.root) {

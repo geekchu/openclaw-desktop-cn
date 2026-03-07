@@ -17,7 +17,7 @@ Last updated: 2026-01-01
 
 ## TL;DR
 
-- **Tailoring lives outside the repo:** `~/.openclaw/workspace` (workspace) + `~/.openclaw/openclaw.json` (config).
+- **Tailoring lives outside the repo:** `~/.openclawcn/workspace` (workspace) + `~/.openclawcn/openclaw.json` (config).
 - **Stable workflow:** install the macOS app; let it run the bundled Gateway.
 - **Bleeding edge workflow:** run the Gateway yourself via `pnpm gateway:watch`, then let the macOS app attach in Local mode.
 
@@ -31,8 +31,8 @@ Last updated: 2026-01-01
 
 If you want “100% tailored to me” _and_ easy updates, keep your customization in:
 
-- **Config:** `~/.openclaw/openclaw.json` (JSON/JSON5-ish)
-- **Workspace:** `~/.openclaw/workspace` (skills, prompts, memories; make it a private git repo)
+- **Config:** `~/.openclawcn/openclaw.json` (JSON/JSON5-ish)
+- **Workspace:** `~/.openclawcn/workspace` (skills, prompts, memories; make it a private git repo)
 
 Bootstrap once:
 
@@ -118,29 +118,29 @@ openclaw health
 
 - **Wrong port:** Gateway WS defaults to `ws://127.0.0.1:28789`; keep app + CLI on the same port.
 - **Where state lives:**
-  - Credentials: `~/.openclaw/credentials/`
-  - Sessions: `~/.openclaw/agents/<agentId>/sessions/`
+  - Credentials: `~/.openclawcn/credentials/`
+  - Sessions: `~/.openclawcn/agents/<agentId>/sessions/`
   - Logs: `/tmp/openclaw/`
 
 ## Credential storage map
 
 Use this when debugging auth or deciding what to back up:
 
-- **WhatsApp**: `~/.openclaw/credentials/whatsapp/<accountId>/creds.json`
+- **WhatsApp**: `~/.openclawcn/credentials/whatsapp/<accountId>/creds.json`
 - **Telegram bot token**: config/env or `channels.telegram.tokenFile`
 - **Discord bot token**: config/env (token file not yet supported)
 - **Slack tokens**: config/env (`channels.slack.*`)
 - **Pairing allowlists**:
-  - `~/.openclaw/credentials/<channel>-allowFrom.json` (default account)
-  - `~/.openclaw/credentials/<channel>-<accountId>-allowFrom.json` (non-default accounts)
-- **Model auth profiles**: `~/.openclaw/agents/<agentId>/agent/auth-profiles.json`
-- **File-backed secrets payload (optional)**: `~/.openclaw/secrets.json`
-- **Legacy OAuth import**: `~/.openclaw/credentials/oauth.json`
+  - `~/.openclawcn/credentials/<channel>-allowFrom.json` (default account)
+  - `~/.openclawcn/credentials/<channel>-<accountId>-allowFrom.json` (non-default accounts)
+- **Model auth profiles**: `~/.openclawcn/agents/<agentId>/agent/auth-profiles.json`
+- **File-backed secrets payload (optional)**: `~/.openclawcn/secrets.json`
+- **Legacy OAuth import**: `~/.openclawcn/credentials/oauth.json`
   More detail: [Security](/gateway/security#credential-storage-map).
 
 ## Updating (without wrecking your setup)
 
-- Keep `~/.openclaw/workspace` and `~/.openclaw/` as “your stuff”; don’t put personal prompts/config into the `openclaw` repo.
+- Keep `~/.openclawcn/workspace` and `~/.openclawcn/` as “your stuff”; don’t put personal prompts/config into the `openclaw` repo.
 - Updating source: `git pull` + `pnpm install` (when lockfile changed) + keep using `pnpm gateway:watch`.
 
 ## Linux (systemd user service)

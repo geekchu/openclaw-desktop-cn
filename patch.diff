@@ -1,0 +1,454 @@
+commit 1012249033840762bbd1467fff5bf533d794e7d6
+Author: OpenClaw AI <bot@openclaw.ai>
+Date:   Sun Mar 8 03:44:02 2026 +0800
+
+    build: resolve massive ts integration errors across monorepo
+
+diff --git a/ui/src/ui/views/config-channels.ts b/ui/src/ui/views/config-channels.ts
+index fbc387c13..cd60d6338 100644
+--- a/ui/src/ui/views/config-channels.ts
++++ b/ui/src/ui/views/config-channels.ts
+@@ -2,10 +2,16 @@ import { LitElement, html, css, nothing } from "lit";
+ import { customElement, state } from "lit/decorators.js";
+ 
+ /* ── tiny Tauri invoke helper ─────────────────────────────── */
+-const tauri = (window as any).__TAURI__;
+-async function invoke<T = any>(cmd: string, args?: Record<string, unknown>): Promise<T> {
++const tauri = (
++  window as unknown as {
++    __TAURI__?: {
++      core?: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
++    };
++  }
++).__TAURI__;
++async function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+   if (tauri?.core?.invoke) {
+-    return tauri.core.invoke(cmd, args);
++    return tauri.core.invoke(cmd, args) as Promise<T>;
+   }
+   throw new Error("Tauri invoke not available");
+ }
+@@ -114,18 +120,7 @@ const channelIcons = {
+       <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z" />
+     </svg>
+   `,
+-  wechat: html`
+-    <svg
+-      viewBox="0 0 24 24"
+-      fill="none"
+-      stroke="currentColor"
+-      stroke-width="2"
+-      stroke-linecap="round"
+-      stroke-linejoin="round"
+-    >
+-      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+-    </svg>
+-  `,
++
+   wecom: html`
+     <svg
+       viewBox="0 0 24 24"
+@@ -180,7 +175,7 @@ const channelIcons = {
+   `,
+ };
+ 
+-const iconChevronRight = html`
++const _iconChevronRight = html`
+   <svg
+     viewBox="0 0 24 24"
+     width="16"
+@@ -356,7 +351,7 @@ const channelInfo: Record<
+   string,
+   {
+     name: string;
+-    icon: any;
++    icon: unknown;
+     theme: string;
+     fields: ChannelField[];
+     helpText?: string;
+@@ -401,6 +396,18 @@ const channelInfo: Record<
+           { value: "disabled", label: "禁用" },
+         ],
+       },
++      {
++        key: "allowFrom",
++        label: "私聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: 1234567, 7654321",
++      },
++      {
++        key: "groupAllowFrom",
++        label: "群组白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: -1001234, -1005678",
++      },
+     ],
+     helpText: "推荐搜索 @BotFather 发送 /newbot 获取 Token",
+   },
+@@ -410,7 +417,7 @@ const channelInfo: Record<
+     theme: "blue",
+     fields: [
+       {
+-        key: "botToken",
++        key: "token",
+         label: "Bot Token",
+         type: "password",
+         placeholder: "Discord Bot Token",
+@@ -432,6 +439,12 @@ const channelInfo: Record<
+           { value: "disabled", label: "禁用" },
+         ],
+       },
++      {
++        key: "allowFrom",
++        label: "私聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: 123456789",
++      },
+     ],
+     helpText: "从 Discord Developer Portal 获取",
+   },
+@@ -449,6 +462,47 @@ const channelInfo: Record<
+       },
+       { key: "appToken", label: "App Token", type: "password", placeholder: "xapp-..." },
+       { key: "testChannelId", label: "测试 Channel ID", type: "text", placeholder: "可选" },
++      {
++        key: "requireMention",
++        label: "需要 @提及",
++        type: "select",
++        options: [
++          { value: "true", label: "是" },
++          { value: "false", label: "否" },
++        ],
++      },
++      {
++        key: "dmPolicy",
++        label: "私聊策略",
++        type: "select",
++        options: [
++          { value: "pairing", label: "配对模式" },
++          { value: "open", label: "开放模式" },
++          { value: "disabled", label: "禁用" },
++        ],
++      },
++      {
++        key: "groupPolicy",
++        label: "群聊策略",
++        type: "select",
++        options: [
++          { value: "allowlist", label: "白名单" },
++          { value: "open", label: "开放模式" },
++          { value: "disabled", label: "禁用" },
++        ],
++      },
++      {
++        key: "allowFrom",
++        label: "私聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: U1234567, U7654321",
++      },
++      {
++        key: "groupAllowFrom",
++        label: "群聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: C1234567, C7654321",
++      },
+     ],
+     helpText: "从 Slack API 后台获取",
+   },
+@@ -472,10 +526,16 @@ const channelInfo: Record<
+         required: true,
+       },
+       {
+-        key: "testChatId",
+-        label: "测试 Chat ID",
+-        type: "text",
+-        placeholder: "用于发送测试消息的群聊/用户 ID (可选)",
++        key: "encryptKey",
++        label: "Encrypt Key",
++        type: "password",
++        placeholder: "用于 Webhook 模式的消息加密密钥 (可选)",
++      },
++      {
++        key: "verificationToken",
++        label: "Verification Token",
++        type: "password",
++        placeholder: "用于 Webhook 模式的事件订阅验证令牌 (可选)",
+       },
+       {
+         key: "connectionMode",
+@@ -524,6 +584,18 @@ const channelInfo: Record<
+           { value: "disabled", label: "禁用" },
+         ],
+       },
++      {
++        key: "allowFrom",
++        label: "私聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: ou_123456789",
++      },
++      {
++        key: "groupAllowFrom",
++        label: "群聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: oc_123456789",
++      },
+     ],
+     helpText: "需要安装并启用开放平台的机器人能力",
+   },
+@@ -552,6 +624,24 @@ const channelInfo: Record<
+           { value: "disabled", label: "禁用" },
+         ],
+       },
++      {
++        key: "allowFrom",
++        label: "私聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: +1234567890",
++      },
++      {
++        key: "groupAllowFrom",
++        label: "群聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "群组 ID",
++      },
++      {
++        key: "dbPath",
++        label: "chat.db 路径",
++        type: "text",
++        placeholder: "可选 (如果由于权限问题失败可以填文件拷贝路径)",
++      },
+     ],
+     helpText: "仅支持 macOS",
+   },
+@@ -580,24 +670,22 @@ const channelInfo: Record<
+           { value: "disabled", label: "禁用" },
+         ],
+       },
+-    ],
+-    helpText: "登录成功后支持发送和接收",
+-  },
+-  wechat: {
+-    name: "微信公众号",
+-    icon: channelIcons.wechat,
+-    theme: "green",
+-    fields: [
+-      { key: "appId", label: "App ID", type: "text", placeholder: "微信开放平台 App ID" },
+       {
+-        key: "appSecret",
+-        label: "App Secret",
+-        type: "password",
+-        placeholder: "微信开放平台 App Secret",
++        key: "allowFrom",
++        label: "私聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: 8613800000000@s.whatsapp.net",
++      },
++      {
++        key: "groupAllowFrom",
++        label: "群聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: 12345678-9012@g.us",
+       },
+     ],
+-    helpText: "微信公众号",
++    helpText: "登录成功后支持发送和接收",
+   },
++
+   wecom: {
+     name: "企业微信",
+     icon: channelIcons.wecom,
+@@ -650,6 +738,12 @@ const channelInfo: Record<
+           { value: "card", label: "AI 卡片" },
+         ],
+       },
++      {
++        key: "agentId",
++        label: "Agent ID",
++        type: "text",
++        placeholder: "可选，微应用 AgentId",
++      },
+       {
+         key: "dmPolicy",
+         label: "私聊策略",
+@@ -669,6 +763,12 @@ const channelInfo: Record<
+           { value: "allowlist", label: "白名单" },
+         ],
+       },
++      {
++        key: "allowFrom",
++        label: "私聊白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: user123, manager456",
++      },
+     ],
+     helpText: "钉钉企业内部机器人，使用 Stream 模式，无需公网 IP",
+   },
+@@ -710,9 +810,43 @@ const channelInfo: Record<
+           { value: "allowlist", label: "白名单" },
+         ],
+       },
++      {
++        key: "allowFrom",
++        label: "私聊/群组白名单 (逗号分隔)",
++        type: "text",
++        placeholder: "如: 12345678",
++      },
+     ],
+     helpText: "QQ 官方机器人，使用 WebSocket 连接，无需公网 IP",
+   },
++  default: {
++    name: "未知平台",
++    icon: channelIcons.default,
++    theme: "gray",
++    fields: [
++      {
++        key: "dmPolicy",
++        label: "私聊策略",
++        type: "select",
++        options: [
++          { value: "pairing", label: "配对模式" },
++          { value: "open", label: "开放模式" },
++          { value: "disabled", label: "禁用" },
++        ],
++      },
++      {
++        key: "groupPolicy",
++        label: "群组策略",
++        type: "select",
++        options: [
++          { value: "allowlist", label: "白名单" },
++          { value: "open", label: "开放" },
++          { value: "disabled", label: "禁用" },
++        ],
++      },
++    ],
++    helpText: "未知的通讯平台配置",
++  },
+ };
+ 
+ interface TestResult {
+@@ -1249,10 +1383,14 @@ export class OpenClawConfigChannels extends LitElement {
+         channel: channelId,
+       });
+       // Guard against stale responses from a previously selected channel
+-      if (this.selectedChannel !== channelId) return;
++      if (this.selectedChannel !== channelId) {
++        return;
++      }
+       this.pairingRequests = result;
+     } catch (e) {
+-      if (this.selectedChannel !== channelId) return;
++      if (this.selectedChannel !== channelId) {
++        return;
++      }
+       console.error("获取配对请求失败:", e);
+       this.pairingRequests = [];
+     } finally {
+@@ -1263,7 +1401,9 @@ export class OpenClawConfigChannels extends LitElement {
+   }
+ 
+   private async _handleApproveCode(channelId: string, code: string) {
+-    if (!code.trim()) return;
++    if (!code.trim()) {
++      return;
++    }
+     this.approveLoading = true;
+     this.approveResult = null;
+     try {
+@@ -1286,18 +1426,14 @@ export class OpenClawConfigChannels extends LitElement {
+   private async fetchChannels() {
+     try {
+       const result: ChannelConfig[] = await invoke("get_channels_config");
+-      // 中国用户常用渠道排在前面
+       const channelOrder: Record<string, number> = {
+         wecom: 0,
+         dingtalk: 1,
+         feishu: 2,
+-        qqbot: 3,
+-        wechat: 4,
+-        telegram: 5,
+-        whatsapp: 6,
+-        discord: 7,
+-        slack: 8,
+-        imessage: 9,
++        whatsapp: 3,
++        discord: 4,
++        slack: 5,
++        imessage: 6,
+       };
+       result.sort(
+         (a, b) => (channelOrder[a.channel_type] ?? 99) - (channelOrder[b.channel_type] ?? 99),
+@@ -1336,12 +1472,16 @@ export class OpenClawConfigChannels extends LitElement {
+   }
+ 
+   private handleShowClearConfirm() {
+-    if (!this.selectedChannel) return;
++    if (!this.selectedChannel) {
++      return;
++    }
+     this.showClearConfirm = true;
+   }
+ 
+   private async handleClearConfig() {
+-    if (!this.selectedChannel) return;
++    if (!this.selectedChannel) {
++      return;
++    }
+ 
+     const channel = this.channels.find((c) => c.id === this.selectedChannel);
+     const channelName = channel
+@@ -1371,7 +1511,9 @@ export class OpenClawConfigChannels extends LitElement {
+   }
+ 
+   private async handleQuickTest() {
+-    if (!this.selectedChannel) return;
++    if (!this.selectedChannel) {
++      return;
++    }
+ 
+     this.testing = true;
+     this.testResult = null;
+@@ -1506,10 +1648,14 @@ export class OpenClawConfigChannels extends LitElement {
+   }
+ 
+   private async handleSave() {
+-    if (!this.selectedChannel) return;
++    if (!this.selectedChannel) {
++      return;
++    }
+ 
+     const channel = this.channels.find((c) => c.id === this.selectedChannel);
+-    if (!channel) return;
++    if (!channel) {
++      return;
++    }
+ 
+     this.saving = true;
+     try {
+@@ -1547,9 +1693,13 @@ export class OpenClawConfigChannels extends LitElement {
+ 
+   private hasValidConfig(channel: ChannelConfig) {
+     const info = channelInfo[channel.channel_type];
+-    if (!info) return channel.enabled;
++    if (!info) {
++      return channel.enabled;
++    }
+     const requiredFields = info.fields.filter((f) => f.required);
+-    if (requiredFields.length === 0) return channel.enabled;
++    if (requiredFields.length === 0) {
++      return channel.enabled;
++    }
+     return requiredFields.every((field) => {
+       const value = channel.config[field.key];
+       return value !== undefined && value !== null && String(value).trim() !== "";
+@@ -1801,8 +1951,9 @@ export class OpenClawConfigChannels extends LitElement {
+                         this.approveCode = (e.target as HTMLInputElement).value;
+                       }}
+                       @keydown=${(e: KeyboardEvent) => {
+-                        if (e.key === "Enter")
++                        if (e.key === "Enter") {
+                           this._handleApproveCode(currentChannel.id, this.approveCode);
++                        }
+                       }}
+                     />
+                     <button class="btn btn-primary btn-sm" @click=${() => this._handleApproveCode(currentChannel.id, this.approveCode)} ?disabled=${this.approveLoading || !this.approveCode.trim()}>

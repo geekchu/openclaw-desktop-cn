@@ -92,7 +92,7 @@ const IMAGE_SERVER_PORT = parseInt(process.env.QQBOT_IMAGE_SERVER_PORT || "18765
 // 使用绝对路径，确保文件保存和读取使用同一目录
 const IMAGE_SERVER_DIR =
   process.env.QQBOT_IMAGE_SERVER_DIR ||
-  path.join(process.env.HOME || "/home/ubuntu", ".openclaw", "qqbot", "images");
+  path.join(process.env.HOME || "/home/ubuntu", ".openclawcn", "qqbot", "images");
 
 // 消息队列配置（异步处理，防止阻塞心跳）
 const MESSAGE_QUEUE_SIZE = 1000; // 最大队列长度
@@ -547,10 +547,10 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
         let attachmentInfo = "";
         const imageUrls: string[] = [];
         const imageMediaTypes: string[] = [];
-        // 存到 .openclaw/qqbot 目录下的 downloads 文件夹
+        // 存到 .openclawcn/qqbot 目录下的 downloads 文件夹
         const downloadDir = path.join(
           process.env.HOME || "/home/ubuntu",
-          ".openclaw",
+          ".openclawcn",
           "qqbot",
           "downloads",
         );

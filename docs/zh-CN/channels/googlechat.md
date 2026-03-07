@@ -31,7 +31,7 @@ x-i18n:
    - 前往 **Keys** 标签页。
    - 点击 **Add Key** > **Create new key**。
    - 选择 **JSON** 并点击 **Create**。
-4. 将下载的 JSON 文件存储在 Gateway 网关主机上（例如 `~/.openclaw/googlechat-service-account.json`）。
+4. 将下载的 JSON 文件存储在 Gateway 网关主机上（例如 `~/.openclawcn/googlechat-service-account.json`）。
 5. 在 [Google Cloud Console Chat Configuration](https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat) 中创建一个 Google Chat 应用：
    - 填写 **Application info**：
      - **App name**：（例如 `OpenClaw`）

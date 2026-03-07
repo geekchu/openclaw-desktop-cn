@@ -9,7 +9,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
+OPENCLAW_CONFIG="$HOME/.openclawcn/openclaw.json"
 
 show_help() {
     echo "用法: $0 [选项]"

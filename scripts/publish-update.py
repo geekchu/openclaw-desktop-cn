@@ -15,6 +15,7 @@ OpenClaw 更新发布脚本 (Python + paramiko)
 import getpass
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,58 +49,91 @@ def get_password():
     return getpass.getpass(f"SSH password for {USER}@{HOST}: ")
 
 
-def collect_artifacts():
+def collect_artifacts(version):
     """扫描 bundle 目录，收集各平台产物。返回 (platforms_dict, extra_uploads)。"""
     platforms = {}
     extra_uploads = []
 
+    version_pattern = re.compile(rf"(^|[_-]){re.escape(version)}([_.-]|$)")
+
+    def matches_requested_version(file_path):
+        return bool(version_pattern.search(file_path.name))
+
+    def pick_signed_artifact(directory, predicate, sig_path_for):
+        signed = []
+        for file_path in directory.iterdir():
+            if not predicate(file_path):
+                continue
+            sig_file = sig_path_for(file_path)
+            if sig_file.is_file():
+                signed.append((file_path, sig_file))
+        if not signed:
+            return None, None
+        matching_version = [item for item in signed if matches_requested_version(item[0])]
+        if matching_version:
+            signed = matching_version
+        signed.sort(key=lambda item: item[0].stat().st_mtime_ns, reverse=True)
+        return signed[0]
+
+    def pick_latest_artifact(directory, predicate):
+        matches = [file_path for file_path in directory.iterdir() if predicate(file_path)]
+        if not matches:
+            return None
+        matching_version = [file_path for file_path in matches if matches_requested_version(file_path)]
+        if matching_version:
+            matches = matching_version
+        matches.sort(key=lambda file_path: file_path.stat().st_mtime_ns, reverse=True)
+        return matches[0]
+
     # Windows NSIS
     nsis_dir = BUNDLE_BASE / "nsis"
     if nsis_dir.is_dir():
-        for f in nsis_dir.iterdir():
-            if f.name.endswith("-setup.exe") and not f.name.endswith(".sig"):
-                sig_file = f.with_suffix(f.suffix + ".sig")
-                if sig_file.is_file():
-                    platforms["windows-x86_64"] = {
-                        "file": f,
-                        "sig": sig_file.read_text(encoding="utf-8").strip(),
-                    }
-                    print(f"  [OK] Windows NSIS: {f.name}")
-                break
+        f, sig_file = pick_signed_artifact(
+            nsis_dir,
+            lambda file_path: file_path.name.endswith("-setup.exe") and not file_path.name.endswith(".sig"),
+            lambda file_path: file_path.with_suffix(file_path.suffix + ".sig"),
+        )
+        if f and sig_file:
+            platforms["windows-x86_64"] = {
+                "file": f,
+                "sig": sig_file.read_text(encoding="utf-8").strip(),
+            }
+            print(f"  [OK] Windows NSIS: {f.name}")
 
     # macOS
     macos_dir = BUNDLE_BASE / "macos"
     if macos_dir.is_dir():
-        for f in macos_dir.iterdir():
-            if f.name.endswith(".app.tar.gz") and not f.name.endswith(".sig"):
-                sig_file = Path(str(f) + ".sig")
-                if sig_file.is_file():
-                    platforms["darwin-aarch64"] = {
-                        "file": f,
-                        "sig": sig_file.read_text(encoding="utf-8").strip(),
-                    }
-                    print(f"  [OK] macOS (aarch64): {f.name}")
-                break
+        f, sig_file = pick_signed_artifact(
+            macos_dir,
+            lambda file_path: file_path.name.endswith(".app.tar.gz") and not file_path.name.endswith(".sig"),
+            lambda file_path: Path(str(file_path) + ".sig"),
+        )
+        if f and sig_file:
+            platforms["darwin-aarch64"] = {
+                "file": f,
+                "sig": sig_file.read_text(encoding="utf-8").strip(),
+            }
+            print(f"  [OK] macOS (aarch64): {f.name}")
         # .dmg for website downloads
-        for f in macos_dir.iterdir():
-            if f.name.endswith(".dmg"):
-                extra_uploads.append(f)
-                print(f"  [OK] macOS DMG: {f.name}")
-                break
+        dmg_file = pick_latest_artifact(macos_dir, lambda file_path: file_path.name.endswith(".dmg"))
+        if dmg_file:
+            extra_uploads.append(dmg_file)
+            print(f"  [OK] macOS DMG: {dmg_file.name}")
 
     # Linux AppImage
     appimage_dir = BUNDLE_BASE / "appimage"
     if appimage_dir.is_dir():
-        for f in appimage_dir.iterdir():
-            if f.name.endswith(".AppImage") and not f.name.endswith(".sig"):
-                sig_file = Path(str(f) + ".sig")
-                if sig_file.is_file():
-                    platforms["linux-x86_64"] = {
-                        "file": f,
-                        "sig": sig_file.read_text(encoding="utf-8").strip(),
-                    }
-                    print(f"  [OK] Linux AppImage: {f.name}")
-                break
+        f, sig_file = pick_signed_artifact(
+            appimage_dir,
+            lambda file_path: file_path.name.endswith(".AppImage") and not file_path.name.endswith(".sig"),
+            lambda file_path: Path(str(file_path) + ".sig"),
+        )
+        if f and sig_file:
+            platforms["linux-x86_64"] = {
+                "file": f,
+                "sig": sig_file.read_text(encoding="utf-8").strip(),
+            }
+            print(f"  [OK] Linux AppImage: {f.name}")
 
     return platforms, extra_uploads
 
@@ -180,7 +214,7 @@ def main():
 
     # 1. 收集产物
     print("[1/4] 扫描构建产物...")
-    platforms, extra_uploads = collect_artifacts()
+    platforms, extra_uploads = collect_artifacts(version)
     if not platforms:
         print("ERROR: 未找到任何构建产物。请先运行 cargo tauri build。")
         sys.exit(1)

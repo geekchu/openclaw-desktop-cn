@@ -85,7 +85,7 @@ describe("config env vars", () => {
     });
   });
 
-  it("loads ${VAR} substitutions from ~/.openclaw/.env on repeated runtime loads", async () => {
+  it("loads ${VAR} substitutions from ~/.openclawcn/.env on repeated runtime loads", async () => {
     await withTempHome(async (_home) => {
       await withEnvOverride({ BRAVE_API_KEY: undefined }, async () => {
         const stateDir = process.env.OPENCLAW_STATE_DIR?.trim();

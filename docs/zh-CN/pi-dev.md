@@ -58,7 +58,7 @@ scripts/pi/run-tests.sh --live
 
 ## 完全重置
 
-状态存储在 OpenClaw 状态目录下。默认为 `~/.openclaw`。如果设置了 `OPENCLAW_STATE_DIR`，则使用该目录。
+状态存储在 OpenClaw 状态目录下。默认为 `~/.openclawcn`。如果设置了 `OPENCLAW_STATE_DIR`，则使用该目录。
 
 要重置所有内容：
 

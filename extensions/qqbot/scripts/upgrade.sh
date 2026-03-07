@@ -11,7 +11,7 @@ echo "=== QQBot 插件升级脚本 ==="
 detect_installation() {
   if [ -d "$HOME/.clawdbot" ]; then
     echo "clawdbot"
-  elif [ -d "$HOME/.openclaw" ]; then
+  elif [ -d "$HOME/.openclawcn" ]; then
     echo "openclaw"
   else
     echo ""
@@ -81,7 +81,7 @@ if [ -d "$HOME/.clawdbot" ]; then
 fi
 
 # 检查 openclaw
-if [ -d "$HOME/.openclaw" ]; then
+if [ -d "$HOME/.openclawcn" ]; then
   cleanup_installation "openclaw"
   FOUND_INSTALLATION="openclaw"
 fi

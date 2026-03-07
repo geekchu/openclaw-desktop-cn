@@ -123,7 +123,7 @@ function findOtherStateDirs(stateDir: string): string[] {
       if (entry.name.startsWith(".")) {
         continue;
       }
-      const candidates = [".openclawcn", ".openclaw"].map((dir) =>
+      const candidates = [".openclawcn", ".openclawcn"].map((dir) =>
         path.resolve(root, entry.name, dir),
       );
       for (const candidate of candidates) {
@@ -500,8 +500,8 @@ export async function noteStateIntegrity(
       [
         `- State directory is under macOS cloud-synced storage (${displayStateDir}; ${cloudSyncedStateDir.storage}).`,
         "- This can cause slow I/O and sync/lock races for sessions and credentials.",
-        "- Prefer a local non-synced state dir (for example: ~/.openclaw).",
-        `  Set locally: OPENCLAW_STATE_DIR=~/.openclaw ${formatCliCommand("openclaw doctor")}`,
+        "- Prefer a local non-synced state dir (for example: ~/.openclawcn).",
+        `  Set locally: OPENCLAW_STATE_DIR=~/.openclawcn ${formatCliCommand("openclaw doctor")}`,
       ].join("\n"),
     );
   }

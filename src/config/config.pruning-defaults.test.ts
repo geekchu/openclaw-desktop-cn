@@ -6,7 +6,7 @@ import { loadConfig } from "./config.js";
 import { withTempHome } from "./test-helpers.js";
 
 async function writeConfigForTest(home: string, config: unknown): Promise<void> {
-  const configDir = path.join(home, ".openclaw");
+  const configDir = path.join(home, ".openclawcn");
   await fs.mkdir(configDir, { recursive: true });
   await fs.writeFile(
     path.join(configDir, "openclaw.json"),

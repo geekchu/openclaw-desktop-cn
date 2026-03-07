@@ -123,7 +123,7 @@ Gateway 网关启动后，打开浏览器控制界面。
 
 ## 配置（可选）
 
-配置文件位于 `~/.openclaw/openclaw.json`。
+配置文件位于 `~/.openclawcn/openclaw.json`。
 
 - 如果你**不做任何修改**，OpenClaw 将使用内置的 Pi 二进制文件以 RPC 模式运行，并按发送者创建独立会话。
 - 如果你想要限制访问，可以从 `channels.whatsapp.allowFrom` 和（针对群组的）提及规则开始配置。

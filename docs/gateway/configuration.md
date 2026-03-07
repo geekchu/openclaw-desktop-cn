@@ -9,7 +9,7 @@ title: "Configuration"
 
 # Configuration
 
-OpenClaw reads an optional <Tooltip tip="JSON5 supports comments and trailing commas">**JSON5**</Tooltip> config from `~/.openclaw/openclaw.json`.
+OpenClaw reads an optional <Tooltip tip="JSON5 supports comments and trailing commas">**JSON5**</Tooltip> config from `~/.openclawcn/openclaw.json`.
 
 If the file is missing, OpenClaw uses safe defaults. Common reasons to add a config:
 
@@ -26,9 +26,9 @@ See the [full reference](/gateway/configuration-reference) for every available f
 ## Minimal config
 
 ```json5
-// ~/.openclaw/openclaw.json
+// ~/.openclawcn/openclaw.json
 {
-  agents: { defaults: { workspace: "~/.openclaw/workspace" } },
+  agents: { defaults: { workspace: "~/.openclawcn/workspace" } },
   channels: { whatsapp: { allowFrom: ["+15555550123"] } },
 }
 ```
@@ -54,7 +54,7 @@ See the [full reference](/gateway/configuration-reference) for every available f
     The Control UI renders a form from the config schema, with a **Raw JSON** editor as an escape hatch.
   </Tab>
   <Tab title="Direct edit">
-    Edit `~/.openclaw/openclaw.json` directly. The Gateway watches the file and applies changes automatically (see [hot reload](#config-hot-reload)).
+    Edit `~/.openclawcn/openclaw.json` directly. The Gateway watches the file and applies changes automatically (see [hot reload](#config-hot-reload)).
   </Tab>
 </Tabs>
 
@@ -307,8 +307,8 @@ When validation fails:
     {
       agents: {
         list: [
-          { id: "home", default: true, workspace: "~/.openclaw/workspace-home" },
-          { id: "work", workspace: "~/.openclaw/workspace-work" },
+          { id: "home", default: true, workspace: "~/.openclawcn/workspace-home" },
+          { id: "work", workspace: "~/.openclawcn/workspace-work" },
         ],
       },
       bindings: [
@@ -326,7 +326,7 @@ When validation fails:
     Use `$include` to organize large configs:
 
     ```json5
-    // ~/.openclaw/openclaw.json
+    // ~/.openclawcn/openclaw.json
     {
       gateway: { port: 28789 },
       agents: { $include: "./agents.json5" },
@@ -348,7 +348,7 @@ When validation fails:
 
 ## Config hot reload
 
-The Gateway watches `~/.openclaw/openclaw.json` and applies changes automatically — no manual restart needed for most settings.
+The Gateway watches `~/.openclawcn/openclaw.json` and applies changes automatically — no manual restart needed for most settings.
 
 ### Reload modes
 
@@ -413,7 +413,7 @@ Control-plane write RPCs (`config.apply`, `config.patch`, `update.run`) are rate
     ```bash
     openclaw gateway call config.get --params '{}'  # capture payload.hash
     openclaw gateway call config.apply --params '{
-      "raw": "{ agents: { defaults: { workspace: \"~/.openclaw/workspace\" } } }",
+      "raw": "{ agents: { defaults: { workspace: \"~/.openclawcn/workspace\" } } }",
       "baseHash": "<hash>",
       "sessionKey": "agent:main:whatsapp:dm:+15555550123"
     }'
@@ -451,7 +451,7 @@ Control-plane write RPCs (`config.apply`, `config.patch`, `update.run`) are rate
 OpenClaw reads env vars from the parent process plus:
 
 - `.env` from the current working directory (if present)
-- `~/.openclaw/.env` (global fallback)
+- `~/.openclawcn/.env` (global fallback)
 
 Neither file overrides existing env vars. You can also set inline env vars in config:
 

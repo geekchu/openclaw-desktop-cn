@@ -56,7 +56,7 @@ ssh exe.dev new
 ssh <vm-name>.exe.xyz
 ```
 
-提示：保持此 VM **有状态**。OpenClaw 在 `~/.openclaw/` 和 `~/.openclaw/workspace/` 下存储状态。
+提示：保持此 VM **有状态**。OpenClaw 在 `~/.openclawcn/` 和 `~/.openclawcn/workspace/` 下存储状态。
 
 ## 2) 安装先决条件（在 VM 上）
 

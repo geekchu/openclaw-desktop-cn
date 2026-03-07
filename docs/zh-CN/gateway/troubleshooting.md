@@ -177,7 +177,7 @@ Gateway 网关服务使用**最小 PATH** 运行以避免 shell/管理器的干�
 
 这有意排除版本管理器（nvm/fnm/volta/asdf）和包
 管理器（pnpm/npm），因为服务不加载你的 shell 初始化。运行时
-变量如 `DISPLAY` 应该放在 `~/.openclaw/.env` 中（由 Gateway 网关早期加载）。
+变量如 `DISPLAY` 应该放在 `~/.openclawcn/.env` 中（由 Gateway 网关早期加载）。
 在 `host=gateway` 上的 Exec 运行会将你的登录 shell `PATH` 合并到 exec 环境中，
 所以缺少的工具通常意味着你的 shell 初始化没有导出它们（或设置
 `tools.exec.pathPrepend`）。参见 [/tools/exec](/tools/exec)。
@@ -269,7 +269,7 @@ openclaw gateway status
 
 ### 主聊天在沙箱工作区中运行
 
-症状：`pwd` 或文件工具显示 `~/.openclaw/sandboxes/...` 即使你
+症状：`pwd` 或文件工具显示 `~/.openclawcn/sandboxes/...` 即使你
 期望的是主机工作区。
 
 **原因：** `agents.defaults.sandbox.mode: "non-main"` 基于 `session.mainKey`（默认 `"main"`）判断。
@@ -322,7 +322,7 @@ openclaw status
 # 消息必须匹配 mentionPatterns 或显式提及；默认值在渠道 groups/guilds 中。
 # 多智能体：`agents.list[].groupChat.mentionPatterns` 覆盖全局模式。
 grep -n "agents\\|groupChat\\|mentionPatterns\\|channels\\.whatsapp\\.groups\\|channels\\.telegram\\.groups\\|channels\\.imessage\\.groups\\|channels\\.discord\\.guilds" \
-  "${OPENCLAW_CONFIG_PATH:-$HOME/.openclaw/openclaw.json}"
+  "${OPENCLAW_CONFIG_PATH:-$HOME/.openclawcn/openclaw.json}"
 ```
 
 **检查 3：** 检查日志
@@ -367,7 +367,7 @@ openclaw logs --follow | grep "pairing request"
 **检查 1：** 会话文件是否存在？
 
 ```bash
-ls -la ~/.openclaw/agents/<agentId>/sessions/
+ls -la ~/.openclawcn/agents/<agentId>/sessions/
 ```
 
 **检查 2：** 重置窗口是否太短？
@@ -422,7 +422,7 @@ openclaw gateway --verbose
 
 ```bash
 openclaw channels logout
-trash "${OPENCLAW_STATE_DIR:-$HOME/.openclaw}/credentials" # 如果 logout 无法完全清除所有内容
+trash "${OPENCLAW_STATE_DIR:-$HOME/.openclawcn}/credentials" # 如果 logout 无法完全清除所有内容
 openclaw channels login --verbose       # 重新扫描二维码
 ```
 
@@ -674,7 +674,7 @@ npm install -g openclaw@<version>
 
 ```bash
 # 在配置中打开跟踪日志：
-#   ${OPENCLAW_CONFIG_PATH:-$HOME/.openclaw/openclaw.json} -> { logging: { level: "trace" } }
+#   ${OPENCLAW_CONFIG_PATH:-$HOME/.openclawcn/openclaw.json} -> { logging: { level: "trace" } }
 #
 # 然后运行详细命令将调试输出镜像到标准输出：
 openclaw gateway --verbose
@@ -686,7 +686,7 @@ openclaw channels login --verbose
 | 日志                             | 位置                                                                                                                                                                                                                                                                                                                      |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Gateway 网关文件日志（结构化）   | `/tmp/openclaw/openclaw-YYYY-MM-DD.log`（或 `logging.file`）                                                                                                                                                                                                                                                              |
-| Gateway 网关服务日志（监管程序） | macOS：`$OPENCLAW_STATE_DIR/logs/gateway.log` + `gateway.err.log`（默认：`~/.openclaw/logs/...`；配置文件使用 `~/.openclaw-<profile>/logs/...`）<br />Linux：`journalctl --user -u openclaw-gateway[-<profile>].service -n 200 --no-pager`<br />Windows：`schtasks /Query /TN "OpenClaw Gateway (<profile>)" /V /FO LIST` |
+| Gateway 网关服务日志（监管程序） | macOS：`$OPENCLAW_STATE_DIR/logs/gateway.log` + `gateway.err.log`（默认：`~/.openclawcn/logs/...`；配置文件使用 `~/.openclaw-<profile>/logs/...`）<br />Linux：`journalctl --user -u openclaw-gateway[-<profile>].service -n 200 --no-pager`<br />Windows：`schtasks /Query /TN "OpenClaw Gateway (<profile>)" /V /FO LIST` |
 | 会话文件                         | `$OPENCLAW_STATE_DIR/agents/<agentId>/sessions/`                                                                                                                                                                                                                                                                          |
 | 媒体缓存                         | `$OPENCLAW_STATE_DIR/media/`                                                                                                                                                                                                                                                                                              |
 | 凭证                             | `$OPENCLAW_STATE_DIR/credentials/`                                                                                                                                                                                                                                                                                        |
@@ -722,7 +722,7 @@ openclaw gateway stop
 # 如果你安装了服务并想要干净安装：
 # openclaw gateway uninstall
 
-trash "${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+trash "${OPENCLAW_STATE_DIR:-$HOME/.openclawcn}"
 openclaw channels login         # 重新配对 WhatsApp
 openclaw gateway restart           # 或：openclaw gateway
 ```

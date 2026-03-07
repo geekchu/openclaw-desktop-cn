@@ -1,0 +1,3227 @@
+
+> openclaw@2026.3.2 lint F:\openclaw-desktop-cn
+> oxlint --type-aware
+
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type {
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.telegram.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type { ChannelAccountSnapshot, TelegramStatus } from "../types.ts";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.slack.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type { SlackStatus } from "../types.ts";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.signal.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type { SignalStatus } from "../types.ts";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.nostr.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type { ChannelAccountSnapshot, NostrStatus } from "../types.ts";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.imessage.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type { IMessageStatus } from "../types.ts";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.googlechat.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type { GoogleChatStatus } from "../types.ts";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Variable 'chatFinalReloadTimers' is declared but never used. Unused variables should start with a '_'.
+    ,-[ui/src/ui/app-gateway.ts:47:5]
+ 46 | /** Pending chat-history reload timers so we can cancel them on new final events. */
+ 47 | let chatFinalReloadTimers: ReturnType<typeof setTimeout>[] = [];
+    :     ^^^^^^^^^^|^^^^^^^^^^
+    :               `-- 'chatFinalReloadTimers' is declared here
+ 48 | 
+    `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.discord.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type { DiscordStatus } from "../types.ts";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'listCoreToolSections' is imported but never used.
+   ,-[ui/src/ui/views/agents-utils.ts:3:3]
+ 2 | import {
+ 3 |   listCoreToolSections,
+   :   ^^^^^^^^^^|^^^^^^^^^
+   :             `-- 'listCoreToolSections' is imported here
+ 4 |   PROFILE_OPTIONS as TOOL_PROFILE_OPTIONS,
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'TOOL_PROFILE_OPTIONS' is imported but never used.
+   ,-[ui/src/ui/views/agents-utils.ts:4:22]
+ 3 |   listCoreToolSections,
+ 4 |   PROFILE_OPTIONS as TOOL_PROFILE_OPTIONS,
+   :                      ^^^^^^^^^^|^^^^^^^^^
+   :                                `-- 'TOOL_PROFILE_OPTIONS' is imported here
+ 5 | } from "../../../../src/agents/tool-catalog.js";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'discoverHuggingfaceModels' is imported but never used.
+    ,-[src/agents/models-config.providers.ts:38:3]
+ 37 | import {
+ 38 |   discoverHuggingfaceModels,
+    :   ^^^^^^^^^^^^|^^^^^^^^^^^^
+    :               `-- 'discoverHuggingfaceModels' is imported here
+ 39 |   HUGGINGFACE_BASE_URL,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'HUGGINGFACE_BASE_URL' is imported but never used.
+    ,-[src/agents/models-config.providers.ts:39:3]
+ 38 |   discoverHuggingfaceModels,
+ 39 |   HUGGINGFACE_BASE_URL,
+    :   ^^^^^^^^^^|^^^^^^^^^
+    :             `-- 'HUGGINGFACE_BASE_URL' is imported here
+ 40 |   HUGGINGFACE_MODEL_CATALOG,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'HUGGINGFACE_MODEL_CATALOG' is imported but never used.
+    ,-[src/agents/models-config.providers.ts:40:3]
+ 39 |   HUGGINGFACE_BASE_URL,
+ 40 |   HUGGINGFACE_MODEL_CATALOG,
+    :   ^^^^^^^^^^^^|^^^^^^^^^^^^
+    :               `-- 'HUGGINGFACE_MODEL_CATALOG' is imported here
+ 41 |   buildHuggingfaceModelDefinition,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'buildHuggingfaceModelDefinition' is imported but never used.
+    ,-[src/agents/models-config.providers.ts:41:3]
+ 40 |   HUGGINGFACE_MODEL_CATALOG,
+ 41 |   buildHuggingfaceModelDefinition,
+    :   ^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^
+    :                  `-- 'buildHuggingfaceModelDefinition' is imported here
+ 42 | } from "./huggingface-models.js";
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'pathForTab' is imported but never used.
+    ,-[ui/src/ui/app-render.helpers.ts:10:22]
+  9 | import { icons } from "./icons.ts";
+ 10 | import { iconForTab, pathForTab, titleForTab, type Tab } from "./navigation.ts";
+    :                      ^^^^^|^^^^
+    :                           `-- 'pathForTab' is imported here
+ 11 | import type { ThemeTransitionContext } from "./theme-transition.ts";
+    `----
+  help: Consider removing this import.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/controllers/config.ts:121:51]
+ 120 |   if (!state.onestopSelectedModel) {
+ 121 |     const cfg = snapshot.config as Record<string, any> | undefined;
+     :                                                   ^^^
+ 122 |     const primary = cfg?.agents?.defaults?.model?.primary as string | undefined;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x eslint(no-unused-vars): Variable 'GROUP_LABELS' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/config/schema.ts:40:7]
+ 39 | 
+ 40 | const GROUP_LABELS: Record<string, string> = {
+    :       ^^^^^^|^^^^^
+    :             `-- 'GROUP_LABELS' is declared here
+ 41 |   wizard: "向导",
+    `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Variable 'GROUP_ORDER' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/config/schema.ts:68:7]
+ 67 | 
+ 68 | const GROUP_ORDER: Record<string, number> = {
+    :       ^^^^^|^^^^^
+    :            `-- 'GROUP_ORDER' is declared here
+ 69 |   wizard: 20,
+    `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Variable 'FIELD_LABELS' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/config/schema.ts:96:7]
+ 95 | 
+ 96 | const FIELD_LABELS: Record<string, string> = {
+    :       ^^^^^^|^^^^^
+    :             `-- 'FIELD_LABELS' is declared here
+ 97 |   "meta.lastTouchedVersion": "配置最后修改版本",
+    `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Variable 'FIELD_HELP' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/config/schema.ts:410:7]
+ 409 | 
+ 410 | const FIELD_HELP: Record<string, string> = {
+     :       ^^^^^|^^^^
+     :            `-- 'FIELD_HELP' is declared here
+ 411 |   "meta.lastTouchedVersion": "OpenClaw 写入配置时自动设置。",
+     `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Variable 'FIELD_PLACEHOLDERS' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/config/schema.ts:672:7]
+ 671 | 
+ 672 | const FIELD_PLACEHOLDERS: Record<string, string> = {
+     :       ^^^^^^^^^|^^^^^^^^
+     :                `-- 'FIELD_PLACEHOLDERS' is declared here
+ 673 |   "gateway.remote.url": "ws://host:28789",
+     `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Function 'isSensitivePath' is declared but never used.
+     ,-[src/config/schema.ts:683:10]
+ 682 | 
+ 683 | function isSensitivePath(path: string): boolean {
+     :          ^^^^^^^|^^^^^^^
+     :                 `-- 'isSensitivePath' is declared here
+ 684 |   return SENSITIVE_PATTERNS.some((pattern) => pattern.test(path));
+     `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Identifier 'loadConfig' is imported but never used.
+   ,-[test-delay.mjs:2:10]
+ 1 | import { forceFreePortAndWait } from "./dist/cli/ports.js";
+ 2 | import { loadConfig } from "./dist/config/config.js";
+   :          ^^^^^|^^^^
+   :               `-- 'loadConfig' is imported here
+ 3 | import { startGatewayServer } from "./dist/gateway/server.impl.js";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'createDefaultRuntime' is imported but never used.
+   ,-[test-delay.mjs:4:10]
+ 3 | import { startGatewayServer } from "./dist/gateway/server.impl.js";
+ 4 | import { createDefaultRuntime } from "./dist/runtime.js";
+   :          ^^^^^^^^^^|^^^^^^^^^
+   :                    `-- 'createDefaultRuntime' is imported here
+ 5 | 
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Variable 'server' is declared but never used. Unused variables should start with a '_'.
+    ,-[test-delay.mjs:16:9]
+ 15 |   console.time("gateway-start");
+ 16 |   const server = await startGatewayServer(28789, {
+    :         ^^^|^^
+    :            `-- 'server' is declared here
+ 17 |     bind: "loopback",
+    `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Catch parameter '_err' is caught but never used.
+     ,-[src/cli/ports.ts:187:12]
+ 186 |     return results;
+ 187 |   } catch (_err) {
+     :            ^^|^
+     :              `-- '_err' is declared here
+ 188 |     return [];
+     `----
+  help: Consider handling this error.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+   ,-[ui/src/ui/views/updater.ts:5:22]
+ 4 | 
+ 5 | function getTauri(): any {
+   :                      ^^^
+ 6 |   return (window as any).__TAURI__ ?? null;
+   `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+   ,-[ui/src/ui/views/updater.ts:6:21]
+ 5 | function getTauri(): any {
+ 6 |   return (window as any).__TAURI__ ?? null;
+   :                     ^^^
+ 7 | }
+   `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/updater.ts:56:37]
+ 55 |   const channel = new tauri.core.Channel();
+ 56 |   channel.onmessage = async (event: any) => {
+    :                                     ^^^
+ 57 |     switch (event.event) {
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x eslint-plugin-unicorn(prefer-add-event-listener): Prefer `addEventListener()` over their `on`-function counterparts.
+    ,-[ui/src/ui/views/updater.ts:56:11]
+ 55 |   const channel = new tauri.core.Channel();
+ 56 |   channel.onmessage = async (event: any) => {
+    :           ^^^^^^^^^
+ 57 |     switch (event.event) {
+    `----
+
+  x eslint(no-control-regex): Unexpected control character
+     ,-[ui/src/ui/views/terminal.ts:186:24]
+ 185 | function filterOutput(data: string): string {
+ 186 |   return data.replace(/\x1b\[\?1049[hl]/g, ""); // 备用屏幕缓冲区切换
+     :                        ^^|^
+     :                          `-- 'U+001B' is a control character.
+ 187 | }
+     `----
+
+  x eslint(no-control-regex): Unexpected control character
+     ,-[ui/src/ui/views/terminal.ts:496:36]
+ 495 |     // 剥离 ANSI 转义序列后维护输入缓冲区
+ 496 |     const stripped = data.replace(/\x1b(?:\[[0-9;]*[A-Za-z~]|.)/g, "");
+     :                                    ^^|^
+     :                                      `-- 'U+001B' is a control character.
+ 497 |     for (const ch of stripped) {
+     `----
+
+  x eslint(no-unused-vars): Function 'disposeTerminal' is declared but never used.
+     ,-[ui/src/ui/views/terminal.ts:161:10]
+ 160 | 
+ 161 | function disposeTerminal() {
+     :          ^^^^^^^|^^^^^^^
+     :                 `-- 'disposeTerminal' is declared here
+ 162 |   cleanupResizeObserver();
+     `----
+  help: Consider removing this declaration.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/terminal.ts:9:16]
+  8 | // ── 模块级状态 ──
+  9 | let _terminal: any = null;
+    :                ^^^
+ 10 | let _fitAddon: any = null;
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/terminal.ts:10:16]
+  9 | let _terminal: any = null;
+ 10 | let _fitAddon: any = null;
+    :                ^^^
+ 11 | let _sessionId: string | null = null;
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/terminal.ts:52:22]
+ 51 | 
+ 52 | function getTauri(): any {
+    :                      ^^^
+ 53 |   const w = window as any;
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/terminal.ts:53:23]
+ 52 | function getTauri(): any {
+ 53 |   const w = window as any;
+    :                       ^^^
+ 54 |   return w.__TAURI__ ?? null;
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/terminal.ts:57:77]
+ 56 | 
+ 57 | async function invoke(cmd: string, args?: Record<string, unknown>): Promise<any> {
+    :                                                                             ^^^
+ 58 |   const tauri = getTauri();
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/views/terminal.ts:256:77]
+ 255 |     if (tauri?.event?.listen) {
+ 256 |       _unlistenOutput = await tauri.event.listen("terminal-output", (event: any) => {
+     :                                                                             ^^^
+ 257 |         const payload = event.payload;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/views/terminal.ts:280:73]
+ 279 |       });
+ 280 |       _unlistenExit = await tauri.event.listen("terminal-exit", (event: any) => {
+     :                                                                         ^^^
+ 281 |         const exitId = typeof event.payload === "string" ? event.payload : event.payload?.id;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/views/terminal.ts:305:15]
+ 304 |     updateStatusIndicator("connected");
+ 305 |   } catch (e: any) {
+     :               ^^^
+ 306 |     term.writeln(`\x1b[31m创建终端失败: ${e}\x1b[0m`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/views/terminal.ts:315:38]
+ 314 | // 返回 true 表示成功，false 表示会话已不存在
+ 315 | async function reattachSession(term: any): Promise<boolean> {
+     :                                      ^^^
+ 316 |   // 重置命令拦截状态
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/views/terminal.ts:332:75]
+ 331 |   if (tauri?.event?.listen) {
+ 332 |     _unlistenOutput = await tauri.event.listen("terminal-output", (event: any) => {
+     :                                                                           ^^^
+ 333 |       const payload = event.payload;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/views/terminal.ts:341:71]
+ 340 |     });
+ 341 |     _unlistenExit = await tauri.event.listen("terminal-exit", (event: any) => {
+     :                                                                       ^^^
+ 342 |       const exitId = typeof event.payload === "string" ? event.payload : event.payload?.id;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x eslint(no-unused-vars): Variable 'reasoningLevels' is declared but never used. Unused variables should start with a '_'.
+     ,-[ui/src/ui/views/sessions.ts:231:9]
+ 230 |   const reasoning = row.reasoningLevel ?? "";
+ 231 |   const reasoningLevels = withCurrentOption(REASONING_LEVELS, reasoning);
+     :         ^^^^^^^|^^^^^^^
+     :                `-- 'reasoningLevels' is declared here
+ 232 |   const displayName =
+     `----
+  help: Consider removing this declaration.
+
+  x eslint(no-unused-vars): Function 'escapeShellArg' is declared but never used.
+     ,-[src/process/exec.ts:112:10]
+ 111 |  */
+ 112 | function escapeShellArg(arg: string): string {
+     :          ^^^^^^^|^^^^^^
+     :                 `-- 'escapeShellArg' is declared here
+ 113 |   // eslint-disable-next-line no-control-regex
+     `----
+  help: Consider removing this declaration.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/config.browser.test.ts:38:20]
+ 37 |     onSubsectionChange: vi.fn(),
+ 38 |     onestop: {} as any,
+    :                    ^^^
+ 39 |   });
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/config-system-settings.ts:14:24]
+ 13 | function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+ 14 |   const t = (window as any).__TAURI__;
+    :                        ^^^
+ 15 |   if (t?.core?.invoke) {
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+      ,-[ui/src/ui/views/config-system-settings.ts:1208:30]
+ 1207 |       try {
+ 1208 |         const t = (window as any).__TAURI__;
+      :                              ^^^
+ 1209 |         await t?.core?.invoke("plugin:updater|close", { rid: this._updateRid });
+      `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+      ,-[ui/src/ui/views/config-system-settings.ts:1231:17]
+ 1230 |       }
+ 1231 |     } catch (e: any) {
+      :                 ^^^
+ 1232 |       this.updateError = String(e?.message || e);
+      `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+      ,-[ui/src/ui/views/config-system-settings.ts:1253:17]
+ 1252 |       this.updateDownloading = false;
+ 1253 |     } catch (e: any) {
+      :                 ^^^
+ 1254 |       this.updateError = String(e?.message || e);
+      `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+      ,-[ui/src/ui/views/config-system-settings.ts:1260:26]
+ 1259 |   private async _handleRestart() {
+ 1260 |     const t = (window as any).__TAURI__;
+      :                          ^^^
+ 1261 |     if (!t?.core?.invoke) {
+      `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[src/agents/bash-tools.process.send-keys.e2e.test.ts:22:40]
+ 21 |   expect(result.details.status).toBe("running");
+ 22 |   const sessionId = (result.details as any).sessionId;
+    :                                        ^^^
+ 23 |   expect(sessionId).toBeTruthy();
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[src/agents/bash-tools.process.send-keys.e2e.test.ts:57:40]
+ 56 |   expect(result.details.status).toBe("running");
+ 57 |   const sessionId = (result.details as any).sessionId;
+    :                                        ^^^
+ 58 |   expect(sessionId).toBeTruthy();
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x eslint(no-unused-vars): Variable 'selectedModelInfo' is declared but never used. Unused variables should start with a '_'.
+     ,-[ui/src/ui/views/config-onestop.ts:817:9]
+ 816 |   // 当前选中模型信息
+ 817 |   const selectedModelInfo = props.selectedModel
+     :         ^^^^^^^^|^^^^^^^^
+     :                 `-- 'selectedModelInfo' is declared here
+ 818 |     ? _cachedModels.find((m) => m.id === props.selectedModel)
+     `----
+  help: Consider removing this declaration.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/config-onestop.ts:12:24]
+ 11 | function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+ 12 |   const t = (window as any).__TAURI__;
+    :                        ^^^
+ 13 |   if (t?.core?.invoke) {
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/config-onestop.ts:49:43]
+ 48 |   // 避免多次写文件触发 gateway 的文件监视器反复重启
+ 49 |   const cfg = await invoke<Record<string, any>>("get_config");
+    :                                           ^^^
+ 50 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/views/config-onestop.ts:196:47]
+ 195 |     try {
+ 196 |       const cfg = await invoke<Record<string, any>>("get_config");
+     :                                               ^^^
+ 197 |       const apiKey = cfg?.models?.providers?.onestop?.apiKey;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x eslint(no-unused-vars): Identifier 'crypto' is imported but never used.
+   ,-[src/agents/bash-tools.exec.ts:1:8]
+ 1 | import crypto from "node:crypto";
+   :        ^^^|^^
+   :           `-- 'crypto' is imported here
+ 2 | import fs from "node:fs/promises";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'resolveCommandResolution' is imported but never used.
+   ,-[src/agents/bash-tools.exec.ts:5:10]
+ 4 | import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
+ 5 | import { resolveCommandResolution } from "../infra/exec-approvals-analysis.js";
+   :          ^^^^^^^^^^^^|^^^^^^^^^^^
+   :                      `-- 'resolveCommandResolution' is imported here
+ 6 | import {
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Type 'ExecAsk' is imported but never used.
+   ,-[src/agents/bash-tools.exec.ts:7:8]
+ 6 | import {
+ 7 |   type ExecAsk,
+   :        ^^^|^^^
+   :           `-- 'ExecAsk' is imported here
+ 8 |   type ExecHost,
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Type 'ExecSecurity' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:9:8]
+  8 |   type ExecHost,
+  9 |   type ExecSecurity,
+    :        ^^^^^^|^^^^^
+    :              `-- 'ExecSecurity' is imported here
+ 10 |   type ExecApprovalsFile,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Type 'ExecApprovalsFile' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:10:8]
+  9 |   type ExecSecurity,
+ 10 |   type ExecApprovalsFile,
+    :        ^^^^^^^^|^^^^^^^^
+    :                `-- 'ExecApprovalsFile' is imported here
+ 11 |   addAllowlistEntry,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'addAllowlistEntry' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:11:3]
+ 10 |   type ExecApprovalsFile,
+ 11 |   addAllowlistEntry,
+    :   ^^^^^^^^|^^^^^^^^
+    :           `-- 'addAllowlistEntry' is imported here
+ 12 |   evaluateShellAllowlist,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'evaluateShellAllowlist' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:12:3]
+ 11 |   addAllowlistEntry,
+ 12 |   evaluateShellAllowlist,
+    :   ^^^^^^^^^^^|^^^^^^^^^^
+    :              `-- 'evaluateShellAllowlist' is imported here
+ 13 |   maxAsk,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'requiresExecApproval' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:15:3]
+ 14 |   minSecurity,
+ 15 |   requiresExecApproval,
+    :   ^^^^^^^^^^|^^^^^^^^^
+    :             `-- 'requiresExecApproval' is imported here
+ 16 |   resolveSafeBins,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'resolveSafeBins' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:16:3]
+ 15 |   requiresExecApproval,
+ 16 |   resolveSafeBins,
+    :   ^^^^^^^|^^^^^^^
+    :          `-- 'resolveSafeBins' is imported here
+ 17 |   recordAllowlistUse,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'recordAllowlistUse' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:17:3]
+ 16 |   resolveSafeBins,
+ 17 |   recordAllowlistUse,
+    :   ^^^^^^^^^|^^^^^^^^
+    :            `-- 'recordAllowlistUse' is imported here
+ 18 |   resolveExecApprovals,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'resolveExecApprovals' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:18:3]
+ 17 |   recordAllowlistUse,
+ 18 |   resolveExecApprovals,
+    :   ^^^^^^^^^^|^^^^^^^^^
+    :             `-- 'resolveExecApprovals' is imported here
+ 19 |   resolveExecApprovalsFromFile,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'resolveExecApprovalsFromFile' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:19:3]
+ 18 |   resolveExecApprovals,
+ 19 |   resolveExecApprovalsFromFile,
+    :   ^^^^^^^^^^^^^^|^^^^^^^^^^^^^
+    :                 `-- 'resolveExecApprovalsFromFile' is imported here
+ 20 |   buildSafeShellCommand,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'buildSafeShellCommand' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:20:3]
+ 19 |   resolveExecApprovalsFromFile,
+ 20 |   buildSafeShellCommand,
+    :   ^^^^^^^^^^|^^^^^^^^^^
+    :             `-- 'buildSafeShellCommand' is imported here
+ 21 |   buildSafeBinsShellCommand,
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'buildSafeBinsShellCommand' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:21:3]
+ 20 |   buildSafeShellCommand,
+ 21 |   buildSafeBinsShellCommand,
+    :   ^^^^^^^^^^^^|^^^^^^^^^^^^
+    :               `-- 'buildSafeBinsShellCommand' is imported here
+ 22 | } from "../infra/exec-approvals.js";
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'buildNodeShellCommand' is imported but never used.
+    ,-[src/agents/bash-tools.exec.ts:24:10]
+ 23 | import { resolveExecSafeBinRuntimePolicy } from "../infra/exec-safe-bin-runtime-policy.js";
+ 24 | import { buildNodeShellCommand } from "../infra/node-shell.js";
+    :          ^^^^^^^^^^|^^^^^^^^^^
+    :                    `-- 'buildNodeShellCommand' is imported here
+ 25 | import {
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-irregular-whitespace): Unexpected irregular whitespace
+   ,-[ui/src/ui/views/config-form.render.ts:1:1]
+ 1 | ﻿import { html, nothing } from "lit";
+   : ^
+ 2 | import { icons } from "../icons.ts";
+   `----
+  help: Try to remove the irregular whitespace
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/config-custom-providers.ts:12:22]
+ 11 | 
+ 12 | function getTauri(): any {
+    :                      ^^^
+ 13 |   const w = window as any;
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/config-custom-providers.ts:13:23]
+ 12 | function getTauri(): any {
+ 13 |   const w = window as any;
+    :                       ^^^
+ 14 |   return w.__TAURI__ ?? null;
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[ui/src/ui/views/config-custom-providers.ts:17:27]
+ 16 | 
+ 17 | async function invoke<T = any>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+    :                           ^^^
+ 18 |   const tauri = getTauri();
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[ui/src/ui/views/config-custom-providers.ts:274:17]
+ 273 |       // this.addLog("配置加载完成");
+ 274 |     } catch (e: any) {
+     :                 ^^^
+ 275 |       console.error("Load Data Error:", e);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x eslint(no-unused-vars): Identifier 'formatRelativeTimestamp' is imported but never used.
+   ,-[ui/src/ui/views/channels.whatsapp.ts:2:21]
+ 1 | import { html, nothing } from "lit";
+ 2 | import { formatAgo, formatRelativeTimestamp, formatDurationHuman } from "../format.ts";
+   :                     ^^^^^^^^^^^|^^^^^^^^^^^
+   :                                `-- 'formatRelativeTimestamp' is imported here
+ 3 | import type { WhatsAppStatus } from "../types.ts";
+   `----
+  help: Consider removing this import.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/utils.test.ts:93:76]
+ 92 |       await expect(
+ 93 |         retryWithBackoff(fn, { maxRetries: 3, baseDelayMs: 10, log: log as any }),
+    :                                                                            ^^^
+ 94 |       ).rejects.toBeDefined();
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/types.test.ts:16:10]
+ 15 |       },
+ 16 |     } as any;
+    :          ^^^
+ 17 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/types.test.ts:31:10]
+ 30 |       },
+ 31 |     } as any;
+    :          ^^^
+ 32 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/types.test.ts:50:10]
+ 49 |       },
+ 50 |     } as any;
+    :          ^^^
+ 51 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:35:65]
+ 34 |     mockedUploadMedia.mockResolvedValueOnce("media_img_1");
+ 35 |     mockedAxios.mockResolvedValueOnce({ data: { ok: true } } as any);
+    :                                                                 ^^^
+ 36 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:38:67]
+ 37 |     await sendBySession(
+ 38 |       { clientId: "id", clientSecret: "sec", robotCode: "id" } as any,
+    :                                                                   ^^^
+ 39 |       "https://session.webhook",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:44:51]
+ 43 | 
+ 44 |     const req = mockedAxios.mock.calls[0]?.[0] as any;
+    :                                                   ^^^
+ 45 |     expect(req.data).toEqual({ msgtype: "image", image: { media_id: "media_img_1" } });
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:50:65]
+ 49 |     mockedUploadMedia.mockResolvedValueOnce(null);
+ 50 |     mockedAxios.mockResolvedValueOnce({ data: { ok: true } } as any);
+    :                                                                 ^^^
+ 51 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:53:67]
+ 52 |     await sendBySession(
+ 53 |       { clientId: "id", clientSecret: "sec", robotCode: "id" } as any,
+    :                                                                   ^^^
+ 54 |       "https://session.webhook",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:59:51]
+ 58 | 
+ 59 |     const req = mockedAxios.mock.calls[0]?.[0] as any;
+    :                                                   ^^^
+ 60 |     expect(req.data).toEqual({ msgtype: "text", text: { content: "fallback text" } });
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:67:67]
+ 66 |     const result = await sendProactiveMedia(
+ 67 |       { clientId: "id", clientSecret: "sec", robotCode: "id" } as any,
+    :                                                                   ^^^
+ 68 |       "cidA1B2C3",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:79:83]
+ 78 |     mockedUploadMedia.mockResolvedValueOnce("media_voice_1");
+ 79 |     mockedAxios.mockResolvedValueOnce({ data: { processQueryKey: "q_voice" } } as any);
+    :                                                                                   ^^^
+ 80 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:82:67]
+ 81 |     const result = await sendProactiveMedia(
+ 82 |       { clientId: "id", clientSecret: "sec", robotCode: "id" } as any,
+    :                                                                   ^^^
+ 83 |       "user_123",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-media.test.ts:88:51]
+ 87 | 
+ 88 |     const req = mockedAxios.mock.calls[0]?.[0] as any;
+    :                                                   ^^^
+ 89 |     expect(req.data.msgKey).toBe("sampleAudio");
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-card.test.ts:49:10]
+ 48 |       lastUpdated: Date.now(),
+ 49 |     } as any;
+    :          ^^^
+ 50 |     cardMocks.getActiveCardIdByTargetMock.mockReturnValue("card_1");
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-card.test.ts:56:88]
+ 55 |     const result = await sendMessage(
+ 56 |       { clientId: "id", clientSecret: "sec", messageType: "card", robotCode: "id" } as any,
+    :                                                                                        ^^^
+ 57 |       "cidA1B2C3",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-card.test.ts:72:10]
+ 71 |       lastUpdated: Date.now(),
+ 72 |     } as any;
+    :          ^^^
+ 73 |     cardMocks.getActiveCardIdByTargetMock.mockReturnValue("card_1");
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-card.test.ts:77:77]
+ 76 |     cardMocks.streamAICardMock.mockRejectedValue(new Error("stream failed"));
+ 77 |     mockedAxios.mockResolvedValue({ data: { processQueryKey: "q_123" } } as any);
+    :                                                                             ^^^
+ 78 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-card.test.ts:80:88]
+ 79 |     const result = await sendMessage(
+ 80 |       { clientId: "id", clientSecret: "sec", messageType: "card", robotCode: "id" } as any,
+    :                                                                                        ^^^
+ 81 |       "cidA1B2C3",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-advanced.test.ts:56:74]
+ 55 |     cardMocks.isCardInTerminalStateMock.mockReturnValue(true);
+ 56 |     mockedAxios.mockResolvedValue({ data: { processQueryKey: "q1" } } as any);
+    :                                                                          ^^^
+ 57 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-advanced.test.ts:59:88]
+ 58 |     const result = await sendMessage(
+ 59 |       { clientId: "id", clientSecret: "sec", robotCode: "id", messageType: "card" } as any,
+    :                                                                                        ^^^
+ 60 |       "cidA1B2C3",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-advanced.test.ts:77:67]
+ 76 |     const result = await sendMessage(
+ 77 |       { clientId: "id", clientSecret: "sec", robotCode: "id" } as any,
+    :                                                                   ^^^
+ 78 |       "cidA1B2C3",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/send-service-advanced.test.ts:80:21]
+ 79 |       "text",
+ 80 |       { log: log as any },
+    :                     ^^^
+ 81 |     );
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/send-service-advanced.test.ts:114:67]
+ 113 |     const result = await sendMessage(
+ 114 |       { clientId: "id", clientSecret: "sec", robotCode: "id" } as any,
+     :                                                                   ^^^
+ 115 |       "0341234567",
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/send-service-advanced.test.ts:117:21]
+ 116 |       "text",
+ 117 |       { log: log as any, accountId: "main" } as any,
+     :                     ^^^
+ 118 |     );
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/send-service-advanced.test.ts:117:49]
+ 116 |       "text",
+ 117 |       { log: log as any, accountId: "main" } as any,
+     :                                                 ^^^
+ 118 |     );
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/runtime-peer-index.test.ts:20:35]
+ 19 | 
+ 20 |     const rt = { channel: {} } as any;
+    :                                   ^^^
+ 21 |     runtime.setDingTalkRuntime(rt);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/runtime-peer-index.test.ts:45:43]
+ 44 |     const registerChannel = vi.fn();
+ 45 |     const runtime = { id: "runtime1" } as any;
+    :                                           ^^^
+ 46 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/runtime-peer-index.test.ts:47:16]
+ 46 | 
+ 47 |     (plugin as any).register({ runtime, registerChannel } as any);
+    :                ^^^
+ 48 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/runtime-peer-index.test.ts:47:62]
+ 46 | 
+ 47 |     (plugin as any).register({ runtime, registerChannel } as any);
+    :                                                              ^^^
+ 48 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/onboarding.test.ts:14:18]
+ 13 |     const result = await dingtalkOnboardingAdapter.getStatus({
+ 14 |       cfg: {} as any,
+    :                  ^^^
+ 15 |       accountOverrides: {},
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/onboarding.test.ts:40:18]
+ 39 |     const result = await dingtalkOnboardingAdapter.configure({
+ 40 |       cfg: {} as any,
+    :                  ^^^
+ 41 |       prompter: { note, text, confirm, select },
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/onboarding.test.ts:44:10]
+ 43 |       shouldPromptAccountIds: false,
+ 44 |     } as any);
+    :          ^^^
+ 45 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/message-utils.test.ts:22:10]
+ 21 |       },
+ 22 |     } as any;
+    :          ^^^
+ 23 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/message-utils.test.ts:44:10]
+ 43 |       },
+ 44 |     } as any;
+    :          ^^^
+ 45 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+   ,-[extensions/dingtalk/tests/unit/message-utils-advanced.test.ts:7:88]
+ 6 |     expect(
+ 7 |       extractMessageContent({ msgtype: "picture", content: { downloadCode: "d1" } } as any),
+   :                                                                                        ^^^
+ 8 |     ).toEqual(
+   `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/message-utils-advanced.test.ts:16:12]
+ 15 |         content: { recognition: "语音识别", downloadCode: "d2" },
+ 16 |       } as any),
+    :            ^^^
+ 17 |     ).toEqual(expect.objectContaining({ text: "语音识别", mediaPath: "d2", mediaType: "audio" }));
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/message-utils-advanced.test.ts:20:86]
+ 19 |     expect(
+ 20 |       extractMessageContent({ msgtype: "video", content: { downloadCode: "d3" } } as any),
+    :                                                                                      ^^^
+ 21 |     ).toEqual(
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/message-utils-advanced.test.ts:29:12]
+ 28 |         content: { downloadCode: "d4", fileName: "a.pdf" },
+ 29 |       } as any),
+    :            ^^^
+ 30 |     ).toEqual(
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/message-utils-advanced.test.ts:40:10]
+ 39 |       quoteMessage: { text: { content: "旧引用" } },
+ 40 |     } as any);
+    :          ^^^
+ 41 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/message-utils-advanced.test.ts:46:10]
+ 45 |       content: { quoteContent: "新引用" },
+ 46 |     } as any);
+    :          ^^^
+ 47 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/message-utils-advanced.test.ts:53:95]
+ 52 |   it("falls back for unknown msgtype", () => {
+ 53 |     const result = extractMessageContent({ msgtype: "unknownType", text: { content: "" } } as any);
+    :                                                                                               ^^^
+ 54 |     expect(result.text).toBe("[unknownType消息]");
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/media-utils.test.ts:19:45]
+ 18 | 
+ 19 | const mockedAxiosPost = vi.mocked((axios as any).post);
+    :                                             ^^^
+ 20 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/media-utils.test.ts:44:94]
+ 43 |     const mediaPath = createTempFile(Buffer.from("hello world"));
+ 44 |     mockedAxiosPost.mockResolvedValueOnce({ data: { errcode: 0, media_id: "media_123" } } as any);
+    :                                                                                              ^^^
+ 45 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/media-utils.test.ts:47:50]
+ 46 |     const mediaId = await uploadMedia(
+ 47 |       { clientId: "id", clientSecret: "sec" } as any,
+    :                                                  ^^^
+ 48 |       mediaPath,
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/media-utils.test.ts:64:50]
+ 63 |     const mediaId = await uploadMedia(
+ 64 |       { clientId: "id", clientSecret: "sec" } as any,
+    :                                                  ^^^
+ 65 |       tooLargeVoice,
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/media-utils.test.ts:90:50]
+ 89 |     const mediaId = await uploadMedia(
+ 90 |       { clientId: "id", clientSecret: "sec" } as any,
+    :                                                  ^^^
+ 91 |       mediaPath,
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/media-utils.test.ts:94:14]
+ 93 |       vi.fn().mockResolvedValue("token_abc"),
+ 94 |       log as any,
+    :              ^^^
+ 95 |     );
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:22:10]
+ 21 |       disconnect: vi.fn(),
+ 22 |     } as any;
+    :          ^^^
+ 23 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:54:10]
+ 53 |       disconnect: vi.fn(),
+ 54 |     } as any;
+    :          ^^^
+ 55 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:79:10]
+ 78 |       disconnect: vi.fn(),
+ 79 |     } as any;
+    :          ^^^
+ 80 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:105:10]
+ 104 |       disconnect: vi.fn(),
+ 105 |     } as any;
+     :          ^^^
+ 106 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:127:10]
+ 126 |       disconnect: vi.fn(),
+ 127 |     } as any;
+     :          ^^^
+ 128 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:151:10]
+ 150 |       disconnect: vi.fn(),
+ 151 |     } as any;
+     :          ^^^
+ 152 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:174:10]
+ 173 |       }),
+ 174 |     } as any;
+     :          ^^^
+ 175 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:198:10]
+ 197 |       disconnect: vi.fn(),
+ 198 |     } as any;
+     :          ^^^
+ 199 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:221:10]
+ 220 |       disconnect: vi.fn(),
+ 221 |     } as any;
+     :          ^^^
+ 222 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/connection-manager.test.ts:247:10]
+ 246 |       disconnect: vi.fn(),
+ 247 |     } as any;
+     :          ^^^
+ 248 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/config.test.ts:11:10]
+ 10 |       },
+ 11 |     } as any;
+    :          ^^^
+ 12 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/config-advanced.test.ts:18:10]
+ 17 |       },
+ 18 |     } as any;
+    :          ^^^
+ 19 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/config-advanced.test.ts:26:91]
+ 25 |     expect(
+ 26 |       isConfigured({ channels: { dingtalk: { clientId: "id", clientSecret: "sec" } } } as any),
+    :                                                                                           ^^^
+ 27 |     ).toBe(true);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/config-advanced.test.ts:28:75]
+ 27 |     ).toBe(true);
+ 28 |     expect(isConfigured({ channels: { dingtalk: { clientId: "id" } } } as any)).toBe(false);
+    :                                                                           ^^^
+ 29 |   });
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:128:10]
+ 127 |       data: { downloadUrl: "https://download.url/file" },
+ 128 |     } as any);
+     :          ^^^
+ 129 |     mockedAxiosGet.mockResolvedValueOnce({
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:132:10]
+ 131 |       headers: { "content-type": "image/png" },
+ 132 |     } as any);
+     :          ^^^
+ 133 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:135:72]
+ 134 |     const result = await downloadMedia(
+ 135 |       { clientId: "id", clientSecret: "sec", robotCode: "robot_1" } as any,
+     :                                                                        ^^^
+ 136 |       "download_code_1",
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:146:50]
+ 145 |     const result = await downloadMedia(
+ 146 |       { clientId: "id", clientSecret: "sec" } as any,
+     :                                                  ^^^
+ 147 |       "download_code_1",
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:160:47]
+ 159 |       log: undefined,
+ 160 |       dingtalkConfig: { dmPolicy: "open" } as any,
+     :                                               ^^^
+ 161 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:172:10]
+ 171 |       },
+ 172 |     } as any);
+     :          ^^^
+ 173 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:183:76]
+ 182 |       log: undefined,
+ 183 |       dingtalkConfig: { dmPolicy: "allowlist", allowFrom: ["user_ok"] } as any,
+     :                                                                            ^^^
+ 184 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:195:10]
+ 194 |       },
+ 195 |     } as any);
+     :          ^^^
+ 196 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:207:83]
+ 206 |       log: undefined,
+ 207 |       dingtalkConfig: { groupPolicy: "allowlist", allowFrom: ["cid_allowed"] } as any,
+     :                                                                                   ^^^
+ 208 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:219:10]
+ 218 |       },
+ 219 |     } as any);
+     :          ^^^
+ 220 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:231:68]
+ 230 |       log: undefined,
+ 231 |       dingtalkConfig: { dmPolicy: "open", messageType: "card" } as any,
+     :                                                                    ^^^
+ 232 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:243:10]
+ 242 |       },
+ 243 |     } as any);
+     :          ^^^
+ 244 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:257:92]
+ 256 |       log: undefined,
+ 257 |       dingtalkConfig: { dmPolicy: "open", messageType: "markdown", showThinking: true } as any,
+     :                                                                                            ^^^
+ 258 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:269:10]
+ 268 |       },
+ 269 |     } as any);
+     :          ^^^
+ 270 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:280:87]
+ 279 |     shared.getRuntimeMock.mockReturnValueOnce(runtime);
+ 280 |     const card = { cardInstanceId: "card_2", state: "1", lastUpdated: Date.now() } as any;
+     :                                                                                       ^^^
+ 281 |     shared.createAICardMock.mockResolvedValueOnce(card);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:288:68]
+ 287 |       log: undefined,
+ 288 |       dingtalkConfig: { dmPolicy: "open", messageType: "card" } as any,
+     :                                                                    ^^^
+ 289 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:300:10]
+ 299 |       },
+ 300 |     } as any);
+     :          ^^^
+ 301 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:313:94]
+ 312 | 
+ 313 |     const card = { cardInstanceId: "card_terminal", state: "5", lastUpdated: Date.now() } as any;
+     :                                                                                              ^^^
+ 314 |     shared.createAICardMock.mockResolvedValueOnce(card);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:322:68]
+ 321 |       log: undefined,
+ 322 |       dingtalkConfig: { dmPolicy: "open", messageType: "card" } as any,
+     :                                                                    ^^^
+ 323 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:334:10]
+ 333 |       },
+ 334 |     } as any);
+     :          ^^^
+ 335 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:351:95]
+ 350 | 
+ 351 |     const card = { cardInstanceId: "card_finalized", state: "3", lastUpdated: Date.now() } as any;
+     :                                                                                               ^^^
+ 352 |     shared.createAICardMock.mockResolvedValueOnce(card);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:360:68]
+ 359 |       log: undefined,
+ 360 |       dingtalkConfig: { dmPolicy: "open", messageType: "card" } as any,
+     :                                                                    ^^^
+ 361 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:372:10]
+ 371 |       },
+ 372 |     } as any);
+     :          ^^^
+ 373 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:381:87]
+ 380 |     shared.getRuntimeMock.mockReturnValueOnce(runtime);
+ 381 |     const card = { cardInstanceId: "card_3", state: "1", lastUpdated: Date.now() } as any;
+     :                                                                                       ^^^
+ 382 |     shared.createAICardMock.mockResolvedValueOnce(card);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:393:19]
+ 392 |       sessionWebhook: "https://session.webhook",
+ 393 |       log: log as any,
+     :                   ^^^
+ 394 |       dingtalkConfig: { dmPolicy: "open", messageType: "card" } as any,
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:394:68]
+ 393 |       log: log as any,
+ 394 |       dingtalkConfig: { dmPolicy: "open", messageType: "card" } as any,
+     :                                                                    ^^^
+ 395 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:406:10]
+ 405 |       },
+ 406 |     } as any);
+     :          ^^^
+ 407 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:428:10]
+ 427 |       lastUpdated: Date.now(),
+ 428 |     } as any;
+     :          ^^^
+ 429 |     shared.getActiveCardIdByTargetMock.mockReturnValueOnce("card_active");
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:439:10]
+ 438 |       data: { downloadUrl: "https://download.url/file" },
+ 439 |     } as any);
+     :          ^^^
+ 440 |     mockedAxiosGet.mockResolvedValueOnce({
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:443:10]
+ 442 |       headers: { "content-type": "image/png" },
+ 443 |     } as any);
+     :          ^^^
+ 444 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:456:12]
+ 455 |         groups: { cid_group_1: { systemPrompt: "group prompt" } },
+ 456 |       } as any,
+     :            ^^^
+ 457 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:470:10]
+ 469 |       },
+ 470 |     } as any);
+     :          ^^^
+ 471 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:490:12]
+ 489 |         proactivePermissionHint: { enabled: true, cooldownHours: 24 },
+ 490 |       } as any,
+     :            ^^^
+ 491 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:503:10]
+ 502 |       },
+ 503 |     } as any);
+     :          ^^^
+ 504 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:522:12]
+ 521 |         proactivePermissionHint: { enabled: true, cooldownHours: 24 },
+ 522 |       } as any,
+     :            ^^^
+ 523 |       data: {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:535:10]
+ 534 |       },
+ 535 |     } as any;
+     :          ^^^
+ 536 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/card-service.test.ts:10:17]
+  9 |   const mockAxios = vi.fn();
+ 10 |   (mockAxios as any).post = vi.fn();
+    :                 ^^^
+ 11 |   (mockAxios as any).put = vi.fn();
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/card-service.test.ts:11:17]
+ 10 |   (mockAxios as any).post = vi.fn();
+ 11 |   (mockAxios as any).put = vi.fn();
+    :                 ^^^
+ 12 |   return {
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/card-service.test.ts:30:30]
+ 29 | 
+ 30 | const mockedAxios = axios as any;
+    :                              ^^^
+ 31 | const mockedGetAccessToken = vi.mocked(getAccessToken);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/card-service.test.ts:51:12]
+ 50 |         robotCode: "id",
+ 51 |       } as any,
+    :            ^^^
+ 52 |       "cidA1B2C3",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/card-service.test.ts:53:36]
+ 52 |       "cidA1B2C3",
+ 53 |       { conversationType: "2" } as any,
+    :                                    ^^^
+ 54 |       "main",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/card-service.test.ts:64:50]
+ 63 |     const card = await createAICard(
+ 64 |       { clientId: "id", clientSecret: "sec" } as any,
+    :                                                  ^^^
+ 65 |       "cidA1B2C3",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/card-service.test.ts:66:36]
+ 65 |       "cidA1B2C3",
+ 66 |       { conversationType: "2" } as any,
+    :                                    ^^^
+ 67 |       "main",
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/card-service.test.ts:85:10]
+ 84 |       config: { cardTemplateKey: "content" },
+ 85 |     } as any;
+    :          ^^^
+ 86 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:106:10]
+ 105 |       config: { clientId: "id", clientSecret: "sec", cardTemplateKey: "content" },
+ 106 |     } as any;
+     :          ^^^
+ 107 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:125:10]
+ 124 |       config: { cardTemplateKey: "content" },
+ 125 |     } as any;
+     :          ^^^
+ 126 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:152:10]
+ 151 |       },
+ 152 |     } as any;
+     :          ^^^
+ 153 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:173:10]
+ 172 |       config: { clientId: "id", clientSecret: "sec", cardTemplateKey: "content" },
+ 173 |     } as any;
+     :          ^^^
+ 174 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:189:10]
+ 188 |       config: { cardTemplateKey: "content" },
+ 189 |     } as any;
+     :          ^^^
+ 190 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:215:12]
+ 214 |         robotCode: "id",
+ 215 |       } as any,
+     :            ^^^
+ 216 |       "cid_old",
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:217:36]
+ 216 |       "cid_old",
+ 217 |       { conversationType: "2" } as any,
+     :                                    ^^^
+ 218 |       "main",
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:247:10]
+ 246 |       config: { clientId: "id", clientSecret: "sec", cardTemplateKey: "content" },
+ 247 |     } as any;
+     :          ^^^
+ 248 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:265:10]
+ 264 |       config: { clientId: "id", clientSecret: "sec", cardTemplateKey: "content" },
+ 265 |     } as any;
+     :          ^^^
+ 266 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/auth.test.ts:24:95]
+ 23 |     const { getAccessToken } = await loadAuthModule();
+ 24 |     mockedAxiosPost.mockResolvedValue({ data: { accessToken: "token_a", expireIn: 7200 } } as any);
+    :                                                                                               ^^^
+ 25 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/auth.test.ts:26:76]
+ 25 | 
+ 26 |     const config = { clientId: "ding_id", clientSecret: "ding_secret" } as any;
+    :                                                                            ^^^
+ 27 |     const token1 = await getAccessToken(config);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/auth.test.ts:41:90]
+ 40 |       .mockRejectedValueOnce({ response: { status: 401 }, message: "unauthorized" })
+ 41 |       .mockResolvedValueOnce({ data: { accessToken: "token_retry", expireIn: 7200 } } as any);
+    :                                                                                          ^^^
+ 42 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/auth.test.ts:43:87]
+ 42 | 
+ 43 |     const promise = getAccessToken({ clientId: "ding_retry", clientSecret: "sec" } as any);
+    :                                                                                       ^^^
+ 44 |     await vi.advanceTimersByTimeAsync(120);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/unit/auth.test.ts:57:71]
+ 56 |     await expect(
+ 57 |       getAccessToken({ clientId: "ding_err", clientSecret: "sec" } as any),
+    :                                                                       ^^^
+ 58 |     ).rejects.toBeDefined();
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:43:40]
+ 42 | 
+ 43 |     const account = (dingtalkPlugin as any).config.resolveAccount(cfg, "main");
+    :                                        ^^^
+ 44 |     getAccessTokenMock.mockResolvedValueOnce("token_main");
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:46:45]
+ 45 | 
+ 46 |     const result = await (dingtalkPlugin as any).status.probeAccount?.({
+    :                                             ^^^
+ 47 |       account,
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:49:18]
+ 48 |       timeoutMs: 1000,
+ 49 |       cfg: {} as any,
+    :                  ^^^
+ 50 |     });
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:64:10]
+ 63 |       config: {},
+ 64 |     } as any;
+    :          ^^^
+ 65 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:66:45]
+ 65 | 
+ 66 |     const result = await (dingtalkPlugin as any).status.probeAccount?.({
+    :                                             ^^^
+ 67 |       account,
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:69:18]
+ 68 |       timeoutMs: 1000,
+ 69 |       cfg: {} as any,
+    :                  ^^^
+ 70 |     });
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:81:10]
+ 80 |       config: { clientId: "ding_id", clientSecret: "ding_sec" },
+ 81 |     } as any;
+    :          ^^^
+ 82 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:85:45]
+ 84 | 
+ 85 |     const result = await (dingtalkPlugin as any).status.probeAccount?.({
+    :                                             ^^^
+ 86 |       account,
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/status-probe.test.ts:88:18]
+ 87 |       timeoutMs: 1000,
+ 88 |       cfg: {} as any,
+    :                  ^^^
+ 89 |     });
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/send-media-flow.test.ts:42:45]
+ 41 | 
+ 42 |     const result = await (dingtalkPlugin as any).outbound.sendMedia({
+    :                                             ^^^
+ 43 |       cfg: { channels: { dingtalk: { clientId: "id", clientSecret: "sec" } } },
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/send-media-flow.test.ts:47:10]
+ 46 |       accountId: "default",
+ 47 |     } as any);
+    :          ^^^
+ 48 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/send-media-flow.test.ts:74:30]
+ 73 | 
+ 74 |     await (dingtalkPlugin as any).outbound.sendMedia({
+    :                              ^^^
+ 75 |       cfg: { channels: { dingtalk: { clientId: "id", clientSecret: "sec" } } },
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/send-media-flow.test.ts:80:10]
+ 79 |       accountId: "default",
+ 80 |     } as any);
+    :          ^^^
+ 81 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/send-media-flow.test.ts:97:26]
+ 96 |     await expect(
+ 97 |       (dingtalkPlugin as any).outbound.sendMedia({
+    :                          ^^^
+ 98 |         cfg: { channels: { dingtalk: { clientId: "id", clientSecret: "sec" } } },
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/send-media-flow.test.ts:102:12]
+ 101 |         accountId: "default",
+ 102 |       } as any),
+     :            ^^^
+ 103 |     ).rejects.toThrow(/300001/);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/gateway-start-flow.test.ts:9:34]
+  8 |   cleanupOrphanedTempFilesMock: vi.fn(),
+  9 |   connectionConfig: undefined as any,
+    :                                  ^^^
+ 10 | }));
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-start-flow.test.ts:112:37]
+ 111 | 
+ 112 |     await expect((dingtalkPlugin as any).gateway.startAccount(ctx as any)).rejects.toThrow(
+     :                                     ^^^
+ 113 |       "Connection aborted before start",
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-start-flow.test.ts:112:70]
+ 111 | 
+ 112 |     await expect((dingtalkPlugin as any).gateway.startAccount(ctx as any)).rejects.toThrow(
+     :                                                                      ^^^
+ 113 |       "Connection aborted before start",
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-start-flow.test.ts:125:49]
+ 124 | 
+ 125 |     const stopResult = await (dingtalkPlugin as any).gateway.startAccount(ctx as any);
+     :                                                 ^^^
+ 126 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-start-flow.test.ts:125:82]
+ 124 | 
+ 125 |     const stopResult = await (dingtalkPlugin as any).gateway.startAccount(ctx as any);
+     :                                                                                  ^^^
+ 126 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-start-flow.test.ts:147:45]
+ 146 | 
+ 147 |     const result = await (dingtalkPlugin as any).gateway.startAccount(ctx as any);
+     :                                             ^^^
+ 148 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-start-flow.test.ts:147:78]
+ 146 | 
+ 147 |     const result = await (dingtalkPlugin as any).gateway.startAccount(ctx as any);
+     :                                                                              ^^^
+ 148 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+   ,-[extensions/dingtalk/tests/integration/gateway-inbound-flow.test.ts:8:45]
+ 7 |   isConnectedMock: vi.fn(),
+ 8 |   listener: undefined as undefined | ((res: any) => Promise<void>),
+   :                                             ^^^
+ 9 |   socketCallBackResponseMock: vi.fn(),
+   `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/gateway-inbound-flow.test.ts:23:57]
+ 22 |     config: Record<string, unknown>;
+ 23 |     registerCallbackListener: (topic: string, cb: (res: any) => Promise<void>) => void;
+    :                                                         ^^^
+ 24 |     socketCallBackResponse: (messageId: string, payload: unknown) => void;
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/gateway-inbound-flow.test.ts:28:72]
+ 27 |       this.config = {};
+ 28 |       this.registerCallbackListener = vi.fn((_topic: string, cb: (res: any) => Promise<void>) => {
+    :                                                                        ^^^
+ 29 |         shared.listener = cb;
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/gateway-inbound-flow.test.ts:63:35]
+ 62 | 
+ 63 | const startGatewayAccount = (ctx: any) => dingtalkPlugin.gateway!.startAccount!(ctx);
+    :                                   ^^^
+ 64 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-inbound-flow.test.ts:114:38]
+ 113 | 
+ 114 |     await startGatewayAccount(ctx as any);
+     :                                      ^^^
+ 115 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-inbound-flow.test.ts:149:38]
+ 148 | 
+ 149 |     await startGatewayAccount(ctx as any);
+     :                                      ^^^
+ 150 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-inbound-flow.test.ts:179:38]
+ 178 | 
+ 179 |     await startGatewayAccount(ctx as any);
+     :                                      ^^^
+ 180 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/tests/integration/gateway-inbound-flow.test.ts:216:38]
+ 215 | 
+ 216 |     await startGatewayAccount(ctx as any);
+     :                                      ^^^
+ 217 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:25:10]
+ 24 |       },
+ 25 |     } as any;
+    :          ^^^
+ 26 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:27:36]
+ 26 | 
+ 27 |     const ids = (dingtalkPlugin as any).config.listAccountIds(cfg);
+    :                                    ^^^
+ 28 |     const account = (dingtalkPlugin as any).config.resolveAccount(cfg, "main");
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:28:40]
+ 27 |     const ids = (dingtalkPlugin as any).config.listAccountIds(cfg);
+ 28 |     const account = (dingtalkPlugin as any).config.resolveAccount(cfg, "main");
+    :                                        ^^^
+ 29 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:33:31]
+ 32 |     expect(account.configured).toBe(true);
+ 33 |     expect((dingtalkPlugin as any).config.describeAccount(account).name).toBe("Main");
+    :                               ^^^
+ 34 |   });
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:37:41]
+ 36 |   it("validates outbound resolveTarget and messaging/security helpers", () => {
+ 37 |     const resolved = (dingtalkPlugin as any).outbound.resolveTarget({ to: "group:cidAbC" } as any);
+    :                                         ^^^
+ 38 |     const invalid = (dingtalkPlugin as any).outbound.resolveTarget({ to: "   " } as any);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:37:95]
+ 36 |   it("validates outbound resolveTarget and messaging/security helpers", () => {
+ 37 |     const resolved = (dingtalkPlugin as any).outbound.resolveTarget({ to: "group:cidAbC" } as any);
+    :                                                                                               ^^^
+ 38 |     const invalid = (dingtalkPlugin as any).outbound.resolveTarget({ to: "   " } as any);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:38:40]
+ 37 |     const resolved = (dingtalkPlugin as any).outbound.resolveTarget({ to: "group:cidAbC" } as any);
+ 38 |     const invalid = (dingtalkPlugin as any).outbound.resolveTarget({ to: "   " } as any);
+    :                                        ^^^
+ 39 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:38:85]
+ 37 |     const resolved = (dingtalkPlugin as any).outbound.resolveTarget({ to: "group:cidAbC" } as any);
+ 38 |     const invalid = (dingtalkPlugin as any).outbound.resolveTarget({ to: "   " } as any);
+    :                                                                                     ^^^
+ 39 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:42:31]
+ 41 |     expect(invalid.ok).toBe(false);
+ 42 |     expect((dingtalkPlugin as any).messaging.normalizeTarget("dingtalk:user_1")).toBe("user_1");
+    :                               ^^^
+ 43 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:44:41]
+ 43 | 
+ 44 |     const dmPolicy = (dingtalkPlugin as any).security.resolveDmPolicy({
+    :                                         ^^^
+ 45 |       account: { config: {} },
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:46:10]
+ 45 |       account: { config: {} },
+ 46 |     } as any);
+    :          ^^^
+ 47 |     expect(dmPolicy.policy).toBe("open");
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:52:39]
+ 51 |   it("builds status summary and issues from account snapshot", () => {
+ 52 |     const issues = (dingtalkPlugin as any).status.collectStatusIssues([
+    :                                       ^^^
+ 53 |       { accountId: "a1", configured: false },
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:55:10]
+ 54 |       { accountId: "a2", configured: true },
+ 55 |     ] as any);
+    :          ^^^
+ 56 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:57:40]
+ 56 | 
+ 57 |     const summary = (dingtalkPlugin as any).status.buildChannelSummary({
+    :                                        ^^^
+ 58 |       snapshot: { configured: true, running: false, lastError: "err" },
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:59:10]
+ 58 |       snapshot: { configured: true, running: false, lastError: "err" },
+ 59 |     } as any);
+    :          ^^^
+ 60 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:61:37]
+ 60 | 
+ 61 |     const snap = (dingtalkPlugin as any).status.buildAccountSnapshot({
+    :                                     ^^^
+ 62 |       account: {
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/tests/integration/channel-config-status.test.ts:72:10]
+ 71 |       probe: { ok: true },
+ 72 |     } as any);
+    :          ^^^
+ 73 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/src/utils.ts:10:51]
+  9 |  */
+ 10 | export function maskSensitiveData(data: unknown): any {
+    :                                                   ^^^
+ 11 |   if (data === null || data === undefined) {
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/src/utils.ts:19:69]
+ 18 | 
+ 19 |   const masked = JSON.parse(JSON.stringify(data)) as Record<string, any>;
+    :                                                                     ^^^
+ 20 |   const sensitiveFields = new Set(["token", "accessToken"]);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/src/utils.ts:22:25]
+ 21 | 
+ 22 |   function maskObj(obj: any): void {
+    :                         ^^^
+ 23 |     for (const key in obj) {
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/utils.ts:121:21]
+ 120 |         }
+ 121 |       } catch (err: any) {
+     :                     ^^^
+ 122 |         log?.debug?.(`[DingTalk] Failed to cleanup temp file ${file}: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/utils.ts:129:17]
+ 128 |     }
+ 129 |   } catch (err: any) {
+     :                 ^^^
+ 130 |     log?.debug?.(`[DingTalk] Failed to cleanup temp directory: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/utils.ts:149:19]
+ 148 |       return await fn();
+ 149 |     } catch (err: any) {
+     :                   ^^^
+ 150 |       const statusCode = err.response?.status;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:207:9]
+ 206 |   atUserId?: string | null;
+ 207 |   log?: any;
+     :         ^^^
+ 208 |   mediaPath?: string;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:241:9]
+ 240 |   sessionWebhook: string;
+ 241 |   log?: any;
+     :         ^^^
+ 242 |   dingtalkConfig: DingTalkConfig;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:282:10]
+ 281 |   method?: string;
+ 282 |   data?: any;
+     :          ^^^
+ 283 |   headers?: Record<string, string>;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:290:36]
+ 289 |  */
+ 290 | export interface AxiosResponse<T = any> {
+     :                                    ^^^
+ 291 |   data: T;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:312:22]
+ 311 |   responsePrefix?: string;
+ 312 |   deliver: (payload: any) => Promise<{ ok: boolean; error?: string }>;
+     :                      ^^^
+ 313 | }
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:319:15]
+ 318 | export interface ReplyDispatcherResult {
+ 319 |   dispatcher: any;
+     :               ^^^
+ 320 |   replyOptions: any;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:320:17]
+ 319 |   dispatcher: any;
+ 320 |   replyOptions: any;
+     :                 ^^^
+ 321 |   markDispatchIdle: () => void;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:330:9]
+ 329 |   baseDelayMs?: number;
+ 330 |   log?: any;
+     :         ^^^
+ 331 | }
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:384:18]
+ 383 |   to?: string | null;
+ 384 |   [key: string]: any;
+     :                  ^^^
+ 385 | }
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:395:18]
+ 394 |   accountId?: string;
+ 395 |   [key: string]: any;
+     :                  ^^^
+ 396 | }
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:406:18]
+ 405 |   accountId?: string;
+ 406 |   [key: string]: any;
+     :                  ^^^
+ 407 | }
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:415:71]
+ 414 |   resolveTarget: (params: ResolveTargetParams) => TargetResolutionResult;
+ 415 |   sendText: (params: SendTextParams) => Promise<{ ok: boolean; data?: any; error?: any }>;
+     :                                                                       ^^^
+ 416 |   sendMedia?: (params: SendMediaParams) => Promise<{ ok: boolean; data?: any; error?: any }>;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:415:84]
+ 414 |   resolveTarget: (params: ResolveTargetParams) => TargetResolutionResult;
+ 415 |   sendText: (params: SendTextParams) => Promise<{ ok: boolean; data?: any; error?: any }>;
+     :                                                                                    ^^^
+ 416 |   sendMedia?: (params: SendMediaParams) => Promise<{ ok: boolean; data?: any; error?: any }>;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:416:74]
+ 415 |   sendText: (params: SendTextParams) => Promise<{ ok: boolean; data?: any; error?: any }>;
+ 416 |   sendMedia?: (params: SendMediaParams) => Promise<{ ok: boolean; data?: any; error?: any }>;
+     :                                                                          ^^^
+ 417 | }
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/types.ts:416:87]
+ 415 |   sendText: (params: SendTextParams) => Promise<{ ok: boolean; data?: any; error?: any }>;
+ 416 |   sendMedia?: (params: SendMediaParams) => Promise<{ ok: boolean; data?: any; error?: any }>;
+     :                                                                                       ^^^
+ 417 | }
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/send-service.ts:132:50]
+ 131 |   options: SendMessageOptions & { accountId?: string } = {},
+ 132 | ): Promise<{ ok: boolean; error?: string; data?: any; messageId?: string }> {
+     :                                                  ^^^
+ 133 |   const log = options.log || getLogger();
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/send-service.ts:196:17]
+ 195 |     return { ok: true, data: result.data, messageId };
+ 196 |   } catch (err: any) {
+     :                 ^^^
+ 197 |     log?.error?.(`[DingTalk] Failed to send proactive media: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/send-service.ts:229:17]
+ 228 |     if (mediaId) {
+ 229 |       let body: any;
+     :                 ^^^
+ 230 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/send-service.ts:302:25]
+ 301 |             return { ok: true };
+ 302 |           } catch (err: any) {
+     :                         ^^^
+ 303 |             // Mark failed and continue to markdown fallback to avoid message loss.
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/send-service.ts:323:17]
+ 322 |     return { ok: true, data: result };
+ 323 |   } catch (err: any) {
+     :                 ^^^
+ 324 |     options.log?.error?.(`[DingTalk] Send message failed: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/src/message-utils.ts:32:36]
+ 31 |   const formatQuotedContent = (): string => {
+ 32 |     const textField = data.text as any;
+    :                                    ^^^
+ 33 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/media-utils.ts:118:17]
+ 117 |     }
+ 118 |   } catch (err: any) {
+     :                 ^^^
+ 119 |     // Handle file system errors (e.g., file not found, permission denied)
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/src/inbound-handler.ts:81:9]
+ 80 |   downloadCode: string,
+ 81 |   log?: any,
+    :         ^^^
+ 82 | ): Promise<MediaFile | null> {
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:121:53]
+ 120 |     );
+ 121 |     const payload = response.data as Record<string, any>;
+     :                                                     ^^^
+ 122 |     const downloadUrl = payload?.downloadUrl ?? payload?.data?.downloadUrl;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:138:17]
+ 137 |     return { path: saved.path, mimeType: saved.contentType ?? contentType };
+ 138 |   } catch (err: any) {
+     :                 ^^^
+ 139 |     if (log?.error) {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:213:19]
+ 212 |       );
+ 213 |     } catch (err: any) {
+     :                   ^^^
+ 214 |       log?.debug?.(`[DingTalk] Failed to send proactive permission hint: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:257:23]
+ 256 |           );
+ 257 |         } catch (err: any) {
+     :                       ^^^
+ 258 |           log?.debug?.(`[DingTalk] Failed to send access denied message: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:296:23]
+ 295 |           );
+ 296 |         } catch (err: any) {
+     :                       ^^^
+ 297 |           log?.debug?.(`[DingTalk] Failed to send group access denied message: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:431:21]
+ 430 |         }
+ 431 |       } catch (err: any) {
+     :                     ^^^
+ 432 |         log?.warn?.(
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:454:19]
+ 453 |       }
+ 454 |     } catch (err: any) {
+     :                   ^^^
+ 455 |       log?.debug?.(`[DingTalk] Thinking message failed: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:467:32]
+ 466 |       responsePrefix: "",
+ 467 |       deliver: async (payload: any, info?: { kind: string }) => {
+     :                                ^^^
+ 468 |         try {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:505:23]
+ 504 |           });
+ 505 |         } catch (err: any) {
+     :                       ^^^
+ 506 |           log?.error?.(`[DingTalk] Reply failed: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:516:42]
+ 515 |       // Real-time reasoning stream support for card mode.
+ 516 |       onReasoningStream: async (payload: any) => {
+     :                                          ^^^
+ 517 |         if (!useCardMode || !currentAICard) {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:532:23]
+ 531 |           await streamAICard(currentAICard, thinkingText, false, log);
+ 532 |         } catch (err: any) {
+     :                       ^^^
+ 533 |           log?.debug?.(`[DingTalk] Thinking stream update failed: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:554:40]
+ 553 | 
+ 554 |       const isNonEmptyString = (value: any): boolean =>
+     :                                        ^^^
+ 555 |         typeof value === "string" && value.trim().length > 0;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:575:19]
+ 574 |       }
+ 575 |     } catch (err: any) {
+     :                   ^^^
+ 576 |       log?.debug?.(`[DingTalk] AI Card finalization failed: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:585:26]
+ 584 |         }
+ 585 |       } catch (stateErr: any) {
+     :                          ^^^
+ 586 |         log?.debug?.(`[DingTalk] Failed to update card state to FAILED: ${stateErr.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/src/connection-manager.ts:54:29]
+ 53 |   private socketErrorHandler?: (error: Error) => void;
+ 54 |   private monitoredSocket?: any; // Store the socket instance we attached listeners to
+    :                             ^^^
+ 55 | 
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/connection-manager.ts:141:33]
+ 140 |           this.client.disconnect();
+ 141 |         } catch (disconnectErr: any) {
+     :                                 ^^^
+ 142 |           this.log?.debug?.(
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/connection-manager.ts:164:19]
+ 163 |       return { success: true, attempt: successfulAttempt };
+ 164 |     } catch (err: any) {
+     :                   ^^^
+ 165 |       this.log?.error?.(
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/connection-manager.ts:245:35]
+ 244 |     // Access DWClient internals to monitor connection state
+ 245 |     const client = this.client as any;
+     :                                   ^^^
+ 246 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/connection-manager.ts:419:19]
+ 418 |       this.logRuntimeCounters("reconnect-success");
+ 419 |     } catch (err: any) {
+     :                   ^^^
+ 420 |       if (this.stopped) {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/connection-manager.ts:472:19]
+ 471 |       this.client.disconnect();
+ 472 |     } catch (err: any) {
+     :                   ^^^
+ 473 |       this.log?.warn?.(`[${this.accountId}] Error during disconnect: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+    ,-[extensions/dingtalk/src/channel.ts:70:34]
+ 69 | 
+ 70 | function logInboundCounters(log: any, accountId: string, reason: string): void {
+    :                                  ^^^
+ 71 |   const stats = getInboundCounters(accountId);
+    `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:134:36]
+ 133 |   security: {
+ 134 |     resolveDmPolicy: ({ account }: any) => ({
+     :                                    ^^^
+ 135 |       policy: account.config?.dmPolicy || "open",
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:144:38]
+ 143 |   groups: {
+ 144 |     resolveRequireMention: ({ cfg }: any): boolean => getConfig(cfg).groupPolicy !== "open",
+     :                                      ^^^
+ 145 |     resolveGroupIntroHint: ({ groupId, groupChannel }: any): string | undefined => {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:145:56]
+ 144 |     resolveRequireMention: ({ cfg }: any): boolean => getConfig(cfg).groupPolicy !== "open",
+ 145 |     resolveGroupIntroHint: ({ groupId, groupChannel }: any): string | undefined => {
+     :                                                        ^^^
+ 146 |       const parts = [`conversationId=${groupId}`];
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:162:29]
+ 161 |     deliveryMode: "direct" as const,
+ 162 |     resolveTarget: ({ to }: any) => {
+     :                             ^^^
+ 163 |       const trimmed = to?.trim();
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:174:57]
+ 173 |     },
+ 174 |     sendText: async ({ cfg, to, text, accountId, log }: any) => {
+     :                                                         ^^^
+ 175 |       const config = getConfig(cfg, accountId);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:180:39]
+ 179 |         if (result.ok) {
+ 180 |           const data = result.data as any;
+     :                                       ^^^
+ 181 |           const messageId = String(data?.processQueryKey || data?.messageId || randomUUID());
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:193:21]
+ 192 |         );
+ 193 |       } catch (err: any) {
+     :                     ^^^
+ 194 |         if (err?.response?.data !== undefined) {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:214:8]
+ 213 |       log,
+ 214 |     }: any) => {
+     :        ^^^
+ 215 |       const config = getConfig(cfg, accountId);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:270:21]
+ 269 |         );
+ 270 |       } catch (err: any) {
+     :                     ^^^
+ 271 |         if (err?.response?.data !== undefined) {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:303:18]
+ 302 |       // Disable built-in reconnect so ConnectionManager owns all retry/backoff behavior.
+ 303 |       (client as any).config.autoReconnect = false;
+     :                  ^^^
+ 304 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:305:64]
+ 304 | 
+ 305 |       client.registerCallbackListener(TOPIC_ROBOT, async (res: any) => {
+     :                                                                ^^^
+ 306 |         const messageId = res.headers?.messageId;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:373:25]
+ 372 |           }
+ 373 |         } catch (error: any) {
+     :                         ^^^
+ 374 |           stats.failed += 1;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:479:21]
+ 478 |         }
+ 479 |       } catch (err: any) {
+     :                     ^^^
+ 480 |         ctx.log?.error?.(`[${account.accountId}] Failed to establish connection: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:518:37]
+ 517 |     },
+ 518 |     collectStatusIssues: (accounts: any[]) => {
+     :                                     ^^^
+ 519 |       return accounts.flatMap((account) => {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:533:41]
+ 532 |     },
+ 533 |     buildChannelSummary: ({ snapshot }: any) => ({
+     :                                         ^^^
+ 534 |       configured: snapshot?.configured ?? false,
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:540:50]
+ 539 |     }),
+ 540 |     probeAccount: async ({ account, timeoutMs }: any) => {
+     :                                                  ^^^
+ 541 |       if (!account.configured || !account.config?.clientId || !account.config?.clientSecret) {
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:555:23]
+ 554 |         }
+ 555 |       } catch (error: any) {
+     :                       ^^^
+ 556 |         return { ok: false, error: error.message };
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/channel.ts:559:67]
+ 558 |     },
+ 559 |     buildAccountSnapshot: ({ account, runtime, snapshot, probe }: any) => ({
+     :                                                                   ^^^
+ 560 |       accountId: account.accountId,
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/card-service.ts:120:21]
+ 119 |     });
+ 120 |   } catch (sendErr: any) {
+     :                     ^^^
+ 121 |     log?.warn?.(`[DingTalk][AICard] Failed to send error notification to user: ${sendErr.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/card-service.ts:208:17]
+ 207 |     return aiCardInstance;
+ 208 |   } catch (err: any) {
+     :                 ^^^
+ 209 |     log?.error?.(`[DingTalk][AICard] Create failed: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/card-service.ts:245:19]
+ 244 |       log?.debug?.("[DingTalk][AICard] Token refreshed successfully");
+ 245 |     } catch (err: any) {
+     :                   ^^^
+ 246 |       log?.warn?.(`[DingTalk][AICard] Failed to refresh token: ${err.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/card-service.ts:282:17]
+ 281 |     }
+ 282 |   } catch (err: any) {
+     :                 ^^^
+ 283 |     // 500 unknownError usually means cardTemplateKey mismatch with template variable names.
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  ! typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[extensions/dingtalk/src/card-service.ts:328:26]
+ 327 |         return;
+ 328 |       } catch (retryErr: any) {
+     :                          ^^^
+ 329 |         log?.error?.(`[DingTalk][AICard] Retry after token refresh failed: ${retryErr.message}`);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/gateway/server.channels.test.ts:173:39]
+ 172 |       params: { probe: false, timeoutMs: 2000 },
+ 173 |       respond: (ok: boolean, payload: any) => {
+     :                                       ^^^
+ 174 |         responses.push({
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x eslint(no-unused-vars): Identifier 'createEditTool' is imported but never used.
+   ,-[src/agents/pi-tools.ts:4:3]
+ 3 |   codingTools,
+ 4 |   createEditTool,
+   :   ^^^^^^^|^^^^^^
+   :          `-- 'createEditTool' is imported here
+ 5 |   createReadTool,
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'createWriteTool' is imported but never used.
+   ,-[src/agents/pi-tools.ts:6:3]
+ 5 |   createReadTool,
+ 6 |   createWriteTool,
+   :   ^^^^^^^|^^^^^^^
+   :          `-- 'createWriteTool' is imported here
+ 7 |   readTool,
+   `----
+  help: Consider removing this import.
+
+  ! typescript-eslint(no-base-to-string): 'value' will use Object's default stringification format ('[object Object]') when stringified.
+     ,-[extensions/dingtalk/src/inbound-handler.ts:100:21]
+  99 |     } catch {
+ 100 |       return String(value);
+     :                     ^^^^^
+ 101 |     }
+     `----
+  help: Consider picking a property (e.g. `user.name`), using a formatter (or `JSON.stringify`), or implementing a custom `toString()`/`toLocaleString()` on the type.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+     ,-[ui/src/ui/views/config-custom-providers.ts:242:7]
+ 241 |     if (!this.aiConfig && !this.loading) {
+ 242 |       this.loadData();
+     :       ^^^^^^^^^^^^^^^^
+ 243 |     }
+     `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+     ,-[ui/src/ui/views/config-custom-providers.ts:849:29]
+ 848 |                             e.stopPropagation();
+ 849 |                             this.handleSwitchModel(model.full_id);
+     :                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 850 |                           }}
+     `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+     ,-[ui/src/ui/views/config-custom-providers.ts:924:15]
+ 923 | 
+ 924 |               this.loadData();
+     :               ^^^^^^^^^^^^^^^^
+ 925 |             }}>强制刷新</button>
+     `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+    ,-[ui/src/ui/views/config-system-settings.ts:83:5]
+ 82 |     super.connectedCallback();
+ 83 |     this._loadConfig();
+    :     ^^^^^^^^^^^^^^^^^^^
+ 84 |   }
+    `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-system-settings.ts:1042:132]
+ 1041 |                 <div style="font-size: 12px; color: var(--muted, #71717a); font-weight: 500;">允许访问的额外目录</div>
+ 1042 |                 <button class="opt" style="padding: 4px 10px; font-size: 11px; white-space: nowrap; border-radius: 12px;" @click=${this._handleAddAllowedDir}>+ 添加目录</button>
+      :                                                                                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^|
+      :                                                                                                                                                |            `-- This reference may be unbound and lose `this` context
+ 1043 |               </div>
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-system-settings.ts:1139:73]
+ 1138 |         <div class="action-bar">
+ 1139 |           <button class="btn-primary" ?disabled=${this.saving} @click=${this._handleSaveIdentity}>
+      :                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^|
+      :                                                                                     |           `-- This reference may be unbound and lose `this` context
+ 1140 |             ${
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-system-settings.ts:1184:105]
+ 1183 |           <label class="switch">
+ 1184 |             <input type="checkbox" .checked=${this.autoStart} ?disabled=${this.autoStartBusy} @change=${this._toggleAutoStart} />
+      :                                                                                                         ^^^^^^^^^^^^^^^^^^^^^|
+      :                                                                                                                   |          `-- This reference may be unbound and lose `this` context
+ 1185 |             <span class="switch-track"></span>
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-system-settings.ts:1189:44]
+ 1188 | 
+ 1189 |         <button class="click-row" @click=${this._openConfigDir}>
+      :                                            ^^^^^^^^^^^^^^^^^^^|
+      :                                                     |         `-- This reference may be unbound and lose `this` context
+ 1190 |           <div class="toggle-row-info">
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-system-settings.ts:1305:50]
+ 1304 |             </div>
+ 1305 |             <button class="btn-primary" @click=${this._handleRestart}>重启应用</button>
+      :                                                  ^^^^^^^^^^^^^^^^^^^|
+      :                                                           |         `-- This reference may be unbound and lose `this` context
+ 1306 |           </div>
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-system-settings.ts:1330:50]
+ 1329 |             </div>
+ 1330 |             <button class="btn-primary" @click=${this._handleDownloadUpdate}>下载并安装</button>
+      :                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^|
+      :                                                               |            `-- This reference may be unbound and lose `this` context
+ 1331 |           </div>
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-system-settings.ts:1347:83]
+ 1346 |             </div>
+ 1347 |             <button class="btn-primary" ?disabled=${this.updateChecking} @click=${this._handleCheckUpdate}>
+      :                                                                                   ^^^^^^^^^^^^^^^^^^^^^^^|
+      :                                                                                              |           `-- This reference may be unbound and lose `this` context
+ 1348 |               ${
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+      ,-[ui/src/ui/views/config-channels.ts:1373:5]
+ 1372 |     this._stopPairingPoll();
+ 1373 |     this._fetchPairingRequests(channelId);
+      :     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 1374 |     this._pairingPollTimer = setInterval(() => {
+      `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+      ,-[ui/src/ui/views/config-channels.ts:1375:7]
+ 1374 |     this._pairingPollTimer = setInterval(() => {
+ 1375 |       this._fetchPairingRequests(channelId);
+      :       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 1376 |     }, 30000);
+      `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+      ,-[ui/src/ui/views/config-channels.ts:1417:9]
+ 1416 |         this.approveCode = "";
+ 1417 |         this._fetchPairingRequests(channelId);
+      :         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 1418 |       }
+      `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+  x typescript-eslint(no-base-to-string): 'value' will use Object's default stringification format ('[object Object]') when stringified.
+      ,-[ui/src/ui/views/config-channels.ts:1632:32]
+ 1631 |           } else if (value !== null && value !== undefined) {
+ 1632 |             form[key] = String(value);
+      :                                ^^^^^
+ 1633 |           }
+      `----
+  help: Consider picking a property (e.g. `user.name`), using a formatter (or `JSON.stringify`), or implementing a custom `toString()`/`toLocaleString()` on the type.
+
+  x typescript-eslint(no-base-to-string): 'value' will use Object's default stringification format ('[object Object]') when stringified.
+      ,-[ui/src/ui/views/config-channels.ts:1705:62]
+ 1704 |       const value = channel.config[field.key];
+ 1705 |       return value !== undefined && value !== null && String(value).trim() !== "";
+      :                                                              ^^^^^
+ 1706 |     });
+      `----
+  help: Consider picking a property (e.g. `user.name`), using a formatter (or `JSON.stringify`), or implementing a custom `toString()`/`toLocaleString()` on the type.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-channels.ts:1894:73]
+ 1893 |                     <div class="btn-group" style="margin-top: 12px; display: flex; gap: 8px;">
+ 1894 |                       <button class="btn btn-secondary btn-sm" @click=${this.handleWhatsAppLogin} ?disabled=${this.loginLoading}>
+      :                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^|
+      :                                                                                     |           `-- This reference may be unbound and lose `this` context
+ 1895 |                         ${this.loginLoading ? iconLoader2 : iconQrCode} 启动扫码
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+      ,-[ui/src/ui/views/config-channels.ts:1955:27]
+ 1954 |                         if (e.key === "Enter") {
+ 1955 |                           this._handleApproveCode(currentChannel.id, this.approveCode);
+      :                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 1956 |                         }
+      `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-channels.ts:1985:28]
+ 1984 |                   class="btn btn-primary"
+ 1985 |                   @click=${this.handleSave}
+      :                            ^^^^^^^^^^^^^^^|
+      :                                   |       `-- This reference may be unbound and lose `this` context
+ 1986 |                   ?disabled=${this.saving}
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-channels.ts:1994:28]
+ 1993 |                   class="btn btn-secondary"
+ 1994 |                   @click=${this.handleQuickTest}
+      :                            ^^^^^^^^^^^^^^^^^^^^|
+      :                                      |         `-- This reference may be unbound and lose `this` context
+ 1995 |                   ?disabled=${this.testing}
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-channels.ts:2008:30]
+ 2007 |                     class="btn btn-danger"
+ 2008 |                     @click=${this.handleShowClearConfirm}
+      :                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^|
+      :                                           |             `-- This reference may be unbound and lose `this` context
+ 2009 |                     ?disabled=${this.clearing}
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+      ,-[ui/src/ui/views/config-channels.ts:2017:112]
+ 2016 |                     <span style="color: var(--accent, #ff5c5c);">确定清空？</span>
+ 2017 |                     <button class="btn btn-danger btn-sm" style="background: rgba(255, 92, 92, 0.2);" @click=${this.handleClearConfig}>确定</button>
+      :                                                                                                                ^^^^^^^^^^^^^^^^^^^^^^|
+      :                                                                                                                           |          `-- This reference may be unbound and lose `this` context
+ 2018 |                     <button class="btn btn-secondary btn-sm" @click=${() => (this.showClearConfirm = false)}>取消</button>
+      `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript(tsconfig-error): Invalid tsconfig
+    ,-[openclawcn_web/tsconfig.json:21:5]
+ 20 |     ],
+ 21 |     "baseUrl": ".",
+    :     ^^^^^^^^^
+ 22 |     "paths": {
+    `----
+  help: Option 'baseUrl' has been removed. Please remove it from your configuration.
+        See https://github.com/oxc-project/tsgolint/issues/351 for more information.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+    ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:61:35]
+ 60 | 
+ 61 | const mockedAxiosPost = vi.mocked(axios.post);
+    :                                   ^^^^^^^^^^|
+    :                                        |    `-- This reference may be unbound and lose `this` context
+ 62 | const mockedAxiosGet = vi.mocked(axios.get);
+    `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+    ,-[extensions/dingtalk/tests/unit/inbound-handler.test.ts:62:34]
+ 61 | const mockedAxiosPost = vi.mocked(axios.post);
+ 62 | const mockedAxiosGet = vi.mocked(axios.get);
+    :                                  ^^^^^^^^^|
+    :                                      |    `-- This reference may be unbound and lose `this` context
+ 63 | 
+    `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+  x typescript-eslint(no-unnecessary-template-expression): Template literal expression is unnecessary and can be simplified.
+     ,-[extensions/dingtalk/tests/unit/card-service.test.ts:198:22]
+ 197 |   it("formatContentForCard truncates and annotates content", () => {
+ 198 |     const content = `${"x".repeat(510)}`;
+     :                      ^^^^^^^^^^^^^^^^^^
+ 199 |     const result = formatContentForCard(content, "thinking");
+     `----
+
+  x typescript-eslint(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`.
+    ,-[extensions/dingtalk/tests/unit/auth.test.ts:10:35]
+  9 | 
+ 10 | const mockedAxiosPost = vi.mocked(axios.post);
+    :                                   ^^^^^^^^^^|
+    :                                        |    `-- This reference may be unbound and lose `this` context
+ 11 | 
+    `----
+  help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+
+Found 241 warnings and 110 errors.
+Finished in 9.3s on 4696 files using 12 threads.
+ ELIFECYCLE  Command failed with exit code 1.

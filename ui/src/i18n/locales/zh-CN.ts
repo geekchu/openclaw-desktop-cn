@@ -50,7 +50,7 @@ export const zh_CN: TranslationMap = {
     skills: "管理技能可用性和 API 密钥注入。",
     nodes: "配对设备、功能和命令公开。",
     chat: "用于快速干预的直接网关聊天会话。",
-    config: "安全地编辑 ~/.openclaw/openclaw.json。",
+    config: "安全地编辑 ~/.openclawcn/openclaw.json。",
     debug: "网关快照、事件和手动 RPC 调用。",
     logs: "网关文件日志的实时追踪。",
     terminal: "访问并控制底层终端环境。",

@@ -29,7 +29,7 @@ x-i18n:
 - 创建 Compute Engine VM
 - 安装 Docker（隔离的应用运行时）
 - 在 Docker 中启动 OpenClaw Gateway 网关
-- 在主机上持久化 `~/.openclaw` + `~/.openclaw/workspace`（重启/重建后仍保留）
+- 在主机上持久化 `~/.openclawcn` + `~/.openclawcn/workspace`（重启/重建后仍保留）
 - 通过 SSH 隧道从你的笔记本电脑访问控制 UI
 
 Gateway 网关可以通过以下方式访问：
@@ -211,8 +211,8 @@ Docker 容器是临时的。
 所有长期状态必须存在于主机上。
 
 ```bash
-mkdir -p ~/.openclaw
-mkdir -p ~/.openclaw/workspace
+mkdir -p ~/.openclawcn
+mkdir -p ~/.openclawcn/workspace
 ```
 
 ---
@@ -227,11 +227,11 @@ OPENCLAW_GATEWAY_TOKEN=change-me-now
 OPENCLAW_GATEWAY_BIND=lan
 OPENCLAW_GATEWAY_PORT=28789
 
-OPENCLAW_CONFIG_DIR=/home/$USER/.openclaw
-OPENCLAW_WORKSPACE_DIR=/home/$USER/.openclaw/workspace
+OPENCLAW_CONFIG_DIR=/home/$USER/.openclawcn
+OPENCLAW_WORKSPACE_DIR=/home/$USER/.openclawcn/workspace
 
 GOG_KEYRING_PASSWORD=change-me-now
-XDG_CONFIG_HOME=/home/node/.openclaw
+XDG_CONFIG_HOME=/home/node/.openclawcn
 ```
 
 生成强密钥：
@@ -267,8 +267,8 @@ services:
       - XDG_CONFIG_HOME=${XDG_CONFIG_HOME}
       - PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
-      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
-      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclawcn
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclawcn/workspace
     ports:
       # 推荐：在 VM 上保持 Gateway 网关仅绑定 loopback；通过 SSH 隧道访问。
       # 要公开暴露，移除 `127.0.0.1:` 前缀并相应配置防火墙。
@@ -416,12 +416,12 @@ OpenClaw 在 Docker 中运行，但 Docker 不是真实来源。
 
 | 组件             | 位置                              | 持久化机制    | 说明                        |
 | ---------------- | --------------------------------- | ------------- | --------------------------- |
-| Gateway 网关配置 | `/home/node/.openclaw/`           | 主机卷挂载    | 包括 `openclaw.json`、令牌  |
-| 模型认证配置文件 | `/home/node/.openclaw/`           | 主机卷挂载    | OAuth 令牌、API 密钥        |
-| Skill 配置       | `/home/node/.openclaw/skills/`    | 主机卷挂载    | Skill 级别状态              |
-| 智能体工作区     | `/home/node/.openclaw/workspace/` | 主机卷挂载    | 代码和智能体产物            |
-| WhatsApp 会话    | `/home/node/.openclaw/`           | 主机卷挂载    | 保留 QR 登录                |
-| Gmail 密钥环     | `/home/node/.openclaw/`           | 主机卷 + 密码 | 需要 `GOG_KEYRING_PASSWORD` |
+| Gateway 网关配置 | `/home/node/.openclawcn/`           | 主机卷挂载    | 包括 `openclaw.json`、令牌  |
+| 模型认证配置文件 | `/home/node/.openclawcn/`           | 主机卷挂载    | OAuth 令牌、API 密钥        |
+| Skill 配置       | `/home/node/.openclawcn/skills/`    | 主机卷挂载    | Skill 级别状态              |
+| 智能体工作区     | `/home/node/.openclawcn/workspace/` | 主机卷挂载    | 代码和智能体产物            |
+| WhatsApp 会话    | `/home/node/.openclawcn/`           | 主机卷挂载    | 保留 QR 登录                |
+| Gmail 密钥环     | `/home/node/.openclawcn/`           | 主机卷 + 密码 | 需要 `GOG_KEYRING_PASSWORD` |
 | 外部二进制文件   | `/usr/local/bin/`                 | Docker 镜像   | 必须在构建时内置            |
 | Node 运行时      | 容器文件系统                      | Docker 镜像   | 每次镜像构建时重建          |
 | OS 包            | 容器文件系统                      | Docker 镜像   | 不要在运行时安装            |

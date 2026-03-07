@@ -24,7 +24,7 @@ Status: ready for DMs + spaces via Google Chat API webhooks (HTTP only).
    - Go to the **Keys** tab.
    - Click **Add Key** > **Create new key**.
    - Select **JSON** and press **Create**.
-4. Store the downloaded JSON file on your gateway host (e.g., `~/.openclaw/googlechat-service-account.json`).
+4. Store the downloaded JSON file on your gateway host (e.g., `~/.openclawcn/googlechat-service-account.json`).
 5. Create a Google Chat app in the [Google Cloud Console Chat Configuration](https://console.cloud.google.com/apis/api/chat.googleapis.com/hangouts-chat):
    - Fill in the **Application info**:
      - **App name**: (e.g. `OpenClaw`)

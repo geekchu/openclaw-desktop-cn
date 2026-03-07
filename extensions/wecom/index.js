@@ -20,7 +20,7 @@ const DEFAULT_ACCOUNT_ID = "default";
 const THINKING_PLACEHOLDER = "思考中...";
 
 // Image cache directory.
-const MEDIA_CACHE_DIR = join(process.env.HOME || "/tmp", ".openclaw", "media", "wecom");
+const MEDIA_CACHE_DIR = join(process.env.HOME || "/tmp", ".openclawcn", "media", "wecom");
 
 // =============================================================================
 // Command allowlist configuration

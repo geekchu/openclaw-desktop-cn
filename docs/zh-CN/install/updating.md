@@ -41,9 +41,9 @@ curl -fsSL https://openclaw.ai/install.sh | bash
 - 了解你的安装方式：**全局**（npm/pnpm）还是**源码**（git clone）。
 - 了解你的 Gateway 网关运行方式：**前台终端**还是**受管理服务**（launchd/systemd）。
 - 快照你的定制内容：
-  - 配置：`~/.openclaw/openclaw.json`
-  - 凭证：`~/.openclaw/credentials/`
-  - 工作区：`~/.openclaw/workspace`
+  - 配置：`~/.openclawcn/openclaw.json`
+  - 凭证：`~/.openclawcn/credentials/`
+  - 工作区：`~/.openclawcn/workspace`
 
 ## 更新（全局安装）
 

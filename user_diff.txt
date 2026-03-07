@@ -1,0 +1,184 @@
+diff --git a/build.ps1 b/build.ps1
+index 687a29afa..2852e34f3 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -1,37 +1,60 @@
+-# [OpenClaw Build] Preparing Tauri environment...
+-$KeyPath = "$HOME\.tauri\openclaw.key"
++$ErrorActionPreference = "Stop"
+ 
+-# Check if the private key exists
+-if (!(Test-Path $KeyPath)) {
+-    Write-Host "[ERROR] Private key not found at $KeyPath" -ForegroundColor Red
+-    Write-Host "Please run the following command to generate it first:"
+-    Write-Host "cargo tauri signer generate -w `"$KeyPath`" --password 123 --force" -ForegroundColor Yellow
++# [OpenClaw Build] Preparing Tauri environment...
++$ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
++$KeyPath = Join-Path $HOME ".tauri\openclaw.key"
++$ExitCode = 0
++
++Push-Location $ScriptRoot
++try {
++    # Check if the private key exists
++    if (!(Test-Path $KeyPath)) {
++        $ExitCode = 1
++        Write-Host "[ERROR] Private key not found at $KeyPath" -ForegroundColor Red
++        Write-Host "Please run the following command to generate it first:"
++        Write-Host "cargo tauri signer generate -w `"$KeyPath`" --password 123 --force" -ForegroundColor Yellow
++        throw "Private key not found"
++    }
++
++    # Read the private key content into environment variable
++    $env:TAURI_SIGNING_PRIVATE_KEY = [System.IO.File]::ReadAllText($KeyPath).Trim()
++    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "123"
++
++    Write-Host "[OpenClaw Build] Private key loaded successfully." -ForegroundColor Green
++
++    Write-Host "[OpenClaw Build] Cleaning cargo cache..." -ForegroundColor Cyan
++    Set-Location -Path (Join-Path $ScriptRoot "src-tauri")
++    cargo clean
++    if ($LASTEXITCODE -ne 0) {
++        $ExitCode = $LASTEXITCODE
++        throw "cargo clean failed with exit code $LASTEXITCODE."
++    }
++
++    Set-Location -Path $ScriptRoot
++
++    Write-Host "[OpenClaw Build] Starting pnpm installer:build..." -ForegroundColor Cyan
++
++    $env:BUILD_CONFIG = "release"
++    pnpm installer:build
++
++    if ($LASTEXITCODE -ne 0) {
++        $ExitCode = $LASTEXITCODE
++        throw "Build failed with exit code $LASTEXITCODE."
++    }
++
++    Write-Host "[OpenClaw Build] Build completed successfully." -ForegroundColor Green
+     Pause
+-    exit 1
+ }
+-
+-# Read the private key content into environment variable
+-$env:TAURI_SIGNING_PRIVATE_KEY = [System.IO.File]::ReadAllText($KeyPath).Trim()
+-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "123"
+-
+-Write-Host "[OpenClaw Build] Private key loaded successfully." -ForegroundColor Green
+-
+-Write-Host "[OpenClaw Build] Cleaning cargo cache..." -ForegroundColor Cyan
+-Set-Location -Path "src-tauri"
+-cargo clean
+-Set-Location -Path ".."
+-
+-Write-Host "[OpenClaw Build] Starting pnpm installer:build..." -ForegroundColor Cyan
+-
+-$env:BUILD_CONFIG = "release"
+-# Run the build
+-pnpm installer:build
+-
+-if ($LASTEXITCODE -ne 0) {
+-    Write-Host "[ERROR] Build failed with exit code $LASTEXITCODE." -ForegroundColor Red
++catch {
++    if ($ExitCode -eq 0) {
++        $ExitCode = 1
++    }
++    if ($_.Exception.Message -ne "Private key not found") {
++        Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
++    }
+     Pause
+-    exit $LASTEXITCODE
++    exit $ExitCode
++}
++finally {
++    Pop-Location
+ }
+-
+-Write-Host "[OpenClaw Build] Build completed successfully." -ForegroundColor Green
+-Pause
+diff --git a/scripts/build-installer.js b/scripts/build-installer.js
+index 23c9bf41a..d57a154c2 100644
+--- a/scripts/build-installer.js
++++ b/scripts/build-installer.js
+@@ -145,7 +145,10 @@ function checkEnvironment() {
+       ok = false;
+     }
+   } else if (
+-    process.env.TAURI_SIGNING_PRIVATE_KEY.includes("ENCRYPTED") &&
++    Buffer.from(process.env.TAURI_SIGNING_PRIVATE_KEY, "base64")
++      .toString("utf-8")
++      .toLowerCase()
++      .includes("encrypted") &&
+     !process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+   ) {
+     if (requiresSigning) {
+diff --git a/scripts/prepare-gateway-bundle.js b/scripts/prepare-gateway-bundle.js
+index 929ba3ac6..f3e6561da 100644
+--- a/scripts/prepare-gateway-bundle.js
++++ b/scripts/prepare-gateway-bundle.js
+@@ -292,8 +292,8 @@ console.log(
+ console.log("\n[bundle] === Step 5: 安装生产依赖（含 extension 依赖）===");
+ run("npm install --omit=dev --install-strategy=hoisted", { cwd: bundleDir });
+ 
+-// Step 6.6: 删除桌面版不需要的重量级包
+-console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ===");
++// Step 6: 删除桌面版不需要的重量级包
++console.log("\n[bundle] === Step 6: 删除桌面版不需要的重量级包 ===");
+ {
+   // 桌面版通过 API 接入模型，不需要本地推理引擎
+   // 仅删除确定不需要的包，保留可能被运行时 import 的包
+diff --git a/ui/build_log.txt b/ui/build_log.txt
+deleted file mode 100644
+index 57806fce6..000000000
+--- a/ui/build_log.txt
++++ /dev/null
+@@ -1,50 +0,0 @@
+-
+-> openclaw-control-ui@ build F:\openclaw-desktop-cn\ui
+-> vite build
+-
+-[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+-transforming...
+-[32m✓[39m 143 modules transformed.
+-✗ Build failed in 556ms
+-error during build:
+-[vite:esbuild] Transform failed with 3 errors:
+-F:/openclaw-desktop-cn/ui/src/ui/views/config-custom-providers.ts:743:4: ERROR: The symbol "_dataVersion" has already been declared
+-F:/openclaw-desktop-cn/ui/src/ui/views/config-custom-providers.ts:744:4: ERROR: The symbol "_lastRenderedVersion" has already been declared
+-F:/openclaw-desktop-cn/ui/src/ui/views/config-custom-providers.ts:749:9: ERROR: The symbol "triggerUpdate" has already been declared
+-file: F:/openclaw-desktop-cn/ui/src/ui/views/config-custom-providers.ts:743:4
+-
+-The symbol "_dataVersion" has already been declared
+-741 |  
+-742 |  let _lastTemplate: any = null;
+-743 |  let _dataVersion = 0;
+-    |      ^
+-744 |  let _lastRenderedVersion = -1;
+-745 |  
+-
+-The symbol "_lastRenderedVersion" has already been declared
+-742 |  let _lastTemplate: any = null;
+-743 |  let _dataVersion = 0;
+-744 |  let _lastRenderedVersion = -1;
+-    |      ^
+-745 |  
+-746 |  // 覆盖 triggerUpdate 以更新数据版本
+-
+-The symbol "triggerUpdate" has already been declared
+-747 |  const _originalTriggerUpdate = triggerUpdate;
+-748 |  // @ts-ignore - Create a local override for the module-level function
+-749 |  function triggerUpdate() {
+-    |           ^
+-750 |    _dataVersion++;
+-751 |    if (_requestUpdate) _requestUpdate();
+-
+-    at failureErrorWithLog (F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:1467:15)
+-    at F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:736:50
+-    at responseCallbacks.<computed> (F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:603:9)
+-    at handleIncomingPacket (F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:658:12)
+-    at Socket.readFromStdout (F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:581:7)
+-    at Socket.emit (node:events:508:28)
+-    at addChunk (node:internal/streams/readable:559:12)
+-    at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+-    at Readable.push (node:internal/streams/readable:390:5)
+-    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+- ELIFECYCLE  Command failed with exit code 1.

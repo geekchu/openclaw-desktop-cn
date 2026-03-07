@@ -31,19 +31,33 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 const bundleDir = join(projectRoot, "src-tauri", "gateway-bundle");
 
+function getPathParts(pathValue = process.env.PATH) {
+  return (pathValue ?? "").split(";").filter(Boolean);
+}
+
+function getWindowsPowerShellExe() {
+  return join(
+    process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows",
+    "System32",
+    "WindowsPowerShell",
+    "v1.0",
+    "powershell.exe",
+  );
+}
+
 // Windows: cargo tauri build 的子进程可能丢失用户 PATH，导致找不到 pnpm/bash 等工具。
 // 从系统环境变量重新拼接完整 PATH 以确保工具可用。
 if (process.platform === "win32") {
   try {
     const fullPath = execSync(
-      "powershell -NoProfile -Command \"[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')\"",
+      `"${getWindowsPowerShellExe()}" -NoProfile -Command "[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')"`,
       { encoding: "utf-8", windowsHide: true },
     ).trim();
     if (fullPath) {
       // 合并：原始 PATH 优先，再追加系统环境变量中缺失的条目
-      const origParts = process.env.PATH.split(";").filter(Boolean);
+      const origParts = getPathParts();
       const origLower = new Set(origParts.map((p) => p.toLowerCase()));
-      const newParts = fullPath.split(";").filter(Boolean);
+      const newParts = getPathParts(fullPath);
       for (const p of newParts) {
         if (!origLower.has(p.toLowerCase())) {
           origParts.push(p);
@@ -57,8 +71,8 @@ if (process.platform === "win32") {
 
   // 确保当前 node 可执行文件的目录在 PATH 最前面。
   const nodeDir = dirname(process.execPath);
-  if (!process.env.PATH.split(";").some((p) => p.toLowerCase() === nodeDir.toLowerCase())) {
-    process.env.PATH = `${nodeDir};${process.env.PATH}`;
+  if (!getPathParts().some((p) => p.toLowerCase() === nodeDir.toLowerCase())) {
+    process.env.PATH = [nodeDir, ...getPathParts()].join(";");
   }
 
   // 确保 Git for Windows 的 bash 路径在 WSL bash (C:\Windows\System32\bash.exe) 之前。
@@ -72,7 +86,7 @@ if (process.platform === "win32") {
   ];
   const gitBashDir = gitBashCandidates.find((d) => existsSync(join(d, "bash.exe")));
   if (gitBashDir) {
-    const parts = process.env.PATH.split(";").filter(Boolean);
+    const parts = getPathParts();
     const lowerGit = gitBashDir.toLowerCase();
     // 移除已有的同路径条目，然后插到最前面
     const filtered = parts.filter((p) => p.toLowerCase() !== lowerGit);
@@ -292,8 +306,8 @@ console.log(
 console.log("\n[bundle] === Step 5: 安装生产依赖（含 extension 依赖）===");
 run("npm install --omit=dev --install-strategy=hoisted", { cwd: bundleDir });
 
-// Step 6.6: 删除桌面版不需要的重量级包
-console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ===");
+// Step 6: 删除桌面版不需要的重量级包
+console.log("\n[bundle] === Step 6: 删除桌面版不需要的重量级包 ===");
 {
   // 桌面版通过 API 接入模型，不需要本地推理引擎
   // 仅删除确定不需要的包，保留可能被运行时 import 的包

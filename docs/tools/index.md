@@ -492,7 +492,7 @@ Notes:
   - Reply format includes `Status`, `Result`, and compact stats.
   - `Result` is the assistant completion text; if missing, the latest `toolResult` is used as fallback.
 - Manual completion-mode spawns send directly first, with queue fallback and retry on transient failures (`status: "ok"` means run finished, not that announce delivered).
-- `sessions_spawn` supports inline file attachments for subagent runtime only (ACP rejects them). Each attachment has `name`, `content`, and optional `encoding` (`utf8` or `base64`) and `mimeType`. Files are materialized into the child workspace at `.openclaw/attachments/<uuid>/` with a `.manifest.json` metadata file. The tool returns a receipt with `count`, `totalBytes`, per file `sha256`, and `relDir`. Attachment content is automatically redacted from transcript persistence.
+- `sessions_spawn` supports inline file attachments for subagent runtime only (ACP rejects them). Each attachment has `name`, `content`, and optional `encoding` (`utf8` or `base64`) and `mimeType`. Files are materialized into the child workspace at `.openclawcn/attachments/<uuid>/` with a `.manifest.json` metadata file. The tool returns a receipt with `count`, `totalBytes`, per file `sha256`, and `relDir`. Attachment content is automatically redacted from transcript persistence.
   - Configure limits via `tools.sessions_spawn.attachments` (`enabled`, `maxTotalBytes`, `maxFiles`, `maxFileBytes`, `retainOnSessionKeep`).
   - `attachAs.mountPath` is a reserved hint for future mount implementations.
 - `sessions_spawn` is non-blocking and returns `status: "accepted"` immediately.

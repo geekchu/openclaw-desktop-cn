@@ -150,7 +150,7 @@ OpenClaw 将自动提供本地安装路径。
 2. 创建一个 **Azure Bot**（App ID + 密钥 + 租户 ID）。
 3. 构建一个引用机器人并包含以下 RSC 权限的 **Teams 应用包**。
 4. 将 Teams 应用上传/安装到团队中（或用于私信的个人范围）。
-5. 在 `~/.openclaw/openclaw.json`（或环境变量）中配置 `msteams` 并启动 Gateway 网关。
+5. 在 `~/.openclawcn/openclaw.json`（或环境变量）中配置 `msteams` 并启动 Gateway 网关。
 6. Gateway 网关默认在 `/api/messages` 上监听 Bot Framework webhook 流量。
 
 ## Azure Bot 设置（前提条件）
@@ -603,7 +603,7 @@ Authorization 头仅附加到 `channels.msteams.mediaAuthAllowHosts` 中的主�
 OpenClaw 将 Teams 投票作为 Adaptive Cards 发送（没有原生 Teams 投票 API）。
 
 - CLI：`openclaw message poll --channel msteams --target conversation:<id> ...`
-- 投票由 Gateway 网关记录在 `~/.openclaw/msteams-polls.json` 中。
+- 投票由 Gateway 网关记录在 `~/.openclawcn/msteams-polls.json` 中。
 - Gateway 网关必须保持在线才能记录投票。
 - 投票尚不自动发布结果摘要（如需要请检查存储文件）。
 

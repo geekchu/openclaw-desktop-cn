@@ -311,13 +311,13 @@ Runbook: [iOS connect](https://docs.openclaw.ai/platforms/ios).
 
 ## Agent workspace + skills
 
-- Workspace root: `~/.openclaw/workspace` (configurable via `agents.defaults.workspace`).
+- Workspace root: `~/.openclawcn/workspace` (configurable via `agents.defaults.workspace`).
 - Injected prompt files: `AGENTS.md`, `SOUL.md`, `TOOLS.md`.
-- Skills: `~/.openclaw/workspace/skills/<skill>/SKILL.md`.
+- Skills: `~/.openclawcn/workspace/skills/<skill>/SKILL.md`.
 
 ## Configuration
 
-Minimal `~/.openclaw/openclaw.json` (model + defaults):
+Minimal `~/.openclawcn/openclaw.json` (model + defaults):
 
 ```json5
 {
@@ -339,7 +339,7 @@ Details: [Security guide](https://docs.openclaw.ai/gateway/security) · [Docker 
 
 ### [WhatsApp](https://docs.openclaw.ai/channels/whatsapp)
 
-- Link the device: `pnpm openclaw channels login` (stores creds in `~/.openclaw/credentials`).
+- Link the device: `pnpm openclaw channels login` (stores creds in `~/.openclawcn/credentials`).
 - Allowlist who can talk to the assistant via `channels.whatsapp.allowFrom`.
 - If `channels.whatsapp.groups` is set, it becomes a group allowlist; include `"*"` to allow all.
 

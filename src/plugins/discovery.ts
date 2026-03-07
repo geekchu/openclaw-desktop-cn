@@ -596,7 +596,7 @@ export function discoverOpenClawPlugins(params: {
   }
   if (workspaceDir) {
     const workspaceRoot = resolveUserPath(workspaceDir);
-    const workspaceExtDirs = [path.join(workspaceRoot, ".openclaw", "extensions")];
+    const workspaceExtDirs = [path.join(workspaceRoot, ".openclawcn", "extensions")];
     for (const dir of workspaceExtDirs) {
       discoverInDirectory({
         dir,
@@ -619,12 +619,40 @@ export function discoverOpenClawPlugins(params: {
   if (bundledExtensions) {
     // Fast path: esbuild single-file optimization injected these extensions statically.
     for (const idHint of Object.keys(bundledExtensions)) {
-      candidates.push({
-        idHint,
-        source: `bundled://${idHint}`,
-        rootDir: bundledDir ?? "",
+      const bundledRoot = bundledDir ? path.join(bundledDir, idHint) : undefined;
+      const bundledEntry = bundledRoot ? path.join(bundledRoot, "index.cjs") : undefined;
+      if (bundledRoot && bundledEntry && fs.existsSync(bundledEntry)) {
+        addCandidate({
+          candidates,
+          diagnostics,
+          seen,
+          idHint,
+          source: bundledEntry,
+          rootDir: bundledRoot,
+          origin: "bundled",
+          ownershipUid: params.ownershipUid,
+          manifest: readPackageManifest(bundledRoot, false),
+          packageDir: bundledRoot,
+        });
+        continue;
+      }
+
+      diagnostics.push({
+        level: "warn",
+        pluginId: idHint,
+        source: bundledEntry ?? bundledDir ?? `bundled://${idHint}`,
+        message: "bundled extension shim is missing; falling back to directory discovery",
+      });
+    }
+
+    if (bundledDir) {
+      discoverInDirectory({
+        dir: bundledDir,
         origin: "bundled",
-        packageManifest: {},
+        ownershipUid: params.ownershipUid,
+        candidates,
+        diagnostics,
+        seen,
       });
     }
   } else if (bundledDir) {

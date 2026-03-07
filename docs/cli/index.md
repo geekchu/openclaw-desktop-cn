@@ -312,7 +312,7 @@ Initialize config + workspace.
 
 Options:
 
-- `--workspace <dir>`: agent workspace path (default `~/.openclaw/workspace`).
+- `--workspace <dir>`: agent workspace path (default `~/.openclawcn/workspace`).
 - `--wizard`: run the onboarding wizard.
 - `--non-interactive`: run wizard without prompts.
 - `--mode <local|remote>`: wizard mode.

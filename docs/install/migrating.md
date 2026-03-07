@@ -12,8 +12,8 @@ This guide migrates a OpenClaw Gateway from one machine to another **without red
 
 The migration is simple conceptually:
 
-- Copy the **state directory** (`$OPENCLAW_STATE_DIR`, default: `~/.openclaw/`) — this includes config, auth, sessions, and channel state.
-- Copy your **workspace** (`~/.openclaw/workspace/` by default) — this includes your agent files (memory, prompts, etc.).
+- Copy the **state directory** (`$OPENCLAW_STATE_DIR`, default: `~/.openclawcn/`) — this includes config, auth, sessions, and channel state.
+- Copy your **workspace** (`~/.openclawcn/workspace/` by default) — this includes your agent files (memory, prompts, etc.).
 
 But there are common footguns around **profiles**, **permissions**, and **partial copies**.
 
@@ -23,7 +23,7 @@ But there are common footguns around **profiles**, **permissions**, and **partia
 
 Most installs use the default:
 
-- **State dir:** `~/.openclaw/`
+- **State dir:** `~/.openclawcn/`
 
 But it may be different if you use:
 
@@ -42,7 +42,7 @@ Look for mentions of `OPENCLAW_STATE_DIR` / profile in the output. If you run mu
 
 Common defaults:
 
-- `~/.openclaw/workspace/` (recommended workspace)
+- `~/.openclawcn/workspace/` (recommended workspace)
 - a custom folder you created
 
 Your workspace is where files like `MEMORY.md`, `USER.md`, and `memory/*.md` live.
@@ -80,9 +80,9 @@ openclaw gateway stop
 ```bash
 # Adjust paths if you use a profile or custom locations
 cd ~
-tar -czf openclaw-state.tgz .openclaw
+tar -czf openclaw-state.tgz .openclawcn
 
-tar -czf openclaw-workspace.tgz .openclaw/workspace
+tar -czf openclaw-workspace.tgz .openclawcn/workspace
 ```
 
 If you have multiple profiles/state dirs (e.g. `~/.openclaw-main`, `~/.openclaw-work`), archive each.
@@ -93,14 +93,14 @@ On the **new** machine, install the CLI (and Node if needed):
 
 - See: [Install](/install)
 
-At this stage, it’s OK if onboarding creates a fresh `~/.openclaw/` — you will overwrite it in the next step.
+At this stage, it’s OK if onboarding creates a fresh `~/.openclawcn/` — you will overwrite it in the next step.
 
 ### Step 2 — Copy the state dir + workspace to the new machine
 
 Copy **both**:
 
-- `$OPENCLAW_STATE_DIR` (default `~/.openclaw/`)
-- your workspace (default `~/.openclaw/workspace/`)
+- `$OPENCLAW_STATE_DIR` (default `~/.openclawcn/`)
+- your workspace (default `~/.openclawcn/workspace/`)
 
 Common approaches:
 
@@ -110,7 +110,7 @@ Common approaches:
 
 After copying, ensure:
 
-- Hidden directories were included (e.g. `.openclaw/`)
+- Hidden directories were included (e.g. `.openclawcn/`)
 - File ownership is correct for the user running the gateway
 
 ### Step 3 — Run Doctor (migrations + service repair)

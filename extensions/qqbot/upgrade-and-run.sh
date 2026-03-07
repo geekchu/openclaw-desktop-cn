@@ -118,7 +118,7 @@ if ! openclaw plugins install . 2>&1 | tee "$INSTALL_LOG"; then
     
     # 检查权限
     echo "   - 权限问题: 检查安装目录权限"
-    echo "     ls -la ~/.openclaw/ 2>/dev/null || echo '目录不存在'"
+    echo "     ls -la ~/.openclawcn/ 2>/dev/null || echo '目录不存在'"
     
     # 检查npm配置
     echo "   - npm配置: 检查当前npm配置"
@@ -227,7 +227,7 @@ if openclaw config set channels.qqbot.markdownSupport "$MARKDOWN_VALUE" 2>&1; th
     echo "✅ Markdown配置成功"
 else
     echo "⚠️  openclaw config set 失败，尝试直接编辑配置文件..."
-    OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
+    OPENCLAW_CONFIG="$HOME/.openclawcn/openclaw.json"
     if [ -f "$OPENCLAW_CONFIG" ] && node -e "
       const fs = require('fs');
       const cfg = JSON.parse(fs.readFileSync('$OPENCLAW_CONFIG', 'utf-8'));
@@ -271,9 +271,9 @@ echo "当前目录: $(pwd)"
 echo ""
 echo "如果启动失败，请检查:"
 echo "1. 端口占用: lsof -i :3000 (或OpenClaw使用的端口)"
-echo "2. 配置文件: ls -la ~/.openclaw/"
+echo "2. 配置文件: ls -la ~/.openclawcn/"
 
-echo "3. 查看日志: tail -f ~/.openclaw/logs/*.log 2>/dev/null || echo '无日志文件'"
+echo "3. 查看日志: tail -f ~/.openclawcn/logs/*.log 2>/dev/null || echo '无日志文件'"
 echo ""
 echo "按 Ctrl+C 停止服务"
 echo "========================================="
@@ -315,7 +315,7 @@ else
     echo "3. 检查步骤:"
     echo "   a. 检查端口: lsof -i :3000 2>/dev/null || echo '端口3000可用'"
     echo "   b. 检查依赖: openclaw --version"
-    echo "   c. 检查配置: ls -la ~/.openclaw/config.yaml 2>/dev/null"
+    echo "   c. 检查配置: ls -la ~/.openclawcn/config.yaml 2>/dev/null"
     
     # 显示错误摘要
     if [ -f "$GATEWAY_LOG" ]; then

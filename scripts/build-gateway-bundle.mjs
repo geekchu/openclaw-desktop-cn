@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { builtinModules, createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
@@ -8,6 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 const bundleDir = join(projectRoot, "src-tauri", "gateway-bundle");
 const artifactsDir = join(projectRoot, ".artifacts");
+const requireFromProjectRoot = createRequire(join(projectRoot, "package.json"));
 
 // Ensure artifacts dir exists
 if (!existsSync(artifactsDir)) {
@@ -62,7 +64,7 @@ writeFileSync(syntheticEntryPath, syntheticContent, "utf-8");
 
 // 3. Clear target bundle dir but keep the skeleton
 if (existsSync(bundleDir)) {
-  rmSync(bundleDir, { recursive: true, force: true });
+  rmSync(bundleDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 mkdirSync(bundleDir, { recursive: true });
 
@@ -70,10 +72,11 @@ mkdirSync(bundleDir, { recursive: true });
 console.log("[build-bundle] Running esbuild...");
 
 try {
-  esbuild.buildSync({
+  const buildResult = esbuild.buildSync({
     entryPoints: [syntheticEntryPath],
     bundle: true,
     outfile: join(bundleDir, "openclaw.mjs"),
+    metafile: true,
     format: "esm",
     platform: "node",
     target: "node22",
@@ -98,6 +101,145 @@ try {
     ],
   });
   console.log("[build-bundle] Bundle generated successfully.");
+
+  const rootPkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf-8"));
+  const declaredDeps = new Map();
+  for (const [name, version] of Object.entries(rootPkg.dependencies || {})) {
+    if (typeof version === "string" && !version.startsWith("workspace:")) {
+      declaredDeps.set(name, version);
+    }
+  }
+  for (const ext of extensions) {
+    const extPkgPath = join(projectRoot, "extensions", ext.name, "package.json");
+    if (!existsSync(extPkgPath)) {
+      continue;
+    }
+    const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
+    for (const [name, version] of Object.entries(extPkg.dependencies || {})) {
+      if (typeof version === "string" && !version.startsWith("workspace:") && !declaredDeps.has(name)) {
+        declaredDeps.set(name, version);
+      }
+    }
+  }
+
+  const builtinSet = new Set(builtinModules.flatMap((name) => [name, name.replace(/^node:/, "")]));
+  const requiredDeps = new Map();
+  const resolvedVersions = new Map();
+  const bundleText = readFileSync(join(bundleDir, "openclaw.mjs"), "utf-8");
+
+  function topLevelPackage(specifier) {
+    if (
+      !specifier ||
+      specifier === "<runtime>" ||
+      specifier.startsWith(".") ||
+      specifier.startsWith("/") ||
+      specifier.startsWith("node:") ||
+      /^[A-Za-z]:/.test(specifier)
+    ) {
+      return null;
+    }
+    if (specifier.startsWith("@")) {
+      const parts = specifier.split("/");
+      return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : specifier;
+    }
+    return specifier.split("/")[0];
+  }
+
+  function includePackage(specifier) {
+    const pkgName = topLevelPackage(specifier);
+    if (!pkgName || builtinSet.has(pkgName)) {
+      return;
+    }
+    let version = declaredDeps.get(pkgName);
+    if (!version) {
+      if (resolvedVersions.has(pkgName)) {
+        version = resolvedVersions.get(pkgName);
+      } else {
+        try {
+          const installedPkgPath = requireFromProjectRoot.resolve(`${pkgName}/package.json`);
+          const installedPkg = JSON.parse(readFileSync(installedPkgPath, "utf-8"));
+          version = typeof installedPkg.version === "string" ? installedPkg.version.trim() : undefined;
+        } catch {
+          version = undefined;
+        }
+        resolvedVersions.set(pkgName, version);
+      }
+    }
+    if (version) {
+      requiredDeps.set(pkgName, version);
+    }
+  }
+
+  for (const input of Object.values(buildResult.metafile?.inputs || {})) {
+    for (const imp of input.imports || []) {
+      if (imp.external) {
+        includePackage(imp.path);
+      }
+    }
+  }
+
+  const runtimeRequirePattern = /(?:^|[^\w$.])(?:__require|require)\(\s*["']([^"'\n]+)["']\s*\)/g;
+  for (const match of bundleText.matchAll(runtimeRequirePattern)) {
+    includePackage(match[1]);
+  }
+
+  for (const pkgName of ["playwright-core", "ffmpeg-static"]) {
+    includePackage(pkgName);
+  }
+
+  const bundlePkg = {
+    name: rootPkg.name,
+    version: rootPkg.version,
+    type: "module",
+    main: "openclaw.mjs",
+    dependencies: Object.fromEntries([...requiredDeps.entries()].sort(([a], [b]) => a.localeCompare(b))),
+    optionalDependencies: {},
+  };
+
+  writeFileSync(join(bundleDir, "package.json"), JSON.stringify(bundlePkg, null, 2));
+  console.log(
+    `[build-bundle] Created optimized package.json (${requiredDeps.size} runtime dependencies retained).`,
+  );
+
+  const bundledExtensionsDir = join(bundleDir, "extensions");
+  mkdirSync(bundledExtensionsDir, { recursive: true });
+
+  for (const ext of extensions) {
+    const sourceRoot = join(projectRoot, "extensions", ext.name);
+    const targetRoot = join(bundledExtensionsDir, ext.name);
+    mkdirSync(targetRoot, { recursive: true });
+
+    const manifestPath = join(sourceRoot, "openclaw.plugin.json");
+    if (existsSync(manifestPath)) {
+      copyFileSync(manifestPath, join(targetRoot, "openclaw.plugin.json"));
+    }
+
+    const packagePath = join(sourceRoot, "package.json");
+    if (existsSync(packagePath)) {
+      const packageJson = JSON.parse(readFileSync(packagePath, "utf-8"));
+      if (packageJson?.openclaw && Array.isArray(packageJson.openclaw.extensions)) {
+        packageJson.openclaw = {
+          ...packageJson.openclaw,
+          extensions: ["./index.cjs"],
+        };
+      }
+      if (typeof packageJson.main === "string") {
+        packageJson.main = "./index.cjs";
+      }
+      writeFileSync(join(targetRoot, "package.json"), JSON.stringify(packageJson, null, 2), "utf-8");
+    }
+
+    const shimSource = [
+      `const extension = globalThis.__BUNDLED_EXTENSIONS__?.[${JSON.stringify(ext.name)}];`,
+      "if (!extension) {",
+      `  throw new Error(${JSON.stringify(`Bundled extension shim could not find ${ext.name} in __BUNDLED_EXTENSIONS__`)});`,
+      "}",
+      "module.exports = extension;",
+      "",
+    ].join("\n");
+    writeFileSync(join(targetRoot, "index.cjs"), shimSource, "utf-8");
+  }
+  console.log(`[build-bundle] Created ${extensions.length} bundled extension shims.`);
 } catch (err) {
   console.error("[build-bundle] Esbuild failed:", err);
   process.exit(1);
@@ -106,7 +248,7 @@ try {
 // 5. Copy necessary runtime assets that aren't JS modules
 console.log("[build-bundle] Copying runtime assets...");
 // Ex: docs/reference/templates which is expected by the daemon/init
-const copyTargets = ["docs/reference/templates", "assets", "skills"];
+const copyTargets = ["dist/control-ui", "docs/reference/templates", "assets", "skills"];
 
 for (const target of copyTargets) {
   const srcDir = join(projectRoot, ...target.split("/"));
@@ -130,36 +272,5 @@ for (const target of copyTargets) {
     console.log(`[build-bundle] Copied ${target}`);
   }
 }
-
-// We also need a fake package.json in the bundle folder so that OpenClaw's internal package.json reader doesn't crash
-// Crucially, we MUST also define our external dependencies here so they can be installed separately for the bundle.
-const rootPkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf-8"));
-
-// Fetch versions for external dependencies from the root package.json or dependencies
-const resolveVersion = (pkgName) => {
-  return rootPkg.dependencies?.[pkgName] || rootPkg.devDependencies?.[pkgName] || "*";
-};
-
-const bundlePkg = {
-  name: rootPkg.name,
-  version: rootPkg.version,
-  type: "module",
-  main: "openclaw.mjs",
-  dependencies: {
-    "playwright-core": resolveVersion("playwright-core"),
-    "ffmpeg-static": resolveVersion("ffmpeg-static"),
-  },
-  optionalDependencies: {},
-};
-
-// Clean out any wildcard externals that we couldn't properly resolve a single exact package for
-for (const key of Object.keys(bundlePkg.dependencies)) {
-  if (bundlePkg.dependencies[key] === "*") {
-    // Attempt to parse out of pnpm-lock if strictly required, but usually these wildcard modules are implicitly provided.
-    // For safety, we keep them as '*' so `npm install` gracefully pulls the latest compatible or skips.
-  }
-}
-
-writeFileSync(join(bundleDir, "package.json"), JSON.stringify(bundlePkg, null, 2));
 
 console.log("[build-bundle] === Finished Single-File Backend Bundling ===");

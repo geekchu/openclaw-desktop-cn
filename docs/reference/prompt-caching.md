@@ -145,7 +145,7 @@ OpenClaw exposes dedicated cache-trace diagnostics for embedded agent runs.
 diagnostics:
   cacheTrace:
     enabled: true
-    filePath: "~/.openclaw/logs/cache-trace.jsonl" # optional
+    filePath: "~/.openclawcn/logs/cache-trace.jsonl" # optional
     includeMessages: false # default true
     includePrompt: false # default true
     includeSystem: false # default true

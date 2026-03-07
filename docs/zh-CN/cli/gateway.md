@@ -42,7 +42,7 @@ openclaw gateway run
 
 注意事项：
 
-- 默认情况下，除非在 `~/.openclaw/openclaw.json` 中设置了 `gateway.mode=local`，否则 Gateway 网关将拒绝启动。使用 `--allow-unconfigured` 进行临时/开发运行。
+- 默认情况下，除非在 `~/.openclawcn/openclaw.json` 中设置了 `gateway.mode=local`，否则 Gateway 网关将拒绝启动。使用 `--allow-unconfigured` 进行临时/开发运行。
 - 在没有认证的情况下绑定到 loopback 之外的地址会被阻止（安全护栏）。
 - `SIGUSR1` 在授权时触发进程内重启（启用 `commands.restart` 或使用 gateway 工具/config apply/update）。
 - `SIGINT`/`SIGTERM` 处理程序会停止 Gateway 网关进程，但不会恢复任何自定义终端状态。如果你用 TUI 或 raw-mode 输入包装 CLI，请在退出前恢复终端。

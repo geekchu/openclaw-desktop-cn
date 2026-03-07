@@ -9,7 +9,7 @@ import { fetchWithSsrFGuard } from "openclaw/plugin-sdk";
 import { getDefaultSsrFPolicy } from "../urbit/context.js";
 
 // Default to OpenClaw workspace media directory
-const DEFAULT_MEDIA_DIR = path.join(homedir(), ".openclaw", "workspace", "media", "inbound");
+const DEFAULT_MEDIA_DIR = path.join(homedir(), ".openclawcn", "workspace", "media", "inbound");
 
 export interface ExtractedImage {
   url: string;

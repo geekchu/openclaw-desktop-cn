@@ -243,7 +243,7 @@ describe("directive behavior", () => {
   it("stores auth profile overrides on /model directive", async () => {
     await withTempHome(async (home) => {
       const storePath = sessionStorePath(home);
-      const authDir = path.join(home, ".openclaw", "agents", "main", "agent");
+      const authDir = path.join(home, ".openclawcn", "agents", "main", "agent");
       await fs.mkdir(authDir, { recursive: true, mode: 0o700 });
       await fs.writeFile(
         path.join(authDir, "auth-profiles.json"),

@@ -83,7 +83,7 @@ describe("config plugin validation", () => {
       channels: ["bluebubbles"],
       schema: { type: "object" },
     });
-    process.env.OPENCLAW_STATE_DIR = path.join(suiteHome, ".openclaw");
+    process.env.OPENCLAW_STATE_DIR = path.join(suiteHome, ".openclawcn");
     process.env.OPENCLAW_PLUGIN_MANIFEST_CACHE_MS = "10000";
     clearPluginManifestRegistryCache();
     // Warm the plugin manifest cache once so path-based validations can reuse

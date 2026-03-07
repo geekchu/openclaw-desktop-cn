@@ -1,0 +1,19 @@
+2026-03-07T18:15:14.153Z [gateway] force: no listeners on port 28801
+2026-03-08T02:15:27.931+08:00 [tlon] Checking for binary at: F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\tlon\node_modules\.bin\tlon, exists: false
+2026-03-08T02:15:27.939+08:00 [tlon] Checking for platform binary at: F:\openclaw-desktop-cn\src-tauri\target\debug\gateway-bundle\extensions\tlon\node_modules\@tloncorp\tlon-skill-win32-x64\tlon, exists: false
+2026-03-08T02:15:27.943+08:00 [tlon] Falling back to PATH lookup for 'tlon'
+2026-03-07T18:15:27.948Z [gateway] [tlon] Registering tlon tool, binary: tlon
+2026-03-07T18:15:29.277Z INFO [wecom] WeCom plugin registering...
+2026-03-07T18:15:29.279Z INFO [wecom] WeCom channel registered
+2026-03-07T18:15:29.280Z INFO [wecom] WeCom HTTP handler registered
+2026-03-07T18:15:30.597Z [canvas] host mounted at http://127.0.0.1:28801/__openclaw__/canvas/ (root C:\Users\Administrator\.openclawcn\canvas)
+2026-03-07T18:15:30.707Z [heartbeat] started
+2026-03-07T18:15:30.715Z [health-monitor] started (interval: 300s, startup-grace: 60s, channel-connect-grace: 120s)
+2026-03-07T18:15:30.721Z [gateway] agent model: onestop/Qwen3.5-Plus
+2026-03-07T18:15:30.724Z [gateway] listening on ws://127.0.0.1:28801, ws://[::1]:28801 (PID 17360)
+2026-03-07T18:15:30.729Z [gateway] log file: C:\Users\ADMINI~1\AppData\Local\Temp\openclaw\openclaw-2026-03-08.log
+2026-03-07T18:15:30.772Z [browser/server] Browser control listening on http://127.0.0.1:28803/ (auth=token)
+2026-03-07T18:15:30.786Z INFO [wecom] WeCom gateway starting {"accountId":"default","webhookPath":"/webhooks/wecom"}
+2026-03-07T18:15:30.793Z [wecom] [default] auto-restart attempt 1/10 in 5s
+2026-03-07T18:15:36.034Z INFO [wecom] WeCom gateway starting {"accountId":"default","webhookPath":"/webhooks/wecom"}
+2026-03-07T18:15:36.041Z [wecom] [default] auto-restart attempt 2/10 in 11s

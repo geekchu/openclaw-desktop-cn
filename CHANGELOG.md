@@ -865,7 +865,7 @@ Docs: https://docs.openclaw.ai
 - Providers/Moonshot: mark Kimi K2.5 as image-capable in implicit + onboarding model definitions, and refresh stale explicit provider capability fields (`input`/`reasoning`/context limits) from implicit catalogs so existing configs pick up Moonshot vision support without manual model rewrites. (#13135, #4459) Thanks @manikv12.
 - Agents/Transcript: enable consecutive-user turn merging for strict non-OpenAI `openai-completions` providers (for example Moonshot/Kimi), reducing `roles must alternate` ordering failures on OpenAI-compatible endpoints while preserving current OpenRouter/Opencode behavior. (#7693) Thanks @steipete.
 - Install/Discord Voice: make `@discordjs/opus` an optional dependency so `openclaw` install/update no longer hard-fails when native Opus builds fail, while keeping `opusscript` as the runtime fallback decoder for Discord voice flows. (#23737, #23733, #23703) Thanks @jeadland, @Sheetaa, and @Breakyman.
-- Docker/Setup: precreate `$OPENCLAW_CONFIG_DIR/identity` during `docker-setup.sh` so CLI commands that need device identity (for example `devices list`) avoid `EACCES ... /home/node/.openclaw/identity` failures on restrictive bind mounts. (#23948) Thanks @ackson-beep.
+- Docker/Setup: precreate `$OPENCLAW_CONFIG_DIR/identity` during `docker-setup.sh` so CLI commands that need device identity (for example `devices list`) avoid `EACCES ... /home/node/.openclawcn/identity` failures on restrictive bind mounts. (#23948) Thanks @ackson-beep.
 - Exec/Background: stop applying the default exec timeout to background sessions (`background: true` or explicit `yieldMs`) when no explicit timeout is set, so long-running background jobs are no longer terminated at the default timeout boundary. (#23303) Thanks @steipete.
 - Slack/Threading: sessions: keep parent-session forking and thread-history context active beyond first turn by removing first-turn-only gates in session init, thread-history fetch, and reply prompt context injection. (#23843, #23090) Thanks @vincentkoc and @Taskle.
 - Slack/Threading: respect `replyToMode` when Slack auto-populates top-level `thread_ts`, and ignore inline `replyToId` directive tags when `replyToMode` is `off` so thread forcing stays disabled unless explicitly configured. (#23839, #23320, #23513) Thanks @vincentkoc and @dorukardahan.
@@ -1674,7 +1674,7 @@ Docs: https://docs.openclaw.ai
 - Security/Zalo: reject ambiguous shared-path webhook routing when multiple webhook targets match the same secret.
 - Security/Nostr: require loopback source and block cross-origin profile mutation/import attempts. Thanks @vincentkoc.
 - Security/Signal: harden signal-cli archive extraction during install to prevent path traversal outside the install root.
-- Security/Hooks: restrict hook transform modules to `~/.openclaw/hooks/transforms` (prevents path traversal/escape module loads via config). Config note: `hooks.transformsDir` must now be within that directory. Thanks @akhmittra.
+- Security/Hooks: restrict hook transform modules to `~/.openclawcn/hooks/transforms` (prevents path traversal/escape module loads via config). Config note: `hooks.transformsDir` must now be within that directory. Thanks @akhmittra.
 - Security/Hooks: ignore hook package manifest entries that point outside the package directory (prevents out-of-tree handler loads during hook discovery).
 - Security/Archive: enforce archive extraction entry/size limits to prevent resource exhaustion from high-expansion ZIP/TAR archives. Thanks @vincentkoc.
 - Security/Media: reject oversized base64-backed input media before decoding to avoid large allocations. Thanks @vincentkoc.
@@ -1728,7 +1728,7 @@ Docs: https://docs.openclaw.ai
 
 ### Breaking
 
-- Config/State: removed legacy `.moltbot` auto-detection/migration and `moltbot.json` config candidates. If you still have state/config under `~/.moltbot`, move it to `~/.openclaw` (recommended) or set `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` explicitly.
+- Config/State: removed legacy `.moltbot` auto-detection/migration and `moltbot.json` config candidates. If you still have state/config under `~/.moltbot`, move it to `~/.openclawcn` (recommended) or set `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` explicitly.
 
 ### Fixes
 
@@ -2701,7 +2701,7 @@ Docs: https://docs.openclaw.ai
 - Security: warn when <=300B models run without sandboxing while web tools are enabled. https://docs.openclaw.ai/cli/security
 - Exec: add host/security/ask routing for gateway + node exec. https://docs.openclaw.ai/tools/exec
 - Exec: add `/exec` directive for per-session exec defaults (host/security/ask/node). https://docs.openclaw.ai/tools/exec
-- Exec approvals: migrate approvals to `~/.openclaw/exec-approvals.json` with per-agent allowlists + skill auto-allow toggle, and add approvals UI + node exec lifecycle events. https://docs.openclaw.ai/tools/exec-approvals
+- Exec approvals: migrate approvals to `~/.openclawcn/exec-approvals.json` with per-agent allowlists + skill auto-allow toggle, and add approvals UI + node exec lifecycle events. https://docs.openclaw.ai/tools/exec-approvals
 - Nodes: add headless node host (`openclaw node start`) for `system.run`/`system.which`. https://docs.openclaw.ai/cli/node
 - Nodes: add node daemon service install/status/start/stop/restart. https://docs.openclaw.ai/cli/node
 - Bridge: add `skills.bins` RPC to support node host auto-allow skill bins.
@@ -2858,7 +2858,7 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 - **BREAKING:** Drop legacy `chatType: "room"` support; use `chatType: "channel"`.
 - **BREAKING:** remove legacy provider-specific target resolution fallbacks; target resolution is centralized with plugin hints + directory lookups.
 - **BREAKING:** `openclaw hooks` is now `openclaw webhooks`; hooks live under `openclaw hooks`. https://docs.openclaw.ai/cli/webhooks
-- **BREAKING:** `openclaw plugins install <path>` now copies into `~/.openclaw/extensions` (use `--link` to keep path-based loading).
+- **BREAKING:** `openclaw plugins install <path>` now copies into `~/.openclawcn/extensions` (use `--link` to keep path-based loading).
 
 ### Changes
 
@@ -3162,7 +3162,7 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 ### New & Improved
 
 - Memory: add custom OpenAI-compatible embedding endpoints; support OpenAI/local `node-llama-cpp` embeddings with per-agent overrides and provider metadata in tools/CLI. (#819) — thanks @mukhtharcm.
-- Memory: new `openclaw memory` CLI plus `memory_search`/`memory_get` tools with snippets + line ranges; index stored under `~/.openclaw/memory/{agentId}.sqlite` with watch-on-by-default.
+- Memory: new `openclaw memory` CLI plus `memory_search`/`memory_get` tools with snippets + line ranges; index stored under `~/.openclawcn/memory/{agentId}.sqlite` with watch-on-by-default.
 - Agents: strengthen memory recall guidance; make workspace bootstrap truncation configurable (default 20k) with warnings; add default sub-agent model config.
 - Tools/Sandbox: add tool profiles + group shorthands; support tool-policy groups in `tools.sandbox.tools`; drop legacy `memory` shorthand; allow Docker bind mounts via `docker.binds`. (#790) — thanks @akonyer.
 - Tools: add provider/model-specific tool policy overrides (`tools.byProvider`) to trim tool exposure per provider.
@@ -3423,7 +3423,7 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 - CLI UX: logs output modes (pretty/plain/JSONL) + colorized health/daemon output; global `--no-color`; lobster palette in onboarding/config.
 - Dev ergonomics: gateway `--dev/--reset` + dev profile auto-config; C-3PO dev templates; dev gateway/TUI helper scripts.
 - Sandbox/Workspace: sandbox list/recreate commands; sync skills into sandbox workspace; sandbox browser auto-start.
-- Config/Onboarding: inline env vars; OpenAI API key flow to shared `~/.openclaw/.env`; Opus 4.5 default prompt for Anthropic auth; QuickStart auto-install gateway (Node-only) + provider picker tweaks + skip-systemd flags; TUI bootstrap prompt (`tui --message`); remove Bun runtime choice.
+- Config/Onboarding: inline env vars; OpenAI API key flow to shared `~/.openclawcn/.env`; Opus 4.5 default prompt for Anthropic auth; QuickStart auto-install gateway (Node-only) + provider picker tweaks + skip-systemd flags; TUI bootstrap prompt (`tui --message`); remove Bun runtime choice.
 - Providers: Microsoft Teams provider (polling, attachments, outbound sends, requireMention, config reload/DM policy). (#404) — thanks @onutc
 - Providers: WhatsApp broadcast groups for multi-agent replies (#547) — thanks @pasogott; inbound media size cap configurable (#505) — thanks @koala73; identity-based message prefixes (#578) — thanks @p6l-richard.
 - Providers: Telegram inline keyboard buttons + callback payload routing (#491) — thanks @azade-c; cron topic delivery targets (#474/#478) — thanks @mitschabaude-bot, @nachoiacovino; `[[audio_as_voice]]` tag support (#490) — thanks @jarvis-medmatic.
@@ -3529,7 +3529,7 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 - WhatsApp: mark offline history sync messages as read without auto-reply. (#193) — thanks @mcinteerj
 - Discord: avoid duplicate replies when a provider emits late streaming `text_end` events (OpenAI/GPT).
 - CLI: use tailnet IP for local gateway calls when bind is tailnet/auto (fixes #176).
-- Env: load global `$OPENCLAW_STATE_DIR/.env` (`~/.openclaw/.env`) as a fallback after CWD `.env`.
+- Env: load global `$OPENCLAW_STATE_DIR/.env` (`~/.openclawcn/.env`) as a fallback after CWD `.env`.
 - Env: optional login-shell env fallback (opt-in; imports expected keys without overriding existing env).
 - Agent tools: OpenAI-compatible tool JSON Schemas (fix `browser`, normalize union schemas).
 - Onboarding: when running from source, auto-build missing Control UI assets (`bun run ui:build`).

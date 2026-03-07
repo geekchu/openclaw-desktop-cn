@@ -31,7 +31,7 @@ OpenClaw 在两个地方记录日志：
 
 日期使用 Gateway 网关主机的本地时区。
 
-你可以在 `~/.openclaw/openclaw.json` 中覆盖此设置：
+你可以在 `~/.openclawcn/openclaw.json` 中覆盖此设置：
 
 ```json
 {
@@ -103,7 +103,7 @@ openclaw channels logs --channel whatsapp
 
 ## 配置日志
 
-所有日志配置都在 `~/.openclaw/openclaw.json` 的 `logging` 下。
+所有日志配置都在 `~/.openclawcn/openclaw.json` 的 `logging` 下。
 
 ```json
 {

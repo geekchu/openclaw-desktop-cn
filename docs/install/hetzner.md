@@ -30,7 +30,7 @@ See [Security](/gateway/security) and [VPS hosting](/vps).
 - Rent a small Linux server (Hetzner VPS)
 - Install Docker (isolated app runtime)
 - Start the OpenClaw Gateway in Docker
-- Persist `~/.openclaw` + `~/.openclaw/workspace` on the host (survives restarts/rebuilds)
+- Persist `~/.openclawcn` + `~/.openclawcn/workspace` on the host (survives restarts/rebuilds)
 - Access the Control UI from your laptop via an SSH tunnel
 
 The Gateway can be accessed via:
@@ -121,10 +121,10 @@ Docker containers are ephemeral.
 All long-lived state must live on the host.
 
 ```bash
-mkdir -p /root/.openclaw/workspace
+mkdir -p /root/.openclawcn/workspace
 
 # Set ownership to the container user (uid 1000):
-chown -R 1000:1000 /root/.openclaw
+chown -R 1000:1000 /root/.openclawcn
 ```
 
 ---
@@ -139,11 +139,11 @@ OPENCLAW_GATEWAY_TOKEN=change-me-now
 OPENCLAW_GATEWAY_BIND=lan
 OPENCLAW_GATEWAY_PORT=28789
 
-OPENCLAW_CONFIG_DIR=/root/.openclaw
-OPENCLAW_WORKSPACE_DIR=/root/.openclaw/workspace
+OPENCLAW_CONFIG_DIR=/root/.openclawcn
+OPENCLAW_WORKSPACE_DIR=/root/.openclawcn/workspace
 
 GOG_KEYRING_PASSWORD=change-me-now
-XDG_CONFIG_HOME=/home/node/.openclaw
+XDG_CONFIG_HOME=/home/node/.openclawcn
 ```
 
 Generate strong secrets:
@@ -179,8 +179,8 @@ services:
       - XDG_CONFIG_HOME=${XDG_CONFIG_HOME}
       - PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
-      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
-      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclawcn
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclawcn/workspace
     ports:
       # Recommended: keep the Gateway loopback-only on the VPS; access via SSH tunnel.
       # To expose it publicly, remove the `127.0.0.1:` prefix and firewall accordingly.
@@ -323,12 +323,12 @@ All long-lived state must survive restarts, rebuilds, and reboots.
 
 | Component           | Location                          | Persistence mechanism  | Notes                            |
 | ------------------- | --------------------------------- | ---------------------- | -------------------------------- |
-| Gateway config      | `/home/node/.openclaw/`           | Host volume mount      | Includes `openclaw.json`, tokens |
-| Model auth profiles | `/home/node/.openclaw/`           | Host volume mount      | OAuth tokens, API keys           |
-| Skill configs       | `/home/node/.openclaw/skills/`    | Host volume mount      | Skill-level state                |
-| Agent workspace     | `/home/node/.openclaw/workspace/` | Host volume mount      | Code and agent artifacts         |
-| WhatsApp session    | `/home/node/.openclaw/`           | Host volume mount      | Preserves QR login               |
-| Gmail keyring       | `/home/node/.openclaw/`           | Host volume + password | Requires `GOG_KEYRING_PASSWORD`  |
+| Gateway config      | `/home/node/.openclawcn/`           | Host volume mount      | Includes `openclaw.json`, tokens |
+| Model auth profiles | `/home/node/.openclawcn/`           | Host volume mount      | OAuth tokens, API keys           |
+| Skill configs       | `/home/node/.openclawcn/skills/`    | Host volume mount      | Skill-level state                |
+| Agent workspace     | `/home/node/.openclawcn/workspace/` | Host volume mount      | Code and agent artifacts         |
+| WhatsApp session    | `/home/node/.openclawcn/`           | Host volume mount      | Preserves QR login               |
+| Gmail keyring       | `/home/node/.openclawcn/`           | Host volume + password | Requires `GOG_KEYRING_PASSWORD`  |
 | External binaries   | `/usr/local/bin/`                 | Docker image           | Must be baked at build time      |
 | Node runtime        | Container filesystem              | Docker image           | Rebuilt every image build        |
 | OS packages         | Container filesystem              | Docker image           | Do not install at runtime        |

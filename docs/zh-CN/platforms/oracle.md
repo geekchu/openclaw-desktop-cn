@@ -200,7 +200,7 @@ https://openclaw.<tailnet-name>.ts.net/
 
 ### 仍然推荐
 
-- **凭证权限：** `chmod 700 ~/.openclaw`
+- **凭证权限：** `chmod 700 ~/.openclawcn`
 - **安全审计：** `openclaw security audit`
 - **系统更新：** 定期 `sudo apt update && sudo apt upgrade`
 - **监控 Tailscale：** 在 [Tailscale 管理控制台](https://login.tailscale.com/admin) 中查看设备
@@ -290,13 +290,13 @@ uname -m  # 应该显示 aarch64
 
 所有状态存储在：
 
-- `~/.openclaw/` — 配置、凭证、会话数据
-- `~/.openclaw/workspace/` — 工作区（SOUL.md、记忆、产物）
+- `~/.openclawcn/` — 配置、凭证、会话数据
+- `~/.openclawcn/workspace/` — 工作区（SOUL.md、记忆、产物）
 
 定期备份：
 
 ```bash
-tar -czvf openclaw-backup.tar.gz ~/.openclaw ~/.openclaw/workspace
+tar -czvf openclaw-backup.tar.gz ~/.openclawcn ~/.openclawcn/workspace
 ```
 
 ---

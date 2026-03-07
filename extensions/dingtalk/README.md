@@ -40,7 +40,7 @@ openclaw plugins install -l .
 
 ### 方法 C：手动安装
 
-1. 将本目录下载或复制到 `~/.openclaw/extensions/dingtalk`。
+1. 将本目录下载或复制到 `~/.openclawcn/extensions/dingtalk`。
 2. 确保包含 `index.ts`, `openclaw.plugin.json` 和 `package.json`。
 3. 运行 `openclaw plugins list` 确认 `dingtalk` 已显示在列表中。
 
@@ -64,7 +64,7 @@ openclaw plugins install -l .
 openclaw plugins list
 ```
 
-#### 步骤 2：在 `~/.openclaw/openclaw.json` 添加 `plugins.allow`
+#### 步骤 2：在 `~/.openclawcn/openclaw.json` 添加 `plugins.allow`
 
 ```json5
 {
@@ -200,7 +200,7 @@ openclaw configure --section channels
 
 ### 方法 2：手动配置文件
 
-在 `~/.openclaw/openclaw.json` 中添加（仅作参考，交互式配置会自动生成）：
+在 `~/.openclawcn/openclaw.json` 中添加（仅作参考，交互式配置会自动生成）：
 
 > 至少包含 `plugins.allow` 和 `channels.dingtalk` 两部分，内容参考上文钉钉开发者配置指南
 

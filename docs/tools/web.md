@@ -100,10 +100,10 @@ current limits and pricing.
 ### Where to set the key (recommended)
 
 **Recommended:** run `openclaw configure --section web`. It stores the key in
-`~/.openclaw/openclaw.json` under `tools.web.search.apiKey`.
+`~/.openclawcn/openclaw.json` under `tools.web.search.apiKey`.
 
 **Environment alternative:** set `BRAVE_API_KEY` in the Gateway process
-environment. For a gateway install, put it in `~/.openclaw/.env` (or your
+environment. For a gateway install, put it in `~/.openclawcn/.env` (or your
 service environment). See [Env vars](/help/faq#how-does-openclaw-load-environment-variables).
 
 ## Using Perplexity (direct or via OpenRouter)
@@ -142,7 +142,7 @@ crypto/prepaid).
 ```
 
 **Environment alternative:** set `OPENROUTER_API_KEY` or `PERPLEXITY_API_KEY` in the Gateway
-environment. For a gateway install, put it in `~/.openclaw/.env`.
+environment. For a gateway install, put it in `~/.openclawcn/.env`.
 
 If no base URL is set, OpenClaw chooses a default based on the API key source:
 
@@ -190,7 +190,7 @@ which returns AI-synthesized answers backed by live Google Search results with c
 ```
 
 **Environment alternative:** set `GEMINI_API_KEY` in the Gateway environment.
-For a gateway install, put it in `~/.openclaw/.env`.
+For a gateway install, put it in `~/.openclawcn/.env`.
 
 ### Notes
 

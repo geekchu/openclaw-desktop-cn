@@ -43,18 +43,18 @@ launchctl bootout gui/$UID/bot.molt.gateway
 
 `scripts/restart-mac.sh --no-sign` 用于在没有签名密钥时的快速本地构建。为了防止 launchd 指向未签名的中继二进制文件，它：
 
-- 写入 `~/.openclaw/disable-launchagent`。
+- 写入 `~/.openclawcn/disable-launchagent`。
 
 已签名运行的 `scripts/restart-mac.sh` 会在标记存在时清除此覆盖。要手动重置：
 
 ```bash
-rm ~/.openclaw/disable-launchagent
+rm ~/.openclawcn/disable-launchagent
 ```
 
 ## 仅连接模式
 
 要强制 macOS 应用**永不安装或管理 launchd**，请使用
-`--attach-only`（或 `--no-launchd`）启动它。这会设置 `~/.openclaw/disable-launchagent`，
+`--attach-only`（或 `--no-launchd`）启动它。这会设置 `~/.openclawcn/disable-launchagent`，
 因此应用只会连接到已运行的 Gateway 网关。你可以在调试设置中切换相同的
 行为。
 

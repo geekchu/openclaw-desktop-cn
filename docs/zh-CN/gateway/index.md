@@ -34,7 +34,7 @@ openclaw gateway --force
 pnpm gateway:watch
 ```
 
-- 配置热重载监视 `~/.openclaw/openclaw.json`（或 `OPENCLAW_CONFIG_PATH`）。
+- 配置热重载监视 `~/.openclawcn/openclaw.json`（或 `OPENCLAW_CONFIG_PATH`）。
   - 默认模式：`gateway.reload.mode="hybrid"`（热应用安全更改，关键更改时重启）。
   - 热重载在需要时通过 **SIGUSR1** 使用进程内重启。
   - 使用 `gateway.reload.mode="off"` 禁用。
@@ -43,7 +43,7 @@ pnpm gateway:watch
   - OpenAI Chat Completions（HTTP）：[`/v1/chat/completions`](/gateway/openai-http-api)。
   - OpenResponses（HTTP）：[`/v1/responses`](/gateway/openresponses-http-api)。
   - Tools Invoke（HTTP）：[`/tools/invoke`](/gateway/tools-invoke-http-api)。
-- 默认在 `canvasHost.port`（默认 `18793`）上启动 Canvas 文件服务器，从 `~/.openclaw/workspace/canvas` 提供 `http://<gateway-host>:18793/__openclaw__/canvas/`。使用 `canvasHost.enabled=false` 或 `OPENCLAW_SKIP_CANVAS_HOST=1` 禁用。
+- 默认在 `canvasHost.port`（默认 `18793`）上启动 Canvas 文件服务器，从 `~/.openclawcn/workspace/canvas` 提供 `http://<gateway-host>:18793/__openclaw__/canvas/`。使用 `canvasHost.enabled=false` 或 `OPENCLAW_SKIP_CANVAS_HOST=1` 禁用。
 - 输出日志到 stdout；使用 launchd/systemd 保持运行并轮转日志。
 - 故障排除时传递 `--verbose` 以将调试日志（握手、请求/响应、事件）从日志文件镜像到 stdio。
 - `--force` 使用 `lsof` 查找所选端口上的监听器，发送 SIGTERM，记录它终止了什么，然后启动 Gateway 网关（如果缺少 `lsof` 则快速失败）。
@@ -101,7 +101,7 @@ openclaw --dev health
 - `OPENCLAW_GATEWAY_PORT=19001`（Gateway 网关 WS + HTTP）
 - 浏览器控制服务端口 = `19003`（派生：`gateway.port+2`，仅 loopback）
 - `canvasHost.port=19005`（派生：`gateway.port+4`）
-- 当你在 `--dev` 下运行 `setup`/`onboard` 时，`agents.defaults.workspace` 默认变为 `~/.openclaw/workspace-dev`。
+- 当你在 `--dev` 下运行 `setup`/`onboard` 时，`agents.defaults.workspace` 默认变为 `~/.openclawcn/workspace-dev`。
 
 派生端口（经验法则）：
 
@@ -128,8 +128,8 @@ openclaw --profile rescue gateway install
 示例：
 
 ```bash
-OPENCLAW_CONFIG_PATH=~/.openclaw/a.json OPENCLAW_STATE_DIR=~/.openclaw-a openclaw gateway --port 19001
-OPENCLAW_CONFIG_PATH=~/.openclaw/b.json OPENCLAW_STATE_DIR=~/.openclaw-b openclaw gateway --port 19002
+OPENCLAW_CONFIG_PATH=~/.openclawcn/a.json OPENCLAW_STATE_DIR=~/.openclaw-a openclaw gateway --port 19001
+OPENCLAW_CONFIG_PATH=~/.openclawcn/b.json OPENCLAW_STATE_DIR=~/.openclaw-b openclaw gateway --port 19002
 ```
 
 ## 协议（运维视角）

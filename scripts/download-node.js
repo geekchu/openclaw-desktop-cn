@@ -31,6 +31,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 const nodeRuntimeDir = join(projectRoot, "src-tauri", "node-runtime");
 
+function getWindowsPowerShellExe() {
+  return join(
+    process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows",
+    "System32",
+    "WindowsPowerShell",
+    "v1.0",
+    "powershell.exe",
+  );
+}
+
 const NODE_VERSION = "v24.13.0";
 const NODE_BASE_URL = `https://nodejs.org/dist/${NODE_VERSION}`;
 const VERSION_FILE = join(nodeRuntimeDir, ".node-version");
@@ -168,7 +178,7 @@ async function downloadAndExtractPlatform(platformKey) {
   if (config.archiveExt === "zip") {
     console.log(`[download-node] 解压 (zip) ${archivePath}`);
     execSync(
-      `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`,
+      `"${getWindowsPowerShellExe()}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`,
       { stdio: "inherit" },
     );
   } else if (config.archiveExt === "tar.xz") {
@@ -190,7 +200,7 @@ async function downloadAndExtractPlatform(platformKey) {
   // 移动到目标目录
   if (process.platform === "win32") {
     execSync(
-      `powershell -NoProfile -NonInteractive -Command "Move-Item -Path '${innerDir}' -Destination '${destDir}'"`,
+      `"${getWindowsPowerShellExe()}" -NoProfile -NonInteractive -Command "Move-Item -Path '${innerDir}' -Destination '${destDir}'"`,
       { stdio: "inherit" },
     );
   } else {

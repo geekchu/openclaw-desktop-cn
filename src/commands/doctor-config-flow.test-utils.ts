@@ -11,7 +11,7 @@ export async function runDoctorConfigWithInput<T>(params: {
   }) => Promise<T>;
 }) {
   return withTempHome(async (home) => {
-    const configDir = path.join(home, ".openclaw");
+    const configDir = path.join(home, ".openclawcn");
     await fs.mkdir(configDir, { recursive: true });
     await fs.writeFile(
       path.join(configDir, "openclaw.json"),

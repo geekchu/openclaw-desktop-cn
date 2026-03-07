@@ -141,7 +141,7 @@ describe("Agent-specific sandbox config", () => {
           sandbox: {
             mode: "all",
             scope: "agent",
-            workspaceRoot: "~/.openclaw/sandboxes",
+            workspaceRoot: "~/.openclawcn/sandboxes",
           },
         },
         list: [

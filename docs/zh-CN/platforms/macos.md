@@ -77,7 +77,7 @@ Gateway -> Node Service (WS)
 `system.run` 由 macOS 应用中的 **Exec 审批**控制（设置 → Exec approvals）。安全 + 询问 + 允许列表本地存储在 Mac 上：
 
 ```
-~/.openclaw/exec-approvals.json
+~/.openclawcn/exec-approvals.json
 ```
 
 示例：

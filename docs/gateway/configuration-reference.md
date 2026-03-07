@@ -1,6 +1,6 @@
 ---
 title: "Configuration Reference"
-description: "Complete field-by-field reference for ~/.openclaw/openclaw.json"
+description: "Complete field-by-field reference for ~/.openclawcn/openclaw.json"
 summary: "Complete reference for every OpenClaw config key, defaults, and channel settings"
 read_when:
   - You need exact field-level config semantics or defaults
@@ -9,7 +9,7 @@ read_when:
 
 # Configuration Reference
 
-Every field available in `~/.openclaw/openclaw.json`. For a task-oriented overview, see [Configuration](/gateway/configuration).
+Every field available in `~/.openclawcn/openclaw.json`. For a task-oriented overview, see [Configuration](/gateway/configuration).
 
 Config format is **JSON5** (comments + trailing commas allowed). All fields are optional — OpenClaw uses safe defaults when omitted.
 
@@ -134,7 +134,7 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
         default: {},
         personal: {},
         biz: {
-          // authDir: "~/.openclaw/credentials/whatsapp/biz",
+          // authDir: "~/.openclawcn/credentials/whatsapp/biz",
         },
       },
     },
@@ -735,11 +735,11 @@ Include your own number in `allowFrom` to enable self-chat mode (ignores native 
 
 ### `agents.defaults.workspace`
 
-Default: `~/.openclaw/workspace`.
+Default: `~/.openclawcn/workspace`.
 
 ```json5
 {
-  agents: { defaults: { workspace: "~/.openclaw/workspace" } },
+  agents: { defaults: { workspace: "~/.openclawcn/workspace" } },
 }
 ```
 
@@ -1076,7 +1076,7 @@ Optional **Docker sandboxing** for the embedded agent. See [Sandboxing](/gateway
         mode: "non-main", // off | non-main | all
         scope: "agent", // session | agent | shared
         workspaceAccess: "none", // none | ro | rw
-        workspaceRoot: "~/.openclaw/sandboxes",
+        workspaceRoot: "~/.openclawcn/sandboxes",
         docker: {
           image: "openclaw-sandbox:bookworm-slim",
           containerPrefix: "openclaw-sbx-",
@@ -1150,7 +1150,7 @@ Optional **Docker sandboxing** for the embedded agent. See [Sandboxing](/gateway
 
 **Workspace access:**
 
-- `none`: per-scope sandbox workspace under `~/.openclaw/sandboxes`
+- `none`: per-scope sandbox workspace under `~/.openclawcn/sandboxes`
 - `ro`: sandbox workspace at `/workspace`, agent workspace mounted read-only at `/agent`
 - `rw`: agent workspace mounted read/write at `/workspace`
 
@@ -1226,8 +1226,8 @@ scripts/sandbox-browser-setup.sh   # optional browser image
         id: "main",
         default: true,
         name: "Main Agent",
-        workspace: "~/.openclaw/workspace",
-        agentDir: "~/.openclaw/agents/main/agent",
+        workspace: "~/.openclawcn/workspace",
+        agentDir: "~/.openclawcn/agents/main/agent",
         model: "anthropic/claude-opus-4-6", // or { primary, fallbacks }
         params: { cacheRetention: "none" }, // overrides matching defaults.models params by key
         identity: {
@@ -1270,8 +1270,8 @@ Run multiple isolated agents inside one Gateway. See [Multi-Agent](/concepts/mul
 {
   agents: {
     list: [
-      { id: "home", default: true, workspace: "~/.openclaw/workspace-home" },
-      { id: "work", workspace: "~/.openclaw/workspace-work" },
+      { id: "home", default: true, workspace: "~/.openclawcn/workspace-home" },
+      { id: "work", workspace: "~/.openclawcn/workspace-work" },
     ],
   },
   bindings: [
@@ -1309,7 +1309,7 @@ Within each tier, the first matching `bindings` entry wins.
     list: [
       {
         id: "personal",
-        workspace: "~/.openclaw/workspace-personal",
+        workspace: "~/.openclawcn/workspace-personal",
         sandbox: { mode: "off" },
       },
     ],
@@ -1327,7 +1327,7 @@ Within each tier, the first matching `bindings` entry wins.
     list: [
       {
         id: "family",
-        workspace: "~/.openclaw/workspace-family",
+        workspace: "~/.openclawcn/workspace-family",
         sandbox: { mode: "all", scope: "agent", workspaceAccess: "ro" },
         tools: {
           allow: [
@@ -1356,7 +1356,7 @@ Within each tier, the first matching `bindings` entry wins.
     list: [
       {
         id: "public",
-        workspace: "~/.openclaw/workspace-public",
+        workspace: "~/.openclawcn/workspace-public",
         sandbox: { mode: "all", scope: "agent", workspaceAccess: "none" },
         tools: {
           allow: [
@@ -1419,7 +1419,7 @@ See [Multi-Agent Sandbox & Tools](/tools/multi-agent-sandbox-tools) for preceden
       group: { mode: "idle", idleMinutes: 120 },
     },
     resetTriggers: ["/new", "/reset"],
-    store: "~/.openclaw/agents/{agentId}/sessions/sessions.json",
+    store: "~/.openclawcn/agents/{agentId}/sessions/sessions.json",
     parentForkMaxTokens: 100000, // skip parent-thread fork above this token count (0 disables)
     maintenance: {
       mode: "warn", // warn | enforce
@@ -1550,7 +1550,7 @@ Batches rapid text-only messages from the same sender into a single agent turn. 
       modelOverrides: { enabled: true },
       maxTextLength: 4000,
       timeoutMs: 30000,
-      prefsPath: "~/.openclaw/settings/tts.json",
+      prefsPath: "~/.openclawcn/settings/tts.json",
       elevenlabs: {
         apiKey: "elevenlabs_api_key",
         baseUrl: "https://api.elevenlabs.io",
@@ -1883,7 +1883,7 @@ Controls inline attachment support for `sessions_spawn`.
 Notes:
 
 - Attachments are only supported for `runtime: "subagent"`. ACP runtime rejects them.
-- Files are materialized into the child workspace at `.openclaw/attachments/<uuid>/` with a `.manifest.json`.
+- Files are materialized into the child workspace at `.openclawcn/attachments/<uuid>/` with a `.manifest.json`.
 - Attachment content is automatically redacted from transcript persistence.
 - Base64 inputs are validated with strict alphabet/padding checks and a pre-decode size guard.
 - File permissions are `0700` for directories and `0600` for files.
@@ -1914,7 +1914,7 @@ Notes:
 
 ## Custom providers and base URLs
 
-OpenClaw uses the pi-coding-agent model catalog. Add custom providers via `models.providers` in config or `~/.openclaw/agents/<agentId>/agent/models.json`.
+OpenClaw uses the pi-coding-agent model catalog. Add custom providers via `models.providers` in config or `~/.openclawcn/agents/<agentId>/agent/models.json`.
 
 ```json5
 {
@@ -2245,7 +2245,7 @@ See [Local Models](/gateway/local-models). TL;DR: run MiniMax M2.5 via LM Studio
 }
 ```
 
-- Loaded from `~/.openclaw/extensions`, `<workspace>/.openclaw/extensions`, plus `plugins.load.paths`.
+- Loaded from `~/.openclawcn/extensions`, `<workspace>/.openclawcn/extensions`, plus `plugins.load.paths`.
 - **Config changes require a gateway restart.**
 - `allow`: optional allowlist (only listed plugins load). `deny` wins.
 - `plugins.entries.<id>.apiKey`: plugin-level API key convenience field (when supported by the plugin).
@@ -2418,7 +2418,7 @@ See [Plugins](/tools/plugin).
 Run multiple gateways on one host with unique ports and state dirs:
 
 ```bash
-OPENCLAW_CONFIG_PATH=~/.openclaw/a.json \
+OPENCLAW_CONFIG_PATH=~/.openclawcn/a.json \
 OPENCLAW_STATE_DIR=~/.openclaw-a \
 openclaw gateway --port 19001
 ```
@@ -2443,7 +2443,7 @@ See [Multiple Gateways](/gateway/multiple-gateways).
     allowedSessionKeyPrefixes: ["hook:"],
     allowedAgentIds: ["hooks", "main"],
     presets: ["gmail"],
-    transformsDir: "~/.openclaw/hooks/transforms",
+    transformsDir: "~/.openclawcn/hooks/transforms",
     mappings: [
       {
         match: { path: "gmail" },
@@ -2521,7 +2521,7 @@ Auth: `Authorization: Bearer <token>` or `x-openclaw-token: <token>`.
 ```json5
 {
   canvasHost: {
-    root: "~/.openclaw/workspace/canvas",
+    root: "~/.openclawcn/workspace/canvas",
     liveReload: true,
     // enabled: false, // or OPENCLAW_SKIP_CANVAS_HOST=1
   },
@@ -2571,7 +2571,7 @@ Auth: `Authorization: Bearer <token>` or `x-openclaw-token: <token>`.
 }
 ```
 
-Writes a unicast DNS-SD zone under `~/.openclaw/dns/`. For cross-network discovery, pair with a DNS server (CoreDNS recommended) + Tailscale split DNS.
+Writes a unicast DNS-SD zone under `~/.openclawcn/dns/`. For cross-network discovery, pair with a DNS server (CoreDNS recommended) + Tailscale split DNS.
 
 Setup: `openclaw dns setup --apply`.
 
@@ -2597,7 +2597,7 @@ Setup: `openclaw dns setup --apply`.
 ```
 
 - Inline env vars are only applied if the process env is missing the key.
-- `.env` files: CWD `.env` + `~/.openclaw/.env` (neither overrides existing vars).
+- `.env` files: CWD `.env` + `~/.openclawcn/.env` (neither overrides existing vars).
 - `shellEnv`: imports missing expected keys from your login shell profile.
 - See [Environment](/help/environment) for full precedence.
 
@@ -2654,7 +2654,7 @@ Validation:
       default: { source: "env" }, // optional explicit env provider
       filemain: {
         source: "file",
-        path: "~/.openclaw/secrets.json",
+        path: "~/.openclawcn/secrets.json",
         mode: "json",
         timeoutMs: 5000,
       },
@@ -2704,7 +2704,7 @@ Notes:
 - Per-agent profiles are stored at `<agentDir>/auth-profiles.json`.
 - `auth-profiles.json` supports value-level refs (`keyRef` for `api_key`, `tokenRef` for `token`).
 - Static runtime credentials come from in-memory resolved snapshots; legacy static `auth.json` entries are scrubbed when discovered.
-- Legacy OAuth imports from `~/.openclaw/credentials/oauth.json`.
+- Legacy OAuth imports from `~/.openclawcn/credentials/oauth.json`.
 - See [OAuth](/concepts/oauth).
 - Secrets runtime behavior and `audit/configure/apply` tooling: [Secrets Management](/gateway/secrets).
 
@@ -2883,7 +2883,7 @@ Template placeholders expanded in `tools.media.models[].args`:
 Split config into multiple files:
 
 ```json5
-// ~/.openclaw/openclaw.json
+// ~/.openclawcn/openclaw.json
 {
   gateway: { port: 28789 },
   agents: { $include: "./agents.json5" },

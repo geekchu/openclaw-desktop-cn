@@ -24,7 +24,7 @@ describe("resolveProviderAuths key normalization", () => {
   ): Promise<T> {
     const base = path.join(suiteRoot, `case-${++suiteCase}`);
     await fs.mkdir(base, { recursive: true });
-    await fs.mkdir(path.join(base, ".openclaw", "agents", "main", "sessions"), { recursive: true });
+    await fs.mkdir(path.join(base, ".openclawcn", "agents", "main", "sessions"), { recursive: true });
 
     const keysToRestore = new Set<string>([
       "HOME",
@@ -43,7 +43,7 @@ describe("resolveProviderAuths key normalization", () => {
     process.env.HOME = base;
     process.env.USERPROFILE = base;
     delete process.env.OPENCLAW_HOME;
-    process.env.OPENCLAW_STATE_DIR = path.join(base, ".openclaw");
+    process.env.OPENCLAW_STATE_DIR = path.join(base, ".openclawcn");
     for (const [key, value] of Object.entries(env)) {
       if (value === undefined) {
         delete process.env[key];
@@ -65,7 +65,7 @@ describe("resolveProviderAuths key normalization", () => {
   }
 
   async function writeAuthProfiles(home: string, profiles: Record<string, unknown>) {
-    const agentDir = path.join(home, ".openclaw", "agents", "main", "agent");
+    const agentDir = path.join(home, ".openclawcn", "agents", "main", "agent");
     await fs.mkdir(agentDir, { recursive: true });
     await fs.writeFile(
       path.join(agentDir, "auth-profiles.json"),
@@ -75,7 +75,7 @@ describe("resolveProviderAuths key normalization", () => {
   }
 
   async function writeConfig(home: string, config: Record<string, unknown>) {
-    const stateDir = path.join(home, ".openclaw");
+    const stateDir = path.join(home, ".openclawcn");
     await fs.mkdir(stateDir, { recursive: true });
     await fs.writeFile(
       path.join(stateDir, "openclaw.json"),
@@ -85,7 +85,7 @@ describe("resolveProviderAuths key normalization", () => {
   }
 
   async function writeProfileOrder(home: string, provider: string, profileIds: string[]) {
-    const agentDir = path.join(home, ".openclaw", "agents", "main", "agent");
+    const agentDir = path.join(home, ".openclawcn", "agents", "main", "agent");
     const parsed = JSON.parse(
       await fs.readFile(path.join(agentDir, "auth-profiles.json"), "utf8"),
     ) as Record<string, unknown>;

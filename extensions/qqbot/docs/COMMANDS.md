@@ -46,7 +46,7 @@ openclaw config set channels.qqbot.enabled true
 ```
 
 > **注意**：`openclaw channels add --channel` 仅支持内置通道（telegram、discord 等）。
-> QQBot 作为自定义插件，需通过 `config set` 或直接编辑 `~/.openclaw/openclaw.json` 配置。
+> QQBot 作为自定义插件，需通过 `config set` 或直接编辑 `~/.openclawcn/openclaw.json` 配置。
 
 ### 禁用通道
 
@@ -204,10 +204,10 @@ bash ./scripts/upgrade.sh
 
 | 路径                            | 说明            |
 | ------------------------------- | --------------- |
-| `~/.openclaw/`                  | OpenClaw 主目录 |
-| `~/.openclaw/openclaw.json`     | 全局配置文件    |
-| `~/.openclaw/extensions/`       | 插件安装目录    |
-| `~/.openclaw/extensions/qqbot/` | QQBot 插件目录  |
+| `~/.openclawcn/`                  | OpenClaw 主目录 |
+| `~/.openclawcn/openclaw.json`     | 全局配置文件    |
+| `~/.openclawcn/extensions/`       | 插件安装目录    |
+| `~/.openclawcn/extensions/qqbot/` | QQBot 插件目录  |
 
 ---
 

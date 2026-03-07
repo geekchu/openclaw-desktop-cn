@@ -45,7 +45,7 @@ openclaw gateway uninstall
 3. Delete state + config:
 
 ```bash
-rm -rf "${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+rm -rf "${OPENCLAW_STATE_DIR:-$HOME/.openclawcn}"
 ```
 
 If you set `OPENCLAW_CONFIG_PATH` to a custom location outside the state dir, delete that file too.
@@ -53,7 +53,7 @@ If you set `OPENCLAW_CONFIG_PATH` to a custom location outside the state dir, de
 4. Delete your workspace (optional, removes agent files):
 
 ```bash
-rm -rf ~/.openclaw/workspace
+rm -rf ~/.openclawcn/workspace
 ```
 
 5. Remove the CLI install (pick the one you used):
@@ -107,7 +107,7 @@ The task script lives under your state dir.
 
 ```powershell
 schtasks /Delete /F /TN "OpenClaw Gateway"
-Remove-Item -Force "$env:USERPROFILE\.openclaw\gateway.cmd"
+Remove-Item -Force "$env:USERPROFILE\.openclawcn\gateway.cmd"
 ```
 
 If you used a profile, delete the matching task name and `~\.openclaw-<profile>\gateway.cmd`.

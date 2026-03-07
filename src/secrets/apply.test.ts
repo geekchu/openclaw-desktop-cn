@@ -50,7 +50,7 @@ function createOpenAiProviderConfig(apiKey: unknown = "sk-openai-plaintext") {
 }
 
 function buildFixturePaths(rootDir: string) {
-  const stateDir = path.join(rootDir, ".openclaw");
+  const stateDir = path.join(rootDir, ".openclawcn");
   return {
     rootDir,
     stateDir,

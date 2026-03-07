@@ -50,7 +50,7 @@ const withClearedEnv = <T>(
 beforeAll(async () => {
   await fixtureSuite.setup();
   tempHome = await createTempHomeEnv("openclaw-skills-home-");
-  await fs.mkdir(path.join(tempHome.home, ".openclaw", "agents", "main", "sessions"), {
+  await fs.mkdir(path.join(tempHome.home, ".openclawcn", "agents", "main", "sessions"), {
     recursive: true,
   });
 });

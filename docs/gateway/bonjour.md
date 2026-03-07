@@ -47,7 +47,7 @@ openclaw dns setup --apply
 This installs CoreDNS and configures it to:
 
 - listen on port 53 only on the gateway’s Tailscale interfaces
-- serve your chosen domain (example: `openclaw.internal.`) from `~/.openclaw/dns/<domain>.db`
+- serve your chosen domain (example: `openclaw.internal.`) from `~/.openclawcn/dns/<domain>.db`
 
 Validate from a tailnet‑connected machine:
 
@@ -73,7 +73,7 @@ access, bind explicitly and keep auth enabled.
 
 For tailnet‑only setups:
 
-- Set `gateway.bind: "tailnet"` in `~/.openclaw/openclaw.json`.
+- Set `gateway.bind: "tailnet"` in `~/.openclawcn/openclaw.json`.
 - Restart the Gateway (or restart the macOS menubar app).
 
 ## What advertises
@@ -166,7 +166,7 @@ sequences (e.g. spaces become `\032`).
 ## Disabling / configuration
 
 - `OPENCLAW_DISABLE_BONJOUR=1` disables advertising (legacy: `OPENCLAW_DISABLE_BONJOUR`).
-- `gateway.bind` in `~/.openclaw/openclaw.json` controls the Gateway bind mode.
+- `gateway.bind` in `~/.openclawcn/openclaw.json` controls the Gateway bind mode.
 - `OPENCLAW_SSH_PORT` overrides the SSH port advertised in TXT (legacy: `OPENCLAW_SSH_PORT`).
 - `OPENCLAW_TAILNET_DNS` publishes a MagicDNS hint in TXT (legacy: `OPENCLAW_TAILNET_DNS`).
 - `OPENCLAW_CLI_PATH` overrides the advertised CLI path (legacy: `OPENCLAW_CLI_PATH`).

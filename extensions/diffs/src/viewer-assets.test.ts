@@ -1,5 +1,11 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { getServedViewerAsset, VIEWER_LOADER_PATH, VIEWER_RUNTIME_PATH } from "./viewer-assets.js";
+import {
+  buildViewerRuntimePathCandidates,
+  getServedViewerAsset,
+  VIEWER_LOADER_PATH,
+  VIEWER_RUNTIME_PATH,
+} from "./viewer-assets.js";
 
 describe("viewer assets", () => {
   it("serves a stable loader that points at the current runtime bundle", async () => {
@@ -18,5 +24,14 @@ describe("viewer assets", () => {
 
   it("returns null for unknown asset paths", async () => {
     await expect(getServedViewerAsset("/plugins/diffs/assets/not-real.js")).resolves.toBeNull();
+  });
+
+  it("includes a cwd-based fallback path for bundled runtime assets", () => {
+    const candidates = buildViewerRuntimePathCandidates(
+      "file:///C:/app/gateway-bundle/openclaw.mjs",
+      "C:\\app\\gateway-bundle",
+    );
+
+    expect(candidates).toContain(path.join("C:\\app\\gateway-bundle", "extensions", "diffs", "assets", "viewer-runtime.js"));
   });
 });

@@ -75,7 +75,7 @@ describe("discoverOpenClawPlugins", () => {
     fs.mkdirSync(globalExt, { recursive: true });
     fs.writeFileSync(path.join(globalExt, "alpha.ts"), "export default function () {}", "utf-8");
 
-    const workspaceExt = path.join(workspaceDir, ".openclaw", "extensions");
+    const workspaceExt = path.join(workspaceDir, ".openclawcn", "extensions");
     fs.mkdirSync(workspaceExt, { recursive: true });
     fs.writeFileSync(path.join(workspaceExt, "beta.ts"), "export default function () {}", "utf-8");
 
@@ -118,6 +118,63 @@ describe("discoverOpenClawPlugins", () => {
     expect(ids).not.toContain("feishu.backup-20260222");
     expect(ids).not.toContain("telegram.disabled.20260222");
     expect(ids).not.toContain("discord.bak");
+  });
+
+  it("prefers bundled extension shims when static extensions are injected", async () => {
+    const stateDir = makeTempDir();
+    const bundledDir = path.join(stateDir, "bundled-extensions");
+    const pluginDir = path.join(bundledDir, "feishu");
+    fs.mkdirSync(pluginDir, { recursive: true });
+    fs.writeFileSync(path.join(pluginDir, "index.cjs"), "module.exports = {};", "utf-8");
+    fs.writeFileSync(
+      path.join(pluginDir, "openclaw.plugin.json"),
+      JSON.stringify({ id: "feishu", configSchema: { type: "object", additionalProperties: true } }),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      path.join(pluginDir, "package.json"),
+      JSON.stringify({
+        name: "@openclaw/feishu",
+        version: "1.2.3",
+        openclaw: { install: { npmSpec: "@openclaw/feishu" } },
+      }),
+      "utf-8",
+    );
+
+    const globalWithBundled = globalThis as typeof globalThis & {
+      __BUNDLED_EXTENSIONS__?: Record<string, unknown>;
+    };
+    const previousBundled = globalWithBundled.__BUNDLED_EXTENSIONS__;
+    globalWithBundled.__BUNDLED_EXTENSIONS__ = { feishu: {} };
+
+    try {
+      const result = await withEnvAsync(
+        {
+          OPENCLAW_STATE_DIR: stateDir,
+          CLAWDBOT_STATE_DIR: undefined,
+          OPENCLAW_BUNDLED_PLUGINS_DIR: bundledDir,
+        },
+        async () => discoverOpenClawPlugins({}),
+      );
+
+      const candidate = result.candidates.find((entry) => entry.idHint === "feishu" && entry.origin === "bundled");
+      expect(candidate).toMatchObject({
+        source: path.join(pluginDir, "index.cjs"),
+        rootDir: pluginDir,
+        packageName: "@openclaw/feishu",
+        packageVersion: "1.2.3",
+        packageManifest: { install: { npmSpec: "@openclaw/feishu" } },
+      });
+      expect(result.diagnostics).not.toContainEqual(
+        expect.objectContaining({ message: expect.stringContaining("bundled extension shim is missing") }),
+      );
+    } finally {
+      if (previousBundled === undefined) {
+        delete globalWithBundled.__BUNDLED_EXTENSIONS__;
+      } else {
+        globalWithBundled.__BUNDLED_EXTENSIONS__ = previousBundled;
+      }
+    }
   });
 
   it("loads package extension packs", async () => {

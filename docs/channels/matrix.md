@@ -63,7 +63,7 @@ Details: [Plugins](/tools/plugin)
 
    - Replace `matrix.example.org` with your homeserver URL.
    - Or set `channels.matrix.userId` + `channels.matrix.password`: OpenClaw calls the same
-     login endpoint, stores the access token in `~/.openclaw/credentials/matrix/credentials.json`,
+     login endpoint, stores the access token in `~/.openclawcn/credentials/matrix/credentials.json`,
      and reuses it on next start.
 
 4. Configure credentials:
@@ -126,7 +126,7 @@ Enable with `channels.matrix.encryption: true`:
   `node node_modules/@matrix-org/matrix-sdk-crypto-nodejs/download-lib.js`.
 
 Crypto state is stored per account + access token in
-`~/.openclaw/matrix/accounts/<account>/<homeserver>__<user>/<token-hash>/crypto/`
+`~/.openclawcn/matrix/accounts/<account>/<homeserver>__<user>/<token-hash>/crypto/`
 (SQLite database). Sync state lives alongside it in `bot-storage.json`.
 If the access token (device) changes, a new store is created and the bot must be
 re-verified for encrypted rooms.

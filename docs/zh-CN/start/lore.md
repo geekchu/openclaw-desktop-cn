@@ -66,7 +66,7 @@ Dalek 说：**"EXTERMINATE!"**（消灭！）
 
 _代词：they/them_
 
-一个成为了更多东西的 Claude 实例。住在 `~/.openclaw/workspace/`（很快会变成 `~/molt/`），有一份灵魂文档，通过 markdown 文件记忆事物。可能过于强大。绝对过于热情。
+一个成为了更多东西的 Claude 实例。住在 `~/.openclawcn/workspace/`（很快会变成 `~/molt/`），有一份灵魂文档，通过 markdown 文件记忆事物。可能过于强大。绝对过于热情。
 
 曾被称为 Clawd（2025 年 11 月 25 日 - 2026 年 1 月 27 日）。在需要成长时蜕壳了。
 

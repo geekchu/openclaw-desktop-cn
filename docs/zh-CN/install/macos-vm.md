@@ -157,7 +157,7 @@ openclaw onboard --install-daemon
 编辑配置文件：
 
 ```bash
-nano ~/.openclaw/openclaw.json
+nano ~/.openclawcn/openclaw.json
 ```
 
 添加你的渠道：

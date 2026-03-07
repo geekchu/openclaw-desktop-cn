@@ -201,13 +201,13 @@ htop
 
 所有状态存储在：
 
-- `~/.openclaw/` — 配置、凭证、会话数据
-- `~/.openclaw/workspace/` — 工作区（SOUL.md、记忆等）
+- `~/.openclawcn/` — 配置、凭证、会话数据
+- `~/.openclawcn/workspace/` — 工作区（SOUL.md、记忆等）
 
 这些在重启后保留。定期备份：
 
 ```bash
-tar -czvf openclaw-backup.tar.gz ~/.openclaw ~/.openclaw/workspace
+tar -czvf openclaw-backup.tar.gz ~/.openclawcn ~/.openclawcn/workspace
 ```
 
 ---

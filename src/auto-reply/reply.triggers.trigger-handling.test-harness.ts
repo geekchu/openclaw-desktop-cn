@@ -149,7 +149,7 @@ function setTempHomeEnv(home: string): void {
   process.env.HOME = home;
   process.env.USERPROFILE = home;
   delete process.env.OPENCLAW_HOME;
-  process.env.OPENCLAW_STATE_DIR = join(home, ".openclaw");
+  process.env.OPENCLAW_STATE_DIR = join(home, ".openclawcn");
 
   if (process.platform !== "win32") {
     return;
@@ -178,7 +178,7 @@ afterAll(async () => {
 export async function withTempHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
   const home = join(suiteTempHomeRoot, `case-${++suiteTempHomeId}`);
   const snapshot = snapshotTempHomeEnv();
-  await fs.mkdir(join(home, ".openclaw", "agents", "main", "sessions"), { recursive: true });
+  await fs.mkdir(join(home, ".openclawcn", "agents", "main", "sessions"), { recursive: true });
   setTempHomeEnv(home);
 
   try {

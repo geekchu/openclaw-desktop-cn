@@ -44,7 +44,7 @@ sudo dpkg -i google-chrome-stable_current_amd64.deb
 sudo apt --fix-broken install -y  # if there are dependency errors
 ```
 
-然后更新你的 OpenClaw 配置（`~/.openclaw/openclaw.json`）：
+然后更新你的 OpenClaw 配置（`~/.openclawcn/openclaw.json`）：
 
 ```json
 {
@@ -79,7 +79,7 @@ sudo apt --fix-broken install -y  # if there are dependency errors
 ```bash
 chromium-browser --headless --no-sandbox --disable-gpu \
   --remote-debugging-port=18800 \
-  --user-data-dir=$HOME/.openclaw/browser/openclaw/user-data \
+  --user-data-dir=$HOME/.openclawcn/browser/openclaw/user-data \
   about:blank &
 ```
 
@@ -92,7 +92,7 @@ Description=OpenClaw Browser (Chrome CDP)
 After=network.target
 
 [Service]
-ExecStart=/snap/bin/chromium --headless --no-sandbox --disable-gpu --remote-debugging-port=18800 --user-data-dir=%h/.openclaw/browser/openclaw/user-data about:blank
+ExecStart=/snap/bin/chromium --headless --no-sandbox --disable-gpu --remote-debugging-port=18800 --user-data-dir=%h/.openclawcn/browser/openclaw/user-data about:blank
 Restart=on-failure
 RestartSec=5
 

@@ -94,11 +94,11 @@ If you override any of these in config or env, you must keep them unique per ins
 ## Manual env example
 
 ```bash
-OPENCLAW_CONFIG_PATH=~/.openclaw/main.json \
+OPENCLAW_CONFIG_PATH=~/.openclawcn/main.json \
 OPENCLAW_STATE_DIR=~/.openclaw-main \
 openclaw gateway --port 28789
 
-OPENCLAW_CONFIG_PATH=~/.openclaw/rescue.json \
+OPENCLAW_CONFIG_PATH=~/.openclawcn/rescue.json \
 OPENCLAW_STATE_DIR=~/.openclaw-rescue \
 openclaw gateway --port 19001
 ```

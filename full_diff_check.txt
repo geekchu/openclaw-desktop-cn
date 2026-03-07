@@ -1,0 +1,409 @@
+diff --git a/build.ps1 b/build.ps1
+index 687a29afa..2852e34f3 100644
+--- a/build.ps1
++++ b/build.ps1
+@@ -1,37 +1,60 @@
+-# [OpenClaw Build] Preparing Tauri environment...
+-$KeyPath = "$HOME\.tauri\openclaw.key"
++$ErrorActionPreference = "Stop"
+ 
+-# Check if the private key exists
+-if (!(Test-Path $KeyPath)) {
+-    Write-Host "[ERROR] Private key not found at $KeyPath" -ForegroundColor Red
+-    Write-Host "Please run the following command to generate it first:"
+-    Write-Host "cargo tauri signer generate -w `"$KeyPath`" --password 123 --force" -ForegroundColor Yellow
++# [OpenClaw Build] Preparing Tauri environment...
++$ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
++$KeyPath = Join-Path $HOME ".tauri\openclaw.key"
++$ExitCode = 0
++
++Push-Location $ScriptRoot
++try {
++    # Check if the private key exists
++    if (!(Test-Path $KeyPath)) {
++        $ExitCode = 1
++        Write-Host "[ERROR] Private key not found at $KeyPath" -ForegroundColor Red
++        Write-Host "Please run the following command to generate it first:"
++        Write-Host "cargo tauri signer generate -w `"$KeyPath`" --password 123 --force" -ForegroundColor Yellow
++        throw "Private key not found"
++    }
++
++    # Read the private key content into environment variable
++    $env:TAURI_SIGNING_PRIVATE_KEY = [System.IO.File]::ReadAllText($KeyPath).Trim()
++    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "123"
++
++    Write-Host "[OpenClaw Build] Private key loaded successfully." -ForegroundColor Green
++
++    Write-Host "[OpenClaw Build] Cleaning cargo cache..." -ForegroundColor Cyan
++    Set-Location -Path (Join-Path $ScriptRoot "src-tauri")
++    cargo clean
++    if ($LASTEXITCODE -ne 0) {
++        $ExitCode = $LASTEXITCODE
++        throw "cargo clean failed with exit code $LASTEXITCODE."
++    }
++
++    Set-Location -Path $ScriptRoot
++
++    Write-Host "[OpenClaw Build] Starting pnpm installer:build..." -ForegroundColor Cyan
++
++    $env:BUILD_CONFIG = "release"
++    pnpm installer:build
++
++    if ($LASTEXITCODE -ne 0) {
++        $ExitCode = $LASTEXITCODE
++        throw "Build failed with exit code $LASTEXITCODE."
++    }
++
++    Write-Host "[OpenClaw Build] Build completed successfully." -ForegroundColor Green
+     Pause
+-    exit 1
+ }
+-
+-# Read the private key content into environment variable
+-$env:TAURI_SIGNING_PRIVATE_KEY = [System.IO.File]::ReadAllText($KeyPath).Trim()
+-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "123"
+-
+-Write-Host "[OpenClaw Build] Private key loaded successfully." -ForegroundColor Green
+-
+-Write-Host "[OpenClaw Build] Cleaning cargo cache..." -ForegroundColor Cyan
+-Set-Location -Path "src-tauri"
+-cargo clean
+-Set-Location -Path ".."
+-
+-Write-Host "[OpenClaw Build] Starting pnpm installer:build..." -ForegroundColor Cyan
+-
+-$env:BUILD_CONFIG = "release"
+-# Run the build
+-pnpm installer:build
+-
+-if ($LASTEXITCODE -ne 0) {
+-    Write-Host "[ERROR] Build failed with exit code $LASTEXITCODE." -ForegroundColor Red
++catch {
++    if ($ExitCode -eq 0) {
++        $ExitCode = 1
++    }
++    if ($_.Exception.Message -ne "Private key not found") {
++        Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
++    }
+     Pause
+-    exit $LASTEXITCODE
++    exit $ExitCode
++}
++finally {
++    Pop-Location
+ }
+-
+-Write-Host "[OpenClaw Build] Build completed successfully." -ForegroundColor Green
+-Pause
+diff --git a/scripts/build-installer.js b/scripts/build-installer.js
+index 23c9bf41a..80404fdb9 100644
+--- a/scripts/build-installer.js
++++ b/scripts/build-installer.js
+@@ -69,6 +69,16 @@ function formatSize(bytes) {
+   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+ }
+ 
++function isEncryptedSigningKey(signingKey) {
++  const raw = signingKey.toLowerCase();
++  if (raw.includes("encrypted")) {
++    return true;
++  }
++
++  const decoded = Buffer.from(signingKey, "base64").toString("utf-8").toLowerCase();
++  return decoded.includes("encrypted");
++}
++
+ // -- Step 0: 环境检查 --
+ 
+ function checkEnvironment() {
+@@ -145,7 +155,7 @@ function checkEnvironment() {
+       ok = false;
+     }
+   } else if (
+-    process.env.TAURI_SIGNING_PRIVATE_KEY.includes("ENCRYPTED") &&
++    isEncryptedSigningKey(process.env.TAURI_SIGNING_PRIVATE_KEY) &&
+     !process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+   ) {
+     if (requiresSigning) {
+diff --git a/scripts/download-node.js b/scripts/download-node.js
+index a6f4bc8fd..2219ca361 100644
+--- a/scripts/download-node.js
++++ b/scripts/download-node.js
+@@ -31,6 +31,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
+ const projectRoot = resolve(__dirname, "..");
+ const nodeRuntimeDir = join(projectRoot, "src-tauri", "node-runtime");
+ 
++function getWindowsPowerShellExe() {
++  return join(
++    process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows",
++    "System32",
++    "WindowsPowerShell",
++    "v1.0",
++    "powershell.exe",
++  );
++}
++
+ const NODE_VERSION = "v24.13.0";
+ const NODE_BASE_URL = `https://nodejs.org/dist/${NODE_VERSION}`;
+ const VERSION_FILE = join(nodeRuntimeDir, ".node-version");
+@@ -168,7 +178,7 @@ async function downloadAndExtractPlatform(platformKey) {
+   if (config.archiveExt === "zip") {
+     console.log(`[download-node] 解压 (zip) ${archivePath}`);
+     execSync(
+-      `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`,
++      `"${getWindowsPowerShellExe()}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`,
+       { stdio: "inherit" },
+     );
+   } else if (config.archiveExt === "tar.xz") {
+@@ -190,7 +200,7 @@ async function downloadAndExtractPlatform(platformKey) {
+   // 移动到目标目录
+   if (process.platform === "win32") {
+     execSync(
+-      `powershell -NoProfile -NonInteractive -Command "Move-Item -Path '${innerDir}' -Destination '${destDir}'"`,
++      `"${getWindowsPowerShellExe()}" -NoProfile -NonInteractive -Command "Move-Item -Path '${innerDir}' -Destination '${destDir}'"`,
+       { stdio: "inherit" },
+     );
+   } else {
+diff --git a/scripts/prepare-gateway-bundle.js b/scripts/prepare-gateway-bundle.js
+index 929ba3ac6..6cfcb1dcf 100644
+--- a/scripts/prepare-gateway-bundle.js
++++ b/scripts/prepare-gateway-bundle.js
+@@ -31,19 +31,33 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
+ const projectRoot = resolve(__dirname, "..");
+ const bundleDir = join(projectRoot, "src-tauri", "gateway-bundle");
+ 
++function getPathParts(pathValue = process.env.PATH) {
++  return (pathValue ?? "").split(";").filter(Boolean);
++}
++
++function getWindowsPowerShellExe() {
++  return join(
++    process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows",
++    "System32",
++    "WindowsPowerShell",
++    "v1.0",
++    "powershell.exe",
++  );
++}
++
+ // Windows: cargo tauri build 的子进程可能丢失用户 PATH，导致找不到 pnpm/bash 等工具。
+ // 从系统环境变量重新拼接完整 PATH 以确保工具可用。
+ if (process.platform === "win32") {
+   try {
+     const fullPath = execSync(
+-      "powershell -NoProfile -Command \"[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')\"",
++      `"${getWindowsPowerShellExe()}" -NoProfile -Command "[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')"`,
+       { encoding: "utf-8", windowsHide: true },
+     ).trim();
+     if (fullPath) {
+       // 合并：原始 PATH 优先，再追加系统环境变量中缺失的条目
+-      const origParts = process.env.PATH.split(";").filter(Boolean);
++      const origParts = getPathParts();
+       const origLower = new Set(origParts.map((p) => p.toLowerCase()));
+-      const newParts = fullPath.split(";").filter(Boolean);
++      const newParts = getPathParts(fullPath);
+       for (const p of newParts) {
+         if (!origLower.has(p.toLowerCase())) {
+           origParts.push(p);
+@@ -57,8 +71,8 @@ if (process.platform === "win32") {
+ 
+   // 确保当前 node 可执行文件的目录在 PATH 最前面。
+   const nodeDir = dirname(process.execPath);
+-  if (!process.env.PATH.split(";").some((p) => p.toLowerCase() === nodeDir.toLowerCase())) {
+-    process.env.PATH = `${nodeDir};${process.env.PATH}`;
++  if (!getPathParts().some((p) => p.toLowerCase() === nodeDir.toLowerCase())) {
++    process.env.PATH = [nodeDir, ...getPathParts()].join(";");
+   }
+ 
+   // 确保 Git for Windows 的 bash 路径在 WSL bash (C:\Windows\System32\bash.exe) 之前。
+@@ -72,7 +86,7 @@ if (process.platform === "win32") {
+   ];
+   const gitBashDir = gitBashCandidates.find((d) => existsSync(join(d, "bash.exe")));
+   if (gitBashDir) {
+-    const parts = process.env.PATH.split(";").filter(Boolean);
++    const parts = getPathParts();
+     const lowerGit = gitBashDir.toLowerCase();
+     // 移除已有的同路径条目，然后插到最前面
+     const filtered = parts.filter((p) => p.toLowerCase() !== lowerGit);
+@@ -292,8 +306,8 @@ console.log(
+ console.log("\n[bundle] === Step 5: 安装生产依赖（含 extension 依赖）===");
+ run("npm install --omit=dev --install-strategy=hoisted", { cwd: bundleDir });
+ 
+-// Step 6.6: 删除桌面版不需要的重量级包
+-console.log("\n[bundle] === Step 6.6: 删除桌面版不需要的重量级包 ===");
++// Step 6: 删除桌面版不需要的重量级包
++console.log("\n[bundle] === Step 6: 删除桌面版不需要的重量级包 ===");
+ {
+   // 桌面版通过 API 接入模型，不需要本地推理引擎
+   // 仅删除确定不需要的包，保留可能被运行时 import 的包
+diff --git a/scripts/publish-update.py b/scripts/publish-update.py
+index 761a8f744..cc1503b02 100644
+--- a/scripts/publish-update.py
++++ b/scripts/publish-update.py
+@@ -53,53 +53,75 @@ def collect_artifacts():
+     platforms = {}
+     extra_uploads = []
+ 
++    def pick_signed_artifact(directory, predicate, sig_path_for):
++        signed = []
++        for file_path in directory.iterdir():
++            if not predicate(file_path):
++                continue
++            sig_file = sig_path_for(file_path)
++            if sig_file.is_file():
++                signed.append((file_path, sig_file))
++        if not signed:
++            return None, None
++        signed.sort(key=lambda item: item[0].stat().st_mtime_ns, reverse=True)
++        return signed[0]
++
++    def pick_latest_artifact(directory, predicate):
++        matches = [file_path for file_path in directory.iterdir() if predicate(file_path)]
++        if not matches:
++            return None
++        matches.sort(key=lambda file_path: file_path.stat().st_mtime_ns, reverse=True)
++        return matches[0]
++
+     # Windows NSIS
+     nsis_dir = BUNDLE_BASE / "nsis"
+     if nsis_dir.is_dir():
+-        for f in nsis_dir.iterdir():
+-            if f.name.endswith("-setup.exe") and not f.name.endswith(".sig"):
+-                sig_file = f.with_suffix(f.suffix + ".sig")
+-                if sig_file.is_file():
+-                    platforms["windows-x86_64"] = {
+-                        "file": f,
+-                        "sig": sig_file.read_text(encoding="utf-8").strip(),
+-                    }
+-                    print(f"  [OK] Windows NSIS: {f.name}")
+-                break
++        f, sig_file = pick_signed_artifact(
++            nsis_dir,
++            lambda file_path: file_path.name.endswith("-setup.exe") and not file_path.name.endswith(".sig"),
++            lambda file_path: file_path.with_suffix(file_path.suffix + ".sig"),
++        )
++        if f and sig_file:
++            platforms["windows-x86_64"] = {
++                "file": f,
++                "sig": sig_file.read_text(encoding="utf-8").strip(),
++            }
++            print(f"  [OK] Windows NSIS: {f.name}")
+ 
+     # macOS
+     macos_dir = BUNDLE_BASE / "macos"
+     if macos_dir.is_dir():
+-        for f in macos_dir.iterdir():
+-            if f.name.endswith(".app.tar.gz") and not f.name.endswith(".sig"):
+-                sig_file = Path(str(f) + ".sig")
+-                if sig_file.is_file():
+-                    platforms["darwin-aarch64"] = {
+-                        "file": f,
+-                        "sig": sig_file.read_text(encoding="utf-8").strip(),
+-                    }
+-                    print(f"  [OK] macOS (aarch64): {f.name}")
+-                break
++        f, sig_file = pick_signed_artifact(
++            macos_dir,
++            lambda file_path: file_path.name.endswith(".app.tar.gz") and not file_path.name.endswith(".sig"),
++            lambda file_path: Path(str(file_path) + ".sig"),
++        )
++        if f and sig_file:
++            platforms["darwin-aarch64"] = {
++                "file": f,
++                "sig": sig_file.read_text(encoding="utf-8").strip(),
++            }
++            print(f"  [OK] macOS (aarch64): {f.name}")
+         # .dmg for website downloads
+-        for f in macos_dir.iterdir():
+-            if f.name.endswith(".dmg"):
+-                extra_uploads.append(f)
+-                print(f"  [OK] macOS DMG: {f.name}")
+-                break
++        dmg_file = pick_latest_artifact(macos_dir, lambda file_path: file_path.name.endswith(".dmg"))
++        if dmg_file:
++            extra_uploads.append(dmg_file)
++            print(f"  [OK] macOS DMG: {dmg_file.name}")
+ 
+     # Linux AppImage
+     appimage_dir = BUNDLE_BASE / "appimage"
+     if appimage_dir.is_dir():
+-        for f in appimage_dir.iterdir():
+-            if f.name.endswith(".AppImage") and not f.name.endswith(".sig"):
+-                sig_file = Path(str(f) + ".sig")
+-                if sig_file.is_file():
+-                    platforms["linux-x86_64"] = {
+-                        "file": f,
+-                        "sig": sig_file.read_text(encoding="utf-8").strip(),
+-                    }
+-                    print(f"  [OK] Linux AppImage: {f.name}")
+-                break
++        f, sig_file = pick_signed_artifact(
++            appimage_dir,
++            lambda file_path: file_path.name.endswith(".AppImage") and not file_path.name.endswith(".sig"),
++            lambda file_path: Path(str(file_path) + ".sig"),
++        )
++        if f and sig_file:
++            platforms["linux-x86_64"] = {
++                "file": f,
++                "sig": sig_file.read_text(encoding="utf-8").strip(),
++            }
++            print(f"  [OK] Linux AppImage: {f.name}")
+ 
+     return platforms, extra_uploads
+ 
+diff --git a/ui/build_log.txt b/ui/build_log.txt
+deleted file mode 100644
+index 57806fce6..000000000
+--- a/ui/build_log.txt
++++ /dev/null
+@@ -1,50 +0,0 @@
+-
+-> openclaw-control-ui@ build F:\openclaw-desktop-cn\ui
+-> vite build
+-
+-[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+-transforming...
+-[32m✓[39m 143 modules transformed.
+-✗ Build failed in 556ms
+-error during build:
+-[vite:esbuild] Transform failed with 3 errors:
+-F:/openclaw-desktop-cn/ui/src/ui/views/config-custom-providers.ts:743:4: ERROR: The symbol "_dataVersion" has already been declared
+-F:/openclaw-desktop-cn/ui/src/ui/views/config-custom-providers.ts:744:4: ERROR: The symbol "_lastRenderedVersion" has already been declared
+-F:/openclaw-desktop-cn/ui/src/ui/views/config-custom-providers.ts:749:9: ERROR: The symbol "triggerUpdate" has already been declared
+-file: F:/openclaw-desktop-cn/ui/src/ui/views/config-custom-providers.ts:743:4
+-
+-The symbol "_dataVersion" has already been declared
+-741 |  
+-742 |  let _lastTemplate: any = null;
+-743 |  let _dataVersion = 0;
+-    |      ^
+-744 |  let _lastRenderedVersion = -1;
+-745 |  
+-
+-The symbol "_lastRenderedVersion" has already been declared
+-742 |  let _lastTemplate: any = null;
+-743 |  let _dataVersion = 0;
+-744 |  let _lastRenderedVersion = -1;
+-    |      ^
+-745 |  
+-746 |  // 覆盖 triggerUpdate 以更新数据版本
+-
+-The symbol "triggerUpdate" has already been declared
+-747 |  const _originalTriggerUpdate = triggerUpdate;
+-748 |  // @ts-ignore - Create a local override for the module-level function
+-749 |  function triggerUpdate() {
+-    |           ^
+-750 |    _dataVersion++;
+-751 |    if (_requestUpdate) _requestUpdate();
+-
+-    at failureErrorWithLog (F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:1467:15)
+-    at F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:736:50
+-    at responseCallbacks.<computed> (F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:603:9)
+-    at handleIncomingPacket (F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:658:12)
+-    at Socket.readFromStdout (F:\openclaw-desktop-cn\node_modules\.pnpm\esbuild@0.27.3\node_modules\esbuild\lib\main.js:581:7)
+-    at Socket.emit (node:events:508:28)
+-    at addChunk (node:internal/streams/readable:559:12)
+-    at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+-    at Readable.push (node:internal/streams/readable:390:5)
+-    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+- ELIFECYCLE  Command failed with exit code 1.

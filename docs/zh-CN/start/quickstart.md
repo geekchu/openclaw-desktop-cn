@@ -74,7 +74,7 @@ openclaw onboard --install-daemon
 ## 多实例快速开始（可选）
 
 ```bash
-OPENCLAW_CONFIG_PATH=~/.openclaw/a.json \
+OPENCLAW_CONFIG_PATH=~/.openclawcn/a.json \
 OPENCLAW_STATE_DIR=~/.openclaw-a \
 openclaw gateway --port 19001
 ```

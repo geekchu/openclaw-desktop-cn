@@ -123,7 +123,7 @@ Gatewayの起動後、ブラウザでControl UIを開きます。
 
 ## 設定（オプション）
 
-設定は`~/.openclaw/openclaw.json`にあります。
+設定は`~/.openclawcn/openclaw.json`にあります。
 
 - **何もしなければ**、OpenClawはバンドルされたPiバイナリをRPCモードで使用し、送信者ごとのセッションを作成します。
 - 制限を設けたい場合は、`channels.whatsapp.allowFrom`と（グループの場合）メンションルールから始めてください。

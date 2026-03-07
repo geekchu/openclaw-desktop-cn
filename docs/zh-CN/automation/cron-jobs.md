@@ -25,7 +25,7 @@ x-i18n:
 ## 简要概述
 
 - 定时任务运行在 **Gateway网关内部**（而非模型内部）。
-- 任务持久化存储在 `~/.openclaw/cron/` 下，因此重启不会丢失计划。
+- 任务持久化存储在 `~/.openclawcn/cron/` 下，因此重启不会丢失计划。
 - 两种执行方式：
   - **主会话**：入队一个系统事件，然后在下一次心跳时运行。
   - **隔离式**：在 `cron:<jobId>` 中运行专用智能体轮次，可投递摘要（默认 announce）或不投递。
@@ -69,7 +69,7 @@ openclaw cron add \
 
 ## 定时任务的存储位置
 
-定时任务默认持久化存储在 Gateway网关主机的 `~/.openclaw/cron/jobs.json` 中。Gateway网关将文件加载到内存中，并在更改时写回，因此仅在 Gateway网关停止时手动编辑才是安全的。请优先使用 `openclaw cron add/edit` 或定时任务工具调用 API 进行更改。
+定时任务默认持久化存储在 Gateway网关主机的 `~/.openclawcn/cron/jobs.json` 中。Gateway网关将文件加载到内存中，并在更改时写回，因此仅在 Gateway网关停止时手动编辑才是安全的。请优先使用 `openclaw cron add/edit` 或定时任务工具调用 API 进行更改。
 
 ## 新手友好概述
 
@@ -276,8 +276,8 @@ Telegram 通过 `message_thread_id` 支持论坛主题。对于定时任务投�
 
 ## 存储与历史
 
-- 任务存储：`~/.openclaw/cron/jobs.json`（Gateway网关管理的 JSON）。
-- 运行历史：`~/.openclaw/cron/runs/<jobId>.jsonl`（JSONL，自动清理）。
+- 任务存储：`~/.openclawcn/cron/jobs.json`（Gateway网关管理的 JSON）。
+- 运行历史：`~/.openclawcn/cron/runs/<jobId>.jsonl`（JSONL，自动清理）。
 - 覆盖存储路径：配置中的 `cron.store`。
 
 ## 配置
@@ -286,7 +286,7 @@ Telegram 通过 `message_thread_id` 支持论坛主题。对于定时任务投�
 {
   cron: {
     enabled: true, // 默认 true
-    store: "~/.openclaw/cron/jobs.json",
+    store: "~/.openclawcn/cron/jobs.json",
     maxConcurrentRuns: 1, // 默认 1
   },
 }

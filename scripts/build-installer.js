@@ -69,6 +69,16 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isEncryptedSigningKey(signingKey) {
+  const raw = signingKey.toLowerCase();
+  if (raw.includes("encrypted")) {
+    return true;
+  }
+
+  const decoded = Buffer.from(signingKey, "base64").toString("utf-8").toLowerCase();
+  return decoded.includes("encrypted");
+}
+
 // -- Step 0: 环境检查 --
 
 function checkEnvironment() {
@@ -145,7 +155,7 @@ function checkEnvironment() {
       ok = false;
     }
   } else if (
-    process.env.TAURI_SIGNING_PRIVATE_KEY.includes("ENCRYPTED") &&
+    isEncryptedSigningKey(process.env.TAURI_SIGNING_PRIVATE_KEY) &&
     !process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD
   ) {
     if (requiresSigning) {

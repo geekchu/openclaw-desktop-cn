@@ -406,13 +406,13 @@ openclaw doctor
 可以。复制**状态目录**和**工作区**，然后运行一次 Doctor。只要你同时复制**两个**位置，就能保持你的机器人“完全一样”（记忆、会话历史、认证和渠道状态）：
 
 1. 在新机器上安装 OpenClaw。
-2. 从旧机器复制 `$OPENCLAW_STATE_DIR`（默认：`~/.openclaw`）。
-3. 复制你的工作区（默认：`~/.openclaw/workspace`）。
+2. 从旧机器复制 `$OPENCLAW_STATE_DIR`（默认：`~/.openclawcn`）。
+3. 复制你的工作区（默认：`~/.openclawcn/workspace`）。
 4. 运行 `openclaw doctor` 并重启 Gateway 网关服务。
 
 这会保留配置、认证配置文件、WhatsApp 凭据、会话和记忆。如果你处于远程模式，请记住 Gateway 网关主机拥有会话存储和工作区。
 
-**重要：** 如果你只将工作区提交/推送到 GitHub，你只备份了**记忆 + 引导文件**，但**不包括**会话历史或认证。它们位于 `~/.openclaw/` 下（例如 `~/.openclaw/agents/<agentId>/sessions/`）。
+**重要：** 如果你只将工作区提交/推送到 GitHub，你只备份了**记忆 + 引导文件**，但**不包括**会话历史或认证。它们位于 `~/.openclawcn/` 下（例如 `~/.openclawcn/agents/<agentId>/sessions/`）。
 
 相关：[迁移](/install/migrating)、[磁盘上的文件位置](/help/faq#where-does-openclaw-store-its-data)、
 [智能体工作区](/concepts/agent-workspace)、[Doctor](/gateway/doctor)、
@@ -790,7 +790,7 @@ brew install <formula>
 
 可以。安装另一种方式，然后运行 Doctor 使 Gateway 网关服务指向新的入口点。
 这**不会删除你的数据**——它只改变 OpenClaw 代码的安装位置。你的状态
-（`~/.openclaw`）和工作区（`~/.openclaw/workspace`）保持不变。
+（`~/.openclawcn`）和工作区（`~/.openclawcn/workspace`）保持不变。
 
 从 npm → git：
 
@@ -934,11 +934,11 @@ OpenClaw 是一个**个人助手**和协调层，不是 IDE 替代品。使用 C
 
 ### 如何自定义 Skills 而不弄脏仓库
 
-使用托管覆盖而不是编辑仓库副本。将你的更改放在 `~/.openclaw/skills/<name>/SKILL.md`（或通过 `~/.openclaw/openclaw.json` 中的 `skills.load.extraDirs` 添加文件夹）。优先级是 `<workspace>/skills` > `~/.openclaw/skills` > 内置，所以托管覆盖优先生效而不会修改 git。只有值得上游合并的编辑才应该放在仓库中并作为 PR 提交。
+使用托管覆盖而不是编辑仓库副本。将你的更改放在 `~/.openclawcn/skills/<name>/SKILL.md`（或通过 `~/.openclawcn/openclaw.json` 中的 `skills.load.extraDirs` 添加文件夹）。优先级是 `<workspace>/skills` > `~/.openclawcn/skills` > 内置，所以托管覆盖优先生效而不会修改 git。只有值得上游合并的编辑才应该放在仓库中并作为 PR 提交。
 
 ### 可以从自定义文件夹加载 Skills 吗
 
-可以。通过 `~/.openclaw/openclaw.json` 中的 `skills.load.extraDirs` 添加额外目录（最低优先级）。默认优先级保持不变：`<workspace>/skills` → `~/.openclaw/skills` → 内置 → `skills.load.extraDirs`。`clawhub` 默认安装到 `./skills`，OpenClaw 将其视为 `<workspace>/skills`。
+可以。通过 `~/.openclawcn/openclaw.json` 中的 `skills.load.extraDirs` 添加额外目录（最低优先级）。默认优先级保持不变：`<workspace>/skills` → `~/.openclawcn/skills` → 内置 → `skills.load.extraDirs`。`clawhub` 默认安装到 `./skills`，OpenClaw 将其视为 `<workspace>/skills`。
 
 ### 如何为不同任务使用不同模型
 
@@ -1028,7 +1028,7 @@ pnpm add -g clawhub
    exec ssh -T user@mac-host /opt/homebrew/bin/imsg "$@"
    ```
 2. 将包装器放在 Linux 主机的 `PATH` 上（例如 `~/bin/imsg`）。
-3. 覆盖 Skills 元数据（工作区或 `~/.openclaw/skills`）以允许 Linux：
+3. 覆盖 Skills 元数据（工作区或 `~/.openclawcn/skills`）以允许 Linux：
    ```markdown
    ---
    name: imsg
@@ -1063,7 +1063,7 @@ clawhub install <skill-slug>
 clawhub update --all
 ```
 
-ClawHub 安装到当前目录下的 `./skills`（或回退到你配置的 OpenClaw 工作区）；OpenClaw 在下一个会话中将其视为 `<workspace>/skills`。对于跨智能体共享的 Skills，将它们放在 `~/.openclaw/skills/<name>/SKILL.md`。某些 Skills 期望通过 Homebrew 安装二进制文件；在 Linux 上意味着 Linuxbrew（参阅上面的 Homebrew Linux 常见问题条目）。参阅[Skills](/tools/skills)和 [ClawHub](/tools/clawhub)。
+ClawHub 安装到当前目录下的 `./skills`（或回退到你配置的 OpenClaw 工作区）；OpenClaw 在下一个会话中将其视为 `<workspace>/skills`。对于跨智能体共享的 Skills，将它们放在 `~/.openclawcn/skills/<name>/SKILL.md`。某些 Skills 期望通过 Homebrew 安装二进制文件；在 Linux 上意味着 Linuxbrew（参阅上面的 Homebrew Linux 常见问题条目）。参阅[Skills](/tools/skills)和 [ClawHub](/tools/clawhub)。
 
 ### 如何安装用于浏览器接管的 Chrome 扩展
 
@@ -1139,7 +1139,7 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 
 不是——**OpenClaw 的状态是本地的**，但**外部服务仍然会看到你发送给它们的内容**。
 
-- **默认本地：** 会话、记忆文件、配置和工作区位于 Gateway 网关主机上（`~/.openclaw` + 你的工作区目录）。
+- **默认本地：** 会话、记忆文件、配置和工作区位于 Gateway 网关主机上（`~/.openclawcn` + 你的工作区目录）。
 - **必然远程：** 你发送给模型提供商（Anthropic/OpenAI/等）的消息会发送到它们的 API，聊天平台（WhatsApp/Telegram/Slack/等）在它们的服务器上存储消息数据。
 - **你控制范围：** 使用本地模型可以将提示保留在你的机器上，但渠道流量仍然通过渠道的服务器。
 
@@ -1147,7 +1147,7 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 
 ### OpenClaw 将数据存储在哪里
 
-所有内容位于 `$OPENCLAW_STATE_DIR`（默认：`~/.openclaw`）下：
+所有内容位于 `$OPENCLAW_STATE_DIR`（默认：`~/.openclawcn`）下：
 
 | 路径                                                            | 用途                                                 |
 | --------------------------------------------------------------- | ---------------------------------------------------- |
@@ -1160,23 +1160,23 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 | `$OPENCLAW_STATE_DIR/agents/<agentId>/sessions/`                | 对话历史和状态（按智能体）                           |
 | `$OPENCLAW_STATE_DIR/agents/<agentId>/sessions/sessions.json`   | 会话元数据（按智能体）                               |
 
-旧版单智能体路径：`~/.openclaw/agent/*`（通过 `openclaw doctor` 迁移）。
+旧版单智能体路径：`~/.openclawcn/agent/*`（通过 `openclaw doctor` 迁移）。
 
-你的**工作区**（AGENTS.md、记忆文件、Skills 等）是独立的，通过 `agents.defaults.workspace` 配置（默认：`~/.openclaw/workspace`）。
+你的**工作区**（AGENTS.md、记忆文件、Skills 等）是独立的，通过 `agents.defaults.workspace` 配置（默认：`~/.openclawcn/workspace`）。
 
 ### AGENTS.md / SOUL.md / USER.md / MEMORY.md 应该放在哪里
 
-这些文件位于**智能体工作区**中，而不是 `~/.openclaw`。
+这些文件位于**智能体工作区**中，而不是 `~/.openclawcn`。
 
 - **工作区（按智能体）**：`AGENTS.md`、`SOUL.md`、`IDENTITY.md`、`USER.md`、
   `MEMORY.md`（或 `memory.md`）、`memory/YYYY-MM-DD.md`、可选的 `HEARTBEAT.md`。
-- **状态目录（`~/.openclaw`）**：配置、凭据、认证配置文件、会话、日志和共享 Skills（`~/.openclaw/skills`）。
+- **状态目录（`~/.openclawcn`）**：配置、凭据、认证配置文件、会话、日志和共享 Skills（`~/.openclawcn/skills`）。
 
-默认工作区是 `~/.openclaw/workspace`，可通过以下方式配置：
+默认工作区是 `~/.openclawcn/workspace`，可通过以下方式配置：
 
 ```json5
 {
-  agents: { defaults: { workspace: "~/.openclaw/workspace" } },
+  agents: { defaults: { workspace: "~/.openclawcn/workspace" } },
 }
 ```
 
@@ -1190,7 +1190,7 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 
 将你的**智能体工作区**放入一个**私有** git 仓库，并备份到某个私有位置（例如 GitHub 私有仓库）。这会捕获记忆 + AGENTS/SOUL/USER 文件，让你以后可以恢复助手的“思维”。
 
-**不要**提交 `~/.openclaw` 下的任何内容（凭据、会话、令牌）。如果你需要完整恢复，将工作区和状态目录分别备份（参阅上面的迁移问题）。
+**不要**提交 `~/.openclawcn` 下的任何内容（凭据、会话、令牌）。如果你需要完整恢复，将工作区和状态目录分别备份（参阅上面的迁移问题）。
 
 文档：[智能体工作区](/concepts/agent-workspace)。
 
@@ -1222,13 +1222,13 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 
 ### 配置文件是什么格式？在哪里
 
-OpenClaw 从 `$OPENCLAW_CONFIG_PATH`（默认：`~/.openclaw/openclaw.json`）读取可选的 **JSON5** 配置：
+OpenClaw 从 `$OPENCLAW_CONFIG_PATH`（默认：`~/.openclawcn/openclaw.json`）读取可选的 **JSON5** 配置：
 
 ```
 $OPENCLAW_CONFIG_PATH
 ```
 
-如果文件不存在，使用安全的默认值（包括默认工作区 `~/.openclaw/workspace`）。
+如果文件不存在，使用安全的默认值（包括默认工作区 `~/.openclawcn/workspace`）。
 
 ### 我设置了 gateway.bind: "lan"（或 "tailnet"），现在什么都监听不了 / UI 显示未授权
 
@@ -1289,7 +1289,7 @@ Gateway 网关监视配置文件并支持热重载：
 
 - 如果你使用允许列表，添加 `web_search`/`web_fetch` 或 `group:web`。
 - `web_fetch` 默认启用（除非明确禁用）。
-- 守护进程从 `~/.openclaw/.env`（或服务环境）读取环境变量。
+- 守护进程从 `~/.openclawcn/.env`（或服务环境）读取环境变量。
 
 文档：[Web 工具](/tools/web)。
 
@@ -1299,7 +1299,7 @@ Gateway 网关监视配置文件并支持热重载：
 
 恢复：
 
-- 从备份恢复（git 或复制的 `~/.openclaw/openclaw.json`）。
+- 从备份恢复（git 或复制的 `~/.openclawcn/openclaw.json`）。
 - 如果没有备份，重新运行 `openclaw doctor` 并重新配置渠道/模型。
 - 如果这是意外情况，提交 bug 并附上你最后已知的配置或任何备份。
 - 本地编码智能体通常可以从日志或历史中重建工作配置。
@@ -1457,7 +1457,7 @@ SSH 对临时 shell 访问很好，但节点对于持续的智能体工作流和
 
 ```json5
 {
-  agents: { defaults: { workspace: "~/.openclaw/workspace" } },
+  agents: { defaults: { workspace: "~/.openclawcn/workspace" } },
   channels: { whatsapp: { allowFrom: ["+15555550123"] } },
 }
 ```
@@ -1512,7 +1512,7 @@ Serve 暴露 **Gateway 网关控制 UI + WS**。节点通过同一个 Gateway �
 OpenClaw 从父进程（shell、launchd/systemd、CI 等）读取环境变量，并额外加载：
 
 - 当前工作目录下的 `.env`
-- `~/.openclaw/.env`（即 `$OPENCLAW_STATE_DIR/.env`）的全局回退 `.env`
+- `~/.openclawcn/.env`（即 `$OPENCLAW_STATE_DIR/.env`）的全局回退 `.env`
 
 两个 `.env` 文件都不会覆盖已有的环境变量。
 
@@ -1533,7 +1533,7 @@ OpenClaw 从父进程（shell、launchd/systemd、CI 等）读取环境变量，
 
 两个常见修复方法：
 
-1. 将缺失的密钥放在 `~/.openclaw/.env` 中，这样即使服务不继承你的 shell 环境也能被获取。
+1. 将缺失的密钥放在 `~/.openclawcn/.env` 中，这样即使服务不继承你的 shell 环境也能被获取。
 2. 启用 shell 导入（可选的便利功能）：
 
 ```json5
@@ -1556,7 +1556,7 @@ OpenClaw 从父进程（shell、launchd/systemd、CI 等）读取环境变量，
 
 如果 Gateway 网关作为服务（launchd/systemd）运行，它不会继承你的 shell 环境。通过以下方式之一修复：
 
-1. 将令牌放在 `~/.openclaw/.env` 中：
+1. 将令牌放在 `~/.openclawcn/.env` 中：
    ```
    COPILOT_GITHUB_TOKEN=...
    ```
@@ -1741,7 +1741,7 @@ openclaw directory groups list --channel whatsapp
 
 没有硬性限制。几十个（甚至几百个）都没问题，但请注意：
 
-- **磁盘增长：** 会话 + 记录位于 `~/.openclaw/agents/<agentId>/sessions/` 下。
+- **磁盘增长：** 会话 + 记录位于 `~/.openclawcn/agents/<agentId>/sessions/` 下。
 - **令牌成本：** 更多智能体意味着更多并发模型使用。
 - **运维开销：** 按智能体的认证配置文件、工作区和渠道路由。
 
@@ -1814,7 +1814,7 @@ MiniMax M2.1 有自己的文档：[MiniMax](/providers/minimax) 和
 - 聊天中的 `/model`（快速，按会话）
 - `openclaw models set ...`（只更新模型配置）
 - `openclaw configure --section models`（交互式）
-- 编辑 `~/.openclaw/openclaw.json` 中的 `agents.defaults.model`
+- 编辑 `~/.openclawcn/openclaw.json` 中的 `agents.defaults.model`
 
 避免使用部分对象执行 `config.apply`，除非你打算替换整个配置。如果你确实覆盖了配置，从备份恢复或重新运行 `openclaw doctor` 来修复。
 
@@ -2011,7 +2011,7 @@ Z.AI（GLM 模型）：
 这通常意味着**新智能体**的认证存储为空。认证是按智能体的，存储在：
 
 ```
-~/.openclaw/agents/<agentId>/agent/auth-profiles.json
+~/.openclawcn/agents/<agentId>/agent/auth-profiles.json
 ```
 
 修复选项：
@@ -2043,10 +2043,10 @@ No credentials found for profile "anthropic:default"
 ### No credentials found for profile "anthropic:default" 的修复清单
 
 - **确认认证配置文件的位置**（新路径 vs 旧路径）
-  - 当前：`~/.openclaw/agents/<agentId>/agent/auth-profiles.json`
-  - 旧版：`~/.openclaw/agent/*`（通过 `openclaw doctor` 迁移）
+  - 当前：`~/.openclawcn/agents/<agentId>/agent/auth-profiles.json`
+  - 旧版：`~/.openclawcn/agent/*`（通过 `openclaw doctor` 迁移）
 - **确认环境变量被 Gateway 网关加载**
-  - 如果你在 shell 中设置了 `ANTHROPIC_API_KEY` 但通过 systemd/launchd 运行 Gateway 网关，它可能不会继承。将其放在 `~/.openclaw/.env` 中或启用 `env.shellEnv`。
+  - 如果你在 shell 中设置了 `ANTHROPIC_API_KEY` 但通过 systemd/launchd 运行 Gateway 网关，它可能不会继承。将其放在 `~/.openclawcn/.env` 中或启用 `env.shellEnv`。
 - **确保你编辑的是正确的智能体**
   - 多智能体设置意味着可能有多个 `auth-profiles.json` 文件。
 - **完整性检查模型/认证状态**
@@ -2060,7 +2060,7 @@ No credentials found for profile "anthropic:default"
   - 运行 `claude setup-token`，然后用 `openclaw models auth setup-token --provider anthropic` 粘贴。
   - 如果令牌在另一台机器上创建，使用 `openclaw models auth paste-token --provider anthropic`。
 - **如果你想使用 API 密钥**
-  - 在 **Gateway 网关主机**上将 `ANTHROPIC_API_KEY` 放入 `~/.openclaw/.env`。
+  - 在 **Gateway 网关主机**上将 `ANTHROPIC_API_KEY` 放入 `~/.openclawcn/.env`。
   - 清除任何强制缺失配置文件的固定顺序：
     ```bash
     openclaw models auth order clear --provider anthropic
@@ -2089,7 +2089,7 @@ No credentials found for profile "anthropic:default"
 认证配置文件是绑定到提供商的命名凭据记录（OAuth 或 API 密钥）。配置文件位于：
 
 ```
-~/.openclaw/agents/<agentId>/agent/auth-profiles.json
+~/.openclawcn/agents/<agentId>/agent/auth-profiles.json
 ```
 
 ### 典型的配置文件 ID 有哪些
@@ -2292,7 +2292,7 @@ openclaw logs --follow
 
 服务/supervisor 日志（当 Gateway 网关通过 launchd/systemd 运行时）：
 
-- macOS：`$OPENCLAW_STATE_DIR/logs/gateway.log` 和 `gateway.err.log`（默认：`~/.openclaw/logs/...`；配置文件使用 `~/.openclaw-<profile>/logs/...`）
+- macOS：`$OPENCLAW_STATE_DIR/logs/gateway.log` 和 `gateway.err.log`（默认：`~/.openclawcn/logs/...`；配置文件使用 `~/.openclaw-<profile>/logs/...`）
 - Linux：`journalctl --user -u openclaw-gateway[-<profile>].service -n 200 --no-pager`
 - Windows：`schtasks /Query /TN "OpenClaw Gateway 网关 (<profile>)" /V /FO LIST`
 

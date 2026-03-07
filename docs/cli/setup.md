@@ -8,7 +8,7 @@ title: "setup"
 
 # `openclaw setup`
 
-Initialize `~/.openclaw/openclaw.json` and the agent workspace.
+Initialize `~/.openclawcn/openclaw.json` and the agent workspace.
 
 Related:
 
@@ -19,7 +19,7 @@ Related:
 
 ```bash
 openclaw setup
-openclaw setup --workspace ~/.openclaw/workspace
+openclaw setup --workspace ~/.openclawcn/workspace
 ```
 
 To run the wizard via setup:

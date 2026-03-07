@@ -78,7 +78,7 @@ Gateway -> Node Service (WS)
 Security + ask + allowlist are stored locally on the Mac in:
 
 ```
-~/.openclaw/exec-approvals.json
+~/.openclawcn/exec-approvals.json
 ```
 
 Example:
@@ -152,7 +152,7 @@ sessions and credentials.
 Prefer a local non-synced state path such as:
 
 ```bash
-OPENCLAW_STATE_DIR=~/.openclaw
+OPENCLAW_STATE_DIR=~/.openclawcn
 ```
 
 If `openclaw doctor` detects state under:

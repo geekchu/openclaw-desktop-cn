@@ -19,8 +19,8 @@ x-i18n:
 
 迁移在概念上很简单：
 
-- 复制**状态目录**（`$OPENCLAW_STATE_DIR`，默认：`~/.openclaw/`）— 这包括配置、认证、会话和渠道状态。
-- 复制你的**工作区**（默认 `~/.openclaw/workspace/`）— 这包括你的智能体文件（记忆、提示等）。
+- 复制**状态目录**（`$OPENCLAW_STATE_DIR`，默认：`~/.openclawcn/`）— 这包括配置、认证、会话和渠道状态。
+- 复制你的**工作区**（默认 `~/.openclawcn/workspace/`）— 这包括你的智能体文件（记忆、提示等）。
 
 但在**配置文件**、**权限**和**部分复制**方面有常见的陷阱。
 
@@ -30,7 +30,7 @@ x-i18n:
 
 大多数安装使用默认值：
 
-- **状态目录：** `~/.openclaw/`
+- **状态目录：** `~/.openclawcn/`
 
 但如果你使用以下方式，可能会不同：
 
@@ -49,7 +49,7 @@ openclaw status
 
 常见默认值：
 
-- `~/.openclaw/workspace/`（推荐的工作区）
+- `~/.openclawcn/workspace/`（推荐的工作区）
 - 你创建的自定义文件夹
 
 你的工作区是 `MEMORY.md`、`USER.md` 和 `memory/*.md` 等文件所在的位置。
@@ -87,9 +87,9 @@ openclaw gateway stop
 ```bash
 # 如果你使用配置文件或自定义位置，请调整路径
 cd ~
-tar -czf openclaw-state.tgz .openclaw
+tar -czf openclaw-state.tgz .openclawcn
 
-tar -czf openclaw-workspace.tgz .openclaw/workspace
+tar -czf openclaw-workspace.tgz .openclawcn/workspace
 ```
 
 如果你有多个配置文件/状态目录（例如 `~/.openclaw-main`、`~/.openclaw-work`），分别归档每个。
@@ -100,14 +100,14 @@ tar -czf openclaw-workspace.tgz .openclaw/workspace
 
 - 参见：[安装](/install)
 
-在这个阶段，如果新手引导创建了一个新的 `~/.openclaw/` 也没关系 — 你将在下一步覆盖它。
+在这个阶段，如果新手引导创建了一个新的 `~/.openclawcn/` 也没关系 — 你将在下一步覆盖它。
 
 ### 步骤 2 — 将状态目录 + 工作区复制到新机器
 
 复制**两者**：
 
-- `$OPENCLAW_STATE_DIR`（默认 `~/.openclaw/`）
-- 你的工作区（默认 `~/.openclaw/workspace/`）
+- `$OPENCLAW_STATE_DIR`（默认 `~/.openclawcn/`）
+- 你的工作区（默认 `~/.openclawcn/workspace/`）
 
 常见方法：
 
@@ -117,7 +117,7 @@ tar -czf openclaw-workspace.tgz .openclaw/workspace
 
 复制后，确保：
 
-- 包含了隐藏目录（例如 `.openclaw/`）
+- 包含了隐藏目录（例如 `.openclawcn/`）
 - 文件所有权对于运行 Gateway 网关的用户是正确的
 
 ### 步骤 3 — 运行 Doctor（迁移 + 服务修复）

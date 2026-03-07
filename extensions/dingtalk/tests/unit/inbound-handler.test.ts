@@ -71,7 +71,7 @@ function buildRuntime() {
       },
       media: {
         saveMediaBuffer: vi.fn().mockResolvedValue({
-          path: "/tmp/.openclaw/media/inbound/test-file.png",
+          path: "/tmp/.openclawcn/media/inbound/test-file.png",
           contentType: "image/png",
         }),
       },
@@ -138,7 +138,7 @@ describe("inbound-handler", () => {
 
     expect(result).toBeTruthy();
     expect(result?.mimeType).toBe("image/png");
-    expect(result?.path).toContain("/.openclaw/media/inbound/");
+    expect(result?.path).toContain("/.openclawcn/media/inbound/");
   });
 
   it("downloadMedia returns null when robotCode missing", async () => {

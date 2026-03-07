@@ -15,7 +15,7 @@ x-i18n:
 
 # `openclaw setup`
 
-初始化 `~/.openclaw/openclaw.json` 和智能体工作区。
+初始化 `~/.openclawcn/openclaw.json` 和智能体工作区。
 
 相关内容：
 
@@ -26,7 +26,7 @@ x-i18n:
 
 ```bash
 openclaw setup
-openclaw setup --workspace ~/.openclaw/workspace
+openclaw setup --workspace ~/.openclawcn/workspace
 ```
 
 通过 setup 运行向导：

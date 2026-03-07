@@ -22,7 +22,7 @@ openclaw acp
 openclaw acp --url wss://gateway-host:28789 --token <token>
 
 # Remote Gateway (token from file)
-openclaw acp --url wss://gateway-host:18789 --token-file ~/.openclaw/gateway.token
+openclaw acp --url wss://gateway-host:18789 --token-file ~/.openclawcn/gateway.token
 
 # Attach to an existing session key
 openclaw acp --session agent:main:main
@@ -46,7 +46,7 @@ openclaw acp client
 openclaw acp client --server-args --url wss://gateway-host:28789 --token <token>
 
 # Remote Gateway (token from file)
-openclaw acp client --server-args --url wss://gateway-host:28789 --token-file ~/.openclaw/gateway.token
+openclaw acp client --server-args --url wss://gateway-host:28789 --token-file ~/.openclawcn/gateway.token
 
 # Override the server command (default: openclaw)
 openclaw acp client --server "node" --server-args openclaw.mjs acp --url ws://127.0.0.1:19001
@@ -80,7 +80,7 @@ Example direct run (no config write):
 ```bash
 openclaw acp --url wss://gateway-host:28789 --token <token>
 # preferred for local process safety
-openclaw acp --url wss://gateway-host:28789 --token-file ~/.openclaw/gateway.token
+openclaw acp --url wss://gateway-host:28789 --token-file ~/.openclawcn/gateway.token
 ```
 
 ## Selecting agents

@@ -94,7 +94,7 @@ exec ssh -T gateway-host imsg "$@"
   channels: {
     imessage: {
       enabled: true,
-      cliPath: "~/.openclaw/scripts/imsg-ssh",
+      cliPath: "~/.openclawcn/scripts/imsg-ssh",
       remoteHost: "user@gateway-host", // used for SCP attachment fetches
       includeAttachments: true,
       // Optional: override allowed attachment roots.
@@ -217,7 +217,7 @@ imsg send <handle> "test"
   channels: {
     imessage: {
       enabled: true,
-      cliPath: "~/.openclaw/scripts/imsg-ssh",
+      cliPath: "~/.openclawcn/scripts/imsg-ssh",
       remoteHost: "bot@mac-mini.tailnet-1234.ts.net",
       includeAttachments: true,
       dbPath: "/Users/bot/Library/Messages/chat.db",

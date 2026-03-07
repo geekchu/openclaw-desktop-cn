@@ -523,7 +523,7 @@ import { ... } from "@mariozechner/pi-tui";
 | 调用方式 | `pi` 命令 / RPC         | 通过 `createAgentSession()` 的 SDK                                                              |
 | 工具     | 默认编码工具            | 自定义 OpenClaw 工具套件                                                                        |
 | 系统提示 | AGENTS.md + prompts     | 按渠道/上下文动态生成                                                                           |
-| 会话存储 | `~/.pi/agent/sessions/` | `~/.openclaw/agents/<agentId>/sessions/`（或 `$OPENCLAW_STATE_DIR/agents/<agentId>/sessions/`） |
+| 会话存储 | `~/.pi/agent/sessions/` | `~/.openclawcn/agents/<agentId>/sessions/`（或 `$OPENCLAW_STATE_DIR/agents/<agentId>/sessions/`） |
 | 认证     | 单一凭证                | 带轮换的多配置文件                                                                              |
 | 扩展     | 从磁盘加载              | 编程方式 + 磁盘路径                                                                             |
 | 事件处理 | TUI 渲染                | 基于回调（onBlockReply 等）                                                                     |

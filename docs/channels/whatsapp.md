@@ -349,9 +349,9 @@ Behavior notes:
   </Accordion>
 
   <Accordion title="Credential paths and legacy compatibility">
-    - current auth path: `~/.openclaw/credentials/whatsapp/<accountId>/creds.json`
+    - current auth path: `~/.openclawcn/credentials/whatsapp/<accountId>/creds.json`
     - backup file: `creds.json.bak`
-    - legacy default auth in `~/.openclaw/credentials/` is still recognized/migrated for default-account flows
+    - legacy default auth in `~/.openclawcn/credentials/` is still recognized/migrated for default-account flows
   </Accordion>
 
   <Accordion title="Logout behavior">

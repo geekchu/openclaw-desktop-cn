@@ -98,13 +98,13 @@ OpenClaw 按顺序扫描：
 
 2. 工作区扩展
 
-- `<workspace>/.openclaw/extensions/*.ts`
-- `<workspace>/.openclaw/extensions/*/index.ts`
+- `<workspace>/.openclawcn/extensions/*.ts`
+- `<workspace>/.openclawcn/extensions/*/index.ts`
 
 3. 全局扩展
 
-- `~/.openclaw/extensions/*.ts`
-- `~/.openclaw/extensions/*/index.ts`
+- `~/.openclawcn/extensions/*.ts`
+- `~/.openclawcn/extensions/*/index.ts`
 
 4. 捆绑扩展（随 OpenClaw 一起发布，**默认禁用**）
 
@@ -165,9 +165,9 @@ OpenClaw 按顺序扫描：
 
 OpenClaw 还可以合并**外部渠道目录**（例如，MPM 注册表导出）。将 JSON 文件放在以下位置之一：
 
-- `~/.openclaw/mpm/plugins.json`
-- `~/.openclaw/mpm/catalog.json`
-- `~/.openclaw/plugins/catalog.json`
+- `~/.openclawcn/mpm/plugins.json`
+- `~/.openclawcn/mpm/catalog.json`
+- `~/.openclawcn/plugins/catalog.json`
 
 或将 `OPENCLAW_PLUGIN_CATALOG_PATHS`（或 `OPENCLAW_MPM_CATALOG_PATHS`）指向一个或多个 JSON 文件（逗号/分号/`PATH` 分隔）。每个文件应包含 `{ "entries": [ { "name": "@scope/pkg", "openclaw": { "channel": {...}, "install": {...} } } ] }`。
 
@@ -266,7 +266,7 @@ OpenClaw 在运行时根据发现的插件增强 `uiHints`：
 ```bash
 openclaw plugins list
 openclaw plugins info <id>
-openclaw plugins install <path>                 # copy a local file/dir into ~/.openclaw/extensions/<id>
+openclaw plugins install <path>                 # copy a local file/dir into ~/.openclawcn/extensions/<id>
 openclaw plugins install ./extensions/voice-call # relative path ok
 openclaw plugins install ./plugin.tgz           # install from a local tarball
 openclaw plugins install ./plugin.zip           # install from a local zip
@@ -606,7 +606,7 @@ export default function (api) {
 
 - 插件 `package.json` 必须包含带有一个或多个入口文件的 `openclaw.extensions`。
 - 入口文件可以是 `.js` 或 `.ts`（jiti 在运行时加载 TS）。
-- `openclaw plugins install <npm-spec>` 使用 `npm pack`，提取到 `~/.openclaw/extensions/<id>/`，并在配置中启用它。
+- `openclaw plugins install <npm-spec>` 使用 `npm pack`，提取到 `~/.openclawcn/extensions/<id>/`，并在配置中启用它。
 - 配置键稳定性：作用域包被规范化为 `plugins.entries.*` 的**无作用域** id。
 
 ## 示例插件：Voice Call

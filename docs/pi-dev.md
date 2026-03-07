@@ -61,7 +61,7 @@ For tool call behavior, prompt for a `read` or `exec` action so you can see tool
 
 ## Clean Slate Reset
 
-State lives under the OpenClaw state directory. Default is `~/.openclaw`. If `OPENCLAW_STATE_DIR` is set, use that directory instead.
+State lives under the OpenClaw state directory. Default is `~/.openclawcn`. If `OPENCLAW_STATE_DIR` is set, use that directory instead.
 
 To reset everything:
 

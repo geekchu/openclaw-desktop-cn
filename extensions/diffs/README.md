@@ -67,7 +67,7 @@ Input safety limits:
 
 ## Plugin Defaults
 
-Set plugin-wide defaults in `~/.openclaw/openclaw.json`:
+Set plugin-wide defaults in `~/.openclawcn/openclaw.json`:
 
 ```json5
 {

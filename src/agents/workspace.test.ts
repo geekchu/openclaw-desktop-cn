@@ -25,11 +25,11 @@ describe("resolveDefaultAgentWorkspaceDir", () => {
       HOME: "/home/other",
     } as NodeJS.ProcessEnv);
 
-    expect(dir).toBe(path.join(path.resolve("/srv/openclaw-home"), ".openclaw", "workspace"));
+    expect(dir).toBe(path.join(path.resolve("/srv/openclaw-home"), ".openclawcn", "workspace"));
   });
 });
 
-const WORKSPACE_STATE_PATH_SEGMENTS = [".openclaw", "workspace-state.json"] as const;
+const WORKSPACE_STATE_PATH_SEGMENTS = [".openclawcn", "workspace-state.json"] as const;
 
 async function readOnboardingState(dir: string): Promise<{
   version: number;

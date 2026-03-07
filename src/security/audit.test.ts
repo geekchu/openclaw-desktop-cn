@@ -1879,7 +1879,7 @@ description: test skill
         "channels.discord.guilds.123.channels.general.users:security-team",
       );
       expect(finding?.detail).toContain(
-        "~/.openclaw/credentials/discord-allowFrom.json:team.owner",
+        "~/.openclawcn/credentials/discord-allowFrom.json:team.owner",
       );
       expect(finding?.detail).not.toContain("<@123456789012345678>");
     });
@@ -2451,8 +2451,8 @@ description: test skill
     const cfg: OpenClawConfig = {};
 
     const res = await audit(cfg, {
-      stateDir: "/Users/test/Dropbox/.openclaw",
-      configPath: "/Users/test/Dropbox/.openclaw/openclaw.json",
+      stateDir: "/Users/test/Dropbox/.openclawcn",
+      configPath: "/Users/test/Dropbox/.openclawcn/openclaw.json",
     });
 
     expectFinding(res, "fs.synced_dir", "warn");
