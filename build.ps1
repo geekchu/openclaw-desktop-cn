@@ -23,6 +23,7 @@ Set-Location -Path ".."
 
 Write-Host "[OpenClaw Build] Starting pnpm installer:build..." -ForegroundColor Cyan
 
+$env:BUILD_CONFIG = "release"
 # Run the build
 pnpm installer:build
 

@@ -30,10 +30,10 @@
                                         └───────────────────────────────────┘
 
 构建机器 (Windows / macOS)                         更新服务器 (47.57.241.17)
-┌──────────────────┐   scp 上传产物 + latest.json   ┌───────────────────────┐
-│ pnpm installer:  │ ─────────────────────────────→ │ /var/www/             │
-│   build          │   publish-update.sh            │   openclaw-update/    │
-└──────────────────┘                                └───────────────────────┘
+┌──────────────────┐   paramiko 上传产物 + latest.json  ┌───────────────────────┐
+│ pnpm installer:  │ ─────────────────────────────────→ │ /var/www/             │
+│   build          │   publish-update.py                │   openclaw-update/    │
+└──────────────────┘                                    └───────────────────────┘
                                                       ↓ latest.json (元数据)
                                                     openclawcn.net/update/
                                                       ↓ 安装包文件
@@ -63,15 +63,14 @@
 | pnpm                 | 最新     | `npm install -g pnpm`                    |
 | Rust (rustc + cargo) | stable   | https://rustup.rs/                       |
 | cargo-tauri          | 2.x      | `cargo install tauri-cli --version "^2"` |
-| jq (原生版)          | 任意     | 发布脚本需要，见下方说明                 |
+| Python 3             | >= 3.7   | 发布脚本需要                             |
+| paramiko (Python 包) | 最新     | `pip install paramiko`                   |
 
 **Windows 额外说明：**
 
 - NSIS 由 Tauri 自动下载，无需手动安装
-- 推荐使用 Git Bash 运行发布脚本（`publish-update.sh` 需要 bash 4+ 的关联数组）
-- ⚠️ **jq 必须安装原生版本**，npm 的 `jq` 包不可用。下载地址：https://github.com/jqlang/jq/releases
-  将 `jq-windows-amd64.exe` 重命名为 `jq.exe` 放入 PATH 目录（如 Git Bash 的 `/usr/bin/`）
 - `.npmrc` 中已配置 `registry=https://registry.npmmirror.com` 加速 npm 下载
+- 发布脚本使用 Python + paramiko，无需 jq 或 bash 4+
 
 ### 2. minisign 签名密钥
 
@@ -172,20 +171,21 @@ git push && git push --tags
 1. **直接双击** 项目根目录下的 `build.bat`。
 2. 或在 PowerShell/Terminal 中执行 `.\build.ps1`。
 
-> 💡 **提示**：这几个脚本会自动从 `~/.tauri/openclaw.key` 读取私钥设置环境变量，并自带 `cargo clean` 机制以确保产物完全无幽灵缓存。
+> 💡 **提示**：这几个脚本会自动设置 `BUILD_CONFIG=release` 环境变量（触发极速单文件后端打包优化），并从 `~/.tauri/openclaw.key` 读取私钥设置环境变量，同时自带 `cargo clean` 机制以确保产物完全无幽灵缓存。
 
 #### macOS（在 Mac 机器上执行）
 
 ```bash
-# 设置签名环境变量
+# 设置签名环境变量及打包优化变量
 export TAURI_SIGNING_PRIVATE_KEY=$(cat ~/.tauri/openclaw.key)
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="123"
+export BUILD_CONFIG="release"
 
 # 构建
 pnpm installer:build
 ```
 
-**构建脚本自动完成：** 环境检查 → `pnpm install` → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 Vite UI 构建 + gateway-bundle 打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
+**构建脚本自动完成：** 环境检查 → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 Vite UI 构建 + `esbuild` 极速单文件 `gateway-bundle` 打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
 
 > ⚠️ **首次构建或修改前端代码/配置后**，建议先清除 Cargo 编译缓存再构建：
 >
@@ -215,26 +215,30 @@ pnpm installer:build
 
 ### 步骤 4：发布到更新服务器
 
-在 Windows 上需要在 Git Bash 中运行（脚本依赖 bash 4+ 关联数组和 `jq`）。
-
 #### 方式 A：使用脚本（推荐）
 
 ```bash
-# Windows 下先确保原生 jq 在 PATH 中（如果已配好可跳过）
-export PATH="/c/Users/$USERNAME/AppData/Local/Microsoft/WinGet/Packages:$PATH"
+# 如未安装 paramiko，先安装
+pip install paramiko
 
-bash scripts/publish-update.sh 0.3.0 root@47.57.241.17
+# 发布（会交互式输入 SSH 密码，只需输一次）
+python scripts/publish-update.py 0.3.0
+```
+
+也可通过环境变量传入密码（CI 场景）：
+
+```bash
+DEPLOY_SSH_PASSWORD=xxx python scripts/publish-update.py 0.3.0
 ```
 
 脚本自动完成：
 
 1. 扫描 `src-tauri/target/release/bundle/` 下各平台的安装包和 `.sig` 文件
-2. 从服务器获取现有的 `latest.json`，如果版本号相同则**合并**平台条目（不会覆盖其他平台）
-3. 读取 `.sig` 签名内容，生成/更新 `latest.json`
-4. 通过 `scp` 上传安装包到服务器 `/var/www/openclaw-update/artifacts/`
-5. 上传 `latest.json` 到服务器 `/var/www/openclaw-update/`
+2. 通过 HTTPS 获取服务器现有的 `latest.json`，如果版本号相同则**合并**平台条目（不会覆盖其他平台）
+3. 读取 `.sig` 签名内容，生成/更新 `latest.json`（纯 Python，不依赖 jq）
+4. paramiko 单连接：mkdir → sftp 上传所有产物 → sftp 上传 latest.json
 
-> **跨平台发布时**，可以在各自机器上分别运行 `publish-update.sh`（版本号保持一致），
+> **跨平台发布时**，可以在各自机器上分别运行 `publish-update.py`（版本号保持一致），
 > 脚本会自动合并已有的平台条目。例如：先在 Windows 上发布（写入 `windows-x86_64`），
 > 再在 macOS 上发布（追加 `darwin-aarch64`，保留 `windows-x86_64`）。
 
@@ -443,7 +447,7 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 
 > macOS 当前仅发布 Apple Silicon (aarch64) 版本。Intel Mac 用户需手动下载安装。
 > 如需支持 Intel Mac，可构建 universal binary（`cargo tauri build --target universal-apple-darwin`），
-> 然后在 `publish-update.sh` 中同时添加 `darwin-x86_64` 条目。
+> 然后在 `publish-update.py` 中同时添加 `darwin-x86_64` 条目。
 
 ---
 
@@ -540,11 +544,11 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 
 ### 发布相关
 
-| 问题                                                    | 原因                                     | 解决                                          |
-| ------------------------------------------------------- | ---------------------------------------- | --------------------------------------------- |
-| `publish-update.sh` 报 `declare -A: not found`          | bash 版本过低                            | 使用 Git Bash（自带 bash 4+）                 |
-| `jq: command not found` 或 `Cannot find module 'async'` | 未安装原生 jq，或 npm 的 jq 包拦截了命令 | 下载原生 jq.exe 放入 PATH，确保在 npm jq 之前 |
-| scp 上传失败                                            | SSH 密钥未配置                           | 配置 SSH 密钥或使用密码                       |
+| 问题                                              | 原因                   | 解决                                            |
+| ------------------------------------------------- | ---------------------- | ----------------------------------------------- |
+| `ModuleNotFoundError: No module named 'paramiko'` | 未安装 paramiko        | `pip install paramiko`                          |
+| SSH 连接超时                                      | 网络不通或服务器防火墙 | 检查网络，确认 22 端口可达                      |
+| 上传中文文件名乱码                                | 终端编码问题           | Python + paramiko SFTP 不受此影响，正常使用即可 |
 
 ### 客户端更新相关
 
@@ -597,12 +601,12 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### 发布脚本
 
-| 文件                             | 用途                                           |
-| -------------------------------- | ---------------------------------------------- |
-| `scripts/publish-update.sh`      | 一键发布（收集产物→生成 latest.json→scp 上传） |
-| `scripts/setup-update-server.sh` | 服务器目录初始化（一次性）                     |
-| `scripts/deploy-update-nginx.sh` | 服务器 Nginx 配置部署（一次性）                |
-| `scripts/deploy-cdn-nginx.sh`    | CDN 子域名 Nginx 配置 + SSL（一次性）          |
+| 文件                             | 用途                                                |
+| -------------------------------- | --------------------------------------------------- |
+| `scripts/publish-update.py`      | 一键发布（收集产物→生成 latest.json→paramiko 上传） |
+| `scripts/setup-update-server.sh` | 服务器目录初始化（一次性）                          |
+| `scripts/deploy-update-nginx.sh` | 服务器 Nginx 配置部署（一次性）                     |
+| `scripts/deploy-cdn-nginx.sh`    | CDN 子域名 Nginx 配置 + SSL（一次性）               |
 
 ### 前端代码
 

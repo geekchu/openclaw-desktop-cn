@@ -26,6 +26,7 @@ cd ..
 
 echo [OpenClaw Build] Starting pnpm installer:build...
 
+set BUILD_CONFIG=release
 call pnpm installer:build
 
 if %errorlevel% neq 0 (
