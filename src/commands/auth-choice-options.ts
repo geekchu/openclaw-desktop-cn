@@ -156,6 +156,12 @@ const AUTH_CHOICE_GROUP_DEFS: {
     choices: ["together-api-key"],
   },
   {
+    value: "huggingface",
+    label: "Hugging Face",
+    hint: "Inference Providers (API key)",
+    choices: ["huggingface-api-key"],
+  },
+  {
     value: "venice",
     label: "Venice AI",
     hint: "Privacy-focused (uncensored models)",

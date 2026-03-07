@@ -12,6 +12,7 @@ import {
   applyTestPluginDefaults,
   normalizePluginsConfig,
   resolveEffectiveEnableState,
+  resolveEnableState,
   resolveMemorySlotDecision,
   type NormalizedPluginsConfig,
 } from "./config-state.js";

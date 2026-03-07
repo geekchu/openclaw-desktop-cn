@@ -397,7 +397,7 @@ export function createOpenClawCodingTools(options?: {
     }
     return [
       workspaceOnly
-        ? wrapToolWorkspaceRootGuard(tool, workspaceRoot, fsConfig.allowedDirs, selfProtectDirs)
+        ? wrapToolWorkspaceRootGuard(tool, workspaceRoot, undefined, selfProtectDirs)
         : tool,
     ];
   });
@@ -452,7 +452,7 @@ export function createOpenClawCodingTools(options?: {
               ? { root: sandboxRoot, bridge: sandboxFsBridge! }
               : undefined,
           workspaceOnly: applyPatchWorkspaceOnly,
-          allowedDirs: fsConfig.allowedDirs,
+          allowedDirs: undefined,
         });
   const tools: AnyAgentTool[] = [
     ...base,
@@ -486,7 +486,7 @@ export function createOpenClawCodingTools(options?: {
             ? wrapToolWorkspaceRootGuard(
                 applyPatchTool as unknown as AnyAgentTool,
                 workspaceRoot,
-                fsConfig.allowedDirs,
+                undefined,
                 selfProtectDirs,
               )
             : (applyPatchTool as unknown as AnyAgentTool),
@@ -498,7 +498,7 @@ export function createOpenClawCodingTools(options?: {
             ? wrapExecToolPathGuard(
                 execTool as unknown as AnyAgentTool,
                 workspaceRoot,
-                fsConfig.allowedDirs,
+                undefined,
                 selfProtectDirs,
               )
             : (execTool as unknown as AnyAgentTool),

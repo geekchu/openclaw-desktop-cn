@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Command } from "commander";
 import { describe, expect, it, vi } from "vitest";
+import { type GatewayBonjourBeacon } from "../infra/bonjour-discovery.js";
 
 const callGateway = vi.fn(async () => ({ ok: true }));
 const startGatewayServer = vi.fn(async () => ({
@@ -54,13 +56,13 @@ async function withEnvOverride<T>(
 vi.mock(
   new URL("../../gateway/call.ts", new URL("./gateway-cli/call.ts", import.meta.url)).href,
   () => ({
-    callGateway: (opts: unknown) => callGateway(opts),
+    callGateway: () => callGateway(),
     randomIdempotencyKey: () => "rk_test",
   }),
 );
 
 vi.mock("../gateway/server.js", () => ({
-  startGatewayServer: (port: number, opts?: unknown) => startGatewayServer(port, opts),
+  startGatewayServer: () => startGatewayServer(),
 }));
 
 vi.mock("../globals.js", () => ({
@@ -74,7 +76,7 @@ vi.mock("../runtime.js", () => ({
 }));
 
 vi.mock("./ports.js", () => ({
-  forceFreePortAndWait: (port: number) => forceFreePortAndWait(port),
+  forceFreePortAndWait: () => forceFreePortAndWait(),
 }));
 
 vi.mock("../daemon/service.js", () => ({
@@ -99,11 +101,11 @@ vi.mock("../daemon/program-args.js", () => ({
 }));
 
 vi.mock("../infra/bonjour-discovery.js", () => ({
-  discoverGatewayBeacons: (opts: unknown) => discoverGatewayBeacons(opts),
+  discoverGatewayBeacons: () => discoverGatewayBeacons(),
 }));
 
 vi.mock("../commands/gateway-status.js", () => ({
-  gatewayStatusCommand: (opts: unknown) => gatewayStatusCommand(opts),
+  gatewayStatusCommand: () => gatewayStatusCommand(),
 }));
 
 describe("gateway-cli coverage", () => {
@@ -154,8 +156,8 @@ describe("gateway-cli coverage", () => {
         tailnetDns: "studio.tailnet.ts.net",
         gatewayPort: 28789,
         sshPort: 22,
-      },
-    ]);
+      } as GatewayBonjourBeacon,
+    ] as any);
 
     const { registerGatewayCli } = await import("./gateway-cli.js");
     const program = new Command();
@@ -186,8 +188,8 @@ describe("gateway-cli coverage", () => {
         tailnetDns: "studio.tailnet.ts.net",
         gatewayPort: 28789,
         sshPort: 22,
-      },
-    ]);
+      } as GatewayBonjourBeacon,
+    ] as any);
 
     const { registerGatewayCli } = await import("./gateway-cli.js");
     const program = new Command();

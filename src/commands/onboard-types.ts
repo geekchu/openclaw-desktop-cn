@@ -23,6 +23,7 @@ export type AuthChoice =
   | "synthetic-api-key"
   | "venice-api-key"
   | "together-api-key"
+  | "huggingface-api-key"
   | "codex-cli"
   | "apiKey"
   | "gemini-api-key"
@@ -72,6 +73,7 @@ export type AuthChoiceGroupId =
   | "mistral"
   | "qwen"
   | "together"
+  | "huggingface"
   | "qianfan"
   | "xai"
   | "volcengine"
@@ -127,6 +129,7 @@ export type OnboardOptions = {
   syntheticApiKey?: string;
   veniceApiKey?: string;
   togetherApiKey?: string;
+  huggingfaceApiKey?: string;
   opencodeZenApiKey?: string;
   xaiApiKey?: string;
   volcengineApiKey?: string;

@@ -112,6 +112,7 @@ describe("getHealthSnapshot", () => {
     setActivePluginRegistry(
       createTestRegistry([{ pluginId: "telegram", plugin: telegramPlugin, source: "test" }]),
     );
+    // @ts-expect-error: PluginRuntime mock mismatch
     setTelegramRuntime(createPluginRuntime());
   });
 

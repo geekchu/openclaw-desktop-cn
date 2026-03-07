@@ -1,16 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeEnv } from "../runtime.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
-import type { AuthChoice } from "./onboard-types.js";
 import { applyAuthChoice, resolvePreferredProviderForAuthChoice } from "./auth-choice.js";
 import {
   MINIMAX_CN_API_BASE_URL,
   ZAI_CODING_CN_BASE_URL,
   ZAI_CODING_GLOBAL_BASE_URL,
 } from "./onboard-auth.js";
+import type { AuthChoice } from "./onboard-types.js";
 
 vi.mock("../providers/github-copilot-auth.js", () => ({
   githubCopilotLoginCommand: vi.fn(async () => {}),
@@ -354,7 +355,7 @@ describe("applyAuthChoice", () => {
       expect.objectContaining({ message: "Select Z.AI endpoint", initialValue: "global" }),
     );
     expect(result.config.models?.providers?.zai?.baseUrl).toBe(ZAI_CODING_CN_BASE_URL);
-    expect(result.config.agents?.defaults?.model?.primary).toBe("zai/glm-5");
+    expect((result.config.agents?.defaults?.model as any)?.primary).toBe("zai/glm-5");
 
     const authProfilePath = authProfilePathFor(requireAgentDir());
     const raw = await fs.readFile(authProfilePath, "utf8");
@@ -448,7 +449,7 @@ describe("applyAuthChoice", () => {
       provider: "xai",
       mode: "api_key",
     });
-    expect(result.config.agents?.defaults?.model?.primary).toBe("openai/gpt-4o-mini");
+    expect((result.config.agents?.defaults?.model as any)?.primary).toBe("openai/gpt-4o-mini");
     expect(result.agentModelOverride).toBe("xai/grok-4");
 
     const authProfilePath = authProfilePathFor(requireAgentDir());
@@ -501,12 +502,12 @@ describe("applyAuthChoice", () => {
         setDefaultModel: true,
       });
 
-      expect(result.config.agents?.defaults?.model?.primary).toBe("github-copilot/gpt-4o");
+      expect((result.config.agents?.defaults?.model as any)?.primary).toBe("github-copilot/gpt-4o");
     } finally {
       if (previousIsTTYDescriptor) {
         Object.defineProperty(stdin, "isTTY", previousIsTTYDescriptor);
       } else if (!hadOwnIsTTY) {
-        delete stdin.isTTY;
+        delete (stdin as any).isTTY;
       }
     }
   });
@@ -557,7 +558,9 @@ describe("applyAuthChoice", () => {
     expect(text).toHaveBeenCalledWith(
       expect.objectContaining({ message: "Enter OpenCode Zen API key" }),
     );
-    expect(result.config.agents?.defaults?.model?.primary).toBe("anthropic/claude-opus-4-5");
+    expect((result.config.agents?.defaults?.model as any)?.primary).toBe(
+      "anthropic/claude-opus-4-5",
+    );
     expect(result.config.models?.providers?.["opencode-zen"]).toBeUndefined();
     expect(result.agentModelOverride).toBe("opencode/claude-opus-4-6");
   });
@@ -707,7 +710,7 @@ describe("applyAuthChoice", () => {
       provider: "openrouter",
       mode: "api_key",
     });
-    expect(result.config.agents?.defaults?.model?.primary).toBe("openrouter/auto");
+    expect((result.config.agents?.defaults?.model as any)?.primary).toBe("openrouter/auto");
 
     const authProfilePath = authProfilePathFor(requireAgentDir());
     const raw = await fs.readFile(authProfilePath, "utf8");
@@ -858,7 +861,7 @@ describe("applyAuthChoice", () => {
       provider: "vercel-ai-gateway",
       mode: "api_key",
     });
-    expect(result.config.agents?.defaults?.model?.primary).toBe(
+    expect((result.config.agents?.defaults?.model as any)?.primary).toBe(
       "vercel-ai-gateway/anthropic/claude-opus-4.6",
     );
 
@@ -924,7 +927,7 @@ describe("applyAuthChoice", () => {
       provider: "cloudflare-ai-gateway",
       mode: "api_key",
     });
-    expect(result.config.agents?.defaults?.model?.primary).toBe(
+    expect((result.config.agents?.defaults?.model as any)?.primary).toBe(
       "cloudflare-ai-gateway/claude-sonnet-4-5",
     );
 
@@ -981,7 +984,7 @@ describe("applyAuthChoice", () => {
     };
     const text: WizardPrompter["text"] = vi.fn(async (params) => {
       if (params.message === "Paste the redirect URL") {
-        const lastLog = runtime.log.mock.calls.at(-1)?.[0];
+        const lastLog = (runtime.log as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
         const urlLine = typeof lastLog === "string" ? lastLog : String(lastLog ?? "");
         const urlMatch = urlLine.match(/https?:\/\/\S+/)?.[0] ?? "";
         const state = urlMatch ? new URL(urlMatch).searchParams.get("state") : null;
@@ -1047,7 +1050,7 @@ describe("applyAuthChoice", () => {
     process.env.OPENCLAW_AGENT_DIR = path.join(tempStateDir, "agent");
     process.env.PI_CODING_AGENT_DIR = process.env.OPENCLAW_AGENT_DIR;
 
-    resolvePluginProviders.mockReturnValue([
+    (resolvePluginProviders as any).mockReturnValue([
       {
         id: "qwen-portal",
         label: "Qwen",
@@ -1086,7 +1089,7 @@ describe("applyAuthChoice", () => {
           },
         ],
       },
-    ]);
+    ] as any[]);
 
     const prompter: WizardPrompter = {
       intro: vi.fn(noopAsync),
@@ -1107,7 +1110,7 @@ describe("applyAuthChoice", () => {
     };
 
     const result = await applyAuthChoice({
-      authChoice: "qwen-portal",
+      authChoice: "qwen-portal" as AuthChoice,
       config: {},
       prompter,
       runtime,
@@ -1118,7 +1121,7 @@ describe("applyAuthChoice", () => {
       provider: "qwen-portal",
       mode: "oauth",
     });
-    expect(result.config.agents?.defaults?.model?.primary).toBe("qwen-portal/coder-model");
+    expect((result.config.agents?.defaults?.model as any)?.primary).toBe("qwen-portal/coder-model");
     expect(result.config.models?.providers?.["qwen-portal"]).toMatchObject({
       baseUrl: "https://portal.qwen.ai/v1",
       apiKey: "qwen-oauth",
@@ -1142,7 +1145,7 @@ describe("applyAuthChoice", () => {
     process.env.OPENCLAW_AGENT_DIR = path.join(tempStateDir, "agent");
     process.env.PI_CODING_AGENT_DIR = process.env.OPENCLAW_AGENT_DIR;
 
-    resolvePluginProviders.mockReturnValue([
+    (resolvePluginProviders as any).mockReturnValue([
       {
         id: "minimax-portal",
         label: "MiniMax",
@@ -1181,7 +1184,7 @@ describe("applyAuthChoice", () => {
           },
         ],
       },
-    ]);
+    ] as any[]);
 
     const prompter: WizardPrompter = {
       intro: vi.fn(noopAsync),
@@ -1202,7 +1205,7 @@ describe("applyAuthChoice", () => {
     };
 
     const result = await applyAuthChoice({
-      authChoice: "minimax-portal",
+      authChoice: "minimax-portal" as AuthChoice,
       config: {},
       prompter,
       runtime,
@@ -1213,7 +1216,9 @@ describe("applyAuthChoice", () => {
       provider: "minimax-portal",
       mode: "oauth",
     });
-    expect(result.config.agents?.defaults?.model?.primary).toBe("minimax-portal/MiniMax-M2.1");
+    expect((result.config.agents?.defaults?.model as any)?.primary).toBe(
+      "minimax-portal/MiniMax-M2.1",
+    );
     expect(result.config.models?.providers?.["minimax-portal"]).toMatchObject({
       baseUrl: "https://api.minimax.io/anthropic",
       apiKey: "minimax-oauth",
