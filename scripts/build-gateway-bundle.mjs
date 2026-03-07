@@ -118,8 +118,11 @@ for (const target of copyTargets) {
         execSync(`robocopy "${srcDir}" "${dstDir}" /E /NFL /NDL /NJH /NJS /NP`, {
           windowsHide: true,
         });
-      } catch {
-        /* robocopy exit codes */
+      } catch (err) {
+        // robocopy exit codes: 0-7 = success (bitmask), >=8 = error
+        if (err.status >= 8) {
+          throw err;
+        }
       }
     } else {
       execSync(`cp -R "${srcDir}" "${dstDir}"`);
