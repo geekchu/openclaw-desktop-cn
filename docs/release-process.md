@@ -189,8 +189,9 @@ pnpm installer:build
 
 > ⚠️ **首次构建或修改前端代码/配置后**，建议先清除 Cargo 编译缓存再构建：
 >
-> ```powershell
+> ```bash
 > cd src-tauri; cargo clean; cd ..
+> export BUILD_CONFIG="release"
 > pnpm installer:build
 > ```
 >
