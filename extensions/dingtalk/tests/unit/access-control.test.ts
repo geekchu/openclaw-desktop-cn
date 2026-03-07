@@ -3,7 +3,7 @@ import {
   isSenderAllowed,
   isSenderGroupAllowed,
   normalizeAllowFrom,
-} from "../../src/access-control";
+} from "../../src/access-control.js";
 
 describe("access-control", () => {
   it("normalizes allowFrom entries and strips dingtalk prefixes", () => {

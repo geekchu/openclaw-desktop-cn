@@ -15,7 +15,7 @@ vi.mock("axios", () => {
   };
 });
 
-import { getAccessToken } from "../../src/auth";
+import { getAccessToken } from "../../src/auth.js";
 import {
   cleanupCardCache,
   createAICard,
@@ -24,8 +24,8 @@ import {
   getActiveCardIdByTarget,
   getCardById,
   streamAICard,
-} from "../../src/card-service";
-import { AICardStatus } from "../../src/types";
+} from "../../src/card-service.js";
+import { AICardStatus } from "../../src/types.js";
 
 const mockedAxios = axios as any;
 const mockedGetAccessToken = vi.mocked(getAccessToken);

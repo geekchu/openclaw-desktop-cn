@@ -524,7 +524,7 @@ async function processMessageWithPipeline(params: {
     cfg: config,
     dispatcherOptions: {
       ...prefixOptions,
-      deliver: async (payload) => {
+      deliver: async (payload: any) => {
         await deliverZaloReply({
           payload,
           token,

@@ -8,12 +8,12 @@ vi.mock("openclaw/plugin-sdk", () => ({
 describe("runtime + peer registry + index plugin", () => {
   beforeEach(async () => {
     vi.resetModules();
-    const peer = await import("../../src/peer-id-registry");
+    const peer = await import("../../src/peer-id-registry.js");
     peer.clearPeerIdRegistry();
   });
 
   it("runtime getter throws before initialization and returns assigned runtime later", async () => {
-    const runtime = await import("../../src/runtime");
+    const runtime = await import("../../src/runtime.js");
 
     expect(() => runtime.getDingTalkRuntime()).toThrow("DingTalk runtime not initialized");
 
@@ -24,7 +24,7 @@ describe("runtime + peer registry + index plugin", () => {
   });
 
   it("peer id registry preserves original case by lowercased key", async () => {
-    const peer = await import("../../src/peer-id-registry");
+    const peer = await import("../../src/peer-id-registry.js");
 
     peer.registerPeerId("CidAbC+123");
 
@@ -36,15 +36,15 @@ describe("runtime + peer registry + index plugin", () => {
   });
 
   it("index plugin register wires runtime and channel registration", async () => {
-    const runtimeModule = await import("../../src/runtime");
+    const runtimeModule = await import("../../src/runtime.js");
     const runtimeSpy = vi.spyOn(runtimeModule, "setDingTalkRuntime");
 
-    const plugin = (await import("../../index")).default;
+    const plugin = (await import("../../index.js")).default;
 
     const registerChannel = vi.fn();
     const runtime = { id: "runtime1" } as any;
 
-    plugin.register({ runtime, registerChannel } as any);
+    (plugin as any).register({ runtime, registerChannel } as any);
 
     expect(runtimeSpy).toHaveBeenCalledWith(runtime);
     expect(registerChannel).toHaveBeenCalledTimes(1);

@@ -1,5 +1,4 @@
 import { html, nothing, LitElement } from "lit";
-import type { AppViewState } from "./app-view-state.ts";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { t } from "../i18n/index.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
@@ -155,10 +154,6 @@ export function renderApp(state: AppViewState) {
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
-  const chatDisabledReason = state.connected ? null : t("chat.disconnected");
-  const isChat = state.tab === "chat";
-  const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
-  const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
   const configValue =
@@ -169,9 +164,11 @@ export function renderApp(state: AppViewState) {
   const modelDefaults = agentsModelDefaults?.model as Record<string, unknown> | undefined;
   const primaryModel = modelDefaults?.primary as string | undefined;
 
-  let chatDisabledReason: string | import("lit").TemplateResult | null = state.connected
+  let chatDisabledReason: import("lit").TemplateResult | null = state.connected
     ? null
-    : "Disconnected from gateway.";
+    : html`
+        Disconnected from gateway.
+      `;
 
   // 仅在配置已成功加载且确认无主模型时才提示；
   // 如果配置加载失败（lastError）或尚未加载（configSnapshot 为 null），不显示此提示

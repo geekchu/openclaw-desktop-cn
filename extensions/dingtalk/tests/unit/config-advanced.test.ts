@@ -1,7 +1,7 @@
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import { getConfig, isConfigured, resolveRelativePath, resolveUserPath } from "../../src/config";
+import { getConfig, isConfigured, resolveRelativePath, resolveUserPath } from "../../src/config.js";
 
 describe("config advanced", () => {
   it("getConfig resolves account override and top-level fallback", () => {

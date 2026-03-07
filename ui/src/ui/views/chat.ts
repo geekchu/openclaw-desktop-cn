@@ -50,7 +50,7 @@ export type ChatProps = {
   queue: ChatQueueItem[];
   connected: boolean;
   canSend: boolean;
-  disabledReason: string | import("lit").TemplateResult | null;
+  disabledReason: import("lit").TemplateResult | null;
   error: string | null;
   sessions: SessionsListResult | null;
   // Focus mode
@@ -462,7 +462,7 @@ export function renderChat(props: ChatProps) {
           <div class="chat-compose__actions">
             <button
               class="btn"
-              ?disabled=${canAbort ? false : (!canCompose || props.sending)}
+              ?disabled=${canAbort ? false : !canCompose || props.sending}
               @click=${canAbort ? props.onAbort : props.onNewSession}
             >
               ${canAbort ? "停止" : "新会话"}

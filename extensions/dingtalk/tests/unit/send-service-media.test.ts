@@ -18,8 +18,8 @@ vi.mock("axios", () => {
   };
 });
 
-import { uploadMedia as uploadMediaUtil } from "../../src/media-utils";
-import { sendBySession, sendProactiveMedia } from "../../src/send-service";
+import { uploadMedia as uploadMediaUtil } from "../../src/media-utils.js";
+import { sendBySession, sendProactiveMedia } from "../../src/send-service.js";
 
 const mockedAxios = vi.mocked(axios);
 const mockedUploadMedia = vi.mocked(uploadMediaUtil);

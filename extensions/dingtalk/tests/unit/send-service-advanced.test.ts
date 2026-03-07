@@ -32,9 +32,9 @@ vi.mock("../../src/card-service", () => ({
 import {
   clearProactiveRiskObservationsForTest,
   recordProactiveRiskObservation,
-} from "../../src/proactive-risk-registry";
-import { sendMessage } from "../../src/send-service";
-import { AICardStatus } from "../../src/types";
+} from "../../src/proactive-risk-registry.js";
+import { sendMessage } from "../../src/send-service.js";
+import { AICardStatus } from "../../src/types.js";
 
 const mockedAxios = vi.mocked(axios);
 

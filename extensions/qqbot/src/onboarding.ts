@@ -3,14 +3,7 @@
  *
  * 提供 openclaw onboard 命令的交互式配置支持
  */
-import type {
-  ChannelOnboardingAdapter,
-  ChannelOnboardingStatus,
-  ChannelOnboardingStatusContext,
-  ChannelOnboardingConfigureContext,
-  ChannelOnboardingResult,
-  OpenClawConfig,
-} from "openclaw/plugin-sdk";
+import type { ChannelOnboardingAdapter, OpenClawConfig } from "openclaw/plugin-sdk";
 import { DEFAULT_ACCOUNT_ID, listQQBotAccountIds, resolveQQBotAccount } from "./config.js";
 
 // 内部类型（用于类型安全）
@@ -69,7 +62,7 @@ function resolveDefaultQQBotAccountId(cfg: OpenClawConfig): string {
 export const qqbotOnboardingAdapter: ChannelOnboardingAdapter = {
   channel: "qqbot" as any,
 
-  getStatus: async (ctx: ChannelOnboardingStatusContext): Promise<ChannelOnboardingStatus> => {
+  getStatus: async (ctx: any): Promise<any> => {
     const cfg = ctx.cfg as OpenClawConfig;
     const configured = listQQBotAccountIds(cfg).some((accountId) => {
       const account = resolveQQBotAccount(cfg, accountId);
@@ -85,7 +78,7 @@ export const qqbotOnboardingAdapter: ChannelOnboardingAdapter = {
     };
   },
 
-  configure: async (ctx: ChannelOnboardingConfigureContext): Promise<ChannelOnboardingResult> => {
+  configure: async (ctx: any): Promise<any> => {
     const cfg = ctx.cfg as OpenClawConfig;
     const prompter = ctx.prompter as Prompter;
     const accountOverrides = ctx.accountOverrides as Record<string, string> | undefined;

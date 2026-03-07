@@ -455,7 +455,11 @@ function formatSubMessageContent(content: string, contentType: string): string {
   }
 }
 
-function checkBotMentioned(event: FeishuMessageEvent, botOpenId?: string, botName?: string): boolean {
+function checkBotMentioned(
+  event: FeishuMessageEvent,
+  botOpenId?: string,
+  botName?: string,
+): boolean {
   if (!botOpenId) return false;
   // Check for @all (@_all in Feishu) — treat as mentioning every bot
   const rawContent = event.message.content ?? "";
@@ -861,7 +865,7 @@ export async function handleFeishuMessage(params: {
     return;
   }
 
-  let ctx = parseFeishuMessageEvent(event, botOpenId, botName ?? account.config?.botName);
+  let ctx = parseFeishuMessageEvent(event, botOpenId, botName ?? (account.config as any)?.botName);
   const isGroup = ctx.chatType === "group";
   const isDirect = !isGroup;
   const senderUserId = event.sender.sender_id.user_id?.trim() || undefined;

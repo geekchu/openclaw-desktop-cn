@@ -3,7 +3,7 @@ use crate::utils::shell;
 use crate::gateway::GatewayManager;
 use tauri::{command, AppHandle, Emitter, Manager};
 use std::process::Command;
-use log::{info, warn, debug};
+use log::{info, warn};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -154,7 +154,7 @@ pub async fn get_service_status() -> Result<ServiceStatus, String> {
 
 /// 启动服务
 #[command]
-pub async fn start_service() -> Result<String, String> {
+pub async fn start_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 启动服务...");
     
     // 检查是否已经运行
@@ -180,44 +180,36 @@ pub async fn start_service() -> Result<String, String> {
         }
     }
     
-    // 直接后台启动 gateway（不等待 doctor，避免阻塞）
-    info!("[服务] 后台启动 gateway...");
-    shell::spawn_openclaw_gateway()
-        .map_err(|e| format!("启动服务失败: {}", e))?;
+    // 直接后台启动 gateway，通过 GatewayManager 绝对控股 PID
+    info!("[服务] 后台集权管理启动 gateway...");
+    let gm = app.state::<GatewayManager>();
+    gm.start().map_err(|e| format!("启动服务失败: {}", e))?;
     
-    // 轮询等待端口开始监听（最多 60 秒）
-    info!("[服务] 等待端口 {} 开始监听...", SERVICE_PORT);
-    for i in 1..=60 {
-        std::thread::sleep(std::time::Duration::from_secs(1));
+    // 轮询等待端口开始监听及 HTTP 就绪（最多 60 秒）
+    info!("[服务] 等待 Gateway HTTP 存活探活 (60秒)...");
+    if gm.wait_for_ready(60) {
         if let Some(pid) = check_port_listening(SERVICE_PORT) {
-            info!("[服务] ✓ 启动成功 ({}秒), PID: {}", i, pid);
+            info!("[服务] ✓ 启动成功, PID: {}", pid);
             return Ok(format!("服务已启动，PID: {}", pid));
         }
-        if i % 5 == 0 {
-            debug!("[服务] 等待中... ({}秒)", i);
-        }
+        info!("[服务] ✓ HTTP已就绪，但端口识别延迟");
+        return Ok("服务已启动".to_string());
     }
     
-    info!("[服务] 等待超时，端口仍未监听");
+    info!("[服务] 等待超时，HTTP 或端口仍未就绪");
     Err("服务启动超时（60秒），请检查 openclaw 日志".to_string())
 }
 
 /// 停止服务
 #[command]
-pub async fn stop_service() -> Result<String, String> {
+pub async fn stop_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 停止服务...");
     
-    let _ = shell::run_openclaw(&["gateway", "stop"]);
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    let gm = app.state::<GatewayManager>();
+    gm.set_suppress_restart(true);
+    gm.stop();
+    gm.set_suppress_restart(false);
     
-    let status = get_service_status().await?;
-    if !status.running {
-        info!("[服务] ✓ 已停止");
-        return Ok("服务已停止".to_string());
-    }
-    
-    // 尝试强制停止
-    let _ = shell::run_openclaw(&["gateway", "stop", "--force"]);
     std::thread::sleep(std::time::Duration::from_millis(500));
     
     let status = get_service_status().await?;

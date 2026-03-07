@@ -30,7 +30,7 @@ function isWholeObjectSensitivePath(path: string): boolean {
 
 function collectSensitiveStrings(value: unknown, values: string[]): void {
   if (typeof value === "string") {
-    if (!isEnvVarPlaceholder(value)) {
+    if (value.length > 0 && !isEnvVarPlaceholder(value)) {
       values.push(value);
     }
     return;
@@ -46,7 +46,7 @@ function collectSensitiveStrings(value: unknown, values: string[]): void {
     // SecretRef objects include structural fields like source/provider that are
     // not secret material and may appear widely in config text.
     if (isSecretRefShape(obj)) {
-      if (!isEnvVarPlaceholder(obj.id)) {
+      if (obj.id.length > 0 && !isEnvVarPlaceholder(obj.id)) {
         values.push(obj.id);
       }
       return;
@@ -166,7 +166,7 @@ function redactObjectWithLookup(
       return redactObjectGuessing(obj, prefix, values, hints);
     }
     return obj.map((item) => {
-      if (typeof item === "string" && !isEnvVarPlaceholder(item)) {
+      if (typeof item === "string" && item.length > 0 && !isEnvVarPlaceholder(item)) {
         values.push(item);
         return REDACTED_SENTINEL;
       }
@@ -185,7 +185,7 @@ function redactObjectWithLookup(
         if (lookup.has(candidate)) {
           matched = true;
           // Hey, greptile, look here, this **IS** only applied to strings
-          if (typeof value === "string" && !isEnvVarPlaceholder(value)) {
+          if (typeof value === "string" && value.length > 0 && !isEnvVarPlaceholder(value)) {
             result[key] = REDACTED_SENTINEL;
             values.push(value);
           } else if (typeof value === "object" && value !== null) {
@@ -223,6 +223,7 @@ function redactObjectWithLookup(
         const markedNonSensitive = isExplicitlyNonSensitivePath(hints, [path, wildcardPath]);
         if (
           typeof value === "string" &&
+          value.length > 0 &&
           !markedNonSensitive &&
           isSensitivePath(path) &&
           !isEnvVarPlaceholder(value)
@@ -261,6 +262,7 @@ function redactObjectGuessing(
         !isExplicitlyNonSensitivePath(hints, [path]) &&
         isSensitivePath(path) &&
         typeof item === "string" &&
+        item.length > 0 &&
         !isEnvVarPlaceholder(item)
       ) {
         values.push(item);
@@ -279,6 +281,7 @@ function redactObjectGuessing(
         !isExplicitlyNonSensitivePath(hints, [dotPath, wildcardPath]) &&
         isSensitivePath(dotPath) &&
         typeof value === "string" &&
+        value.length > 0 &&
         !isEnvVarPlaceholder(value)
       ) {
         result[key] = REDACTED_SENTINEL;
@@ -327,8 +330,6 @@ function withRestoreWarningsSuppressed<T>(fn: () => T): T {
     return fn();
   } finally {
     suppressRestoreWarnings = prev;
-  }
-}
   }
 }
 

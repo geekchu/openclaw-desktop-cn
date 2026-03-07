@@ -10,8 +10,8 @@ export function buildControlUiCspHeader(): string {
     "frame-ancestors 'none'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src 'self' data: https:",
+    "img-src 'self' asset: http://asset.localhost data: https:",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' ws: wss:",
+    "connect-src 'self' ws: wss: ipc: http://ipc.localhost http://localhost:* ws://localhost:* https://api.openclawcn.net https://openclawcn.net",
   ].join("; ");
 }

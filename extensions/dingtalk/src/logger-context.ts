@@ -1,4 +1,4 @@
-import type { Logger } from "./types";
+import type { Logger } from "./types.js";
 
 let currentLogger: Logger | undefined;
 

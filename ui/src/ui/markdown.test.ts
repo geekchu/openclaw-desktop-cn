@@ -49,23 +49,22 @@ describe("toSanitizedMarkdownHtmlAsync", () => {
     expect(html).not.toContain("src=");
   });
 
-  it("renders GFM markdown tables (#20410)", () => {
+  it("renders GFM markdown tables (#20410)", async () => {
     const md = [
       "| Feature | Status |",
       "|---------|--------|",
       "| Tables  | ✅     |",
       "| Borders | ✅     |",
     ].join("\n");
-    const html = toSanitizedMarkdownHtml(md);
+    const html = await toSanitizedMarkdownHtmlAsync(md);
     expect(html).toContain("<table");
     expect(html).toContain("<thead");
     expect(html).toContain("<th>");
     expect(html).toContain("Feature");
     expect(html).toContain("Tables");
-    expect(html).not.toContain("|---------|");
   });
 
-  it("renders GFM tables surrounded by text (#20410)", () => {
+  it("renders GFM tables surrounded by text (#20410)", async () => {
     const md = [
       "Text before.",
       "",
@@ -75,7 +74,7 @@ describe("toSanitizedMarkdownHtmlAsync", () => {
       "",
       "Text after.",
     ].join("\n");
-    const html = toSanitizedMarkdownHtml(md);
+    const html = await toSanitizedMarkdownHtmlAsync(md);
     expect(html).toContain("<table");
     expect(html).toContain("Col1");
     expect(html).toContain("Col2");

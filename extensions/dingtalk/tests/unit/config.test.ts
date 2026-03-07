@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveGroupConfig, stripTargetPrefix } from "../../src/config";
+import { resolveGroupConfig, stripTargetPrefix } from "../../src/config.js";
 
 describe("config helpers", () => {
   it("resolves group config with exact match then wildcard fallback", () => {

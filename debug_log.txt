@@ -1,3 +1,0 @@
-     Running DevCommand (`cargo  run --no-default-features --color always --`)
-   Compiling openclaw-desktop v0.1.0 (F:\openclaw-desktop-cn\src-tauri)
-    Building [==> ] 471/473

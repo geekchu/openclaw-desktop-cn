@@ -1,7 +1,6 @@
 import axios from "axios";
-import type { DingTalkConfig, HandleDingTalkMessageParams, MediaFile } from "./types";
-import { normalizeAllowFrom, isSenderAllowed, isSenderGroupAllowed } from "./access-control";
-import { getAccessToken } from "./auth";
+import { normalizeAllowFrom, isSenderAllowed, isSenderGroupAllowed } from "./access-control.js";
+import { getAccessToken } from "./auth.js";
 import {
   cleanupCardCache,
   createAICard,
@@ -11,20 +10,21 @@ import {
   getCardById,
   isCardInTerminalState,
   streamAICard,
-} from "./card-service";
-import { resolveGroupConfig } from "./config";
-import { formatGroupMembers, noteGroupMember } from "./group-members-store";
-import { setCurrentLogger } from "./logger-context";
-import { extractMessageContent } from "./message-utils";
-import { registerPeerId } from "./peer-id-registry";
+} from "./card-service.js";
+import { resolveGroupConfig } from "./config.js";
+import { formatGroupMembers, noteGroupMember } from "./group-members-store.js";
+import { setCurrentLogger } from "./logger-context.js";
+import { extractMessageContent } from "./message-utils.js";
+import { registerPeerId } from "./peer-id-registry.js";
 import {
   clearProactiveRiskObservationsForTest,
   recordProactiveRiskObservation,
-} from "./proactive-risk-registry";
-import { getDingTalkRuntime } from "./runtime";
-import { sendBySession, sendMessage } from "./send-service";
-import { AICardStatus } from "./types";
-import { formatDingTalkErrorPayloadLog, maskSensitiveData } from "./utils";
+} from "./proactive-risk-registry.js";
+import { getDingTalkRuntime } from "./runtime.js";
+import { sendBySession, sendMessage } from "./send-service.js";
+import type { DingTalkConfig, HandleDingTalkMessageParams, MediaFile } from "./types.js";
+import { AICardStatus } from "./types.js";
+import { formatDingTalkErrorPayloadLog, maskSensitiveData } from "./utils.js";
 
 const DEFAULT_PROACTIVE_HINT_COOLDOWN_HOURS = 24;
 const proactiveHintLastSentAt = new Map<string, number>();

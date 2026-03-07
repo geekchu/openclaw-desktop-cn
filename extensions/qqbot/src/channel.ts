@@ -107,7 +107,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       tokenSource: account?.secretSource,
     }),
     // 关键：解析 allowFrom 配置，用于命令授权
-    resolveAllowFrom: ({ cfg, accountId }: { cfg: OpenClawConfig; accountId?: string }) => {
+    resolveAllowFrom: ({ cfg, accountId }: { cfg: OpenClawConfig; accountId?: string | null }) => {
       const account = resolveQQBotAccount(cfg, accountId);
       const allowFrom = account.config?.allowFrom ?? [];
       console.log(
@@ -157,7 +157,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
         clientSecret,
         clientSecretFile: input.tokenFile,
         name: input.name,
-        imageServerBaseUrl: input.imageServerBaseUrl,
+        imageServerBaseUrl: (input as any).imageServerBaseUrl,
       });
     },
   },
@@ -180,7 +180,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
 
       // 检查是否是已知格式
       if (id.startsWith("c2c:") || id.startsWith("group:") || id.startsWith("channel:")) {
-        return { ok: true, to: `qqbot:${id}` };
+        return `qqbot:${id}`;
       }
 
       // 检查是否是纯 openid（32位十六进制，带连字符）
@@ -188,14 +188,11 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       const openIdPattern =
         /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
       if (openIdPattern.test(id)) {
-        return { ok: true, to: `qqbot:c2c:${id}` };
+        return `qqbot:c2c:${id}`;
       }
 
       // 不认识的格式
-      return {
-        ok: false,
-        error: `Invalid QQ Bot target format: "${target}". Expected: qqbot:c2c:openid, qqbot:group:groupid, or openid (UUID format)`,
-      };
+      return undefined;
     },
     /**
      * 目标解析器配置
@@ -240,7 +237,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       const result = await sendText({ to, text, accountId, replyToId, account });
       return {
         channel: "qqbot",
-        messageId: result.messageId,
+        messageId: result.messageId ?? "",
         error: result.error ? new Error(result.error) : undefined,
       };
     },
@@ -256,7 +253,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       });
       return {
         channel: "qqbot",
-        messageId: result.messageId,
+        messageId: result.messageId ?? "",
         error: result.error ? new Error(result.error) : undefined,
       };
     },
@@ -366,12 +363,12 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       enabled: account?.enabled ?? false,
       configured: Boolean(account?.appId && account?.clientSecret),
       tokenSource: account?.secretSource,
-      running: runtime?.running ?? false,
-      connected: runtime?.connected ?? false,
-      lastConnectedAt: runtime?.lastConnectedAt ?? null,
-      lastError: runtime?.lastError ?? null,
-      lastInboundAt: runtime?.lastInboundAt ?? null,
-      lastOutboundAt: runtime?.lastOutboundAt ?? null,
+      running: Boolean(runtime?.running),
+      connected: Boolean(runtime?.connected),
+      lastConnectedAt: (runtime?.lastConnectedAt as number | null) ?? null,
+      lastError: (runtime?.lastError as string | null) ?? null,
+      lastInboundAt: (runtime?.lastInboundAt as number | null) ?? null,
+      lastOutboundAt: (runtime?.lastOutboundAt as number | null) ?? null,
     }),
   },
 };

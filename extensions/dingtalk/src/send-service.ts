@@ -1,5 +1,19 @@
-import axios from "axios";
 import * as path from "node:path";
+import axios from "axios";
+import { getAccessToken } from "./auth.js";
+import {
+  deleteActiveCardByTarget,
+  getActiveCardIdByTarget,
+  getCardById,
+  isCardInTerminalState,
+  streamAICard,
+} from "./card-service.js";
+import { stripTargetPrefix } from "./config.js";
+import { getLogger } from "./logger-context.js";
+import { uploadMedia as uploadMediaUtil } from "./media-utils.js";
+import { detectMarkdownAndExtractTitle } from "./message-utils.js";
+import { resolveOriginalPeerId } from "./peer-id-registry.js";
+import { getProactiveRiskObservation } from "./proactive-risk-registry.js";
 import type {
   AxiosResponse,
   DingTalkConfig,
@@ -7,25 +21,11 @@ import type {
   ProactiveMessagePayload,
   SendMessageOptions,
   SessionWebhookResponse,
-} from "./types";
-import { getAccessToken } from "./auth";
-import {
-  deleteActiveCardByTarget,
-  getActiveCardIdByTarget,
-  getCardById,
-  isCardInTerminalState,
-  streamAICard,
-} from "./card-service";
-import { stripTargetPrefix } from "./config";
-import { getLogger } from "./logger-context";
-import { uploadMedia as uploadMediaUtil } from "./media-utils";
-import { detectMarkdownAndExtractTitle } from "./message-utils";
-import { resolveOriginalPeerId } from "./peer-id-registry";
-import { getProactiveRiskObservation } from "./proactive-risk-registry";
-import { AICardStatus } from "./types";
-import { formatDingTalkErrorPayloadLog } from "./utils";
+} from "./types.js";
+import { AICardStatus } from "./types.js";
+import { formatDingTalkErrorPayloadLog } from "./utils.js";
 
-export { detectMediaTypeFromExtension } from "./media-utils";
+export { detectMediaTypeFromExtension } from "./media-utils.js";
 
 /**
  * Wrapper to upload media with shared getAccessToken binding.

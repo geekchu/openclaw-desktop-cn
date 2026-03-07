@@ -448,7 +448,7 @@ async function processMessage(
     dispatcherOptions: {
       ...prefixOptions,
       typingCallbacks,
-      deliver: async (payload) => {
+      deliver: async (payload: any) => {
         await deliverZalouserReply({
           payload: payload as { text?: string; mediaUrls?: string[]; mediaUrl?: string },
           profile: account.profile,

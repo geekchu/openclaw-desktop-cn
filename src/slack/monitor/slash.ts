@@ -1,9 +1,15 @@
 import type { SlackActionMiddlewareArgs, SlackCommandMiddlewareArgs } from "@slack/bolt";
 import type { ChatCommandDefinition, CommandArgs } from "../../auto-reply/commands-registry.js";
+import { finalizeInboundContext } from "../../auto-reply/reply/inbound-context.js";
+import { dispatchReplyWithDispatcher } from "../../auto-reply/reply/provider-dispatcher.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import { resolveCommandAuthorizedFromAuthorizers } from "../../channels/command-gating.js";
+import { resolveConversationLabel } from "../../channels/conversation-label.js";
+import { createReplyPrefixOptions } from "../../channels/reply-prefix.js";
+import { recordInboundSessionMetaSafe } from "../../channels/session-meta.js";
 import { resolveNativeCommandsEnabled, resolveNativeSkillsEnabled } from "../../config/commands.js";
 import { danger, logVerbose } from "../../globals.js";
+import { resolveAgentRoute } from "../../routing/resolve-route.js";
 import { chunkItems } from "../../utils/chunk-items.js";
 import type { ResolvedSlackAccount } from "../accounts.js";
 import { resolveSlackAllowListMatch, resolveSlackUserAllowed } from "./allow-list.js";
@@ -501,21 +507,6 @@ export async function registerSlackMonitorSlashCommands(params: {
 
       const channelName = channelInfo?.name;
       const roomLabel = channelName ? `#${channelName}` : `#${command.channel_id}`;
-      const [{ resolveAgentRoute }, { finalizeInboundContext }, { dispatchReplyWithDispatcher }] =
-        await Promise.all([
-          import("../../routing/resolve-route.js"),
-          import("../../auto-reply/reply/inbound-context.js"),
-          import("../../auto-reply/reply/provider-dispatcher.js"),
-        ]);
-      const [
-        { resolveConversationLabel },
-        { createReplyPrefixOptions },
-        { recordInboundSessionMetaSafe },
-      ] = await Promise.all([
-        import("../../channels/conversation-label.js"),
-        import("../../channels/reply-prefix.js"),
-        import("../../channels/session-meta.js"),
-      ]);
 
       const route = resolveAgentRoute({
         cfg,

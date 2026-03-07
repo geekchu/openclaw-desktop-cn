@@ -20,7 +20,7 @@ import * as fs from "node:fs";
 import * as http from "node:http";
 import * as path from "node:path";
 import * as url from "node:url";
-import type { ResolvedQQBotAccount } from "../src/types.js";
+import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import {
   sendProactiveMessageDirect,
   listKnownUsers,
@@ -28,6 +28,7 @@ import {
   getKnownUser,
   broadcastMessage,
 } from "../src/proactive.js";
+import type { ResolvedQQBotAccount } from "../src/types.js";
 
 // 默认端口
 const DEFAULT_PORT = 3721;
@@ -49,7 +50,7 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
           clientSecret: envClientSecret,
           enabled: true,
           secretSource: "env",
-        };
+        } as ResolvedQQBotAccount;
       }
       return null;
     }
@@ -65,7 +66,7 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
           clientSecret: envClientSecret,
           enabled: true,
           secretSource: "env",
-        };
+        } as ResolvedQQBotAccount;
       }
       return null;
     }
@@ -78,7 +79,7 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
         clientSecret: qqbot.clientSecret || envClientSecret,
         enabled: qqbot.enabled ?? true,
         secretSource: qqbot.clientSecret ? "config" : "env",
-      };
+      } as ResolvedQQBotAccount;
     }
 
     const accountConfig = qqbot.accounts?.[accountId];
@@ -89,7 +90,7 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
         clientSecret: accountConfig.clientSecret || qqbot.clientSecret || envClientSecret,
         enabled: accountConfig.enabled ?? true,
         secretSource: accountConfig.clientSecret ? "config" : "env",
-      };
+      } as ResolvedQQBotAccount;
     }
 
     return null;
@@ -239,7 +240,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       }
 
       const cfg = loadConfig();
-      const result = await broadcastMessage(text, cfg as any, { type, accountId, limit });
+      const result = await broadcastMessage(text, cfg as OpenClawConfig, {
+        type,
+        accountId,
+        limit,
+      });
       sendJson(res, 200, result);
       return;
     }

@@ -1,17 +1,17 @@
-import axios from "axios";
 import { randomUUID } from "node:crypto";
+import axios from "axios";
+import { getAccessToken } from "./auth.js";
+import { stripTargetPrefix } from "./config.js";
+import { resolveOriginalPeerId } from "./peer-id-registry.js";
 import type {
   AICardInstance,
   AICardStreamingRequest,
   DingTalkConfig,
   DingTalkInboundMessage,
   Logger,
-} from "./types";
-import { getAccessToken } from "./auth";
-import { stripTargetPrefix } from "./config";
-import { resolveOriginalPeerId } from "./peer-id-registry";
-import { AICardStatus } from "./types";
-import { formatDingTalkErrorPayloadLog } from "./utils";
+} from "./types.js";
+import { AICardStatus } from "./types.js";
+import { formatDingTalkErrorPayloadLog } from "./utils.js";
 
 const DINGTALK_API = "https://api.dingtalk.com";
 // Card cache TTL (1 hour) for terminal states.

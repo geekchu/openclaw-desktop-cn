@@ -11,6 +11,7 @@ import type { ChannelAccountSnapshot, ChannelPlugin } from "../../channels/plugi
 import type { OpenClawConfig } from "../../config/config.js";
 import { loadConfig, readConfigFileSnapshot } from "../../config/config.js";
 import { getChannelActivity } from "../../infra/channel-activity.js";
+import { formatErrorMessage } from "../../infra/errors.js";
 import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
 import { defaultRuntime } from "../../runtime.js";
 import {
@@ -208,28 +209,54 @@ export const channelsHandlers: GatewayRequestHandlers = {
     const channelsMap = payload.channels as Record<string, unknown>;
     const accountsMap = payload.channelAccounts as Record<string, unknown>;
     const defaultAccountIdMap = payload.channelDefaultAccountId as Record<string, unknown>;
+    const resolveFallbackDefaultAccountId = (plugin: ChannelPlugin) => {
+      try {
+        const accountIds = plugin.config.listAccountIds(cfg);
+        return resolveChannelDefaultAccountId({ plugin, cfg, accountIds });
+      } catch {
+        return DEFAULT_ACCOUNT_ID;
+      }
+    };
     for (const plugin of plugins) {
-      const { accounts, defaultAccountId, defaultAccount, resolvedAccounts } =
-        await buildChannelAccounts(plugin.id);
-      const fallbackAccount =
-        resolvedAccounts[defaultAccountId] ?? plugin.config.resolveAccount(cfg, defaultAccountId);
-      const summary = plugin.status?.buildChannelSummary
-        ? await plugin.status.buildChannelSummary({
-            account: fallbackAccount,
-            cfg,
-            defaultAccountId,
-            snapshot:
-              defaultAccount ??
-              ({
-                accountId: defaultAccountId,
-              } as ChannelAccountSnapshot),
-          })
-        : {
-            configured: defaultAccount?.configured ?? false,
-          };
-      channelsMap[plugin.id] = summary;
-      accountsMap[plugin.id] = accounts;
-      defaultAccountIdMap[plugin.id] = defaultAccountId;
+      try {
+        const { accounts, defaultAccountId, defaultAccount, resolvedAccounts } =
+          await buildChannelAccounts(plugin.id);
+        const fallbackAccount =
+          resolvedAccounts[defaultAccountId] ?? plugin.config.resolveAccount(cfg, defaultAccountId);
+        const summary = plugin.status?.buildChannelSummary
+          ? await plugin.status.buildChannelSummary({
+              account: fallbackAccount,
+              cfg,
+              defaultAccountId,
+              snapshot:
+                defaultAccount ??
+                ({
+                  accountId: defaultAccountId,
+                } as ChannelAccountSnapshot),
+            })
+          : {
+              configured: defaultAccount?.configured ?? false,
+            };
+        channelsMap[plugin.id] = summary;
+        accountsMap[plugin.id] = accounts;
+        defaultAccountIdMap[plugin.id] = defaultAccountId;
+      } catch (err) {
+        const message = formatErrorMessage(err);
+        const defaultAccountId = resolveFallbackDefaultAccountId(plugin);
+        channelsMap[plugin.id] = {
+          configured: false,
+          lastError: message,
+        };
+        accountsMap[plugin.id] = [
+          {
+            accountId: defaultAccountId,
+            enabled: false,
+            configured: false,
+            lastError: message,
+          } satisfies ChannelAccountSnapshot,
+        ];
+        defaultAccountIdMap[plugin.id] = defaultAccountId;
+      }
     }
 
     respond(true, payload, undefined);

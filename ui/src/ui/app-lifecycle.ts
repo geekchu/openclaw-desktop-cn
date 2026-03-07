@@ -16,8 +16,8 @@ import {
   syncTabWithLocation,
   syncThemeWithSettings,
 } from "./app-settings.ts";
-import { tabFromPath } from "./navigation.ts";
 import { loadControlUiBootstrapConfig } from "./controllers/control-ui-bootstrap.ts";
+import { tabFromPath } from "./navigation.ts";
 import type { Tab } from "./navigation.ts";
 
 type LifecycleHost = {

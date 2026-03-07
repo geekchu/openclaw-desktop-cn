@@ -17,10 +17,14 @@ export async function checkForUpdate(): Promise<{
   rid: number;
 } | null> {
   const tauri = getTauri();
-  if (!tauri?.core?.invoke) return null;
+  if (!tauri?.core?.invoke) {
+    return null;
+  }
 
   const result = await tauri.core.invoke("plugin:updater|check");
-  if (result == null) return null;
+  if (result == null) {
+    return null;
+  }
 
   // Tauri v2 返回 UpdateMetadata: { rid, currentVersion, version, date?, body?, rawJson }
   return {
@@ -41,7 +45,9 @@ export async function downloadUpdate(
   onProgress?: (percent: number) => void,
 ): Promise<number> {
   const tauri = getTauri();
-  if (!tauri?.core?.invoke) throw new Error("Tauri API 不可用");
+  if (!tauri?.core?.invoke) {
+    throw new Error("Tauri API 不可用");
+  }
 
   let totalBytes = 0;
   let downloadedBytes = 0;
@@ -79,7 +85,9 @@ export async function downloadUpdate(
  */
 export async function installUpdate(updateRid: number, bytesRid: number): Promise<void> {
   const tauri = getTauri();
-  if (!tauri?.core?.invoke) throw new Error("Tauri API 不可用");
+  if (!tauri?.core?.invoke) {
+    throw new Error("Tauri API 不可用");
+  }
 
   await tauri.core.invoke("plugin:updater|install", {
     updateRid,

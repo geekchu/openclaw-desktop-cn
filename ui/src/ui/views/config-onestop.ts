@@ -49,8 +49,12 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
   const cfg = await invoke<Record<string, any>>("get_config");
 
   // 1. 设置 provider 配置 (models.providers.onestop)
-  if (!cfg.models) cfg.models = {};
-  if (!cfg.models.providers) cfg.models.providers = {};
+  if (!cfg.models) {
+    cfg.models = {};
+  }
+  if (!cfg.models.providers) {
+    cfg.models.providers = {};
+  }
   cfg.models.providers[ONESTOP_PROVIDER_NAME] = {
     baseUrl: ONESTOP_BASE_URL,
     // 如果用户未输入新 Key，保留配置文件中已有的 Key
@@ -68,9 +72,15 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
   };
 
   // 2. 注册模型到 agents.defaults.models
-  if (!cfg.agents) cfg.agents = {};
-  if (!cfg.agents.defaults) cfg.agents.defaults = {};
-  if (!cfg.agents.defaults.models) cfg.agents.defaults.models = {};
+  if (!cfg.agents) {
+    cfg.agents = {};
+  }
+  if (!cfg.agents.defaults) {
+    cfg.agents.defaults = {};
+  }
+  if (!cfg.agents.defaults.models) {
+    cfg.agents.defaults.models = {};
+  }
 
   // 先清理该 provider 下的旧模型
   const prefix = `${ONESTOP_PROVIDER_NAME}/`;
@@ -87,12 +97,16 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
   // 3. 设置主模型
   if (selectedModel) {
     const fullId = `${ONESTOP_PROVIDER_NAME}/${selectedModel}`;
-    if (!cfg.agents.defaults.model) cfg.agents.defaults.model = {};
+    if (!cfg.agents.defaults.model) {
+      cfg.agents.defaults.model = {};
+    }
     cfg.agents.defaults.model.primary = fullId;
   }
 
   // 更新元数据
-  if (!cfg.meta) cfg.meta = {};
+  if (!cfg.meta) {
+    cfg.meta = {};
+  }
   cfg.meta.lastTouchedAt = new Date().toISOString();
 
   // 单次写入
@@ -147,7 +161,9 @@ let _saveResult: { success: boolean; message: string } | null = null;
 let _saveResultTimer: ReturnType<typeof setTimeout> | null = null;
 
 function showSaveResult(success: boolean, message: string, requestUpdate: () => void) {
-  if (_saveResultTimer) clearTimeout(_saveResultTimer);
+  if (_saveResultTimer) {
+    clearTimeout(_saveResultTimer);
+  }
   _saveResult = { success, message };
   requestUpdate();
   _saveResultTimer = setTimeout(() => {
@@ -172,7 +188,9 @@ let _existingKeyLoadPromise: Promise<void> | null = null;
 
 /** 从配置文件加载已有的 onestop API Key 并脱敏 */
 function loadExistingApiKey(requestUpdate: () => void): void {
-  if (_existingKeyLoaded || _existingKeyLoadPromise) return;
+  if (_existingKeyLoaded || _existingKeyLoadPromise) {
+    return;
+  }
   _existingKeyLoadPromise = (async () => {
     try {
       const cfg = await invoke<Record<string, any>>("get_config");
@@ -212,20 +230,42 @@ let _fetchPromise: Promise<void> | null = null;
 /** 从模型 ID 推断 Provider */
 function inferProvider(modelId: string): { name: string; key: string } {
   const id = modelId.toLowerCase();
-  if (id.startsWith("deepseek")) return { name: "DeepSeek", key: "deepseek" };
-  if (id.startsWith("doubao") || id.startsWith("seed")) return { name: "豆包", key: "doubao" };
-  if (id.startsWith("glm")) return { name: "智谱 GLM", key: "glm" };
-  if (id.startsWith("hunyuan") || id.startsWith("tencent"))
+  if (id.startsWith("deepseek")) {
+    return { name: "DeepSeek", key: "deepseek" };
+  }
+  if (id.startsWith("doubao") || id.startsWith("seed")) {
+    return { name: "豆包", key: "doubao" };
+  }
+  if (id.startsWith("glm")) {
+    return { name: "智谱 GLM", key: "glm" };
+  }
+  if (id.startsWith("hunyuan") || id.startsWith("tencent")) {
     return { name: "腾讯混元", key: "hunyuan" };
-  if (id.startsWith("kimi")) return { name: "Kimi", key: "kimi" };
-  if (id.startsWith("longcat")) return { name: "Longcat", key: "longcat" };
-  if (id.startsWith("mimo")) return { name: "Mimo", key: "mimo" };
-  if (id.startsWith("minimax")) return { name: "MiniMax", key: "minimax" };
-  if (id.startsWith("qwen")) return { name: "通义千问", key: "qwen" };
-  if (id.startsWith("gpt") || id.startsWith("o1") || id.startsWith("o3") || id.startsWith("o4"))
+  }
+  if (id.startsWith("kimi")) {
+    return { name: "Kimi", key: "kimi" };
+  }
+  if (id.startsWith("longcat")) {
+    return { name: "Longcat", key: "longcat" };
+  }
+  if (id.startsWith("mimo")) {
+    return { name: "Mimo", key: "mimo" };
+  }
+  if (id.startsWith("minimax")) {
+    return { name: "MiniMax", key: "minimax" };
+  }
+  if (id.startsWith("qwen")) {
+    return { name: "通义千问", key: "qwen" };
+  }
+  if (id.startsWith("gpt") || id.startsWith("o1") || id.startsWith("o3") || id.startsWith("o4")) {
     return { name: "OpenAI", key: "openai" };
-  if (id.startsWith("claude")) return { name: "Anthropic", key: "anthropic" };
-  if (id.startsWith("gemini")) return { name: "Google", key: "google" };
+  }
+  if (id.startsWith("claude")) {
+    return { name: "Anthropic", key: "anthropic" };
+  }
+  if (id.startsWith("gemini")) {
+    return { name: "Google", key: "google" };
+  }
   return { name: modelId.split("-")[0] || "其他", key: "other" };
 }
 
@@ -243,15 +283,21 @@ function formatModelName(id: string): string {
 
 /** 获取模型列表 */
 export function fetchModels(requestUpdate: () => void): void {
-  if (_cachedModels.length > 0 || _modelsLoading) return;
-  if (_fetchPromise) return;
+  if (_cachedModels.length > 0 || _modelsLoading) {
+    return;
+  }
+  if (_fetchPromise) {
+    return;
+  }
 
   _modelsLoading = true;
   _modelsError = null;
 
   _fetchPromise = fetch(MODELS_API_URL)
     .then((res) => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       return res.json();
     })
     .then((data: { data: Array<{ id: string; owned_by?: string }> }) => {
@@ -774,7 +820,9 @@ function renderOnestopContent(props: OnestopProps) {
 
   // 切换模型：更新 provider 配置（包括白名单和 primary）
   const handleSwitchModel = async (modelId: string) => {
-    if (_testing) return;
+    if (_testing) {
+      return;
+    }
     try {
       // saveOnestopConfig 已同时处理：provider 配置 + 白名单 + primary 设置
       // 单次写入避免 gateway 文件监视器触发多次重启
@@ -943,7 +991,7 @@ function renderOnestopContent(props: OnestopProps) {
             <!-- Model Grid (当前模型置顶) -->
             <div class="onestop-models">
               ${[...filteredModels]
-                .sort((a, b) =>
+                .toSorted((a, b) =>
                   !_customPrimaryModel && a.id === props.selectedModel
                     ? -1
                     : !_customPrimaryModel && b.id === props.selectedModel

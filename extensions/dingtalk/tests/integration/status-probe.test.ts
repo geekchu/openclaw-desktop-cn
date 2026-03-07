@@ -18,9 +18,9 @@ vi.mock("../../src/auth", () => ({
   getAccessToken: getAccessTokenMock,
 }));
 
-import { dingtalkPlugin } from "../../src/channel";
+import { dingtalkPlugin } from "../../src/channel.js";
 
-describe("dingtalkPlugin.status.probeAccount", () => {
+describe("(dingtalkPlugin as any).status.probeAccount", () => {
   beforeEach(() => {
     getAccessTokenMock.mockReset();
   });
@@ -40,10 +40,14 @@ describe("dingtalkPlugin.status.probeAccount", () => {
       },
     } as OpenClawConfig;
 
-    const account = dingtalkPlugin.config.resolveAccount(cfg, "main");
+    const account = (dingtalkPlugin as any).config.resolveAccount(cfg, "main");
     getAccessTokenMock.mockResolvedValueOnce("token_main");
 
-    const result = await dingtalkPlugin.status.probeAccount?.({ account, timeoutMs: 1000 });
+    const result = await (dingtalkPlugin as any).status.probeAccount?.({
+      account,
+      timeoutMs: 1000,
+      cfg: {} as any,
+    });
 
     expect(getAccessTokenMock).toHaveBeenCalledTimes(1);
     expect(getAccessTokenMock).toHaveBeenCalledWith(
@@ -59,7 +63,11 @@ describe("dingtalkPlugin.status.probeAccount", () => {
       config: {},
     } as any;
 
-    const result = await dingtalkPlugin.status.probeAccount?.({ account, timeoutMs: 1000 });
+    const result = await (dingtalkPlugin as any).status.probeAccount?.({
+      account,
+      timeoutMs: 1000,
+      cfg: {} as any,
+    });
 
     expect(result).toEqual({ ok: false, error: "Not configured" });
     expect(getAccessTokenMock).not.toHaveBeenCalled();
@@ -74,7 +82,11 @@ describe("dingtalkPlugin.status.probeAccount", () => {
 
     getAccessTokenMock.mockRejectedValueOnce(new Error("DingTalk API error 300001"));
 
-    const result = await dingtalkPlugin.status.probeAccount?.({ account, timeoutMs: 1000 });
+    const result = await (dingtalkPlugin as any).status.probeAccount?.({
+      account,
+      timeoutMs: 1000,
+      cfg: {} as any,
+    });
 
     expect(result).toEqual({ ok: false, error: "DingTalk API error 300001" });
   });

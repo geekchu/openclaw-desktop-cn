@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
 import { createChannelTestPluginBase } from "../test-utils/channel-plugins.js";
+import { channelsHandlers } from "./server-methods/channels.js";
 import { setRegistry } from "./server.agent.gateway-server-agent.mocks.js";
 import { createRegistry } from "./server.e2e-registry-helpers.js";
 import {
@@ -129,6 +130,74 @@ describe("gateway server channels", () => {
     expect(signal?.configured).toBe(false);
     expect(signal?.probe).toBeUndefined();
     expect(signal?.lastProbeAt).toBeNull();
+  });
+
+  test("channels.status stays available when one plugin crashes", async () => {
+    const brokenPluginBase = createStubChannelPlugin({ id: "broken", label: "Broken" });
+    setRegistry(
+      createRegistry([
+        {
+          pluginId: "whatsapp",
+          source: "test",
+          plugin: createStubChannelPlugin({ id: "whatsapp", label: "WhatsApp" }),
+        },
+        {
+          pluginId: "broken",
+          source: "test",
+          plugin: {
+            ...brokenPluginBase,
+            config: {
+              ...brokenPluginBase.config,
+              resolveAccount: () => {
+                throw new TypeError("Cannot read properties of undefined (reading 'get')");
+              },
+            },
+          },
+        },
+      ]),
+    );
+
+    const responses: Array<{
+      ok: boolean;
+      payload?: {
+        channels?: Record<string, { configured?: boolean; lastError?: string }>;
+        channelAccounts?: Record<
+          string,
+          Array<{ accountId?: string; configured?: boolean; lastError?: string }>
+        >;
+        channelDefaultAccountId?: Record<string, string>;
+      };
+    }> = [];
+    await channelsHandlers["channels.status"]({
+      params: { probe: false, timeoutMs: 2000 },
+      respond: (ok: boolean, payload: any) => {
+        responses.push({
+          ok,
+          payload: payload as {
+            channels?: Record<string, { configured?: boolean; lastError?: string }>;
+            channelAccounts?: Record<
+              string,
+              Array<{ accountId?: string; configured?: boolean; lastError?: string }>
+            >;
+            channelDefaultAccountId?: Record<string, string>;
+          },
+        });
+      },
+      context: {
+        getRuntimeSnapshot: () => ({ channels: {}, channelAccounts: {} }),
+      },
+    } as never);
+    const res = responses[0];
+
+    expect(res?.ok).toBe(true);
+    expect(res?.payload?.channels?.whatsapp).toBeTruthy();
+    expect(res?.payload?.channels?.broken?.configured).toBe(false);
+    expect(res?.payload?.channels?.broken?.lastError).toContain("reading 'get'");
+    expect(res?.payload?.channelDefaultAccountId?.broken).toBe("default");
+    expect(res?.payload?.channelAccounts?.broken?.[0]?.accountId).toBe("default");
+    expect(res?.payload?.channelAccounts?.broken?.[0]?.lastError).toContain("reading 'get'");
+
+    setRegistry(defaultRegistry);
   });
 
   test("channels.logout reports no session when missing", async () => {

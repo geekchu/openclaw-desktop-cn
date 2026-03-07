@@ -5,7 +5,6 @@ use crate::models::{
 use crate::utils::{file, platform, shell};
 use log::{debug, error, info, warn};
 use serde_json::{json, Value};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::command;
 
@@ -849,25 +848,6 @@ pub async fn add_available_model(model_id: String) -> Result<String, String> {
     Ok(format!("模型 {} 已添加", model_id))
 }
 
-/// 从可用列表移除模型
-#[command]
-pub async fn remove_available_model(model_id: String) -> Result<String, String> {
-    info!("[移除模型] 从可用列表移除模型: {}", model_id);
-
-    let mut config = load_openclaw_config()?;
-
-    if let Some(models) = config
-        .pointer_mut("/agents/defaults/models")
-        .and_then(|v| v.as_object_mut())
-    {
-        models.remove(&model_id);
-    }
-
-    save_openclaw_config(&config)?;
-    info!("[移除模型] ✓ 模型 {} 已移除", model_id);
-
-    Ok(format!("模型 {} 已移除", model_id))
-}
 
 // ============ 旧版兼容 ============
 
@@ -923,11 +903,12 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
         ("feishu", "feishu", vec!["testChatId"]),
         ("whatsapp", "whatsapp", vec![]),
         ("imessage", "imessage", vec![]),
-        ("wechat", "wechat", vec![]),
         ("wecom", "wecom", vec![]),
         ("dingtalk", "dingtalk", vec![]),
         ("qqbot", "qqbot", vec![]),
     ];
+    
+    let array_fields = vec!["allowFrom", "groupAllowFrom"];
     
     for (channel_id, channel_type, test_fields) in channel_types {
         let channel_config = channels_obj.get(channel_id);
@@ -940,10 +921,39 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
         // 将渠道配置转换为 HashMap
         let mut config_map: HashMap<String, Value> = if let Some(cfg) = channel_config {
             if let Some(obj) = cfg.as_object() {
-                obj.iter()
-                    .filter(|(k, _)| *k != "enabled") // 排除 enabled 字段
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect()
+                let mut map = HashMap::new();
+                for (k, v) in obj {
+                    if k == "enabled" {
+                        continue;
+                    }
+                    if array_fields.contains(&k.as_str()) {
+                        if let Some(arr) = v.as_array() {
+                            let strings: Vec<String> = arr.iter()
+                                .filter_map(|item| {
+                                    if let Some(s) = item.as_str() {
+                                        Some(s.to_string())
+                                    } else if let Some(n) = item.as_i64() {
+                                        Some(n.to_string())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            map.insert(k.clone(), json!(strings.join(", ")));
+                            continue;
+                        }
+                    }
+                    map.insert(k.clone(), v.clone());
+                }
+                // Discord botToken -> token migration on read
+                if channel_id == "discord" {
+                    if let Some(bt) = map.remove("botToken") {
+                        if !map.contains_key("token") {
+                            map.insert("token".to_string(), bt);
+                        }
+                    }
+                }
+                map
             } else {
                 HashMap::new()
             }
@@ -1010,6 +1020,7 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
     
     // 这些字段只用于测试，不保存到 openclaw.json，而是保存到 env 文件
     let test_only_fields = vec!["userId", "testChatId", "testChannelId"];
+    let array_fields = vec!["allowFrom", "groupAllowFrom"];
     
     // 构建渠道配置
     let mut channel_obj = json!({
@@ -1027,6 +1038,25 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
             );
             if let Some(val_str) = value.as_str() {
                 let _ = file::set_env_value(&env_path, &env_key, val_str);
+            }
+        } else if array_fields.contains(&key.as_str()) {
+            // 处理字符串逗号分隔数组类型转换
+            if let Some(s) = value.as_str() {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    channel_obj[key] = json!([]);
+                } else {
+                    let arr: Vec<String> = trimmed
+                        .split(',')
+                        .map(|part| part.trim().to_string())
+                        .filter(|part| !part.is_empty())
+                        .collect();
+                    channel_obj[key] = json!(arr);
+                }
+            } else if value.is_array() {
+                channel_obj[key] = value.clone();
+            } else {
+                channel_obj[key] = json!([]);
             }
         } else {
             // 保存到 openclaw.json
@@ -1103,32 +1133,6 @@ pub async fn clear_channel_config(channel_id: String) -> Result<String, String> 
 }
 
 // ============ 飞书插件管理 ============
-
-/// 飞书插件状态
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FeishuPluginStatus {
-    pub installed: bool,
-    pub version: Option<String>,
-    pub plugin_name: Option<String>,
-}
-
-/// 检查飞书插件是否已安装（桌面端已内置所有插件，始终返回已安装）
-#[command]
-pub async fn check_feishu_plugin() -> Result<FeishuPluginStatus, String> {
-    info!("[飞书插件] 桌面端已内置飞书插件，直接返回已安装");
-    Ok(FeishuPluginStatus {
-        installed: true,
-        version: None,
-        plugin_name: Some("feishu (bundled)".to_string()),
-    })
-}
-
-/// 安装飞书插件（桌面端已内置所有插件，直接返回成功）
-#[command]
-pub async fn install_feishu_plugin() -> Result<String, String> {
-    info!("[飞书插件] 桌面端已内置飞书插件，无需安装");
-    Ok("飞书插件已内置，无需安装".to_string())
-}
 
 /// 确保所有内置渠道插件在配置中已启用
 /// 桌面端内置了所有渠道插件，启动时调用此函数预写 plugins.entries

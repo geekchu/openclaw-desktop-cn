@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Deploy openclawcn_web static export to production server via SSH/SFTP."""
+import getpass
 import paramiko
 import os
 import sys
 
 HOST = "47.57.241.17"
 USER = "root"
-PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD", "Wqx505@550719")
+PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD") or getpass.getpass(f"SSH password for {USER}@{HOST}: ")
 REMOTE_DIR = "/var/www/openclawcn_web"
 LOCAL_DIR = os.path.dirname(os.path.abspath(__file__))
 

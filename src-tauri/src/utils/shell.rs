@@ -752,12 +752,7 @@ pub fn load_openclaw_env_vars() -> HashMap<String, String> {
     env_vars
 }
 
-/// 后台启动 openclaw gateway
-/// 与 shell 脚本行为一致：先加载 env 文件，再启动 gateway
-pub fn spawn_openclaw_gateway() -> io::Result<()> {
-    let _child = spawn_openclaw_gateway_with_handle()?;
-    Ok(())
-}
+
 
 /// 后台启动 openclaw gateway 并返回 Child handle
 /// 优先使用 bundle 模式（node + openclaw.mjs），回退到全局 openclaw 命令
@@ -793,7 +788,7 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
         let mut cmd = Command::new(&node_path);
         cmd.arg(&entry_point);
-        cmd.args(["gateway", "--port", "28789", "--bind", "lan", "--desktop-internal", "--force", "--allow-unconfigured"]);
+        cmd.args(["gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         cmd.current_dir(&bundle_dir);
 
         for (key, value) in &user_env_vars {
@@ -892,11 +887,11 @@ pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
 
     let mut cmd = if openclaw_path.ends_with(".cmd") {
         let mut c = Command::new("cmd");
-        c.args(["/c", &openclaw_path, "gateway", "--port", "28789", "--bind", "lan", "--desktop-internal", "--force", "--allow-unconfigured"]);
+        c.args(["/c", &openclaw_path, "gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         c
     } else {
         let mut c = Command::new(&openclaw_path);
-        c.args(["gateway", "--port", "28789", "--bind", "lan", "--desktop-internal", "--force", "--allow-unconfigured"]);
+        c.args(["gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         c
     };
 

@@ -1,7 +1,24 @@
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
-import { DWClient, TOPIC_ROBOT } from "dingtalk-stream";
 import { randomUUID } from "node:crypto";
+import { DWClient, TOPIC_ROBOT } from "dingtalk-stream";
+import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import { buildChannelConfigSchema } from "openclaw/plugin-sdk";
+import { getAccessToken } from "./auth.js";
+import { createAICard, streamAICard, finishAICard } from "./card-service.js";
+import { DingTalkConfigSchema } from "./config-schema.js";
+import { getConfig, isConfigured, resolveRelativePath, stripTargetPrefix } from "./config.js";
+import { ConnectionManager } from "./connection-manager.js";
+import { isMessageProcessed, markMessageProcessed } from "./dedup.js";
+import { handleDingTalkMessage } from "./inbound-handler.js";
+import { getLogger } from "./logger-context.js";
+import { dingtalkOnboardingAdapter } from "./onboarding.js";
+import { resolveOriginalPeerId } from "./peer-id-registry.js";
+import {
+  detectMediaTypeFromExtension,
+  sendMessage,
+  sendProactiveMedia,
+  sendBySession,
+  uploadMedia,
+} from "./send-service.js";
 import type {
   DingTalkInboundMessage,
   GatewayStartContext,
@@ -9,30 +26,13 @@ import type {
   ConnectionManagerConfig,
   DingTalkChannelPlugin,
   ResolvedAccount,
-} from "./types";
-import { getAccessToken } from "./auth";
-import { createAICard, streamAICard, finishAICard } from "./card-service";
-import { getConfig, isConfigured, resolveRelativePath, stripTargetPrefix } from "./config";
-import { DingTalkConfigSchema } from "./config-schema.js";
-import { ConnectionManager } from "./connection-manager";
-import { isMessageProcessed, markMessageProcessed } from "./dedup";
-import { handleDingTalkMessage } from "./inbound-handler";
-import { getLogger } from "./logger-context";
-import { dingtalkOnboardingAdapter } from "./onboarding.js";
-import { resolveOriginalPeerId } from "./peer-id-registry";
-import {
-  detectMediaTypeFromExtension,
-  sendMessage,
-  sendProactiveMedia,
-  sendBySession,
-  uploadMedia,
-} from "./send-service";
-import { ConnectionState } from "./types";
+} from "./types.js";
+import { ConnectionState } from "./types.js";
 import {
   cleanupOrphanedTempFiles,
   formatDingTalkErrorPayloadLog,
   getCurrentTimestamp,
-} from "./utils";
+} from "./utils.js";
 
 const processingDedupKeys = new Set<string>();
 const inboundCountersByAccount = new Map<
@@ -582,4 +582,4 @@ export {
   getAccessToken,
   getLogger,
 };
-export { detectMediaTypeFromExtension } from "./media-utils";
+export { detectMediaTypeFromExtension } from "./media-utils.js";

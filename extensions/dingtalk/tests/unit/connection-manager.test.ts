@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConnectionManager } from "../../src/connection-manager";
-import { ConnectionState } from "../../src/types";
+import { ConnectionManager } from "../../src/connection-manager.js";
+import { ConnectionState } from "../../src/types.js";
 
 describe("ConnectionManager", () => {
   beforeEach(() => {

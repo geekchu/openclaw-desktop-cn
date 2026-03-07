@@ -6,7 +6,6 @@
  */
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { TaskLogsElement } from "./task-logs";
 import { checkForUpdate, downloadUpdate, installUpdate } from "./updater.js";
 
 export const CLAW_CONFIG_SYSTEM = "claw-config-system";
@@ -23,7 +22,9 @@ function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promi
 function getNestedValue(obj: Record<string, unknown>, path: string[]): unknown {
   let cur: unknown = obj;
   for (const k of path) {
-    if (cur == null || typeof cur !== "object") return undefined;
+    if (cur == null || typeof cur !== "object") {
+      return undefined;
+    }
     cur = (cur as Record<string, unknown>)[k];
   }
   return cur;
@@ -31,7 +32,9 @@ function getNestedValue(obj: Record<string, unknown>, path: string[]): unknown {
 function ensurePath(obj: Record<string, unknown>, path: string[]) {
   let cur = obj;
   for (const k of path) {
-    if (cur[k] == null || typeof cur[k] !== "object") cur[k] = {};
+    if (cur[k] == null || typeof cur[k] !== "object") {
+      cur[k] = {};
+    }
     cur = cur[k] as Record<string, unknown>;
   }
 }
@@ -85,23 +88,30 @@ export class SystemSettingsView extends LitElement {
     try {
       const cfg = (await invoke<Record<string, unknown>>("get_config")) ?? {};
       const secMode = getNestedValue(cfg, ["tools", "exec", "security"]);
-      if (secMode === "deny" || secMode === "allowlist" || secMode === "full")
+      if (secMode === "deny" || secMode === "allowlist" || secMode === "full") {
         this.execSecurity = secMode;
+      }
       const askMode = getNestedValue(cfg, ["tools", "exec", "ask"]);
-      if (askMode === "off" || askMode === "on-miss" || askMode === "always")
+      if (askMode === "off" || askMode === "on-miss" || askMode === "always") {
         this.execAsk = askMode;
+      }
       const profile = getNestedValue(cfg, ["tools", "profile"]);
       if (
         profile === "minimal" ||
         profile === "coding" ||
         profile === "messaging" ||
         profile === "full"
-      )
+      ) {
         this.toolProfile = profile;
+      }
       const fsMode = getNestedValue(cfg, ["tools", "fs", "workspaceOnly"]);
-      if (typeof fsMode === "boolean") this.fsWorkspaceOnly = fsMode;
+      if (typeof fsMode === "boolean") {
+        this.fsWorkspaceOnly = fsMode;
+      }
       const fsDirs = getNestedValue(cfg, ["tools", "fs", "allowedDirs"]);
-      if (Array.isArray(fsDirs)) this.fsAllowedDirs = fsDirs.filter((f) => typeof f === "string");
+      if (Array.isArray(fsDirs)) {
+        this.fsAllowedDirs = fsDirs.filter((f) => typeof f === "string");
+      }
       try {
         const desktop = (await invoke<Record<string, unknown>>("get_desktop_config")) ?? {};
         const ident = desktop.identity as Record<string, unknown> | undefined;
@@ -167,31 +177,41 @@ export class SystemSettingsView extends LitElement {
   }
 
   private _handleSecurityChange(mode: typeof this.execSecurity) {
-    if (mode === this.execSecurity) return;
+    if (mode === this.execSecurity) {
+      return;
+    }
     this.execSecurity = mode;
     clearTimeout(this._securityTimer);
     // 切换到非 allowlist 模式时，取消待执行的 ask 保存定时器
-    if (mode !== "allowlist") clearTimeout(this._askTimer);
+    if (mode !== "allowlist") {
+      clearTimeout(this._askTimer);
+    }
     this._securityTimer = setTimeout(
       () => this._saveField(["tools", "exec"], "security", mode),
       300,
     );
   }
   private _handleAskChange(mode: typeof this.execAsk) {
-    if (mode === this.execAsk) return;
+    if (mode === this.execAsk) {
+      return;
+    }
     this.execAsk = mode;
     clearTimeout(this._askTimer);
     this._askTimer = setTimeout(() => this._saveField(["tools", "exec"], "ask", mode), 300);
   }
   private _handleProfileChange(profile: typeof this.toolProfile) {
-    if (profile === this.toolProfile) return;
+    if (profile === this.toolProfile) {
+      return;
+    }
     this.toolProfile = profile;
     clearTimeout(this._profileTimer);
     this._profileTimer = setTimeout(() => this._saveField(["tools"], "profile", profile), 300);
   }
   private _fsTimer?: ReturnType<typeof setTimeout>;
   private _handleFsChange(workspaceOnly: boolean) {
-    if (workspaceOnly === this.fsWorkspaceOnly) return;
+    if (workspaceOnly === this.fsWorkspaceOnly) {
+      return;
+    }
     this.fsWorkspaceOnly = workspaceOnly;
     clearTimeout(this._fsTimer);
     this._fsTimer = setTimeout(
@@ -224,7 +244,9 @@ export class SystemSettingsView extends LitElement {
 
   private async _handleRemoveAllowlistEntry(index: number) {
     const removed = this.allowlistEntries[index];
-    if (!removed) return;
+    if (!removed) {
+      return;
+    }
     const next = [...this.allowlistEntries];
     next.splice(index, 1);
     this.allowlistEntries = next;
@@ -232,7 +254,7 @@ export class SystemSettingsView extends LitElement {
     try {
       const freshData = (await invoke<Record<string, unknown>>("get_exec_approvals")) ?? {};
       const agents = { ...((freshData.agents ?? {}) as Record<string, Record<string, unknown>>) };
-      const mainAgent = { ...(agents.main ?? {}) };
+      const mainAgent = { ...agents.main };
       const currentList = Array.isArray(mainAgent.allowlist)
         ? ([...mainAgent.allowlist] as Array<Record<string, unknown>>)
         : [];
@@ -283,7 +305,9 @@ export class SystemSettingsView extends LitElement {
   }
 
   private async _toggleAutoStart() {
-    if (this.autoStartBusy) return;
+    if (this.autoStartBusy) {
+      return;
+    }
     this.autoStartBusy = true;
     try {
       if (this.autoStart) {
@@ -1234,7 +1258,9 @@ export class SystemSettingsView extends LitElement {
 
   private async _handleRestart() {
     const t = (window as any).__TAURI__;
-    if (!t?.core?.invoke) return;
+    if (!t?.core?.invoke) {
+      return;
+    }
     // 先彻底关闭 Gateway 子进程，释放文件锁，防止安装更新时冲突
     try {
       await t.core.invoke("stop_gateway");

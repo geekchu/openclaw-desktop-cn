@@ -228,7 +228,9 @@ function launchDockerDesktop(): boolean {
 }
 
 async function ensureDockerDaemon(): Promise<void> {
-  if (await isDockerDaemonReady()) return;
+  if (await isDockerDaemonReady()) {
+    return;
+  }
 
   // Check if Docker CLI is installed at all
   if (!(await isDockerInstalled())) {
@@ -238,7 +240,9 @@ async function ensureDockerDaemon(): Promise<void> {
   }
 
   // Docker installed but daemon not running — try auto-start (non-Windows only)
-  if (dockerAutoStartAttempted) return;
+  if (dockerAutoStartAttempted) {
+    return;
+  }
   dockerAutoStartAttempted = true;
 
   const launched = launchDockerDesktop();

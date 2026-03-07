@@ -22,6 +22,7 @@ type AuthChoiceFlagOptions = Pick<
   | "syntheticApiKey"
   | "veniceApiKey"
   | "togetherApiKey"
+  | "huggingfaceApiKey"
   | "zaiApiKey"
   | "xiaomiApiKey"
   | "minimaxApiKey"

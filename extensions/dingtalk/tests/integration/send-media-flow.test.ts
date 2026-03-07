@@ -23,9 +23,9 @@ vi.mock("../../src/send-service", async () => ({
   uploadMedia: vi.fn(),
 }));
 
-import { dingtalkPlugin } from "../../src/channel";
+import { dingtalkPlugin } from "../../src/channel.js";
 
-describe("dingtalkPlugin.outbound.sendMedia flow", () => {
+describe("(dingtalkPlugin as any).outbound.sendMedia flow", () => {
   beforeEach(() => {
     detectMediaTypeFromExtensionMock.mockReset();
     sendProactiveMediaMock.mockReset();
@@ -39,12 +39,12 @@ describe("dingtalkPlugin.outbound.sendMedia flow", () => {
       messageId: "media_1",
     });
 
-    const result = await dingtalkPlugin.outbound.sendMedia({
+    const result = await (dingtalkPlugin as any).outbound.sendMedia({
       cfg: { channels: { dingtalk: { clientId: "id", clientSecret: "sec" } } },
       to: "cidA1B2C3",
       mediaPath: "./fixtures/photo.png",
       accountId: "default",
-    });
+    } as any);
 
     expect(detectMediaTypeFromExtensionMock).toHaveBeenCalledWith(
       path.resolve("./fixtures/photo.png"),
@@ -71,13 +71,13 @@ describe("dingtalkPlugin.outbound.sendMedia flow", () => {
       messageId: "manual_1",
     });
 
-    await dingtalkPlugin.outbound.sendMedia({
+    await (dingtalkPlugin as any).outbound.sendMedia({
       cfg: { channels: { dingtalk: { clientId: "id", clientSecret: "sec" } } },
       to: "user_123",
       mediaPath: "/tmp/voice.wav",
       mediaType: "voice",
       accountId: "default",
-    });
+    } as any);
 
     expect(detectMediaTypeFromExtensionMock).not.toHaveBeenCalled();
     expect(sendProactiveMediaMock).toHaveBeenCalledWith(
@@ -94,12 +94,12 @@ describe("dingtalkPlugin.outbound.sendMedia flow", () => {
     sendProactiveMediaMock.mockResolvedValueOnce({ ok: false, error: "DingTalk API error 300001" });
 
     await expect(
-      dingtalkPlugin.outbound.sendMedia({
+      (dingtalkPlugin as any).outbound.sendMedia({
         cfg: { channels: { dingtalk: { clientId: "id", clientSecret: "sec" } } },
         to: "cidA1B2C3",
         mediaPath: "/tmp/doc.pdf",
         accountId: "default",
-      }),
+      } as any),
     ).rejects.toThrow(/300001/);
   });
 });

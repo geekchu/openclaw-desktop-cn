@@ -135,3 +135,7 @@ dist/protocol.schema.json
 
 # Synthing
 **/.stfolder/
+
+# Debug / profiling artifacts
+cpu-profile.txt
+isolate-*.log

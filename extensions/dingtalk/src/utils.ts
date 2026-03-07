@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Logger, RetryOptions } from "./types";
+import type { Logger, RetryOptions } from "./types.js";
 
 /**
  * Mask sensitive fields in data for safe logging

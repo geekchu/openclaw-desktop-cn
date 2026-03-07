@@ -2,7 +2,6 @@ import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { until } from "lit/directives/until.js";
 import type { AssistantIdentity } from "../assistant-identity.ts";
-import type { MessageGroup } from "../types/chat-types.ts";
 import { toSanitizedMarkdownHtmlAsync } from "../markdown.ts";
 import { openExternalUrlSafe } from "../open-external-url.ts";
 import { detectTextDirection } from "../text-direction.ts";

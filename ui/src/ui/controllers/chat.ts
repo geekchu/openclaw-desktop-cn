@@ -304,11 +304,6 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload): C
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
-    // Immediately append the final assistant message so the UI updates
-    // without waiting for the async loadChatHistory() round-trip.
-    if (payload.message) {
-      state.chatMessages = [...state.chatMessages, payload.message];
-    }
   } else if (payload.state === "aborted") {
     const normalizedMessage = normalizeAbortedAssistantMessage(payload.message);
     if (normalizedMessage && !isAssistantSilentReply(normalizedMessage)) {

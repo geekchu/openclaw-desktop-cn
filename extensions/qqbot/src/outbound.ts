@@ -4,7 +4,6 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import type { ResolvedQQBotAccount } from "./types.js";
 import {
   getAccessToken,
   sendC2CMessage,
@@ -15,6 +14,7 @@ import {
   sendC2CImageMessage,
   sendGroupImageMessage,
 } from "./api.js";
+import type { ResolvedQQBotAccount } from "./types.js";
 import { decodeCronPayload } from "./utils/payload.js";
 
 // ============ 消息回复限流器 ============

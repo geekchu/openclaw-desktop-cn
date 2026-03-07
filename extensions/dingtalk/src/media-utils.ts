@@ -5,13 +5,13 @@
  * Provides functions for media type detection and file upload to DingTalk media servers.
  */
 
-import axios from "axios";
-import FormData from "form-data";
 import * as fs from "fs";
 import { promises as fsPromises } from "fs";
 import * as path from "path";
-import type { DingTalkConfig, Logger } from "./types";
-import { formatDingTalkErrorPayloadLog } from "./utils";
+import axios from "axios";
+import FormData from "form-data";
+import type { DingTalkConfig, Logger } from "./types.js";
+import { formatDingTalkErrorPayloadLog } from "./utils.js";
 
 export type DingTalkMediaType = "image" | "voice" | "video" | "file";
 

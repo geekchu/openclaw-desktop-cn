@@ -56,7 +56,7 @@ import {
   downloadMedia,
   handleDingTalkMessage,
   resetProactivePermissionHintStateForTest,
-} from "../../src/inbound-handler";
+} from "../../src/inbound-handler.js";
 
 const mockedAxiosPost = vi.mocked(axios.post);
 const mockedAxiosGet = vi.mocked(axios.get);

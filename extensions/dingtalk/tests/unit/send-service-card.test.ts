@@ -26,8 +26,8 @@ vi.mock("../../src/card-service", () => ({
   deleteActiveCardByTarget: cardMocks.deleteActiveCardByTargetMock,
 }));
 
-import { sendMessage } from "../../src/send-service";
-import { AICardStatus } from "../../src/types";
+import { sendMessage } from "../../src/send-service.js";
+import { AICardStatus } from "../../src/types.js";
 
 const mockedAxios = vi.mocked(axios);
 

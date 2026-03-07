@@ -10,7 +10,9 @@ let _mountedContainer: HTMLElement | null = null;
 let _preloadScheduled = false;
 
 function ensureIframe(container: HTMLElement) {
-  if (_mountedContainer === container && _iframe) return;
+  if (_mountedContainer === container && _iframe) {
+    return;
+  }
 
   // 清理旧 iframe
   if (_iframe && _iframe.parentElement) {

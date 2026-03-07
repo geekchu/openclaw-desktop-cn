@@ -7,6 +7,7 @@ import {
 import { listChannelPlugins } from "../channels/plugins/index.js";
 import type { ChannelAccountSnapshot, ChannelPlugin } from "../channels/plugins/types.js";
 import { type OpenClawConfig, loadConfig } from "../config/config.js";
+import { formatErrorMessage } from "../infra/errors.js";
 import { DEFAULT_ACCOUNT_ID } from "../routing/session-key.js";
 import { theme } from "../terminal/theme.js";
 import { formatTimeAgo } from "./format-time/format-relative.ts";
@@ -101,102 +102,110 @@ export async function buildChannelSummary(
     resolved.colorize && color ? color(value) : value;
 
   for (const plugin of listChannelPlugins()) {
-    const accountIds = plugin.config.listAccountIds(effective);
-    const defaultAccountId =
-      plugin.config.defaultAccountId?.(effective) ?? accountIds[0] ?? DEFAULT_ACCOUNT_ID;
-    const resolvedAccountIds = accountIds.length > 0 ? accountIds : [defaultAccountId];
-    const entries: ChannelAccountEntry[] = [];
-
-    for (const accountId of resolvedAccountIds) {
-      const account = plugin.config.resolveAccount(effective, accountId);
-      const enabled = resolveChannelAccountEnabled({ plugin, account, cfg: effective });
-      const configured = await resolveChannelAccountConfigured({
-        plugin,
-        account,
-        cfg: effective,
-      });
-      const snapshot = buildChannelAccountSnapshot({
-        plugin,
-        account,
-        cfg: effective,
-        accountId,
-        enabled,
-        configured,
-      });
-      entries.push({ accountId, account, enabled, configured, snapshot });
-    }
-
-    const configuredEntries = entries.filter((entry) => entry.configured);
-    const anyEnabled = entries.some((entry) => entry.enabled);
-    const fallbackEntry =
-      entries.find((entry) => entry.accountId === defaultAccountId) ?? entries[0];
-    const summary = plugin.status?.buildChannelSummary
-      ? await plugin.status.buildChannelSummary({
-          account: fallbackEntry?.account ?? {},
-          cfg: effective,
-          defaultAccountId,
-          snapshot:
-            fallbackEntry?.snapshot ?? ({ accountId: defaultAccountId } as ChannelAccountSnapshot),
-        })
-      : undefined;
-
-    const summaryRecord = summary;
-    const linked =
-      summaryRecord && typeof summaryRecord.linked === "boolean" ? summaryRecord.linked : null;
-    const configured =
-      summaryRecord && typeof summaryRecord.configured === "boolean"
-        ? summaryRecord.configured
-        : configuredEntries.length > 0;
-
-    const status = !anyEnabled
-      ? "disabled"
-      : linked !== null
-        ? linked
-          ? "linked"
-          : "not linked"
-        : configured
-          ? "configured"
-          : "not configured";
-
-    const statusColor =
-      status === "linked" || status === "configured"
-        ? theme.success
-        : status === "not linked"
-          ? theme.error
-          : theme.muted;
     const baseLabel = plugin.meta.label ?? plugin.id;
-    let line = `${baseLabel}: ${status}`;
+    try {
+      const accountIds = plugin.config.listAccountIds(effective);
+      const defaultAccountId =
+        plugin.config.defaultAccountId?.(effective) ?? accountIds[0] ?? DEFAULT_ACCOUNT_ID;
+      const resolvedAccountIds = accountIds.length > 0 ? accountIds : [defaultAccountId];
+      const entries: ChannelAccountEntry[] = [];
 
-    const authAgeMs =
-      summaryRecord && typeof summaryRecord.authAgeMs === "number" ? summaryRecord.authAgeMs : null;
-    const self = summaryRecord?.self as { e164?: string | null } | undefined;
-    if (self?.e164) {
-      line += ` ${self.e164}`;
-    }
-    if (authAgeMs != null && authAgeMs >= 0) {
-      line += ` auth ${formatTimeAgo(authAgeMs)}`;
-    }
-
-    lines.push(tint(line, statusColor));
-
-    if (configuredEntries.length > 0) {
-      for (const entry of configuredEntries) {
-        const details = buildAccountDetails({
-          entry,
+      for (const accountId of resolvedAccountIds) {
+        const account = plugin.config.resolveAccount(effective, accountId);
+        const enabled = resolveChannelAccountEnabled({ plugin, account, cfg: effective });
+        const configured = await resolveChannelAccountConfigured({
           plugin,
+          account,
           cfg: effective,
-          includeAllowFrom: resolved.includeAllowFrom,
         });
-        lines.push(
-          accountLine(
-            formatAccountLabel({
-              accountId: entry.accountId,
-              name: entry.snapshot.name,
-            }),
-            details,
-          ),
-        );
+        const snapshot = buildChannelAccountSnapshot({
+          plugin,
+          account,
+          cfg: effective,
+          accountId,
+          enabled,
+          configured,
+        });
+        entries.push({ accountId, account, enabled, configured, snapshot });
       }
+
+      const configuredEntries = entries.filter((entry) => entry.configured);
+      const anyEnabled = entries.some((entry) => entry.enabled);
+      const fallbackEntry =
+        entries.find((entry) => entry.accountId === defaultAccountId) ?? entries[0];
+      const summary = plugin.status?.buildChannelSummary
+        ? await plugin.status.buildChannelSummary({
+            account: fallbackEntry?.account ?? {},
+            cfg: effective,
+            defaultAccountId,
+            snapshot:
+              fallbackEntry?.snapshot ??
+              ({ accountId: defaultAccountId } as ChannelAccountSnapshot),
+          })
+        : undefined;
+
+      const summaryRecord = summary;
+      const linked =
+        summaryRecord && typeof summaryRecord.linked === "boolean" ? summaryRecord.linked : null;
+      const configured =
+        summaryRecord && typeof summaryRecord.configured === "boolean"
+          ? summaryRecord.configured
+          : configuredEntries.length > 0;
+
+      const status = !anyEnabled
+        ? "disabled"
+        : linked !== null
+          ? linked
+            ? "linked"
+            : "not linked"
+          : configured
+            ? "configured"
+            : "not configured";
+
+      const statusColor =
+        status === "linked" || status === "configured"
+          ? theme.success
+          : status === "not linked"
+            ? theme.error
+            : theme.muted;
+      let line = `${baseLabel}: ${status}`;
+
+      const authAgeMs =
+        summaryRecord && typeof summaryRecord.authAgeMs === "number"
+          ? summaryRecord.authAgeMs
+          : null;
+      const self = summaryRecord?.self as { e164?: string | null } | undefined;
+      if (self?.e164) {
+        line += ` ${self.e164}`;
+      }
+      if (authAgeMs != null && authAgeMs >= 0) {
+        line += ` auth ${formatTimeAgo(authAgeMs)}`;
+      }
+
+      lines.push(tint(line, statusColor));
+
+      if (configuredEntries.length > 0) {
+        for (const entry of configuredEntries) {
+          const details = buildAccountDetails({
+            entry,
+            plugin,
+            cfg: effective,
+            includeAllowFrom: resolved.includeAllowFrom,
+          });
+          lines.push(
+            accountLine(
+              formatAccountLabel({
+                accountId: entry.accountId,
+                name: entry.snapshot.name,
+              }),
+              details,
+            ),
+          );
+        }
+      }
+    } catch (err) {
+      // Keep aggregate status usable even when one channel plugin crashes.
+      lines.push(tint(`${baseLabel}: error (${formatErrorMessage(err)})`, theme.error));
     }
   }
 

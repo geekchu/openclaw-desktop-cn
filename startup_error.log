@@ -1,163 +1,0 @@
-       Debug [tauri_cli::helpers::app_paths] Found Tauri project inside F:\openclaw-desktop-cn\src-tauri on early lookup
-     Running [tauri_cli::interface::rust::desktop] DevCommand (`cargo  run --no-default-features --color always --`)
-[1m[92m   Compiling[0m openclaw-desktop v0.1.0 (F:\openclaw-desktop-cn\src-tauri)
-[1m[96m    Building[0m [==> ] 471/473[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: unused imports: `ModelCostConfig`, `OpenClawConfig`, and `ProviderConfig`[0m
- [1m[96m--> [0msrc\commands\config.rs:3:18
-  [1m[96m|[0m
-[1m[96m3[0m [1m[96m|[0m     ModelConfig, ModelCostConfig, OfficialProvider, OpenClawConfig,
-  [1m[96m|[0m                  [1m[93m^^^^^^^^^^^^^^^[0m                    [1m[93m^^^^^^^^^^^^^^[0m
-[1m[96m4[0m [1m[96m|[0m     ProviderConfig, SuggestedModel,
-  [1m[96m|[0m     [1m[93m^^^^^^^^^^^^^^[0m
-  [1m[96m|[0m
-  [1m[96m= [0m[1m[97mnote[0m: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: unused import: `error`[0m
- [1m[96m--> [0msrc\commands\diagnostics.rs:4:23
-  [1m[96m|[0m
-[1m[96m4[0m [1m[96m|[0m use log::{info, warn, error, debug};
-  [1m[96m|[0m                       [1m[93m^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: unreachable expression[0m
-   [1m[96m--> [0msrc\commands\diagnostics.rs:736:13
-    [1m[96m|[0m
-[1m[96m733[0m [1m[96m|[0m                 return Err("Windows 暂不支持自动启动终端，请手动运行: openclaw channels login --channel whatsapp".to_string());
-    [1m[96m|[0m                 [1m[96m--------------------------------------------------------------------------------------------------------------[0m [1m[96many code following this expression is unreachable[0m
-[1m[96m...[0m
-[1m[96m736[0m [1m[96m|[0m             Ok("已在新终端窗口中启动 WhatsApp 登录，请查看弹出的终端窗口并扫描二维码".to_string())
-    [1m[96m|[0m             [1m[93m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m [1m[93munreachable expression[0m
-    [1m[96m|[0m
-    [1m[96m= [0m[1m[97mnote[0m: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: function `send_test_message` is never used[0m
-   [1m[96m--> [0msrc\commands\diagnostics.rs:491:14
-    [1m[96m|[0m
-[1m[96m491[0m [1m[96m|[0m pub async fn send_test_message(channel_type: String, target: String) -> Result<ChannelTestResult, String> {
-    [1m[96m|[0m              [1m[93m^^^^^^^^^^^^^^^^^[0m
-    [1m[96m|[0m
-    [1m[96m= [0m[1m[97mnote[0m: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
-
-[1m[93mwarning[0m[1m[97m: struct `InstallProgress` is never constructed[0m
-  [1m[96m--> [0msrc\commands\installer.rs:29:12
-   [1m[96m|[0m
-[1m[96m29[0m [1m[96m|[0m pub struct InstallProgress {
-   [1m[96m|[0m            [1m[93m^^^^^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: function `get_latest_openclaw_version` is never used[0m
-    [1m[96m--> [0msrc\commands\installer.rs:1008:4
-     [1m[96m|[0m
-[1m[96m1008[0m [1m[96m|[0m fn get_latest_openclaw_version() -> Option<String> {
-     [1m[96m|[0m    [1m[93m^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: function `compare_versions` is never used[0m
-    [1m[96m--> [0msrc\commands\installer.rs:1035:4
-     [1m[96m|[0m
-[1m[96m1035[0m [1m[96m|[0m fn compare_versions(current: &str, latest: &str) -> bool {
-     [1m[96m|[0m    [1m[93m^^^^^^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: function `get_node_version` is never used[0m
-  [1m[96m--> [0msrc\commands\process.rs:83:14
-   [1m[96m|[0m
-[1m[96m83[0m [1m[96m|[0m pub async fn get_node_version() -> Result<Option<String>, String> {
-   [1m[96m|[0m              [1m[93m^^^^^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: struct `OpenClawConfig` is never constructed[0m
- [1m[96m--> [0msrc\models\config.rs:6:12
-  [1m[96m|[0m
-[1m[96m6[0m [1m[96m|[0m pub struct OpenClawConfig {
-  [1m[96m|[0m            [1m[93m^^^^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: struct `AgentsConfig` is never constructed[0m
-  [1m[96m--> [0msrc\models\config.rs:29:12
-   [1m[96m|[0m
-[1m[96m29[0m [1m[96m|[0m pub struct AgentsConfig {
-   [1m[96m|[0m            [1m[93m^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: struct `AgentDefaults` is never constructed[0m
-  [1m[96m--> [0msrc\models\config.rs:37:12
-   [1m[96m|[0m
-[1m[96m37[0m [1m[96m|[0m pub struct AgentDefaults {
-   [1m[96m|[0m            [1m[93m^^^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: struct `AgentModelConfig` is never constructed[0m
-  [1m[96m--> [0msrc\models\config.rs:63:12
-   [1m[96m|[0m
-[1m[96m63[0m [1m[96m|[0m pub struct AgentModelConfig {
-   [1m[96m|[0m            [1m[93m^^^^^^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: struct `ModelsConfig` is never constructed[0m
-  [1m[96m--> [0msrc\models\config.rs:71:12
-   [1m[96m|[0m
-[1m[96m71[0m [1m[96m|[0m pub struct ModelsConfig {
-   [1m[96m|[0m            [1m[93m^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: struct `ProviderConfig` is never constructed[0m
-  [1m[96m--> [0msrc\models\config.rs:79:12
-   [1m[96m|[0m
-[1m[96m79[0m [1m[96m|[0m pub struct ProviderConfig {
-   [1m[96m|[0m            [1m[93m^^^^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: struct `GatewayConfig` is never constructed[0m
-   [1m[96m--> [0msrc\models\config.rs:133:12
-    [1m[96m|[0m
-[1m[96m133[0m [1m[96m|[0m pub struct GatewayConfig {
-    [1m[96m|[0m            [1m[93m^^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: struct `GatewayAuthConfig` is never constructed[0m
-   [1m[96m--> [0msrc\models\config.rs:144:12
-    [1m[96m|[0m
-[1m[96m144[0m [1m[96m|[0m pub struct GatewayAuthConfig {
-    [1m[96m|[0m            [1m[93m^^^^^^^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: struct `PluginsConfig` is never constructed[0m
-   [1m[96m--> [0msrc\models\config.rs:153:12
-    [1m[96m|[0m
-[1m[96m153[0m [1m[96m|[0m pub struct PluginsConfig {
-    [1m[96m|[0m            [1m[93m^^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: struct `MetaConfig` is never constructed[0m
-   [1m[96m--> [0msrc\models\config.rs:164:12
-    [1m[96m|[0m
-[1m[96m164[0m [1m[96m|[0m pub struct MetaConfig {
-    [1m[96m|[0m            [1m[93m^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: struct `EnvConfig` is never constructed[0m
-   [1m[96m--> [0msrc\models\config.rs:303:12
-    [1m[96m|[0m
-[1m[96m303[0m [1m[96m|[0m pub struct EnvConfig {
-    [1m[96m|[0m            [1m[93m^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: function `append_file` is never used[0m
-  [1m[96m--> [0msrc\utils\file.rs:20:8
-   [1m[96m|[0m
-[1m[96m20[0m [1m[96m|[0m pub fn append_file(path: &str, content: &str) -> io::Result<()> {
-   [1m[96m|[0m        [1m[93m^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: function `read_last_lines` is never used[0m
-  [1m[96m--> [0msrc\utils\file.rs:38:8
-   [1m[96m|[0m
-[1m[96m38[0m [1m[96m|[0m pub fn read_last_lines(path: &str, n: usize) -> io::Result<Vec<String>> {
-   [1m[96m|[0m        [1m[93m^^^^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: function `get_log_file_path` is never used[0m
-  [1m[96m--> [0msrc\utils\platform.rs:45:8
-   [1m[96m|[0m
-[1m[96m45[0m [1m[96m|[0m pub fn get_log_file_path() -> String {
-   [1m[96m|[0m        [1m[93m^^^^^^^^^^^^^^^^^[0m
-
-[1m[93mwarning[0m[1m[97m: function `run_script_output` is never used[0m
-   [1m[96m--> [0msrc\utils\shell.rs:218:8
-    [1m[96m|[0m
-[1m[96m218[0m [1m[96m|[0m pub fn run_script_output(script: &str) -> Result<String, String> {
-    [1m[96m|[0m        [1m[93m^^^^^^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m[1m[97m: function `spawn_background` is never used[0m
-   [1m[96m--> [0msrc\utils\shell.rs:227:8
-    [1m[96m|[0m
-[1m[96m227[0m [1m[96m|[0m pub fn spawn_background(script: &str) -> io::Result<()> {
-    [1m[96m|[0m        [1m[93m^^^^^^^^^^^^^^^^[0m
-
-[1m[96m    Building[0m [==> ] 472/473                             [1m[93mwarning[0m: `openclaw-desktop` (bin "openclaw-desktop") generated 24 warnings (run `cargo fix --bin "openclaw-desktop" -p openclaw-desktop` to apply 2 suggestions)
-[1m[91merror[0m: failed to remove file `F:\openclaw-desktop-cn\src-tauri\target\debug\openclaw-desktop.exe`
-
-Caused by:
-  拒绝访问。 (os error 5)

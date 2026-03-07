@@ -21,7 +21,7 @@ vi.mock("../../src/send-service", async () => ({
   uploadMedia: vi.fn(),
 }));
 
-import { dingtalkPlugin } from "../../src/channel";
+import { dingtalkPlugin } from "../../src/channel.js";
 
 describe("plugin outbound lifecycle", () => {
   beforeEach(() => {

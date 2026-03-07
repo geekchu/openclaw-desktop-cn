@@ -15,8 +15,8 @@ import type {
   ConnectionManagerConfig,
   ConnectionAttemptResult,
   Logger,
-} from "./types";
-import { ConnectionState as ConnectionStateEnum } from "./types";
+} from "./types.js";
+import { ConnectionState as ConnectionStateEnum } from "./types.js";
 
 /**
  * ConnectionManager handles the robust connection lifecycle for DWClient

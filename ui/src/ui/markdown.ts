@@ -147,11 +147,11 @@ export async function toSanitizedMarkdownHtmlAsync(markdown: string): Promise<st
     }
     return sanitized;
   }
-  const rendered = (await engine.marked.parse(`${truncated.text}${suffix}`, {
+  const rendered = await engine.marked.parse(`${truncated.text}${suffix}`, {
     renderer: engine.htmlEscapeRenderer,
     gfm: true,
     breaks: true,
-  })) as string;
+  });
   const sanitized = engine.DOMPurify.sanitize(rendered, sanitizeOptions);
   if (input.length <= MARKDOWN_CACHE_MAX_CHARS) {
     setCachedMarkdown(input, sanitized);

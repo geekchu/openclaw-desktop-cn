@@ -676,7 +676,9 @@ export class CustomProvidersView extends LitElement {
                 this.formCustomModelId = (e.target as HTMLInputElement).value;
               }}
               @keydown=${(e: KeyboardEvent) => {
-                if (e.key === "Enter") this.addCustomModel();
+                if (e.key === "Enter") {
+                  this.addCustomModel();
+                }
               }}
             />
             <button
@@ -773,8 +775,11 @@ export class CustomProvidersView extends LitElement {
         <div
           class="onestop-custom-card__header"
           @click=${() => {
-            if (expanded) this.expandedProviders.delete(provider.name);
-            else this.expandedProviders.add(provider.name);
+            if (expanded) {
+              this.expandedProviders.delete(provider.name);
+            } else {
+              this.expandedProviders.add(provider.name);
+            }
             this.requestUpdate();
           }}
         >
@@ -817,7 +822,7 @@ export class CustomProvidersView extends LitElement {
                 <!-- 模型列表 (当前模型置顶) -->
               <div class="onestop-custom-card__models">
                 ${[...provider.models]
-                  .sort((a, b) => (a.is_primary === b.is_primary ? 0 : a.is_primary ? -1 : 1))
+                  .toSorted((a, b) => (a.is_primary === b.is_primary ? 0 : a.is_primary ? -1 : 1))
                   .map(
                     (model) => html`
                       <div class="onestop-custom-model-row ${model.is_primary ? "primary" : ""}">

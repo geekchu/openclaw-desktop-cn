@@ -58,7 +58,7 @@ vi.mock("../../src/inbound-handler", () => ({
   handleDingTalkMessage: shared.handleDingTalkMessageMock,
 }));
 
-import { dingtalkPlugin } from "../../src/channel";
+import { dingtalkPlugin } from "../../src/channel.js";
 
 const startGatewayAccount = (ctx: any) => dingtalkPlugin.gateway!.startAccount!(ctx);
 

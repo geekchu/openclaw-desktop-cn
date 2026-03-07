@@ -122,18 +122,26 @@ function observeResize(container: HTMLElement) {
   _resizeObserver = new ResizeObserver(() => {
     const w = container.clientWidth;
     const h = container.clientHeight;
-    if (w === 0 || h === 0) return;
-    if (_resizeCooldown) return;
+    if (w === 0 || h === 0) {
+      return;
+    }
+    if (_resizeCooldown) {
+      return;
+    }
 
     // 仅在容器像素变化 >40px 时才重新 fit（排除滚动条/微小变化导致的抖动）
     const dw = Math.abs(w - _lastContainerW);
     const dh = Math.abs(h - _lastContainerH);
-    if (dw < 40 && dh < 40) return;
+    if (dw < 40 && dh < 40) {
+      return;
+    }
 
     _lastContainerW = w;
     _lastContainerH = h;
 
-    if (_fitTimer) clearTimeout(_fitTimer);
+    if (_fitTimer) {
+      clearTimeout(_fitTimer);
+    }
     _fitTimer = setTimeout(() => {
       _resizeCooldown = true;
       try {
@@ -180,8 +188,12 @@ function filterOutput(data: string): string {
 
 // 注册预期的控制键回显，500ms 内未匹配则自动过期
 function expectEchoStrip(...echoes: string[]) {
-  for (const e of echoes) _pendingEchoStrips.add(e);
-  if (_echoStripTimer) clearTimeout(_echoStripTimer);
+  for (const e of echoes) {
+    _pendingEchoStrips.add(e);
+  }
+  if (_echoStripTimer) {
+    clearTimeout(_echoStripTimer);
+  }
   _echoStripTimer = setTimeout(() => {
     _pendingEchoStrips.clear();
     _echoStripTimer = null;
@@ -190,7 +202,9 @@ function expectEchoStrip(...echoes: string[]) {
 
 // 从输出中移除预期的控制键回显（如 ^C）
 function stripExpectedEchoes(text: string): string {
-  if (_pendingEchoStrips.size === 0) return text;
+  if (_pendingEchoStrips.size === 0) {
+    return text;
+  }
   let result = text;
   for (const echo of _pendingEchoStrips) {
     if (result.includes(echo)) {
@@ -208,7 +222,9 @@ function stripExpectedEchoes(text: string): string {
 // ── PTY 会话管理 ──
 
 async function attachSession() {
-  if (_attachBusy) return;
+  if (_attachBusy) {
+    return;
+  }
   _attachBusy = true;
 
   // 重置命令拦截状态
@@ -239,7 +255,9 @@ async function attachSession() {
     if (tauri?.event?.listen) {
       _unlistenOutput = await tauri.event.listen("terminal-output", (event: any) => {
         const payload = event.payload;
-        if (!payload?.data) return;
+        if (!payload?.data) {
+          return;
+        }
         if (ready && payload.id === _sessionId) {
           const filtered = stripExpectedEchoes(filterOutput(payload.data));
           // DEBUG: 检查 ^f 来源
@@ -313,7 +331,9 @@ async function reattachSession(term: any): Promise<boolean> {
   if (tauri?.event?.listen) {
     _unlistenOutput = await tauri.event.listen("terminal-output", (event: any) => {
       const payload = event.payload;
-      if (!payload?.data) return;
+      if (!payload?.data) {
+        return;
+      }
       if (payload.id === _sessionId) {
         term.write(stripExpectedEchoes(filterOutput(payload.data)));
       }
@@ -353,7 +373,9 @@ async function reattachSession(term: any): Promise<boolean> {
 function updateStatusIndicator(status: "connected" | "exited" | "error") {
   const dot = document.getElementById("terminal-status-dot");
   const text = document.getElementById("terminal-status-text");
-  if (!dot || !text) return;
+  if (!dot || !text) {
+    return;
+  }
   dot.className = "terminal-status__dot";
   switch (status) {
     case "connected":
@@ -556,8 +578,12 @@ async function createTerminalInstance(container: HTMLElement) {
 
 async function initTerminal(container: HTMLElement) {
   // 如果终端已经挂载在同一个容器上，直接跳过（防止 lit 重渲染导致反复销毁重建）
-  if (_terminal && _currentContainer === container) return;
-  if (_initBusy) return;
+  if (_terminal && _currentContainer === container) {
+    return;
+  }
+  if (_initBusy) {
+    return;
+  }
 
   _initBusy = true;
   try {

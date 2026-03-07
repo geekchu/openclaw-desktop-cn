@@ -1,4 +1,4 @@
-import type { ChannelAccountSnapshot, ChannelStatusIssue } from "openclaw/plugin-sdk";
+import type { ChannelAccountSnapshot } from "openclaw/plugin-sdk";
 
 type ZalouserAccountStatus = {
   accountId?: unknown;
@@ -27,10 +27,8 @@ function readZalouserAccountStatus(value: ChannelAccountSnapshot): ZalouserAccou
   };
 }
 
-export function collectZalouserStatusIssues(
-  accounts: ChannelAccountSnapshot[],
-): ChannelStatusIssue[] {
-  const issues: ChannelStatusIssue[] = [];
+export function collectZalouserStatusIssues(accounts: ChannelAccountSnapshot[]): any[] {
+  const issues: any[] = [];
   for (const entry of accounts) {
     const account = readZalouserAccountStatus(entry);
     if (!account) {

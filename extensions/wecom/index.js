@@ -1816,7 +1816,12 @@ const plugin = {
     logger.info("WeCom channel registered");
 
     // Register HTTP handler for webhooks
-    api.registerHttpHandler(wecomHttpHandler);
+    api.registerHttpRoute({
+      path: "/webhooks/wecom",
+      handler: wecomHttpHandler,
+      auth: "plugin",
+      match: "prefix",
+    });
     logger.info("WeCom HTTP handler registered");
   },
 };

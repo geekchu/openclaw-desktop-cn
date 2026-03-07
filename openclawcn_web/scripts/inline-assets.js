@@ -16,7 +16,9 @@ function inlineAssets(htmlPath) {
   // Inline <link rel="stylesheet" href="...">
   html = html.replace(/<link\s+rel="stylesheet"\s+href="([^"]+)"[^>]*\/?>/g, (match, href) => {
     const file = path.join(OUT_DIR, href);
-    if (!fs.existsSync(file)) return match;
+    if (!fs.existsSync(file)) {
+      return match;
+    }
     const css = fs.readFileSync(file, "utf-8");
     return `<style>${css}</style>`;
   });
@@ -29,7 +31,9 @@ function inlineAssets(htmlPath) {
   // Inline favicon as data URI
   html = html.replace(/<link\s+rel="icon"\s+href="([^"]+)"[^>]*\/?>/g, (match, href) => {
     const file = path.join(OUT_DIR, href);
-    if (!fs.existsSync(file)) return match;
+    if (!fs.existsSync(file)) {
+      return match;
+    }
     const svg = fs.readFileSync(file, "utf-8");
     const dataUri = `data:image/svg+xml,${encodeURIComponent(svg)}`;
     return `<link rel="icon" href="${dataUri}" type="image/svg+xml"/>`;

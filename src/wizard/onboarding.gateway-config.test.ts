@@ -120,7 +120,6 @@ describe("configureGatewayForOnboarding", () => {
     const result = await runGatewayConfig({
       authChoice: "password",
     });
-    });
 
     const authConfig = result.nextConfig.gateway?.auth as { mode?: string; password?: string };
     expect(authConfig?.mode).toBe("password");

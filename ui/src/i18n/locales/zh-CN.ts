@@ -19,6 +19,7 @@ export const zh_CN: TranslationMap = {
     control: "控制",
     agent: "代理",
     settings: "设置",
+    tools: "工具",
     expand: "展开侧边栏",
     collapse: "折叠侧边栏",
   },
@@ -36,6 +37,7 @@ export const zh_CN: TranslationMap = {
     config: "配置",
     debug: "调试",
     logs: "日志",
+    terminal: "终端",
   },
   subtitles: {
     agents: "管理代理工作区、工具和身份。",
@@ -51,6 +53,7 @@ export const zh_CN: TranslationMap = {
     config: "安全地编辑 ~/.openclaw/openclaw.json。",
     debug: "网关快照、事件和手动 RPC 调用。",
     logs: "网关文件日志的实时追踪。",
+    terminal: "访问并控制底层终端环境。",
   },
   overview: {
     access: {

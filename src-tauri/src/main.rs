@@ -276,13 +276,16 @@ fn main() {
                 let _ = window.eval(r#"
                     document.documentElement.innerHTML = `
                     <head><meta charset="utf-8"><style>
-                        body{margin:0;background:#0f0f0f;display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:system-ui}
-                        .logo{font-size:72px;margin-bottom:24px}
-                        .spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,.15);border-top-color:rgba(255,255,255,.8);border-radius:50%;animation:spin .8s linear infinite}
-                        @keyframes spin{to{transform:rotate(360deg)}}
-                        .text{color:rgba(255,255,255,.5);font-size:13px;margin-top:18px}
+                        body{margin:0;background:radial-gradient(circle at center, #1a1a1a 0%, #050505 100%);display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;}
+                        .logo-container{animation:float 4s ease-in-out infinite;margin-bottom:24px;display:flex;justify-content:center;align-items:center;}
+                        .logo{font-size:80px;filter:drop-shadow(0 0 15px rgba(255,60,60,0.2));}
+                        .spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,.1);border-top-color:rgba(255,255,255,.9);border-radius:50%;animation:spin 1s cubic-bezier(0.68,-0.55,0.265,1.55) infinite;box-shadow:0 0 10px rgba(255,255,255,0.1);}
+                        .text{color:rgba(255,255,255,.6);font-size:14px;margin-top:20px;letter-spacing:1px;animation:pulse 2s ease-in-out infinite;}
+                        @keyframes float{0%,100%{transform:translateY(0px)}50%{transform:translateY(-10px)}}
+                        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+                        @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1;text-shadow:0 0 8px rgba(255,255,255,.3)}}
                     </style></head>
-                    <body><div class="logo">🦞</div><div class="spinner"></div><div class="text">正在启动...</div></body>`;
+                    <body><div class="logo-container"><div class="logo">🦞</div></div><div class="spinner"></div><div class="text">STARTING CORE...</div></body>`;
                 "#);
             }
 
@@ -386,10 +389,6 @@ fn main() {
             config::set_primary_model,
             config::switch_model,
             config::add_available_model,
-            config::remove_available_model,
-            // 飞书插件管理
-            config::check_feishu_plugin,
-            config::install_feishu_plugin,
             // 配对码审批
             config::list_pairing_requests,
             config::approve_pairing_code,

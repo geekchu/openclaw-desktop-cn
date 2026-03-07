@@ -40,8 +40,20 @@ impl GatewayManager {
         self.suppress_restart.load(Ordering::SeqCst)
     }
 
-    /// 启动 gateway 子进程
     pub fn start(&self) -> Result<(), String> {
+        let mut guard = self.child.lock().unwrap();
+
+        // 检查之前是否已经拉起了存活的底层终端句柄，如果有则拦截覆盖
+        if let Some(ref mut child) = *guard {
+            match child.try_wait() {
+                Ok(None) => {
+                    info!("[Gateway] 进程句柄已在追踪运行状态中，拦截并发启动");
+                    return Ok(());
+                }
+                _ => {} // 已抛弃或已死亡的僵尸，允许覆写注入新的
+            }
+        }
+
         info!("[Gateway] 启动 gateway 进程...");
 
         let child = shell::spawn_openclaw_gateway_with_handle()
@@ -49,7 +61,6 @@ impl GatewayManager {
 
         info!("[Gateway] gateway 进程已启动, PID: {}", child.id());
 
-        let mut guard = self.child.lock().unwrap();
         *guard = Some(child);
 
         Ok(())

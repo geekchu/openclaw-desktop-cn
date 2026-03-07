@@ -1,6 +1,6 @@
 import axios from "axios";
-import type { DingTalkConfig, Logger, TokenInfo } from "./types";
-import { retryWithBackoff } from "./utils";
+import type { DingTalkConfig, Logger, TokenInfo } from "./types.js";
+import { retryWithBackoff } from "./utils.js";
 
 interface TokenCache {
   accessToken: string;

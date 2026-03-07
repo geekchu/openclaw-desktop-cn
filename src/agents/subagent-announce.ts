@@ -39,6 +39,11 @@ import {
 } from "./subagent-announce-dispatch.js";
 import { type AnnounceQueueItem, enqueueAnnounce } from "./subagent-announce-queue.js";
 import { getSubagentDepthFromSessionStore } from "./subagent-depth.js";
+import {
+  countPendingDescendantRuns,
+  countPendingDescendantRunsExcludingRun,
+  countActiveDescendantRuns,
+} from "./subagent-registry.js";
 import type { SpawnSubagentMode } from "./subagent-spawn.js";
 import { readLatestAssistantReply } from "./tools/agent-step.js";
 import { sanitizeTextContent, extractAssistantText } from "./tools/sessions-helpers.js";
@@ -773,11 +778,6 @@ async function sendSubagentAnnounceDirectly(params: {
       if (!forceBoundSessionDirectDelivery) {
         let pendingDescendantRuns = 0;
         try {
-          const {
-            countPendingDescendantRuns,
-            countPendingDescendantRunsExcludingRun,
-            countActiveDescendantRuns,
-          } = await import("./subagent-registry.js");
           if (params.currentRunId && typeof countPendingDescendantRunsExcludingRun === "function") {
             pendingDescendantRuns = Math.max(
               0,

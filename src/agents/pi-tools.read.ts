@@ -350,7 +350,6 @@ async function normalizeReadImageResult(
   return { ...result, content: nextContent };
 }
 
-
 function assertDirectPathAccess(
   filePath: string,
   cwd: string,

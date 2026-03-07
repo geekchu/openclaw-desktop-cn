@@ -93,6 +93,13 @@ const resolvePluginSdkAccountIdAlias = (): string | null => {
   return resolvePluginSdkAliasFile({ srcFile: "account-id.ts", distFile: "account-id.js" });
 };
 
+const resolvePluginSdkKeyedAsyncQueueAlias = (): string | null => {
+  return resolvePluginSdkAliasFile({
+    srcFile: "keyed-async-queue.ts",
+    distFile: "keyed-async-queue.js",
+  });
+};
+
 export const __testing = {
   resolvePluginSdkAliasFile,
 };
@@ -437,16 +444,24 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
     }
     const pluginSdkAlias = resolvePluginSdkAlias();
     const pluginSdkAccountIdAlias = resolvePluginSdkAccountIdAlias();
+    const pluginSdkKeyedAsyncQueueAlias = resolvePluginSdkKeyedAsyncQueueAlias();
     jitiLoader = createJiti(import.meta.url, {
       interopDefault: true,
       extensions: [".ts", ".tsx", ".mts", ".cts", ".mtsx", ".ctsx", ".js", ".mjs", ".cjs", ".json"],
-      ...(pluginSdkAlias || pluginSdkAccountIdAlias
+      ...(pluginSdkAlias || pluginSdkAccountIdAlias || pluginSdkKeyedAsyncQueueAlias
         ? {
             alias: {
-              ...(pluginSdkAlias ? { "openclaw/plugin-sdk": pluginSdkAlias } : {}),
+              // More specific subpath aliases MUST come before the general
+              // "openclaw/plugin-sdk" alias, otherwise jiti prefix-matches
+              // the general alias first and appends the subpath to index.js
+              // (e.g. dist/plugin-sdk/index.js/keyed-async-queue).
+              ...(pluginSdkKeyedAsyncQueueAlias
+                ? { "openclaw/plugin-sdk/keyed-async-queue": pluginSdkKeyedAsyncQueueAlias }
+                : {}),
               ...(pluginSdkAccountIdAlias
                 ? { "openclaw/plugin-sdk/account-id": pluginSdkAccountIdAlias }
                 : {}),
+              ...(pluginSdkAlias ? { "openclaw/plugin-sdk": pluginSdkAlias } : {}),
             },
           }
         : {}),
@@ -756,16 +771,20 @@ export async function loadOpenClawPluginsAsync(
 
     const pluginSdkAlias = resolvePluginSdkAlias();
     const pluginSdkAccountIdAlias = resolvePluginSdkAccountIdAlias();
+    const pluginSdkKeyedAsyncQueueAlias = resolvePluginSdkKeyedAsyncQueueAlias();
     const jiti = createJiti(import.meta.url, {
       interopDefault: true,
       extensions: [".ts", ".tsx", ".mts", ".cts", ".mtsx", ".ctsx", ".js", ".mjs", ".cjs", ".json"],
-      ...(pluginSdkAlias || pluginSdkAccountIdAlias
+      ...(pluginSdkAlias || pluginSdkAccountIdAlias || pluginSdkKeyedAsyncQueueAlias
         ? {
             alias: {
-              ...(pluginSdkAlias ? { "openclaw/plugin-sdk": pluginSdkAlias } : {}),
+              ...(pluginSdkKeyedAsyncQueueAlias
+                ? { "openclaw/plugin-sdk/keyed-async-queue": pluginSdkKeyedAsyncQueueAlias }
+                : {}),
               ...(pluginSdkAccountIdAlias
                 ? { "openclaw/plugin-sdk/account-id": pluginSdkAccountIdAlias }
                 : {}),
+              ...(pluginSdkAlias ? { "openclaw/plugin-sdk": pluginSdkAlias } : {}),
             },
           }
         : {}),
@@ -846,7 +865,7 @@ export async function loadOpenClawPluginsAsync(
 
       let mod: OpenClawPluginModule | null = null;
       try {
-        mod = (await jiti.import(candidate.source)) as OpenClawPluginModule;
+        mod = await jiti.import(candidate.source);
       } catch (err) {
         logger.error(`[plugins] ${record.id} failed to load from ${record.source}: ${String(err)}`);
         record.status = "error";

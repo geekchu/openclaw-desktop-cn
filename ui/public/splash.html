@@ -5,41 +5,84 @@
     <style>
       body {
         margin: 0;
-        background: #0f0f0f;
+        background: radial-gradient(circle at center, #1a1a1a 0%, #050505 100%);
         display: flex;
         justify-content: center;
         align-items: center;
         height: 100vh;
         flex-direction: column;
-        font-family: system-ui;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        overflow: hidden;
+      }
+      .logo-container {
+        animation: float 4s ease-in-out infinite;
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
       }
       .logo {
-        font-size: 72px;
-        margin-bottom: 24px;
+        font-size: 80px;
+        filter: drop-shadow(0 0 15px rgba(255, 60, 60, 0.2));
       }
       .spinner {
         width: 32px;
         height: 32px;
-        border: 3px solid rgba(255, 255, 255, 0.15);
-        border-top-color: rgba(255, 255, 255, 0.8);
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top-color: rgba(255, 255, 255, 0.9);
         border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+        animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+      }
+      .text {
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 14px;
+        margin-top: 20px;
+        letter-spacing: 1px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      @keyframes float {
+        0% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+        100% {
+          transform: translateY(0px);
+        }
       }
       @keyframes spin {
-        to {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
           transform: rotate(360deg);
         }
       }
-      .text {
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 13px;
-        margin-top: 18px;
+      @keyframes pulse {
+        0% {
+          opacity: 0.5;
+        }
+        50% {
+          opacity: 1;
+          text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        }
+        100% {
+          opacity: 0.5;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="logo">🦞</div>
+    <div class="logo-container">
+      <div class="logo">🦞</div>
+    </div>
     <div class="spinner"></div>
-    <div class="text">正在启动...</div>
+    <div class="text">STARTING CORE...</div>
   </body>
 </html>

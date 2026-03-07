@@ -1,8 +1,8 @@
 import { html, nothing } from "lit";
-import type { ChannelAccountSnapshot, FeishuStatus } from "../types.ts";
-import type { ChannelsProps } from "./channels.types.ts";
 import { formatAgo } from "../format.ts";
+import type { ChannelAccountSnapshot, FeishuStatus } from "../types.ts";
 import { renderChannelConfigSection } from "./channels.config.ts";
+import type { ChannelsProps } from "./channels.types.ts";
 
 export function renderFeishuCard(params: {
   props: ChannelsProps;

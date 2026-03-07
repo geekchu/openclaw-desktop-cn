@@ -59,7 +59,7 @@ function renderSessionSummary(
   const usage = filteredUsage || session.usage;
   if (!usage) {
     return html`
-      <div class="muted">No usage data for this session.</div>
+      <div class="muted">此会话暂无用量数据。</div>
     `;
   }
 
@@ -97,7 +97,7 @@ function renderSessionSummary(
     toolItems = baseTools.map((tool) => ({
       label: tool.name,
       value: `${toolCounts.get(tool.name) ?? 0}`,
-      sub: "calls",
+      sub: "次调用",
     }));
     toolCallCount = [...toolCounts.values()].reduce((sum, c) => sum + c, 0);
     uniqueToolCount = toolCounts.size;
@@ -105,7 +105,7 @@ function renderSessionSummary(
     toolItems = baseTools.map((tool) => ({
       label: tool.name,
       value: `${tool.count}`,
-      sub: "calls",
+      sub: "次调用",
     }));
     toolCallCount = usage.toolUsage?.totalCalls ?? 0;
     uniqueToolCount = usage.toolUsage?.uniqueTools ?? 0;
@@ -121,29 +121,29 @@ function renderSessionSummary(
     ${badges.length > 0 ? html`<div class="usage-badges">${badges.map((b) => html`<span class="usage-badge">${b}</span>`)}</div>` : nothing}
     <div class="session-summary-grid">
       <div class="session-summary-card">
-        <div class="session-summary-title">Messages</div>
+        <div class="session-summary-title">消息数</div>
         <div class="session-summary-value">${usage.messageCounts?.total ?? 0}</div>
-        <div class="session-summary-meta">${usage.messageCounts?.user ?? 0} user · ${usage.messageCounts?.assistant ?? 0} assistant</div>
+        <div class="session-summary-meta">${usage.messageCounts?.user ?? 0} 用户 · ${usage.messageCounts?.assistant ?? 0} 助手</div>
       </div>
       <div class="session-summary-card">
-        <div class="session-summary-title">Tool Calls</div>
+        <div class="session-summary-title">工具调用</div>
         <div class="session-summary-value">${toolCallCount}</div>
-        <div class="session-summary-meta">${uniqueToolCount} tools</div>
+        <div class="session-summary-meta">${uniqueToolCount} 个工具</div>
       </div>
       <div class="session-summary-card">
-        <div class="session-summary-title">Errors</div>
+        <div class="session-summary-title">错误</div>
         <div class="session-summary-value">${usage.messageCounts?.errors ?? 0}</div>
-        <div class="session-summary-meta">${usage.messageCounts?.toolResults ?? 0} tool results</div>
+        <div class="session-summary-meta">${usage.messageCounts?.toolResults ?? 0} 个工具调用结果</div>
       </div>
       <div class="session-summary-card">
-        <div class="session-summary-title">Duration</div>
+        <div class="session-summary-title">运行时长</div>
         <div class="session-summary-value">${formatDurationCompact(usage.durationMs, { spaced: true }) ?? "—"}</div>
         <div class="session-summary-meta">${formatTs(usage.firstActivity)} → ${formatTs(usage.lastActivity)}</div>
       </div>
     </div>
     <div class="usage-insights-grid" style="margin-top: 12px;">
-      ${renderInsightList("Top Tools", toolItems, "No tool calls")}
-      ${renderInsightList("Model Mix", modelItems, "No model data")}
+      ${renderInsightList("热门工具", toolItems, "暂无工具调用")}
+      ${renderInsightList("模型占比", modelItems, "暂无模型数据")}
     </div>
   `;
 }
@@ -253,7 +253,7 @@ function renderSessionDetailPanel(
   const headerStats = filteredUsage
     ? { totalTokens: filteredUsage.totalTokens, totalCost: filteredUsage.totalCost }
     : { totalTokens: usage?.totalTokens ?? 0, totalCost: usage?.totalCost ?? 0 };
-  const cursorIndicator = filteredUsage ? " (filtered)" : "";
+  const cursorIndicator = filteredUsage ? " (已过滤)" : "";
 
   return html`
     <div class="card session-detail-panel">
@@ -268,13 +268,13 @@ function renderSessionDetailPanel(
           ${
             usage
               ? html`
-            <span><strong>${formatTokens(headerStats.totalTokens)}</strong> tokens${cursorIndicator}</span>
+            <span><strong>${formatTokens(headerStats.totalTokens)}</strong> 令牌${cursorIndicator}</span>
             <span><strong>${formatCost(headerStats.totalCost)}</strong>${cursorIndicator}</span>
           `
               : nothing
           }
         </div>
-        <button class="session-close-btn" @click=${onClose} title="Close session details">×</button>
+        <button class="session-close-btn" @click=${onClose} title="关闭会话详情">×</button>
       </div>
       <div class="session-detail-content">
         ${renderSessionSummary(
@@ -339,14 +339,14 @@ function renderTimeSeriesCompact(
   if (loading) {
     return html`
       <div class="session-timeseries-compact">
-        <div class="muted" style="padding: 20px; text-align: center">Loading...</div>
+        <div class="muted" style="padding: 20px; text-align: center">加载中...</div>
       </div>
     `;
   }
   if (!timeSeries || timeSeries.points.length < 2) {
     return html`
       <div class="session-timeseries-compact">
-        <div class="muted" style="padding: 20px; text-align: center">No timeline data</div>
+        <div class="muted" style="padding: 20px; text-align: center">暂无时间线数据</div>
       </div>
     `;
   }
@@ -371,7 +371,7 @@ function renderTimeSeriesCompact(
   if (points.length < 2) {
     return html`
       <div class="session-timeseries-compact">
-        <div class="muted" style="padding: 20px; text-align: center">No data in range</div>
+        <div class="muted" style="padding: 20px; text-align: center">范围内暂无数据</div>
       </div>
     `;
   }
@@ -452,13 +452,13 @@ function renderTimeSeriesCompact(
   return html`
     <div class="session-timeseries-compact">
       <div class="timeseries-header-row">
-        <div class="card-title" style="font-size: 12px; color: var(--text);">Usage Over Time</div>
+        <div class="card-title" style="font-size: 12px; color: var(--text);">用量时间线</div>
         <div class="timeseries-controls">
           ${
             hasSelection
               ? html`
             <div class="chart-toggle small">
-              <button class="toggle-btn active" @click=${() => onCursorRangeChange?.(null, null)}>Reset</button>
+              <button class="toggle-btn active" @click=${() => onCursorRangeChange?.(null, null)}>重置</button>
             </div>
           `
               : nothing
@@ -673,7 +673,7 @@ function renderTimeSeriesCompact(
         ${
           hasSelection
             ? html`
-              <span style="color: var(--accent);">▶ Turns ${rangeStartIdx + 1}–${rangeEndIdx} of ${points.length}</span> · 
+              <span style="color: var(--accent);">▶ 轮次 ${rangeStartIdx + 1}–${rangeEndIdx} / ${points.length}</span> · 
               ${new Date(rangeStartTs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}–${new Date(rangeEndTs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · 
               ${formatTokens(filteredOutput + filteredInput + filteredCacheRead + filteredCacheWrite)} · 
               ${formatCost(filteredPoints.reduce((s, p) => s + (p.cost || 0), 0))}
@@ -685,7 +685,7 @@ function renderTimeSeriesCompact(
         breakdownByType
           ? html`
               <div style="margin-top: 8px;">
-                <div class="card-title" style="font-size: 12px; margin-bottom: 6px; color: var(--text);">Tokens by Type</div>
+                <div class="card-title" style="font-size: 12px; margin-bottom: 6px; color: var(--text);">按来源类型统计令牌</div>
                 <div class="cost-breakdown-bar" style="height: 18px;">
                   <div class="cost-segment output" style="width: ${pct(filteredOutput, totalTypeTokens).toFixed(1)}%"></div>
                   <div class="cost-segment input" style="width: ${pct(filteredInput, totalTypeTokens).toFixed(1)}%"></div>
@@ -693,20 +693,20 @@ function renderTimeSeriesCompact(
                   <div class="cost-segment cache-read" style="width: ${pct(filteredCacheRead, totalTypeTokens).toFixed(1)}%"></div>
                 </div>
                 <div class="cost-breakdown-legend">
-                  <div class="legend-item" title="Assistant output tokens">
-                    <span class="legend-dot output"></span>Output ${formatTokens(filteredOutput)}
+                  <div class="legend-item" title="助手输出令牌">
+                    <span class="legend-dot output"></span>模型输出 ${formatTokens(filteredOutput)}
                   </div>
-                  <div class="legend-item" title="User + tool input tokens">
-                    <span class="legend-dot input"></span>Input ${formatTokens(filteredInput)}
+                  <div class="legend-item" title="用户 + 工具输入令牌">
+                    <span class="legend-dot input"></span>消息输入 ${formatTokens(filteredInput)}
                   </div>
-                  <div class="legend-item" title="Tokens written to cache">
-                    <span class="legend-dot cache-write"></span>Cache Write ${formatTokens(filteredCacheWrite)}
+                  <div class="legend-item" title="写入缓存的令牌">
+                    <span class="legend-dot cache-write"></span>缓存写入 ${formatTokens(filteredCacheWrite)}
                   </div>
-                  <div class="legend-item" title="Tokens read from cache">
-                    <span class="legend-dot cache-read"></span>Cache Read ${formatTokens(filteredCacheRead)}
+                  <div class="legend-item" title="从缓存读取的令牌">
+                    <span class="legend-dot cache-read"></span>缓存读取 ${formatTokens(filteredCacheRead)}
                   </div>
                 </div>
-                <div class="cost-breakdown-total">Total: ${formatTokens(totalTypeTokens)}</div>
+                <div class="cost-breakdown-total">合计: ${formatTokens(totalTypeTokens)}</div>
               </div>
             `
           : nothing
@@ -724,7 +724,7 @@ function renderContextPanel(
   if (!contextWeight) {
     return html`
       <div class="context-details-panel">
-        <div class="muted" style="padding: 20px; text-align: center">No context data</div>
+        <div class="muted" style="padding: 20px; text-align: center">暂无上下文数据</div>
       </div>
     `;
   }
@@ -766,17 +766,17 @@ function renderContextPanel(
   return html`
     <div class="context-details-panel">
       <div class="context-breakdown-header">
-        <div class="card-title" style="font-size: 12px; color: var(--text);">System Prompt Breakdown</div>
+        <div class="card-title" style="font-size: 12px; color: var(--text);">System Prompt 组成分析</div>
         ${
           hasMore
             ? html`<button class="context-expand-btn" @click=${onToggleExpanded}>
-                ${showAll ? "Collapse" : "Expand all"}
+                ${showAll ? "收起" : "展开详情"}
               </button>`
             : nothing
         }
       </div>
       <p class="context-weight-desc">
-        ${contextPct || "Base context per message"}
+        ${contextPct || "每轮消息中的公共基础上下文长度"}
       </p>
       <div class="context-stacked-bar">
         <div class="context-segment system" style="width: ${pct(systemTokens, totalContextTokens).toFixed(1)}%" title="System: ~${formatTokens(systemTokens)}"></div>
@@ -798,7 +798,7 @@ function renderContextPanel(
                 const more = skillsList.length - skillsTop.length;
                 return html`
                   <div class="context-breakdown-card">
-                    <div class="context-breakdown-title">Skills (${skillsList.length})</div>
+                    <div class="context-breakdown-title">技能 / Skills (${skillsList.length})</div>
                     <div class="context-breakdown-list">
                       ${skillsTop.map(
                         (s) => html`
@@ -811,7 +811,7 @@ function renderContextPanel(
                     </div>
                     ${
                       more > 0
-                        ? html`<div class="context-breakdown-more">+${more} more</div>`
+                        ? html`<div class="context-breakdown-more">+${more} 更多数据</div>`
                         : nothing
                     }
                   </div>
@@ -825,7 +825,7 @@ function renderContextPanel(
                 const more = toolsList.length - toolsTop.length;
                 return html`
                   <div class="context-breakdown-card">
-                    <div class="context-breakdown-title">Tools (${toolsList.length})</div>
+                    <div class="context-breakdown-title">工具 / Tools (${toolsList.length})</div>
                     <div class="context-breakdown-list">
                       ${toolsTop.map(
                         (t) => html`
@@ -838,7 +838,7 @@ function renderContextPanel(
                     </div>
                     ${
                       more > 0
-                        ? html`<div class="context-breakdown-more">+${more} more</div>`
+                        ? html`<div class="context-breakdown-more">+${more} 更多数据</div>`
                         : nothing
                     }
                   </div>
@@ -852,7 +852,7 @@ function renderContextPanel(
                 const more = filesList.length - filesTop.length;
                 return html`
                   <div class="context-breakdown-card">
-                    <div class="context-breakdown-title">Files (${filesList.length})</div>
+                    <div class="context-breakdown-title">文件 / Files (${filesList.length})</div>
                     <div class="context-breakdown-list">
                       ${filesTop.map(
                         (f) => html`
@@ -865,7 +865,7 @@ function renderContextPanel(
                     </div>
                     ${
                       more > 0
-                        ? html`<div class="context-breakdown-more">+${more} more</div>`
+                        ? html`<div class="context-breakdown-more">+${more} 更多数据</div>`
                         : nothing
                     }
                   </div>
@@ -900,16 +900,16 @@ function renderSessionLogsCompact(
   if (loading) {
     return html`
       <div class="session-logs-compact">
-        <div class="session-logs-header">Conversation</div>
-        <div class="muted" style="padding: 20px; text-align: center">Loading...</div>
+        <div class="session-logs-header">完整对话记录</div>
+        <div class="muted" style="padding: 20px; text-align: center">加载中...</div>
       </div>
     `;
   }
   if (!logs || logs.length === 0) {
     return html`
       <div class="session-logs-compact">
-        <div class="session-logs-header">Conversation</div>
-        <div class="muted" style="padding: 20px; text-align: center">No messages</div>
+        <div class="session-logs-header">完整对话记录</div>
+        <div class="muted" style="padding: 20px; text-align: center">暂无对话消息</div>
       </div>
     `;
   }
@@ -961,7 +961,7 @@ function renderSessionLogsCompact(
   const hasCursorFilter = cursorStart != null && cursorEnd != null;
   const displayedCount =
     hasActiveFilters || hasCursorFilter
-      ? `${filteredEntries.length} of ${logs.length} ${hasCursorFilter ? "(timeline filtered)" : ""}`
+      ? `${filteredEntries.length} / ${logs.length} ${hasCursorFilter ? "(按时间线筛选)" : ""}`
       : `${logs.length}`;
 
   const roleSelected = new Set(filters.roles);
@@ -970,9 +970,9 @@ function renderSessionLogsCompact(
   return html`
     <div class="session-logs-compact">
       <div class="session-logs-header">
-        <span>Conversation <span style="font-weight: normal; color: var(--muted);">(${displayedCount} messages)</span></span>
+        <span>Conversation <span style="font-weight: normal; color: var(--muted);">(${displayedCount} 条消息)</span></span>
         <button class="btn btn-sm usage-action-btn usage-secondary-btn" @click=${onToggleExpandedAll}>
-          ${expandedAll ? "Collapse All" : "Expand All"}
+          ${expandedAll ? "全部收起" : "全部展开"}
         </button>
       </div>
       <div class="usage-filters-inline" style="margin: 10px 12px;">
@@ -986,10 +986,10 @@ function renderSessionLogsCompact(
               ),
             )}
         >
-          <option value="user" ?selected=${roleSelected.has("user")}>User</option>
-          <option value="assistant" ?selected=${roleSelected.has("assistant")}>Assistant</option>
-          <option value="tool" ?selected=${roleSelected.has("tool")}>Tool</option>
-          <option value="toolResult" ?selected=${roleSelected.has("toolResult")}>Tool result</option>
+          <option value="user" ?selected=${roleSelected.has("user")}>用户 (User)</option>
+          <option value="assistant" ?selected=${roleSelected.has("assistant")}>助手 (Assistant)</option>
+          <option value="tool" ?selected=${roleSelected.has("tool")}>工具 (Tool)</option>
+          <option value="toolResult" ?selected=${roleSelected.has("toolResult")}>工具返回 (Tool Result)</option>
         </select>
         <select
           multiple
@@ -1013,11 +1013,11 @@ function renderSessionLogsCompact(
             @change=${(event: Event) =>
               onFilterHasToolsChange((event.target as HTMLInputElement).checked)}
           />
-          Has tools
+          包含工具
         </label>
         <input
           type="text"
-          placeholder="Search conversation"
+          placeholder="检索回放内容"
           .value=${filters.query}
           @input=${(event: Event) => onFilterQueryChange((event.target as HTMLInputElement).value)}
         />
@@ -1029,8 +1029,7 @@ function renderSessionLogsCompact(
         ${filteredEntries.map((entry) => {
           const { log, toolInfo, cleanContent } = entry;
           const roleClass = log.role === "user" ? "user" : "assistant";
-          const roleLabel =
-            log.role === "user" ? "You" : log.role === "assistant" ? "Assistant" : "Tool";
+          const roleLabel = log.role === "user" ? "你" : log.role === "assistant" ? "助手" : "工具";
           return html`
           <div class="session-log-entry ${roleClass}">
             <div class="session-log-meta">
@@ -1061,7 +1060,7 @@ function renderSessionLogsCompact(
         ${
           filteredEntries.length === 0
             ? html`
-                <div class="muted" style="padding: 12px">No messages match the filters.</div>
+                <div class="muted" style="padding: 12px">当前的检索和过滤条件下没有匹配的消息。</div>
               `
             : nothing
         }

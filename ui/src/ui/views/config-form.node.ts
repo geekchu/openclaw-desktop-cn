@@ -3,9 +3,8 @@ import type { ConfigUiHints } from "../types.ts";
 import {
   defaultValue,
   hintForPath,
+  humanize,
   pathKey,
-  resolveHelp,
-  resolveLabel,
   schemaType,
   type JsonSchema,
 } from "./config-form.shared.ts";

@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { telegramPlugin } from "../../extensions/telegram/src/channel.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
+import { createChannelTestPluginBase } from "../test-utils/channel-plugins.js";
 import { createTestRegistry } from "../test-utils/channel-plugins.js";
 import type { HealthSummary } from "./health.js";
 import { getHealthSnapshot } from "./health.js";
@@ -112,7 +113,6 @@ describe("getHealthSnapshot", () => {
     setActivePluginRegistry(
       createTestRegistry([{ pluginId: "telegram", plugin: telegramPlugin, source: "test" }]),
     );
-    // @ts-expect-error: PluginRuntime mock mismatch
     setTelegramRuntime(createPluginRuntime());
   });
 
@@ -222,6 +222,49 @@ describe("getHealthSnapshot", () => {
     expect(telegram.configured).toBe(true);
     expect(telegram.probe?.ok).toBe(false);
     expect(telegram.probe?.error).toMatch(/network down/i);
+  });
+
+  it("keeps health snapshots usable when one plugin crashes", async () => {
+    testConfig = { channels: { telegram: { botToken: "t-1" } } };
+    testStore = {};
+    vi.stubEnv("DISCORD_BOT_TOKEN", "");
+    stubTelegramFetchOk([]);
+    setActivePluginRegistry(
+      createTestRegistry([
+        { pluginId: "telegram", plugin: telegramPlugin, source: "test" },
+        {
+          pluginId: "broken",
+          source: "test",
+          plugin: {
+            ...createChannelTestPluginBase({
+              id: "broken",
+              label: "Broken",
+              config: {
+                listAccountIds: () => ["default"],
+                resolveAccount: () => {
+                  throw new TypeError("Cannot read properties of undefined (reading 'get')");
+                },
+              },
+            }),
+          },
+        },
+      ]),
+    );
+
+    const snap = await getHealthSnapshot({ timeoutMs: 25 });
+    const broken = snap.channels.broken as {
+      accountId?: string;
+      configured?: boolean;
+      lastError?: string;
+      accounts?: Record<string, { lastError?: string }>;
+    };
+
+    expect(snap.ok).toBe(true);
+    expect((snap.channels.telegram as { probe?: { ok?: boolean } }).probe?.ok).toBe(true);
+    expect(broken.accountId).toBe("default");
+    expect(broken.configured).toBe(false);
+    expect(broken.lastError).toContain("reading 'get'");
+    expect(broken.accounts?.default?.lastError).toContain("reading 'get'");
   });
 
   it("disables heartbeat for agents without heartbeat blocks", async () => {

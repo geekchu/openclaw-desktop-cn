@@ -1,13 +1,6 @@
 import * as fs from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
-import type {
-  ResolvedQQBotAccount,
-  WSPayload,
-  C2CMessageEvent,
-  GuildMessageEvent,
-  GroupMessageEvent,
-} from "./types.js";
 import {
   getAccessToken,
   getGatewayUrl,
@@ -31,6 +24,13 @@ import {
 import { recordKnownUser, flushKnownUsers } from "./known-users.js";
 import { getQQBotRuntime } from "./runtime.js";
 import { loadSession, saveSession, clearSession, type SessionState } from "./session-store.js";
+import type {
+  ResolvedQQBotAccount,
+  WSPayload,
+  C2CMessageEvent,
+  GuildMessageEvent,
+  GroupMessageEvent,
+} from "./types.js";
 import { convertSilkToWav, isVoiceAttachment, formatDuration } from "./utils/audio-convert.js";
 import {
   getImageSize,
@@ -516,16 +516,18 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
               : event.senderId;
 
         const route = pluginRuntime.channel.routing.resolveAgentRoute({
-          cfg,
+          cfg: cfg as any,
           channel: "qqbot",
           accountId: account.accountId,
           peer: {
-            kind: isGroup ? "group" : "dm",
+            kind: isGroup ? "group" : "direct",
             id: peerId,
           },
         });
 
-        const envelopeOptions = pluginRuntime.channel.reply.resolveEnvelopeFormatOptions(cfg);
+        const envelopeOptions = pluginRuntime.channel.reply.resolveEnvelopeFormatOptions(
+          cfg as any,
+        );
 
         // 组装消息体
         // 静态系统提示已移至 skills/qqbot-cron/SKILL.md 和 skills/qqbot-media/SKILL.md
@@ -861,7 +863,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
 
         try {
           const messagesConfig = pluginRuntime.channel.reply.resolveEffectiveMessagesConfig(
-            cfg,
+            cfg as any,
             route.agentId,
           );
 
@@ -890,7 +892,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
           const dispatchPromise =
             pluginRuntime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
               ctx: ctxPayload,
-              cfg,
+              cfg: cfg as any,
               dispatcherOptions: {
                 responsePrefix: messagesConfig.responsePrefix,
                 deliver: async (

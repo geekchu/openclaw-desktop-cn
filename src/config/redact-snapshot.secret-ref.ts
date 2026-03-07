@@ -12,7 +12,7 @@ export function redactSecretRefId(params: {
 }): Record<string, unknown> {
   const { value, values, redactedSentinel, isEnvVarPlaceholder } = params;
   const redacted: Record<string, unknown> = { ...value };
-  if (!isEnvVarPlaceholder(value.id)) {
+  if (value.id.length > 0 && !isEnvVarPlaceholder(value.id)) {
     values.push(value.id);
     redacted.id = redactedSentinel;
   }

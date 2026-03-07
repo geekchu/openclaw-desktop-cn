@@ -21,13 +21,13 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ResolvedQQBotAccount } from "../src/types.js";
 import {
   sendProactiveMessageDirect,
   listKnownUsers,
   getKnownUsersStats,
   broadcastMessage,
 } from "../src/proactive.js";
+import type { ResolvedQQBotAccount } from "../src/types.js";
 
 // 解析命令行参数
 function parseArgs(): Record<string, string | boolean> {
@@ -68,7 +68,7 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
           clientSecret,
           enabled: true,
           secretSource: "env",
-        };
+        } as ResolvedQQBotAccount;
       }
 
       console.error("配置文件不存在且环境变量未设置");
@@ -91,7 +91,7 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
         clientSecret: qqbot.clientSecret || process.env.QQBOT_CLIENT_SECRET,
         enabled: qqbot.enabled ?? true,
         secretSource: qqbot.clientSecret ? "config" : "env",
-      };
+      } as ResolvedQQBotAccount;
     }
 
     const accountConfig = qqbot.accounts?.[accountId];
@@ -103,7 +103,7 @@ function loadAccount(accountId = "default"): ResolvedQQBotAccount | null {
           accountConfig.clientSecret || qqbot.clientSecret || process.env.QQBOT_CLIENT_SECRET,
         enabled: accountConfig.enabled ?? true,
         secretSource: accountConfig.clientSecret ? "config" : "env",
-      };
+      } as ResolvedQQBotAccount;
     }
 
     console.error(`账户 ${accountId} 不存在`);

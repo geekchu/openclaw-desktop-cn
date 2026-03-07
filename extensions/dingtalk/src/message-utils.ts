@@ -1,4 +1,4 @@
-import type { DingTalkInboundMessage, MessageContent, SendMessageOptions } from "./types";
+import type { DingTalkInboundMessage, MessageContent, SendMessageOptions } from "./types.js";
 
 /**
  * Auto-detect markdown usage and derive message title.

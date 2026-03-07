@@ -832,46 +832,6 @@ function applyChannelHints(hints: ConfigUiHints, channels: ChannelUiMetadata[]):
   return next;
 }
 
-/**
- * Collect the set of config-hint keys that were contributed by plugins and
- * channels so that {@link applySensitiveHints} can limit sensitive-path
- * detection to extension-provided paths.
- *
- * This function was missing after commit 96318641d merged an unfinished PR.
- */
-function collectExtensionHintKeys(
-  _hints: ConfigUiHints,
-  plugins: PluginUiMetadata[],
-  channels: ChannelUiMetadata[],
-): Set<string> {
-  const keys = new Set<string>();
-  for (const plugin of plugins) {
-    const id = plugin.id.trim();
-    if (!id) continue;
-    const basePath = `plugins.entries.${id}`;
-    keys.add(basePath);
-    keys.add(`${basePath}.enabled`);
-    keys.add(`${basePath}.config`);
-    const uiHints = plugin.configUiHints ?? {};
-    for (const relPathRaw of Object.keys(uiHints)) {
-      const relPath = relPathRaw.trim().replace(/^\./, "");
-      if (relPath) keys.add(`${basePath}.config.${relPath}`);
-    }
-  }
-  for (const channel of channels) {
-    const id = channel.id.trim();
-    if (!id) continue;
-    const basePath = `channels.${id}`;
-    keys.add(basePath);
-    const uiHints = channel.configUiHints ?? {};
-    for (const relPathRaw of Object.keys(uiHints)) {
-      const relPath = relPathRaw.trim().replace(/^\./, "");
-      if (relPath) keys.add(`${basePath}.${relPath}`);
-    }
-  }
-  return keys;
-}
-
 function listHeartbeatTargetChannels(channels: ChannelUiMetadata[]): string[] {
   const seen = new Set<string>();
   const ordered: string[] = [];

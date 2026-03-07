@@ -6,11 +6,14 @@ vi.mock("openclaw/plugin-sdk", () => ({
   formatDocsLink: (path: string) => `https://docs.example${path}`,
 }));
 
-import { dingtalkOnboardingAdapter } from "../../src/onboarding";
+import { dingtalkOnboardingAdapter } from "../../src/onboarding.js";
 
 describe("dingtalkOnboardingAdapter", () => {
   it("getStatus returns configured=false for empty config", async () => {
-    const result = await dingtalkOnboardingAdapter.getStatus({ cfg: {} as any });
+    const result = await dingtalkOnboardingAdapter.getStatus({
+      cfg: {} as any,
+      accountOverrides: {},
+    });
 
     expect(result.channel).toBe("dingtalk");
     expect(result.configured).toBe(false);
@@ -41,13 +44,13 @@ describe("dingtalkOnboardingAdapter", () => {
     } as any);
 
     expect(result.accountId).toBe("default");
-    expect(result.cfg.channels.dingtalk.clientId).toBe("ding_client");
-    expect(result.cfg.channels.dingtalk.clientSecret).toBe("ding_secret");
-    expect(result.cfg.channels.dingtalk.robotCode).toBe("ding_robot");
-    expect(result.cfg.channels.dingtalk.messageType).toBe("card");
-    expect(result.cfg.channels.dingtalk.cardTemplateId).toBe("tmpl.schema");
-    expect(result.cfg.channels.dingtalk.cardTemplateKey).toBe("msgContent");
-    expect(result.cfg.channels.dingtalk.allowFrom).toEqual(["user_a", "user_b"]);
+    expect(result.cfg.channels!.dingtalk!.clientId).toBe("ding_client");
+    expect(result.cfg.channels!.dingtalk!.clientSecret).toBe("ding_secret");
+    expect(result.cfg.channels!.dingtalk!.robotCode).toBe("ding_robot");
+    expect(result.cfg.channels!.dingtalk!.messageType).toBe("card");
+    expect(result.cfg.channels!.dingtalk!.cardTemplateId).toBe("tmpl.schema");
+    expect(result.cfg.channels!.dingtalk!.cardTemplateKey).toBe("msgContent");
+    expect(result.cfg.channels!.dingtalk!.allowFrom).toEqual(["user_a", "user_b"]);
     expect(note).toHaveBeenCalled();
   });
 });

@@ -118,7 +118,6 @@ function safeEqualSecret(aRaw: string, bRaw: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
-
 export async function handleBlueBubblesWebhookRequest(
   req: IncomingMessage,
   res: ServerResponse,

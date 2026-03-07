@@ -40,6 +40,11 @@ export default defineConfig([
     ...shared,
   },
   {
+    entry: "src/plugin-sdk/keyed-async-queue.ts",
+    outDir: "dist/plugin-sdk",
+    ...shared,
+  },
+  {
     entry: "src/extensionAPI.ts",
     ...shared,
   },

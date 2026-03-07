@@ -9,7 +9,7 @@ vi.mock("dingtalk-stream", () => ({
   TOPIC_ROBOT: "TOPIC_ROBOT",
 }));
 
-import { dingtalkPlugin } from "../../src/channel";
+import { dingtalkPlugin } from "../../src/channel.js";
 
 describe("channel config + status helpers", () => {
   it("resolves account list and account metadata", () => {
@@ -24,39 +24,41 @@ describe("channel config + status helpers", () => {
       },
     } as any;
 
-    const ids = dingtalkPlugin.config.listAccountIds(cfg);
-    const account = dingtalkPlugin.config.resolveAccount(cfg, "main");
+    const ids = (dingtalkPlugin as any).config.listAccountIds(cfg);
+    const account = (dingtalkPlugin as any).config.resolveAccount(cfg, "main");
 
     expect(ids).toEqual(["main", "backup"]);
     expect(account.accountId).toBe("main");
     expect(account.configured).toBe(true);
-    expect(dingtalkPlugin.config.describeAccount(account).name).toBe("Main");
+    expect((dingtalkPlugin as any).config.describeAccount(account).name).toBe("Main");
   });
 
   it("validates outbound resolveTarget and messaging/security helpers", () => {
-    const resolved = dingtalkPlugin.outbound.resolveTarget({ to: "group:cidAbC" } as any);
-    const invalid = dingtalkPlugin.outbound.resolveTarget({ to: "   " } as any);
+    const resolved = (dingtalkPlugin as any).outbound.resolveTarget({ to: "group:cidAbC" } as any);
+    const invalid = (dingtalkPlugin as any).outbound.resolveTarget({ to: "   " } as any);
 
     expect(resolved).toEqual({ ok: true, to: "cidAbC" });
     expect(invalid.ok).toBe(false);
-    expect(dingtalkPlugin.messaging.normalizeTarget("dingtalk:user_1")).toBe("user_1");
+    expect((dingtalkPlugin as any).messaging.normalizeTarget("dingtalk:user_1")).toBe("user_1");
 
-    const dmPolicy = dingtalkPlugin.security.resolveDmPolicy({ account: { config: {} } } as any);
+    const dmPolicy = (dingtalkPlugin as any).security.resolveDmPolicy({
+      account: { config: {} },
+    } as any);
     expect(dmPolicy.policy).toBe("open");
     expect(dmPolicy.normalizeEntry("dd:User1")).toBe("User1");
   });
 
   it("builds status summary and issues from account snapshot", () => {
-    const issues = dingtalkPlugin.status.collectStatusIssues([
+    const issues = (dingtalkPlugin as any).status.collectStatusIssues([
       { accountId: "a1", configured: false },
       { accountId: "a2", configured: true },
     ] as any);
 
-    const summary = dingtalkPlugin.status.buildChannelSummary({
+    const summary = (dingtalkPlugin as any).status.buildChannelSummary({
       snapshot: { configured: true, running: false, lastError: "err" },
     } as any);
 
-    const snap = dingtalkPlugin.status.buildAccountSnapshot({
+    const snap = (dingtalkPlugin as any).status.buildAccountSnapshot({
       account: {
         accountId: "a1",
         name: "A1",

@@ -13,8 +13,8 @@ vi.mock("axios", () => {
   };
 });
 
-import type { DingTalkConfig } from "../../src/types";
-import { sendBySession, sendProactiveTextOrMarkdown } from "../../src/send-service";
+import { sendBySession, sendProactiveTextOrMarkdown } from "../../src/send-service.js";
+import type { DingTalkConfig } from "../../src/types.js";
 
 const mockedAxios = vi.mocked(axios);
 
@@ -38,7 +38,7 @@ describe("message payload transform", () => {
     });
 
     expect(mockedAxios).toHaveBeenCalledTimes(1);
-    const request = mockedAxios.mock.calls[0]?.[0] as {
+    const request = mockedAxios.mock.calls[0]?.[0] as unknown as {
       url: string;
       method: string;
       data: {
@@ -66,7 +66,7 @@ describe("message payload transform", () => {
     await sendProactiveTextOrMarkdown(config, "cidA1B2C3", "plain text");
 
     expect(mockedAxios).toHaveBeenCalledTimes(1);
-    const request = mockedAxios.mock.calls[0]?.[0] as {
+    const request = mockedAxios.mock.calls[0]?.[0] as unknown as {
       url: string;
       data: {
         msgKey: string;

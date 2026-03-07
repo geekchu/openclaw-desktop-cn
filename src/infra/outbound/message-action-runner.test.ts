@@ -120,14 +120,11 @@ let setWhatsAppRuntime: typeof import("../../../extensions/whatsapp/src/runtime.
 
 function installChannelRuntimes(params?: { includeTelegram?: boolean; includeWhatsApp?: boolean }) {
   const runtime = createPluginRuntime();
-  // @ts-expect-error test mock
   setSlackRuntime(runtime);
   if (params?.includeTelegram !== false) {
-    // @ts-expect-error test mock
     setTelegramRuntime(runtime);
   }
   if (params?.includeWhatsApp !== false) {
-    // @ts-expect-error test mock
     setWhatsAppRuntime(runtime);
   }
 }

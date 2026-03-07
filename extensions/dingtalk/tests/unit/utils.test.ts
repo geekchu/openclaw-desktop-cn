@@ -8,7 +8,7 @@ import {
   formatDingTalkErrorPayloadLog,
   maskSensitiveData,
   retryWithBackoff,
-} from "../../src/utils";
+} from "../../src/utils.js";
 
 describe("utils", () => {
   describe("maskSensitiveData", () => {

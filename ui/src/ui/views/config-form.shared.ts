@@ -1678,9 +1678,15 @@ export function resolveLabel(
   schemaTitle: string | undefined,
   hintLabel: string | undefined,
 ): string {
-  if (hintLabel) return hintLabel;
-  if (hasTranslation(key)) return humanize(key);
-  if (schemaTitle) return schemaTitle;
+  if (hintLabel) {
+    return hintLabel;
+  }
+  if (hasTranslation(key)) {
+    return humanize(key);
+  }
+  if (schemaTitle) {
+    return schemaTitle;
+  }
   return humanize(key);
 }
 
@@ -1695,7 +1701,11 @@ export function resolveHelp(
   hintHelp: string | undefined,
   schemaDescription: string | undefined,
 ): string | undefined {
-  if (hintHelp) return hintHelp;
-  if (schemaDescription && CJK_REGEX.test(schemaDescription)) return schemaDescription;
+  if (hintHelp) {
+    return hintHelp;
+  }
+  if (schemaDescription && CJK_REGEX.test(schemaDescription)) {
+    return schemaDescription;
+  }
   return undefined;
 }

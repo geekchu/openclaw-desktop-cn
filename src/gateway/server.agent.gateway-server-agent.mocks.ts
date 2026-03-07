@@ -13,13 +13,16 @@ export function setRegistry(registry: PluginRegistry) {
 
 vi.mock("./server-plugins.js", async () => {
   const { setActivePluginRegistry } = await import("../plugins/runtime.js");
+  const loadGatewayPlugins = (params: { baseMethods: string[] }) => {
+    setActivePluginRegistry(registryState.registry);
+    return {
+      pluginRegistry: registryState.registry,
+      gatewayMethods: params.baseMethods ?? [],
+    };
+  };
   return {
-    loadGatewayPlugins: (params: { baseMethods: string[] }) => {
-      setActivePluginRegistry(registryState.registry);
-      return {
-        pluginRegistry: registryState.registry,
-        gatewayMethods: params.baseMethods ?? [],
-      };
-    },
+    loadGatewayPlugins,
+    loadGatewayPluginsAsync: async (params: { baseMethods: string[] }) =>
+      loadGatewayPlugins(params),
   };
 });

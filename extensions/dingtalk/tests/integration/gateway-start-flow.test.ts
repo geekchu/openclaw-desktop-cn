@@ -46,14 +46,14 @@ vi.mock("../../src/connection-manager", () => ({
 }));
 
 vi.mock("../../src/utils", async () => {
-  const actual = await vi.importActual<typeof import("../../src/utils")>("../../src/utils");
+  const actual = await vi.importActual<typeof import("../../src/utils.js")>("../../src/utils");
   return {
     ...actual,
     cleanupOrphanedTempFiles: shared.cleanupOrphanedTempFilesMock,
   };
 });
 
-import { dingtalkPlugin } from "../../src/channel";
+import { dingtalkPlugin } from "../../src/channel.js";
 
 function createStartContext(abortSignal?: AbortSignal) {
   let status = {
@@ -109,7 +109,7 @@ describe("gateway.startAccount lifecycle", () => {
     controller.abort();
     const { ctx, setStatusCalls } = createStartContext(controller.signal);
 
-    await expect(dingtalkPlugin.gateway.startAccount(ctx as any)).rejects.toThrow(
+    await expect((dingtalkPlugin as any).gateway.startAccount(ctx as any)).rejects.toThrow(
       "Connection aborted before start",
     );
 
@@ -122,17 +122,17 @@ describe("gateway.startAccount lifecycle", () => {
   it("connects, waits for stop, and executes stop callback", async () => {
     const { ctx, setStatusCalls } = createStartContext();
 
-    const stopResult = await dingtalkPlugin.gateway.startAccount(ctx as any);
+    const stopResult = await (dingtalkPlugin as any).gateway.startAccount(ctx as any);
 
     expect(shared.cleanupOrphanedTempFilesMock).toHaveBeenCalledTimes(1);
     expect(shared.connectMock).toHaveBeenCalledTimes(1);
     expect(shared.waitForStopMock).toHaveBeenCalledTimes(1);
-    expect(setStatusCalls.some((s) => s.running === true && s.lastStartAt !== null)).toBe(true);
+    expect(setStatusCalls.some((s) => s.running && s.lastStartAt !== null)).toBe(true);
 
     stopResult.stop();
 
     expect(shared.stopMock).toHaveBeenCalledTimes(1);
-    expect(setStatusCalls.some((s) => s.running === false && s.lastStopAt !== null)).toBe(true);
+    expect(setStatusCalls.some((s) => !s.running && s.lastStopAt !== null)).toBe(true);
   });
 
   it("handles abort signal by stopping connection manager and setting stopped status", async () => {
@@ -144,10 +144,10 @@ describe("gateway.startAccount lifecycle", () => {
     });
     shared.isConnectedMock.mockReturnValue(false);
 
-    const result = await dingtalkPlugin.gateway.startAccount(ctx as any);
+    const result = await (dingtalkPlugin as any).gateway.startAccount(ctx as any);
 
     expect(shared.stopMock).toHaveBeenCalledTimes(1);
-    expect(setStatusCalls.some((s) => s.running === false && s.lastStopAt !== null)).toBe(true);
+    expect(setStatusCalls.some((s) => !s.running && s.lastStopAt !== null)).toBe(true);
 
     result.stop();
     expect(shared.stopMock).toHaveBeenCalledTimes(1);

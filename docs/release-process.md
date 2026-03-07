@@ -162,8 +162,6 @@ git push && git push --tags
 
 ### 步骤 3：构建签名安装包
 
-#### Windows（在 Windows 机器上执行）
-
 #### Windows（由于集成了构建脚本，无需每次设置环境）
 
 有两种便捷方式：

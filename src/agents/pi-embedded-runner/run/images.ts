@@ -272,7 +272,6 @@ export function modelSupportsImages(model: { input?: string[] }): boolean {
   return model.input?.includes("image") ?? false;
 }
 
-
 /**
  * Detects and loads images referenced in a prompt for models with vision capability.
  *
