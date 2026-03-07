@@ -3,18 +3,18 @@ import { Command } from "commander";
 import { describe, expect, it, vi } from "vitest";
 import { type GatewayBonjourBeacon } from "../infra/bonjour-discovery.js";
 
-const callGateway = vi.fn(async () => ({ ok: true }));
-const startGatewayServer = vi.fn(async () => ({
+const callGateway = vi.fn(async (..._args: any[]) => ({ ok: true }));
+const startGatewayServer = vi.fn(async (..._args: any[]) => ({
   close: vi.fn(async () => {}),
 }));
 const setVerbose = vi.fn();
-const forceFreePortAndWait = vi.fn(async () => ({
+const forceFreePortAndWait = vi.fn(async (..._args: any[]) => ({
   killed: [],
   waitedMs: 0,
   escalatedToSigkill: false,
 }));
 const serviceIsLoaded = vi.fn().mockResolvedValue(true);
-const discoverGatewayBeacons = vi.fn(async () => []);
+const discoverGatewayBeacons = vi.fn(async (..._args: any[]) => []);
 const gatewayStatusCommand = vi.fn(async () => {});
 
 const runtimeLogs: string[] = [];
@@ -56,13 +56,13 @@ async function withEnvOverride<T>(
 vi.mock(
   new URL("../../gateway/call.ts", new URL("./gateway-cli/call.ts", import.meta.url)).href,
   () => ({
-    callGateway: () => callGateway(),
+    callGateway: (..._args: any[]) => (callGateway as any)(..._args),
     randomIdempotencyKey: () => "rk_test",
   }),
 );
 
 vi.mock("../gateway/server.js", () => ({
-  startGatewayServer: () => startGatewayServer(),
+  startGatewayServer: (..._args: any[]) => (startGatewayServer as any)(..._args),
 }));
 
 vi.mock("../globals.js", () => ({
@@ -76,7 +76,7 @@ vi.mock("../runtime.js", () => ({
 }));
 
 vi.mock("./ports.js", () => ({
-  forceFreePortAndWait: () => forceFreePortAndWait(),
+  forceFreePortAndWait: (..._args: any[]) => (forceFreePortAndWait as any)(..._args),
 }));
 
 vi.mock("../daemon/service.js", () => ({
@@ -101,11 +101,11 @@ vi.mock("../daemon/program-args.js", () => ({
 }));
 
 vi.mock("../infra/bonjour-discovery.js", () => ({
-  discoverGatewayBeacons: () => discoverGatewayBeacons(),
+  discoverGatewayBeacons: (..._args: any[]) => (discoverGatewayBeacons as any)(..._args),
 }));
 
 vi.mock("../commands/gateway-status.js", () => ({
-  gatewayStatusCommand: () => gatewayStatusCommand(),
+  gatewayStatusCommand: (..._args: any[]) => (gatewayStatusCommand as any)(..._args),
 }));
 
 describe("gateway-cli coverage", () => {
