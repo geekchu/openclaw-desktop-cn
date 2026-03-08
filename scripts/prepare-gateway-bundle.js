@@ -24,7 +24,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -170,6 +170,84 @@ if (process.env.BUILD_CONFIG === "release") {
   // Create a minimal `node_modules` folder inside the bundle containing ONLY the externalized native binaries
   console.log("\n[bundle] Installing external dependencies for release bundle...");
   run("npm install --omit=dev --no-package-lock", { cwd: bundleDir });
+
+  // Clean up unnecessary files from node_modules to reduce bundle size
+  console.log("\n[bundle] === Cleaning up node_modules for release ===");
+  const nmDir = join(bundleDir, "node_modules");
+  if (existsSync(nmDir)) {
+    let totalRemoved = 0;
+
+    // 1. Remove @types/ entirely (only needed for TypeScript compilation)
+    const typesDir = join(nmDir, "@types");
+    if (existsSync(typesDir)) {
+      rmSync(typesDir, { recursive: true, force: true });
+      console.log("[bundle] Removed @types/");
+      totalRemoved++;
+    }
+
+    // 2. Remove known bloated subdirectories from specific packages
+    const bloatedPaths = [
+      // @larksuiteoapi types/ is 16M of .d.ts files, not needed at runtime
+      join(nmDir, "@larksuiteoapi", "node-sdk", "types"),
+      // @mistralai tests
+      join(nmDir, "@mistralai", "mistralai", "tests"),
+    ];
+    for (const p of bloatedPaths) {
+      if (existsSync(p)) {
+        rmSync(p, { recursive: true, force: true });
+        console.log(`[bundle] Removed ${p.replace(nmDir + sep, "")}`);
+        totalRemoved++;
+      }
+    }
+
+    // 3. Junk file extensions to remove
+    const junkExtensions = new Set([".map", ".md", ".ts", ".mts", ".cts", ".d.ts", ".d.mts", ".d.cts"]);
+
+    // 4. Junk file basenames (case-insensitive)
+    const junkBasenames = /^(?:LICENSE|LICENCE|README|CHANGELOG|HISTORY|CHANGES|AUTHORS|CONTRIBUTORS)(?:\..+)?$/i;
+
+    // 5. Directories that are never needed at runtime
+    const junkDirs = new Set([
+      "test", "tests", "__tests__",
+      "testing", "__mocks__",
+      "example", "examples",
+      ".github", ".vscode", ".idea",
+    ]);
+
+    // Walk node_modules and remove junk
+    function cleanDir(dir) {
+      let entries;
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (junkDirs.has(entry.name)) {
+            rmSync(fullPath, { recursive: true, force: true });
+            totalRemoved++;
+          } else {
+            cleanDir(fullPath);
+          }
+        } else if (entry.isFile()) {
+          const name = entry.name;
+          // Get the effective extension, handling compound extensions like .d.ts
+          const ext = name.endsWith(".d.ts") ? ".d.ts"
+            : name.endsWith(".d.mts") ? ".d.mts"
+            : name.endsWith(".d.cts") ? ".d.cts"
+            : name.slice(name.lastIndexOf("."));
+          const isJunk = junkExtensions.has(ext) || junkBasenames.test(name);
+          if (isJunk) {
+            try { rmSync(fullPath); totalRemoved++; } catch {}
+          }
+        }
+      }
+    }
+    cleanDir(nmDir);
+    console.log(`[bundle] Cleaned ${totalRemoved} unnecessary files/directories from node_modules`);
+  }
 
   process.exit(0);
 }
