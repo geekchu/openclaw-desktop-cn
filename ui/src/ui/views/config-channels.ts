@@ -374,7 +374,6 @@ const channelInfo: Record<
         label: "User ID",
         type: "text",
         placeholder: "你的 Telegram User ID",
-        required: true,
       },
       {
         key: "dmPolicy",
@@ -460,7 +459,27 @@ const channelInfo: Record<
         placeholder: "xoxb-...",
         required: true,
       },
-      { key: "appToken", label: "App Token", type: "password", placeholder: "xapp-..." },
+      {
+        key: "mode",
+        label: "连接模式",
+        type: "select",
+        options: [
+          { value: "socket", label: "Socket Mode（默认）" },
+          { value: "http", label: "HTTP Events API" },
+        ],
+      },
+      {
+        key: "appToken",
+        label: "App Token",
+        type: "password",
+        placeholder: "xapp-...（Socket Mode 必填）",
+      },
+      {
+        key: "signingSecret",
+        label: "Signing Secret",
+        type: "password",
+        placeholder: "HTTP 模式必填",
+      },
       { key: "testChannelId", label: "测试 Channel ID", type: "text", placeholder: "可选" },
       {
         key: "requireMention",
@@ -1332,6 +1351,7 @@ export class OpenClawConfigChannels extends LitElement {
   @state() private showClearConfirm = false;
 
   @state() private visiblePasswords = new Set<string>();
+  @state() private selectedChannelConfig: Record<string, unknown> = {};
 
   @state() private pairingRequests: PairingRequest[] = [];
   @state() private pairingLoading = false;
@@ -1461,6 +1481,77 @@ export class OpenClawConfigChannels extends LitElement {
     }
   }
 
+  private getDefaultDmPolicy(channelType: string): string | null {
+    switch (channelType) {
+      case "telegram":
+      case "discord":
+      case "slack":
+      case "feishu":
+      case "imessage":
+      case "whatsapp":
+        return "pairing";
+      default:
+        return null;
+    }
+  }
+
+  private shouldShowPairing(channelType: string, dmPolicy?: string | null) {
+    const effectivePolicy = dmPolicy?.trim() || this.getDefaultDmPolicy(channelType);
+    return effectivePolicy === "pairing";
+  }
+
+  private parseAllowlist(raw: unknown): string[] {
+    if (typeof raw !== "string") {
+      return [];
+    }
+    return raw
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  private validateConfigBeforeSave(channel: ChannelConfig, config: Record<string, unknown>) {
+    const info = channelInfo[channel.channel_type];
+    const requiredFields = info?.fields.filter((field) => field.required) ?? [];
+    for (const field of requiredFields) {
+      const value = config[field.key];
+      if (value === undefined || value === null || String(value).trim() === "") {
+        return `${field.label} is required`;
+      }
+    }
+
+    const dmPolicy = typeof config.dmPolicy === "string" ? config.dmPolicy.trim() : "";
+    const allowFrom = this.parseAllowlist(config.allowFrom);
+    if (dmPolicy === "allowlist" && allowFrom.length === 0) {
+      return "Allowlist mode requires DM allowlist entries";
+    }
+    if (
+      dmPolicy === "open" &&
+      ["telegram", "discord", "slack", "feishu", "imessage", "whatsapp"].includes(
+        channel.channel_type,
+      ) &&
+      !allowFrom.includes("*")
+    ) {
+      return "Open mode requires * in DM allowlist";
+    }
+
+    if (channel.channel_type === "slack") {
+      const mode = typeof config.mode === "string" && config.mode.trim() ? config.mode.trim() : "socket";
+      if (!config.botToken || String(config.botToken).trim() === "") {
+        return "Bot Token is required";
+      }
+      if (mode === "http") {
+        if (!config.signingSecret || String(config.signingSecret).trim() === "") {
+          return "HTTP mode requires Signing Secret";
+        }
+      } else if (!config.appToken || String(config.appToken).trim() === "") {
+        return "Socket Mode requires App Token";
+      }
+    }
+
+    return null;
+  }
+
   private togglePasswordVisibility(fieldKey: string) {
     const next = new Set(this.visiblePasswords);
     if (next.has(fieldKey)) {
@@ -1493,7 +1584,9 @@ export class OpenClawConfigChannels extends LitElement {
     try {
       await invoke("clear_channel_config", { channelId: this.selectedChannel });
       this.configForm = {};
-      await this.fetchChannels();
+      this.selectedChannelConfig = {};
+      const refreshedChannels = await this.fetchChannels();
+      this.handleChannelSelect(this.selectedChannel, refreshedChannels);
       this.testResult = {
         success: true,
         message: channelName + " 配置已清空",
@@ -1614,35 +1707,31 @@ export class OpenClawConfigChannels extends LitElement {
 
     if (channel) {
       const form: Record<string, string> = {};
-
-      // Initialize all fields from channelInfo to ensure empty states are captured
       const info = channelInfo[channel.channel_type];
-      if (info && info.fields) {
-        info.fields.forEach((f) => {
-          form[f.key] = "";
-        });
+      const editableKeys = new Set(info?.fields.map((field) => field.key) ?? []);
+
+      info?.fields.forEach((field) => {
+        form[field.key] = "";
+      });
+
+      this.selectedChannelConfig = { ...(channel.config || {}) };
+
+      for (const key of editableKeys) {
+        const value = channel.config?.[key];
+        if (typeof value === "boolean") {
+          form[key] = value ? "true" : "false";
+        } else if (typeof value === "string" || typeof value === "number") {
+          form[key] = String(value);
+        }
       }
 
-      // Merge actual config
-      if (channel.config) {
-        Object.entries(channel.config).forEach(([key, value]) => {
-          if (typeof value === "boolean") {
-            form[key] = value ? "true" : "false";
-          } else if (value !== null && value !== undefined) {
-            form[key] = String(value);
-          }
-        });
-      }
       this.configForm = form;
 
-      // Start pairing poll if dmPolicy is 'pairing' (or naturally defaults to pairing)
-      if (
-        form.dmPolicy === "pairing" ||
-        (!form.dmPolicy && info?.fields?.some((f) => f.key === "dmPolicy"))
-      ) {
+      if (this.shouldShowPairing(channel.channel_type, form.dmPolicy)) {
         this._startPairingPoll(channelId);
       }
     } else {
+      this.selectedChannelConfig = {};
       this.configForm = {};
     }
   }
@@ -1659,16 +1748,27 @@ export class OpenClawConfigChannels extends LitElement {
 
     this.saving = true;
     try {
-      const config: Record<string, unknown> = {};
-      Object.entries(this.configForm).forEach(([key, value]) => {
+      const info = channelInfo[channel.channel_type];
+      const config: Record<string, unknown> = { ...this.selectedChannelConfig };
+
+      for (const field of info?.fields ?? []) {
+        const value = this.configForm[field.key] ?? "";
         if (value === "true") {
-          config[key] = true;
+          config[field.key] = true;
         } else if (value === "false") {
-          config[key] = false;
+          config[field.key] = false;
         } else if (value.trim() !== "") {
-          config[key] = value.trim();
+          config[field.key] = value.trim();
+        } else {
+          delete config[field.key];
         }
-      });
+      }
+
+      const validationError = this.validateConfigBeforeSave(channel, config);
+      if (validationError) {
+        this.testResult = { success: false, message: validationError, error: null };
+        return;
+      }
 
       await invoke("save_channel_config", {
         channel: {
@@ -1677,15 +1777,16 @@ export class OpenClawConfigChannels extends LitElement {
         },
       });
 
-      await this.fetchChannels();
+      const refreshedChannels = await this.fetchChannels();
+      this.handleChannelSelect(channel.id, refreshedChannels);
       this.testResult = {
         success: true,
-        message: "保存配置成功",
+        message: "Saved configuration successfully",
         error: null,
       };
     } catch (e) {
-      console.error("保存失败:", e);
-      this.testResult = { success: false, message: "保存配置失败", error: String(e) };
+      console.error("Save failed:", e);
+      this.testResult = { success: false, message: "Failed to save configuration", error: String(e) };
     } finally {
       this.saving = false;
     }
@@ -1696,7 +1797,51 @@ export class OpenClawConfigChannels extends LitElement {
     if (!info) {
       return channel.enabled;
     }
-    const requiredFields = info.fields.filter((f) => f.required);
+
+    const dmPolicy =
+      typeof channel.config.dmPolicy === "string" && channel.config.dmPolicy.trim()
+        ? channel.config.dmPolicy.trim()
+        : this.getDefaultDmPolicy(channel.channel_type);
+    const allowFrom = this.parseAllowlist(channel.config.allowFrom);
+
+    if (dmPolicy === "allowlist" && allowFrom.length === 0) {
+      return false;
+    }
+    if (
+      dmPolicy === "open" &&
+      ["telegram", "discord", "slack", "feishu", "imessage", "whatsapp"].includes(
+        channel.channel_type,
+      ) &&
+      !allowFrom.includes("*")
+    ) {
+      return false;
+    }
+
+    if (channel.channel_type === "telegram") {
+      const botToken = channel.config.botToken;
+      return botToken !== undefined && botToken !== null && String(botToken).trim() !== "";
+    }
+    if (channel.channel_type === "slack") {
+      const botToken = channel.config.botToken;
+      const modeRaw = channel.config.mode;
+      const mode = typeof modeRaw === "string" && modeRaw.trim() ? modeRaw.trim() : "socket";
+      const appToken = channel.config.appToken;
+      const signingSecret = channel.config.signingSecret;
+      const hasBotToken = botToken !== undefined && botToken !== null && String(botToken).trim() !== "";
+      if (!hasBotToken) {
+        return false;
+      }
+      if (mode === "http") {
+        return (
+          signingSecret !== undefined &&
+          signingSecret !== null &&
+          String(signingSecret).trim() !== ""
+        );
+      }
+      return appToken !== undefined && appToken !== null && String(appToken).trim() !== "";
+    }
+
+    const requiredFields = info.fields.filter((field) => field.required);
     if (requiredFields.length === 0) {
       return channel.enabled;
     }
@@ -1718,8 +1863,7 @@ export class OpenClawConfigChannels extends LitElement {
     // dmPolicy 切换时启动/停止配对轮询
     if (key === "dmPolicy" && this.selectedChannel) {
       const channelConfig = this.channels.find((c) => c.id === this.selectedChannel);
-      const info = channelConfig ? channelInfo[channelConfig.channel_type] : null;
-      if (v === "pairing" || (!v && info?.fields?.some((f) => f.key === "dmPolicy"))) {
+      if (channelConfig && this.shouldShowPairing(channelConfig.channel_type, v)) {
         this._startPairingPoll(this.selectedChannel);
       } else {
         this._stopPairingPoll();
@@ -1903,9 +2047,7 @@ export class OpenClawConfigChannels extends LitElement {
 
               <!-- Pairing requests block (when dmPolicy is 'pairing' or default) -->
               ${
-                this.configForm.dmPolicy === "pairing" ||
-                (!this.configForm.dmPolicy &&
-                  currentInfo?.fields?.some((f: ChannelField) => f.key === "dmPolicy"))
+                this.shouldShowPairing(currentChannel.channel_type, this.configForm.dmPolicy)
                   ? html`
                 <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border, #27272a);">
                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">

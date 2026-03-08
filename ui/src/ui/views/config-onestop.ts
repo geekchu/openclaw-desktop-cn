@@ -19,9 +19,70 @@ function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promi
 // ─── 一站式保存逻辑 ───────────────────────────────────────────
 
 const ONESTOP_PROVIDER_NAME = "onestop";
-const ONESTOP_BASE_URL = "https://api.openclawcn.net/v1";
-const MODELS_API_URL = "https://api.openclawcn.net/v1/models";
-const PRICING_URL = "https://api.openclawcn.net/pricing";
+
+// ── Endpoint failover ───────────────────────────────────────
+// Actual API calls go to api2 first; fall back to api on failure.
+// Display URLs (links, text) always show api.openclawcn.net.
+const PRIMARY_API_HOST = "api2.openclawcn.net";
+const FALLBACK_API_HOST = "api.openclawcn.net";
+const DISPLAY_HOST = "api.openclawcn.net"; // never changes
+
+let _apiHost = PRIMARY_API_HOST;
+
+function getBaseUrl(): string {
+  return `https://${_apiHost}/v1`;
+}
+function getModelsApiUrl(): string {
+  return `https://${_apiHost}/v1/models`;
+}
+
+const PRICING_URL = `https://${DISPLAY_HOST}/pricing`;
+
+/** Switch to fallback host and start background recovery probe. */
+function switchToFallbackHost(): void {
+  if (_apiHost === FALLBACK_API_HOST) return;
+  _apiHost = FALLBACK_API_HOST;
+  startEndpointHealthCheck();
+}
+
+function switchToPrimaryHost(): void {
+  _apiHost = PRIMARY_API_HOST;
+  stopEndpointHealthCheck();
+}
+
+let _endpointHealthTimer: ReturnType<typeof setInterval> | null = null;
+const ENDPOINT_HEALTH_INTERVAL_MS = 300_000;
+
+async function probeEndpoint(): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5_000);
+    const res = await fetch(`https://${PRIMARY_API_HOST}/v1/models`, {
+      method: "GET",
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function startEndpointHealthCheck(): void {
+  if (_endpointHealthTimer) return;
+  _endpointHealthTimer = setInterval(() => {
+    void probeEndpoint().then((ok) => {
+      if (ok) switchToPrimaryHost();
+    });
+  }, ENDPOINT_HEALTH_INTERVAL_MS);
+}
+
+function stopEndpointHealthCheck(): void {
+  if (_endpointHealthTimer) {
+    clearInterval(_endpointHealthTimer);
+    _endpointHealthTimer = null;
+  }
+}
 
 /**
  * Save the onestop API key and selected model.
@@ -56,7 +117,7 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
     cfg.models.providers = {};
   }
   cfg.models.providers[ONESTOP_PROVIDER_NAME] = {
-    baseUrl: ONESTOP_BASE_URL,
+    baseUrl: getBaseUrl(),
     // 如果用户未输入新 Key，保留配置文件中已有的 Key
     apiKey: apiKey || cfg.models.providers?.[ONESTOP_PROVIDER_NAME]?.apiKey || "",
     models: modelsToSave.map((m) => ({
@@ -293,7 +354,7 @@ export function fetchModels(requestUpdate: () => void): void {
   _modelsLoading = true;
   _modelsError = null;
 
-  _fetchPromise = fetch(MODELS_API_URL)
+  _fetchPromise = fetch(getModelsApiUrl())
     .then((res) => {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
@@ -315,6 +376,15 @@ export function fetchModels(requestUpdate: () => void): void {
       requestUpdate();
     })
     .catch((err) => {
+      // If primary failed, try fallback
+      if (_apiHost === PRIMARY_API_HOST) {
+        switchToFallbackHost();
+        _fetchPromise = null;
+        _modelsLoading = false;
+        // Retry with fallback host
+        fetchModels(requestUpdate);
+        return;
+      }
       _modelsError = String(err);
       _modelsLoading = false;
       _fetchPromise = null;

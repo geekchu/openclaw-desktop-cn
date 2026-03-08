@@ -266,6 +266,10 @@ fn channel_needs_send_test(channel_type: &str) -> bool {
     }
 }
 
+fn channel_requires_linked_status(channel_type: &str) -> bool {
+    matches!(channel_type.to_lowercase().as_str(), "whatsapp")
+}
+
 /// 从文本输出解析渠道状态
 /// 格式: "- Telegram default: enabled, configured, mode:polling, token:config"
 fn parse_channel_status_text(output: &str, channel_type: &str) -> Option<(bool, bool, bool, String)> {
@@ -324,10 +328,15 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                     });
                 }
                 
-                // 已配置就认为状态OK（Gateway可能没启动，但配置是有的）
-                channel_ok = configured;
+                channel_ok = if channel_requires_linked_status(&channel_type) {
+                    configured && linked
+                } else {
+                    configured
+                };
                 status_message = if linked {
                     "已链接".to_string()
+                } else if channel_requires_linked_status(&channel_type) {
+                    "等待扫码登录".to_string()
                 } else if !status_msg.is_empty() {
                     status_msg
                 } else {
@@ -341,8 +350,18 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                             if let Some(ch) = channels.get(&channel_lower) {
                                 let configured = ch.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
                                 let linked = ch.get("linked").and_then(|v| v.as_bool()).unwrap_or(false);
-                                channel_ok = configured;
-                                status_message = if linked { "已链接".to_string() } else { "已配置".to_string() };
+                                channel_ok = if channel_requires_linked_status(&channel_type) {
+                                    configured && linked
+                                } else {
+                                    configured
+                                };
+                                status_message = if linked {
+                                    "已链接".to_string()
+                                } else if channel_requires_linked_status(&channel_type) {
+                                    "等待扫码登录".to_string()
+                                } else {
+                                    "已配置".to_string()
+                                };
                             }
                         }
                     }
@@ -690,9 +709,78 @@ read -p "按回车键关闭..."
             
             #[cfg(target_os = "windows")]
             {
-                return Err("Windows 暂不支持自动启动终端，请手动运行: openclaw channels login --channel whatsapp".to_string());
+                let script_path = std::env::temp_dir().join("openclaw-whatsapp-login.ps1");
+                let script_content = r#"
+$ErrorActionPreference = 'Continue'
+Clear-Host
+Write-Host '╔════════════════════════════════════════════════════════╗'
+Write-Host '║           WhatsApp 登录向导                           ║'
+Write-Host '╚════════════════════════════════════════════════════════╝'
+Write-Host ''
+Write-Host '步骤 1/3: 启用 WhatsApp 插件...'
+openclaw plugins enable whatsapp 2>$null | Out-Null
+openclaw config set --strict-json plugins.entries.whatsapp.enabled true 2>$null | Out-Null
+openclaw config set channels.whatsapp.dmPolicy pairing 2>$null | Out-Null
+openclaw config set channels.whatsapp.groupPolicy allowlist 2>$null | Out-Null
+Write-Host '✅ 插件已启用'
+Write-Host ''
+Write-Host '步骤 2/3: 重启 Gateway 使插件生效...'
+openclaw gateway stop 2>$null | Out-Null
+Start-Sleep -Seconds 2
+openclaw gateway start 2>$null | Out-Null
+Write-Host '✅ Gateway 已重启'
+Write-Host ''
+Write-Host '步骤 3/3: 启动 WhatsApp 登录...'
+Write-Host '请使用 WhatsApp 手机 App 扫描二维码'
+Write-Host ''
+openclaw channels login --channel whatsapp --verbose
+Write-Host ''
+Read-Host '登录流程结束，按回车关闭窗口'
+"#;
+
+                std::fs::write(&script_path, script_content)
+                    .map_err(|e| format!("创建 PowerShell 脚本失败: {}", e))?;
+
+                std::process::Command::new("powershell.exe")
+                    .args([
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-Command",
+                        &format!(
+                            "Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','{}'",
+                            script_path.display().to_string().replace('\\', "\\\\")
+                        ),
+                    ])
+                    .spawn()
+                    .map_err(|e| format!("启动 PowerShell 终端失败: {}", e))?;
             }
+
+            Ok("已启动 WhatsApp 登录终端".to_string())
         }
         _ => Err(format!("不支持 {} 的登录向导", channel_type)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{channel_requires_linked_status, parse_channel_status_text};
+
+    #[test]
+    fn parse_channel_status_text_marks_whatsapp_as_link_pending() {
+        let parsed = parse_channel_status_text(
+            "- WhatsApp default: enabled, configured, mode:web",
+            "whatsapp",
+        )
+        .expect("should parse whatsapp status line");
+        assert!(parsed.0);
+        assert!(parsed.1);
+        assert!(!parsed.2);
+    }
+
+    #[test]
+    fn only_whatsapp_requires_linked_status() {
+        assert!(channel_requires_linked_status("whatsapp"));
+        assert!(!channel_requires_linked_status("telegram"));
     }
 }

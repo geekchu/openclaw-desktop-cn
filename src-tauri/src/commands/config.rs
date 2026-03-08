@@ -8,6 +8,50 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use tauri::command;
 
+fn desktop_supported_channel_types() -> Vec<(&'static str, &'static str, Vec<&'static str>)> {
+    vec![
+        ("telegram", "telegram", vec!["userId"]),
+        ("discord", "discord", vec!["testChannelId"]),
+        ("slack", "slack", vec!["testChannelId"]),
+        ("feishu", "feishu", vec!["testChatId"]),
+        ("whatsapp", "whatsapp", vec![]),
+        ("imessage", "imessage", vec![]),
+        ("wecom", "wecom", vec![]),
+        ("dingtalk", "dingtalk", vec![]),
+        ("qqbot", "qqbot", vec![]),
+    ]
+}
+
+fn builtin_channel_plugin_ids() -> Vec<&'static str> {
+    vec![
+        "telegram", "discord", "slack", "feishu", "dingtalk", "wecom", "qqbot", "whatsapp",
+        "imessage", "signal", "line", "matrix", "msteams", "googlechat", "mattermost",
+        "irc", "nostr", "zalo", "zalouser", "tlon", "twitch", "bluebubbles",
+        "nextcloud-talk",
+    ]
+}
+
+fn is_test_only_channel_field(field: &str) -> bool {
+    matches!(field, "userId" | "testChatId" | "testChannelId")
+}
+
+fn has_meaningful_channel_value(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(boolean) => *boolean,
+        Value::Number(_) => true,
+        Value::String(text) => !text.trim().is_empty(),
+        Value::Array(items) => items.iter().any(has_meaningful_channel_value),
+        Value::Object(map) => map.iter().any(|(key, item)| {
+            key != "enabled" && !is_test_only_channel_field(key) && has_meaningful_channel_value(item)
+        }),
+    }
+}
+
+fn channel_has_persisted_config(channel_config: Option<&Value>) -> bool {
+    channel_config.is_some_and(has_meaningful_channel_value)
+}
+
 /// 获取 openclaw.json 配置
 fn load_openclaw_config() -> Result<Value, String> {
     let config_path = platform::get_config_file_path();
@@ -895,28 +939,12 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
     
     let mut channels = Vec::new();
     
-    // 支持的渠道类型列表及其测试字段
-    let channel_types = vec![
-        ("telegram", "telegram", vec!["userId"]),
-        ("discord", "discord", vec!["testChannelId"]),
-        ("slack", "slack", vec!["testChannelId"]),
-        ("feishu", "feishu", vec!["testChatId"]),
-        ("whatsapp", "whatsapp", vec![]),
-        ("imessage", "imessage", vec![]),
-        ("wecom", "wecom", vec![]),
-        ("dingtalk", "dingtalk", vec![]),
-        ("qqbot", "qqbot", vec![]),
-    ];
+    let channel_types = desktop_supported_channel_types();
     
     let array_fields = vec!["allowFrom", "groupAllowFrom"];
     
     for (channel_id, channel_type, test_fields) in channel_types {
         let channel_config = channels_obj.get(channel_id);
-        
-        let enabled = channel_config
-            .and_then(|c| c.get("enabled"))
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
         
         // 将渠道配置转换为 HashMap
         let mut config_map: HashMap<String, Value> = if let Some(cfg) = channel_config {
@@ -973,8 +1001,8 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
             }
         }
         
-        // 判断是否已配置（有任何非空配置项）
-        let has_config = !config_map.is_empty() || enabled;
+        // 仅真实渠道配置项算“已配置”，测试字段和裸 enabled 不算
+        let has_config = channel_has_persisted_config(channel_config);
         
         channels.push(ChannelConfig {
             id: channel_id.to_string(),
@@ -1023,9 +1051,7 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
     let array_fields = vec!["allowFrom", "groupAllowFrom"];
     
     // 构建渠道配置
-    let mut channel_obj = json!({
-        "enabled": true
-    });
+    let mut channel_obj = json!({});
     
     // 添加渠道特定配置
     for (key, value) in &channel.config {
@@ -1037,7 +1063,12 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
                 key.to_uppercase()
             );
             if let Some(val_str) = value.as_str() {
-                let _ = file::set_env_value(&env_path, &env_key, val_str);
+                let trimmed = val_str.trim();
+                if trimmed.is_empty() {
+                    let _ = file::remove_env_value(&env_path, &env_key);
+                } else {
+                    let _ = file::set_env_value(&env_path, &env_key, trimmed);
+                }
             }
         } else if array_fields.contains(&key.as_str()) {
             // 处理字符串逗号分隔数组类型转换
@@ -1064,13 +1095,20 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
         }
     }
     
-    // 更新 channels 配置
-    config["channels"][&channel.id] = channel_obj;
-    
-    // 更新 plugins.entries - 确保插件已启用
-    config["plugins"]["entries"][&channel.id] = json!({
-        "enabled": true
-    });
+    if has_meaningful_channel_value(&channel_obj) {
+        channel_obj["enabled"] = json!(true);
+        config["channels"][&channel.id] = channel_obj;
+        config["plugins"]["entries"][&channel.id] = json!({
+            "enabled": true
+        });
+    } else {
+        if let Some(channels) = config.get_mut("channels").and_then(|v| v.as_object_mut()) {
+            channels.remove(&channel.id);
+        }
+        if let Some(entries) = config.pointer_mut("/plugins/entries").and_then(|v| v.as_object_mut()) {
+            entries.remove(&channel.id);
+        }
+    }
     
     // 保存配置
     info!("[保存渠道配置] 写入配置文件...");
@@ -1147,12 +1185,7 @@ pub fn ensure_channel_plugins_enabled() -> Result<(), String> {
         config["plugins"]["entries"] = json!({});
     }
 
-    let channel_ids = vec![
-        "telegram", "discord", "slack", "feishu", "dingtalk", "wecom", "qqbot", "whatsapp", "imessage",
-        "signal", "line", "matrix", "msteams", "googlechat", "mattermost",
-        "irc", "nostr", "zalo", "zalouser", "tlon", "twitch",
-        "bluebubbles", "nextcloud-talk",
-    ];
+    let channel_ids = builtin_channel_plugin_ids();
 
     let entries = config["plugins"]["entries"].as_object_mut()
         .ok_or("plugins.entries 不是对象")?;
@@ -1427,5 +1460,28 @@ pub async fn approve_pairing_code(channel: String, code: String) -> Result<Pairi
                 message: format!("审批失败: {}", clean),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{channel_has_persisted_config, has_meaningful_channel_value};
+    use serde_json::json;
+
+    #[test]
+    fn channel_value_ignores_enabled_and_empty_fields() {
+        assert!(!has_meaningful_channel_value(&json!({ "enabled": true })));
+        assert!(!has_meaningful_channel_value(&json!({ "enabled": true, "token": "   " })));
+        assert!(!has_meaningful_channel_value(&json!({ "testChannelId": "123" })));
+        assert!(has_meaningful_channel_value(&json!({ "enabled": true, "token": "abc" })));
+        assert!(has_meaningful_channel_value(&json!({ "allowFrom": ["x"] })));
+    }
+
+    #[test]
+    fn channel_has_persisted_config_only_counts_real_channel_config() {
+        assert!(!channel_has_persisted_config(None));
+        assert!(!channel_has_persisted_config(Some(&json!({ "enabled": true }))));
+        assert!(!channel_has_persisted_config(Some(&json!({ "userId": "10001" }))));
+        assert!(channel_has_persisted_config(Some(&json!({ "botToken": "123:abc" }))));
     }
 }

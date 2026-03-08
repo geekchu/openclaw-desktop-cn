@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import type { AgentMessage, StreamFn } from "@mariozechner/pi-agent-core";
-import { streamSimple } from "@mariozechner/pi-ai";
+import { createAssistantMessageEventStream, streamSimple } from "@mariozechner/pi-ai";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -38,6 +38,10 @@ import {
 import { DEFAULT_CONTEXT_TOKENS } from "../../defaults.js";
 import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
+import {
+  resolveOnestopUrl,
+  switchToFallback as switchOnestopToFallback,
+} from "../../onestop-endpoint-failover.js";
 import { resolveImageSanitizationLimits } from "../../image-sanitization.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
 import { normalizeProviderId, resolveDefaultModelForAgent } from "../../model-selection.js";
@@ -1005,6 +1009,47 @@ export async function runEmbeddedAttempt(
       } else {
         // Force a stable streamFn reference so vitest can reliably mock @mariozechner/pi-ai.
         activeSession.agent.streamFn = streamSimple;
+      }
+
+      // Onestop endpoint failover: rewrite baseUrl at stream time and retry
+      // with the fallback host when the primary is unreachable.
+      // Only retry if NO content events have been emitted yet (connection-level failure).
+      // If the stream already started producing tokens, retrying would cause
+      // duplicated/garbled output, so we let the error propagate instead.
+      if (normalizeProviderId(params.provider) === "onestop") {
+        const baseFn = activeSession.agent.streamFn;
+        const failoverStreamFn: StreamFn = (model, context, options) => {
+          const out = createAssistantMessageEventStream();
+          const rewritten = { ...model, baseUrl: resolveOnestopUrl(model.baseUrl as string) };
+          const primary = baseFn(rewritten as typeof model, context, options);
+          // Pipe primary stream into output; on connection-level error, retry with fallback.
+          (async () => {
+            let hasContent = false;
+            try {
+              const resolved = await primary;
+              for await (const event of resolved) {
+                if (event.type === "error" && !hasContent) {
+                  // Connection-level failure before any content — try fallback
+                  switchOnestopToFallback();
+                  const fb = { ...model, baseUrl: resolveOnestopUrl(model.baseUrl as string) };
+                  const fallbackResolved = await baseFn(fb as typeof model, context, options);
+                  for await (const fbEvent of fallbackResolved) {
+                    out.push(fbEvent);
+                  }
+                  return;
+                }
+                if (event.type !== "start") {
+                  hasContent = true;
+                }
+                out.push(event);
+              }
+            } catch {
+              out.end();
+            }
+          })();
+          return out;
+        };
+        activeSession.agent.streamFn = failoverStreamFn;
       }
 
       // Ollama with OpenAI-compatible API needs num_ctx in payload.options.
