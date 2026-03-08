@@ -1,5 +1,13 @@
 import { execSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { builtinModules, createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -116,7 +124,11 @@ try {
     }
     const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
     for (const [name, version] of Object.entries(extPkg.dependencies || {})) {
-      if (typeof version === "string" && !version.startsWith("workspace:") && !declaredDeps.has(name)) {
+      if (
+        typeof version === "string" &&
+        !version.startsWith("workspace:") &&
+        !declaredDeps.has(name)
+      ) {
         declaredDeps.set(name, version);
       }
     }
@@ -158,7 +170,8 @@ try {
         try {
           const installedPkgPath = requireFromProjectRoot.resolve(`${pkgName}/package.json`);
           const installedPkg = JSON.parse(readFileSync(installedPkgPath, "utf-8"));
-          version = typeof installedPkg.version === "string" ? installedPkg.version.trim() : undefined;
+          version =
+            typeof installedPkg.version === "string" ? installedPkg.version.trim() : undefined;
         } catch {
           version = undefined;
         }
@@ -192,7 +205,9 @@ try {
     version: rootPkg.version,
     type: "module",
     main: "openclaw.mjs",
-    dependencies: Object.fromEntries([...requiredDeps.entries()].sort(([a], [b]) => a.localeCompare(b))),
+    dependencies: Object.fromEntries(
+      [...requiredDeps.entries()].sort(([a], [b]) => a.localeCompare(b)),
+    ),
     optionalDependencies: {},
   };
 
@@ -226,7 +241,11 @@ try {
       if (typeof packageJson.main === "string") {
         packageJson.main = "./index.cjs";
       }
-      writeFileSync(join(targetRoot, "package.json"), JSON.stringify(packageJson, null, 2), "utf-8");
+      writeFileSync(
+        join(targetRoot, "package.json"),
+        JSON.stringify(packageJson, null, 2),
+        "utf-8",
+      );
     }
 
     const shimSource = [

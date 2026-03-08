@@ -128,7 +128,10 @@ describe("discoverOpenClawPlugins", () => {
     fs.writeFileSync(path.join(pluginDir, "index.cjs"), "module.exports = {};", "utf-8");
     fs.writeFileSync(
       path.join(pluginDir, "openclaw.plugin.json"),
-      JSON.stringify({ id: "feishu", configSchema: { type: "object", additionalProperties: true } }),
+      JSON.stringify({
+        id: "feishu",
+        configSchema: { type: "object", additionalProperties: true },
+      }),
       "utf-8",
     );
     fs.writeFileSync(
@@ -157,7 +160,9 @@ describe("discoverOpenClawPlugins", () => {
         async () => discoverOpenClawPlugins({}),
       );
 
-      const candidate = result.candidates.find((entry) => entry.idHint === "feishu" && entry.origin === "bundled");
+      const candidate = result.candidates.find(
+        (entry) => entry.idHint === "feishu" && entry.origin === "bundled",
+      );
       expect(candidate).toMatchObject({
         source: path.join(pluginDir, "index.cjs"),
         rootDir: pluginDir,
@@ -166,7 +171,9 @@ describe("discoverOpenClawPlugins", () => {
         packageManifest: { install: { npmSpec: "@openclaw/feishu" } },
       });
       expect(result.diagnostics).not.toContainEqual(
-        expect.objectContaining({ message: expect.stringContaining("bundled extension shim is missing") }),
+        expect.objectContaining({
+          message: expect.stringContaining("bundled extension shim is missing"),
+        }),
       );
     } finally {
       if (previousBundled === undefined) {

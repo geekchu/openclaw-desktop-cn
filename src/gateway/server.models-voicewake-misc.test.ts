@@ -246,7 +246,10 @@ describe("gateway server models + voicewake", () => {
         expect(after.payload?.triggers).toEqual(["hi", "there"]);
 
         const onDisk = JSON.parse(
-          await fs.readFile(path.join(homeDir, ".openclawcn", "settings", "voicewake.json"), "utf8"),
+          await fs.readFile(
+            path.join(homeDir, ".openclawcn", "settings", "voicewake.json"),
+            "utf8",
+          ),
         ) as { triggers?: unknown; updatedAtMs?: unknown };
         expect(onDisk.triggers).toEqual(["hi", "there"]);
         expect(typeof onDisk.updatedAtMs).toBe("number");

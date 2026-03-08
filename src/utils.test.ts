@@ -181,7 +181,9 @@ describe("shortenHomeInString", () => {
     vi.stubEnv("HOME", "/home/other");
 
     expect(
-      shortenHomeInString(`config: ${path.resolve("/srv/openclaw-home")}/.openclawcn/openclaw.json`),
+      shortenHomeInString(
+        `config: ${path.resolve("/srv/openclaw-home")}/.openclawcn/openclaw.json`,
+      ),
     ).toBe("config: $OPENCLAW_HOME/.openclawcn/openclaw.json");
 
     vi.unstubAllEnvs();

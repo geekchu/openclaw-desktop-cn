@@ -55,7 +55,9 @@ describe("normalizeConfigPaths", () => {
       );
       expect(cfg.agents?.defaults?.workspace).toBe(path.join(home, "ws-default"));
       expect(cfg.agents?.list?.[0]?.workspace).toBe(path.join(home, "ws-agent"));
-      expect(cfg.agents?.list?.[0]?.agentDir).toBe(path.join(home, ".openclawcn", "agents", "main"));
+      expect(cfg.agents?.list?.[0]?.agentDir).toBe(
+        path.join(home, ".openclawcn", "agents", "main"),
+      );
       expect(cfg.agents?.list?.[0]?.sandbox?.workspaceRoot).toBe(path.join(home, "sandbox-root"));
 
       // Non-path key => do not treat "~" as home expansion.

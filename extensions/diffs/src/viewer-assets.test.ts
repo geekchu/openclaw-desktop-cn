@@ -32,6 +32,8 @@ describe("viewer assets", () => {
       "C:\\app\\gateway-bundle",
     );
 
-    expect(candidates).toContain(path.join("C:\\app\\gateway-bundle", "extensions", "diffs", "assets", "viewer-runtime.js"));
+    expect(candidates).toContain(
+      path.join("C:\\app\\gateway-bundle", "extensions", "diffs", "assets", "viewer-runtime.js"),
+    );
   });
 });
