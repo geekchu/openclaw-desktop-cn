@@ -68,7 +68,6 @@ import { icons } from "./icons.ts";
 import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
 import { resolveConfiguredCronModelSuggestions, sortLocaleStrings } from "./views/agents-utils.ts";
 import { renderAgents } from "./views/agents.ts";
-import { renderChannels } from "./views/channels.ts";
 import { renderChat } from "./views/chat.ts";
 import { saveOnestopConfig } from "./views/config-onestop.ts";
 import { renderConfig } from "./views/config.ts";
@@ -394,45 +393,6 @@ export function renderApp(state: AppViewState) {
                 },
                 onConnect: () => state.connect(),
                 onRefresh: () => state.loadOverview(),
-              })
-            : nothing
-        }
-
-        ${
-          state.tab === "channels"
-            ? renderChannels({
-                connected: state.connected,
-                loading: state.channelsLoading,
-                snapshot: state.channelsSnapshot,
-                lastError: state.channelsError,
-                lastSuccessAt: state.channelsLastSuccess,
-                whatsappMessage: state.whatsappLoginMessage,
-                whatsappQrDataUrl: state.whatsappLoginQrDataUrl,
-                whatsappConnected: state.whatsappLoginConnected,
-                whatsappBusy: state.whatsappBusy,
-                configSchema: state.configSchema,
-                configSchemaLoading: state.configSchemaLoading,
-                configForm: state.configForm,
-                configUiHints: state.configUiHints,
-                configSaving: state.configSaving,
-                configFormDirty: state.configFormDirty,
-                nostrProfileFormState: state.nostrProfileFormState,
-                nostrProfileAccountId: state.nostrProfileAccountId,
-                onRefresh: (probe) => loadChannels(state, probe),
-                onWhatsAppStart: (force) => state.handleWhatsAppStart(force),
-                onWhatsAppWait: () => state.handleWhatsAppWait(),
-                onWhatsAppLogout: () => state.handleWhatsAppLogout(),
-                onConfigPatch: (path, value) => updateConfigFormValue(state, path, value),
-                onConfigSave: () => state.handleChannelConfigSave(),
-                onConfigReload: () => state.handleChannelConfigReload(),
-                onNostrProfileEdit: (accountId, profile) =>
-                  state.handleNostrProfileEdit(accountId, profile),
-                onNostrProfileCancel: () => state.handleNostrProfileCancel(),
-                onNostrProfileFieldChange: (field, value) =>
-                  state.handleNostrProfileFieldChange(field, value),
-                onNostrProfileSave: () => state.handleNostrProfileSave(),
-                onNostrProfileImport: () => state.handleNostrProfileImport(),
-                onNostrProfileToggleAdvanced: () => state.handleNostrProfileToggleAdvanced(),
               })
             : nothing
         }

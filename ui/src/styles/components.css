@@ -595,7 +595,7 @@
 .cron-workspace {
   margin-top: 16px;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   gap: 16px;
   align-items: start;
 }
