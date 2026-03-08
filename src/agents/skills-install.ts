@@ -470,5 +470,9 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
     }
   }
 
-  return withWarnings(await executeInstallCommand({ argv, timeoutMs, env }), warnings);
+  const result = await executeInstallCommand({ argv, timeoutMs, env });
+  if (result.ok) {
+    clearHasBinaryCache();
+  }
+  return withWarnings(result, warnings);
 }
