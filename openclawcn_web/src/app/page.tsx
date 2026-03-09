@@ -174,26 +174,12 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <a
-              href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.4_x64-setup.exe"
-              className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#ef4b58] to-[#ff7079] text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-[#ef4b58]/15 hover:shadow-lg hover:shadow-[#ef4b58]/25 hover:scale-[1.02] transition-all duration-300"
+            <button
+              disabled
+              className="w-full bg-gray-50 text-[#ccc] py-3 rounded-xl cursor-not-allowed text-sm font-medium border border-gray-100"
             >
-              <svg
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              下载 Windows 版 (v0.2.4)
-            </a>
+              Windows 版即将推出
+            </button>
           </div>
 
           <div className="bg-white border border-gray-100 rounded-2xl p-5 md:p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
