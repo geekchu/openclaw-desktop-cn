@@ -5,7 +5,7 @@ import paramiko
 import os
 import sys
 
-HOST = "47.57.241.17"
+HOST = "openclawcn.net"  # 或 47.57.241.17（备用）
 USER = "root"
 PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD") or getpass.getpass(f"SSH password for {USER}@{HOST}: ")
 REMOTE_DIR = "/var/www/openclawcn_web"
