@@ -63,6 +63,9 @@ export class SystemSettingsView extends LitElement {
   @state() private timezone = "Asia/Shanghai";
   @state() private autoStart = false;
   @state() private autoStartBusy = false;
+  @state() private lanAccess = false;
+  @state() private lanAccessBusy = false;
+  @state() private gatewayToken = "";
 
   /* ── update states ── */
   @state() private updateChecking = false;
@@ -120,8 +123,17 @@ export class SystemSettingsView extends LitElement {
           this.userName = (ident.userName as string) || "主人";
           this.timezone = (ident.timezone as string) || "Asia/Shanghai";
         }
+        // 加载局域网访问设置
+        if (typeof desktop.lanAccess === "boolean") {
+          this.lanAccess = desktop.lanAccess;
+        }
       } catch {
         /* ignore */
+      }
+      // 加载 gateway token
+      const gatewayToken = getNestedValue(cfg, ["gateway", "auth", "token"]);
+      if (typeof gatewayToken === "string") {
+        this.gatewayToken = gatewayToken;
       }
       try {
         this.autoStart = await invoke<boolean>("autostart_is_enabled");
@@ -321,6 +333,51 @@ export class SystemSettingsView extends LitElement {
       console.error("切换开机自启失败:", e);
     } finally {
       this.autoStartBusy = false;
+    }
+  }
+
+  private async _toggleLanAccess() {
+    if (this.lanAccessBusy) {
+      return;
+    }
+    this.lanAccessBusy = true;
+    try {
+      const newValue = !this.lanAccess;
+      await invoke("save_desktop_config", { config: { lanAccess: newValue } });
+      this.lanAccess = newValue;
+      // 提示用户需要重启
+      const modeName = newValue ? "局域网访问" : "仅本地访问";
+      if (confirm(`已切换到「${modeName}」模式，需要重启应用才能生效。\n\n是否立即重启？`)) {
+        const t = (window as any).__TAURI__;
+        if (t?.core?.invoke) {
+          try {
+            await t.core.invoke("stop_gateway");
+          } catch { /* best-effort */ }
+          t.core.invoke("plugin:process|restart");
+        }
+      }
+    } catch (e) {
+      console.error("切换局域网访问失败:", e);
+    } finally {
+      this.lanAccessBusy = false;
+    }
+  }
+
+  private async _copyGatewayToken() {
+    if (!this.gatewayToken) return;
+    try {
+      await navigator.clipboard.writeText(this.gatewayToken);
+      // 简单的复制成功提示
+      const btn = this.shadowRoot?.querySelector(".copy-token-btn") as HTMLElement | null;
+      if (btn) {
+        const originalText = btn.textContent;
+        btn.textContent = "已复制";
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 1500);
+      }
+    } catch (e) {
+      console.error("复制失败:", e);
     }
   }
 
@@ -1093,6 +1150,63 @@ export class SystemSettingsView extends LitElement {
           `
               : nothing
           }
+        </div>
+
+        <div class="section">
+          <label class="section-label">
+            网络访问
+            <span class="section-hint">&nbsp;— 控制 Gateway 服务的网络监听范围</span>
+          </label>
+
+          <div class="toggle-row">
+            <div class="toggle-row-info">
+              <div class="toggle-row-icon">🌐</div>
+              <div>
+                <div class="toggle-text-primary">开放局域网访问</div>
+                <div class="toggle-text-secondary">允许局域网内其他设备连接 Gateway（需重启生效）</div>
+              </div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" .checked=${this.lanAccess} ?disabled=${this.lanAccessBusy} @change=${this._toggleLanAccess} />
+              <span class="switch-track"></span>
+            </label>
+          </div>
+
+          ${this.lanAccess ? html`
+            <div style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12px; color: var(--muted, #71717a); margin-bottom: 4px;">Gateway Token（其他设备连接时需要）</div>
+                  <div style="font-family: monospace; font-size: 13px; color: var(--text, #e4e4e7); word-break: break-all;">${this.gatewayToken || "（未配置，请在配置文件中设置 gateway.auth.token）"}</div>
+                </div>
+                ${this.gatewayToken ? html`
+                  <button
+                    class="copy-token-btn"
+                    style="
+                      padding: 6px 12px;
+                      border-radius: 8px;
+                      border: 1px solid var(--border, #27272a);
+                      background: var(--card, #181b22);
+                      color: var(--text, #e4e4e7);
+                      font-size: 12px;
+                      cursor: pointer;
+                      white-space: nowrap;
+                      transition: all 0.15s ease;
+                    "
+                    @click=${this._copyGatewayToken}
+                    @mouseover=${(e: Event) => {
+                      (e.target as HTMLElement).style.background = "var(--bg-hover, #262a35)";
+                      (e.target as HTMLElement).style.borderColor = "var(--border-strong, #3f3f46)";
+                    }}
+                    @mouseout=${(e: Event) => {
+                      (e.target as HTMLElement).style.background = "var(--card, #181b22)";
+                      (e.target as HTMLElement).style.borderColor = "var(--border, #27272a)";
+                    }}
+                  >复制</button>
+                ` : nothing}
+              </div>
+            </div>
+          ` : nothing}
         </div>
 
       </div>`;
