@@ -129,18 +129,18 @@ function renderFallbackIndicator(status: FallbackIndicatorStatus | null | undefi
     return nothing;
   }
   const details = [
-    `Selected: ${status.selected}`,
-    phase === "cleared" ? `Active: ${status.selected}` : `Active: ${status.active}`,
-    phase === "cleared" && status.previous ? `Previous fallback: ${status.previous}` : null,
-    status.reason ? `Reason: ${status.reason}` : null,
-    status.attempts.length > 0 ? `Attempts: ${status.attempts.slice(0, 3).join(" | ")}` : null,
+    `已选择: ${status.selected}`,
+    phase === "cleared" ? `活动: ${status.selected}` : `活动: ${status.active}`,
+    phase === "cleared" && status.previous ? `上次回退: ${status.previous}` : null,
+    status.reason ? `原因: ${status.reason}` : null,
+    status.attempts.length > 0 ? `尝试: ${status.attempts.slice(0, 3).join(" | ")}` : null,
   ]
     .filter(Boolean)
     .join(" • ");
   const message =
     phase === "cleared"
-      ? `Fallback cleared: ${status.selected}`
-      : `Fallback active: ${status.active}`;
+      ? `回退已清除: ${status.selected}`
+      : `回退活动中: ${status.active}`;
   const className =
     phase === "cleared"
       ? "compaction-indicator compaction-indicator--fallback-cleared"
@@ -416,7 +416,7 @@ export function renderChat(props: ChatProps) {
               type="button"
               @click=${props.onScrollToBottom}
             >
-              New messages ${icons.arrowDown}
+              新消息 ${icons.arrowDown}
             </button>
           `
           : nothing
@@ -552,7 +552,7 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
           typeof marker.id === "string"
             ? `divider:compaction:${marker.id}`
             : `divider:compaction:${normalized.timestamp}:${i}`,
-        label: "Compaction",
+        label: "上下文压缩",
         timestamp: normalized.timestamp ?? Date.now(),
       });
       continue;

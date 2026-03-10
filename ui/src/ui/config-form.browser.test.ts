@@ -263,7 +263,7 @@ describe("config form renderer", () => {
       container,
     );
 
-    expect(container.textContent).toContain('No settings match "security"');
+    expect(container.textContent).toContain('没有匹配 "security" 的设置');
   });
 
   it("requires both text and tag when combined", () => {
@@ -285,7 +285,7 @@ describe("config form renderer", () => {
     );
 
     expect(container.textContent).toContain("Token");
-    expect(container.textContent).not.toContain('No settings match "token tag:security"');
+    expect(container.textContent).not.toContain('没有匹配 "token tag:security" 的设置');
 
     const noMatchContainer = document.createElement("div");
     render(
@@ -301,7 +301,7 @@ describe("config form renderer", () => {
       }),
       noMatchContainer,
     );
-    expect(noMatchContainer.textContent).toContain('No settings match "mode tag:security"');
+    expect(noMatchContainer.textContent).toContain('没有匹配 "mode tag:security" 的设置');
   });
 
   it("supports SecretInput unions in additionalProperties maps", () => {

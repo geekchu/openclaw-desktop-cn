@@ -82,11 +82,11 @@ describe("cron view", () => {
     const container = document.createElement("div");
     render(renderCron(createProps()), container);
 
-    expect(container.textContent).toContain("Latest runs across all jobs.");
-    expect(container.textContent).toContain("Status");
-    expect(container.textContent).toContain("All statuses");
-    expect(container.textContent).toContain("Delivery");
-    expect(container.textContent).toContain("All delivery");
+    expect(container.textContent).toContain("所有任务的最新运行记录。");
+    expect(container.textContent).toContain("状态");
+    expect(container.textContent).toContain("全部状态");
+    expect(container.textContent).toContain("投递");
+    expect(container.textContent).toContain("全部投递");
     expect(container.textContent).not.toContain("multi-select");
   });
 
@@ -211,11 +211,11 @@ describe("cron view", () => {
       container,
     );
 
-    expect(container.textContent).toContain("Latest runs for Daily ping.");
+    expect(container.textContent).toContain("Daily ping 的最新运行记录。");
 
     const cards = Array.from(container.querySelectorAll(".card"));
     const runHistoryCard = cards.find(
-      (card) => card.querySelector(".card-title")?.textContent?.trim() === "Run history",
+      (card) => card.querySelector(".card-title")?.textContent?.trim() === "运行历史",
     );
     expect(runHistoryCard).not.toBeUndefined();
 
@@ -246,8 +246,8 @@ describe("cron view", () => {
       container,
     );
 
-    expect(container.textContent).toContain("Due");
-    expect(container.textContent).not.toContain("Next 13");
+    expect(container.textContent).toContain("到期");
+    expect(container.textContent).not.toContain("下次 13");
   });
 
   it("calls onJobsFiltersChange when schedule filter changes", () => {
@@ -394,11 +394,11 @@ describe("cron view", () => {
     expect(onEdit).toHaveBeenCalledWith(job);
     expect(onLoadRuns).toHaveBeenCalledWith("job-3");
 
-    expect(container.textContent).toContain("Edit Job");
-    expect(container.textContent).toContain("Save changes");
+    expect(container.textContent).toContain("编辑任务");
+    expect(container.textContent).toContain("保存更改");
 
     const cancelButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Cancel",
+      (btn) => btn.textContent?.trim() === "取消",
     );
     expect(cancelButton).not.toBeUndefined();
     cancelButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -421,13 +421,13 @@ describe("cron view", () => {
       container,
     );
 
-    expect(container.textContent).toContain("Advanced");
-    expect(container.textContent).toContain("Exact timing (no stagger)");
-    expect(container.textContent).toContain("Stagger window");
-    expect(container.textContent).toContain("Light context");
-    expect(container.textContent).toContain("Model");
-    expect(container.textContent).toContain("Thinking");
-    expect(container.textContent).toContain("Best effort delivery");
+    expect(container.textContent).toContain("高级");
+    expect(container.textContent).toContain("精确时间（无抖动）");
+    expect(container.textContent).toContain("抖动窗口");
+    expect(container.textContent).toContain("轻量上下文");
+    expect(container.textContent).toContain("模型");
+    expect(container.textContent).toContain("思考");
+    expect(container.textContent).toContain("尽力投递");
   });
 
   it("groups stagger window and unit inside the same stagger row", () => {
@@ -447,8 +447,8 @@ describe("cron view", () => {
 
     const staggerGroup = container.querySelector(".cron-stagger-group");
     expect(staggerGroup).not.toBeNull();
-    expect(staggerGroup?.textContent).toContain("Stagger window");
-    expect(staggerGroup?.textContent).toContain("Stagger unit");
+    expect(staggerGroup?.textContent).toContain("抖动窗口");
+    expect(staggerGroup?.textContent).toContain("抖动单位");
   });
 
   it("explains timeout blank behavior and shows cron jitter hint", () => {
@@ -467,9 +467,9 @@ describe("cron view", () => {
     );
 
     expect(container.textContent).toContain(
-      "Optional. Leave blank to use the gateway default timeout behavior for this run.",
+      "可选。留空以使用网关默认超时行为。",
     );
-    expect(container.textContent).toContain("Need jitter? Use Advanced");
+    expect(container.textContent).toContain("需要抖动？使用高级");
   });
 
   it("disables Agent ID when clear-agent is enabled", () => {
@@ -495,14 +495,14 @@ describe("cron view", () => {
   it("renders sectioned cron form layout", () => {
     const container = document.createElement("div");
     render(renderCron(createProps()), container);
-    expect(container.textContent).toContain("Enabled");
-    expect(container.textContent).toContain("Jobs");
-    expect(container.textContent).toContain("Next wake");
-    expect(container.textContent).toContain("Basics");
-    expect(container.textContent).toContain("Schedule");
-    expect(container.textContent).toContain("Execution");
-    expect(container.textContent).toContain("Delivery");
-    expect(container.textContent).toContain("Advanced");
+    expect(container.textContent).toContain("已启用");
+    expect(container.textContent).toContain("任务");
+    expect(container.textContent).toContain("下次唤醒");
+    expect(container.textContent).toContain("基础");
+    expect(container.textContent).toContain("调度");
+    expect(container.textContent).toContain("执行");
+    expect(container.textContent).toContain("投递");
+    expect(container.textContent).toContain("高级");
   });
 
   it("renders checkbox fields with input first for alignment", () => {
@@ -529,10 +529,10 @@ describe("cron view", () => {
       ),
       container,
     );
-    expect(container.textContent).not.toContain("Exact timing (no stagger)");
-    expect(container.textContent).not.toContain("Stagger window");
-    expect(container.textContent).not.toContain("Model");
-    expect(container.textContent).not.toContain("Best effort delivery");
+    expect(container.textContent).not.toContain("精确时间（无抖动）");
+    expect(container.textContent).not.toContain("抖动窗口");
+    expect(container.textContent).not.toContain("模型");
+    expect(container.textContent).not.toContain("尽力投递");
   });
 
   it("renders inline validation errors and disables submit when invalid", () => {
@@ -558,14 +558,14 @@ describe("cron view", () => {
       container,
     );
 
-    expect(container.textContent).toContain("Name is required.");
-    expect(container.textContent).toContain("Cron expression is required.");
-    expect(container.textContent).toContain("Agent message is required.");
-    expect(container.textContent).toContain("Can't add job yet");
-    expect(container.textContent).toContain("Fix 3 fields to continue.");
+    expect(container.textContent).toContain("名称为必填项。");
+    expect(container.textContent).toContain("Cron 表达式为必填项。");
+    expect(container.textContent).toContain("代理消息为必填项。");
+    expect(container.textContent).toContain("暂无法添加任务");
+    expect(container.textContent).toContain("修复 3 个字段以继续。");
 
     const saveButton = Array.from(container.querySelectorAll("button")).find((btn) =>
-      ["Add job", "Save changes"].includes(btn.textContent?.trim() ?? ""),
+      ["添加任务", "保存更改"].includes(btn.textContent?.trim() ?? ""),
     );
     expect(saveButton).not.toBeUndefined();
     expect(saveButton?.disabled).toBe(true);
@@ -594,18 +594,18 @@ describe("cron view", () => {
       container,
     );
 
-    expect(container.textContent).toContain("* Required");
+    expect(container.textContent).toContain("* 必填");
 
     const nameInput = container.querySelector("#cron-name");
     expect(nameInput?.getAttribute("aria-invalid")).toBe("true");
     expect(nameInput?.getAttribute("aria-describedby")).toBe("cron-error-name");
-    expect(container.querySelector("#cron-error-name")?.textContent).toContain("Name is required.");
+    expect(container.querySelector("#cron-error-name")?.textContent).toContain("名称为必填项。");
 
     const everyInput = container.querySelector("#cron-every-amount");
     expect(everyInput?.getAttribute("aria-invalid")).toBe("true");
     expect(everyInput?.getAttribute("aria-describedby")).toBe("cron-error-everyAmount");
     expect(container.querySelector("#cron-error-everyAmount")?.textContent).toContain(
-      "Interval must be greater than 0.",
+      "间隔必须大于 0。",
     );
   });
 
