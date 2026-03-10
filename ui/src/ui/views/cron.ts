@@ -1301,7 +1301,7 @@ export function renderCron(props: CronProps) {
                                     props.onFormChange({
                                       failureAlertAccountId: (e.target as HTMLInputElement).value,
                                     })}
-                                  placeholder="Account ID for multi-account setups"
+                                  placeholder="多账户设置的账户 ID"
                                 />
                               </label>
                             `
