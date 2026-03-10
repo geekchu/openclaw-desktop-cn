@@ -120,7 +120,7 @@ ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 >
 > - `openclawcn.net/update/latest.json` — 更新元数据（版本号、签名），由原服务器直接提供
 > - `cdn.openclawcn.net/update/artifacts/` — 安装包二进制文件，通过 CDN 分发加速下载
-> - 当前 `cdn.openclawcn.net` 临时指向原服务器 `47.57.241.17`，后续切换 DNS 即可无缝迁移到真正的 CDN
+> - 当前 `cdn.openclawcn.net` 临时指向原服务器 `43.99.16.221`，后续切换 DNS 即可无缝迁移到真正的 CDN
 
 ---
 

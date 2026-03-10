@@ -520,23 +520,57 @@ async fn install_openclaw_windows() -> Result<InstallResult, String> {
     let script = r#"
 $ErrorActionPreference = 'Stop'
 
-# 检查 Node.js
+function Resolve-OpenClawCmd {
+    $command = Get-Command openclaw -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $candidates = @()
+    $globalPrefix = npm prefix -g 2>$null
+    if ($globalPrefix) {
+        $candidates += (Join-Path $globalPrefix 'openclaw.cmd')
+        $candidates += (Join-Path $globalPrefix 'openclaw')
+        if ($env:PATH -notlike "*$globalPrefix*") {
+            $env:PATH = "$globalPrefix;$env:PATH"
+        }
+    }
+    if ($env:APPDATA) {
+        $candidates += (Join-Path $env:APPDATA 'npm\openclaw.cmd')
+    }
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+# Check Node.js
 $nodeVersion = node --version 2>$null
 if (-not $nodeVersion) {
-    Write-Host "错误：请先安装 Node.js"
+    Write-Host "Error: please install Node.js first"
     exit 1
 }
 
-Write-Host "使用 npm 安装 OpenClaw..."
+Write-Host "Installing OpenClaw with npm..."
 npm install -g openclaw@latest --unsafe-perm
 
-# 验证安装
-$openclawVersion = openclaw --version 2>$null
+# Verify installation
+$openclawCmd = Resolve-OpenClawCmd
+if (-not $openclawCmd) {
+    Write-Host "OpenClaw was installed, but the executable was not found in this terminal. Please restart the app and try again."
+    exit 1
+}
+
+$openclawVersion = & $openclawCmd --version 2>$null
 if ($openclawVersion) {
-    Write-Host "OpenClaw 安装成功: $openclawVersion"
+    Write-Host "OpenClaw installed successfully: $openclawVersion"
     exit 0
 } else {
-    Write-Host "OpenClaw 安装失败"
+    Write-Host "OpenClaw installation failed"
     exit 1
 }
 "#;
@@ -546,26 +580,25 @@ if ($openclawVersion) {
             if get_openclaw_version().is_some() {
                 Ok(InstallResult {
                     success: true,
-                    message: "OpenClaw 安装成功！".to_string(),
+                    message: "OpenClaw installed successfully!".to_string(),
                     error: None,
                 })
             } else {
                 Ok(InstallResult {
                     success: false,
-                    message: "安装后需要重启应用".to_string(),
+                    message: "Restart the app after installation".to_string(),
                     error: Some(output),
                 })
             }
         }
         Err(e) => Ok(InstallResult {
             success: false,
-            message: "OpenClaw 安装失败".to_string(),
+            message: "OpenClaw installation failed".to_string(),
             error: Some(e),
         }),
     }
 }
 
-/// Unix 系统安装 OpenClaw
 async fn install_openclaw_unix() -> Result<InstallResult, String> {
     let script = r#"
 # 检查 Node.js
@@ -769,121 +802,234 @@ async fn open_openclaw_install_terminal() -> Result<String, String> {
     if platform::is_windows() {
         let script = r#"
 Start-Process powershell -ArgumentList '-NoExit', '-Command', '
+function Resolve-OpenClawCmd {
+    $command = Get-Command openclaw -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $candidates = @()
+    $globalPrefix = npm prefix -g 2>$null
+    if ($globalPrefix) {
+        $candidates += (Join-Path $globalPrefix "openclaw.cmd")
+        $candidates += (Join-Path $globalPrefix "openclaw")
+        if ($env:PATH -notlike "*$globalPrefix*") {
+            $env:PATH = "$globalPrefix;$env:PATH"
+        }
+    }
+    if ($env:APPDATA) {
+        $candidates += (Join-Path $env:APPDATA "npm\openclaw.cmd")
+    }
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "    OpenClaw 安装向导" -ForegroundColor White
+Write-Host "    OpenClaw Setup Wizard" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "正在安装 OpenClaw..." -ForegroundColor Yellow
+Write-Host "Installing OpenClaw..." -ForegroundColor Yellow
 npm install -g openclaw@latest
 
-Write-Host ""
-Write-Host "初始化配置..."
-openclaw config set gateway.mode local
+$openclawCmd = Resolve-OpenClawCmd
+if (-not $openclawCmd) {
+    Write-Host "OpenClaw executable was not found. Please close this window and restart the app." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to close this window"
+    exit
+}
 
 Write-Host ""
-Write-Host "安装完成！" -ForegroundColor Green
-openclaw --version
+Write-Host "Initializing configuration..."
+& $openclawCmd config set gateway.mode local
+
 Write-Host ""
-Read-Host "按回车键关闭此窗口"
+Write-Host "Installation complete!" -ForegroundColor Green
+& $openclawCmd --version
+Write-Host ""
+Read-Host "Press Enter to close this window"
 '
 "#;
         shell::run_powershell_output(script)?;
-        Ok("已打开安装终端".to_string())
+        Ok("Opened install terminal".to_string())
     } else if platform::is_macos() {
         let script_content = r#"#!/bin/bash
+resolve_openclaw_cmd() {
+  if command -v openclaw >/dev/null 2>&1; then
+    command -v openclaw
+    return 0
+  fi
+
+  local global_prefix=""
+  global_prefix="$(npm prefix -g 2>/dev/null || true)"
+  if [ -n "$global_prefix" ]; then
+    if [ -x "$global_prefix/bin/openclaw" ]; then
+      printf '%s\n' "$global_prefix/bin/openclaw"
+      return 0
+    fi
+    if [ -x "$global_prefix/openclaw" ]; then
+      printf '%s\n' "$global_prefix/openclaw"
+      return 0
+    fi
+    PATH="$global_prefix/bin:$global_prefix:$PATH"
+    export PATH
+  fi
+
+  for candidate in "$HOME/.openclawcn/npm-global/bin/openclaw" "$HOME/.npm-global/bin/openclaw"; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 clear
 echo "========================================"
-echo "    OpenClaw 安装向导"
+echo "    OpenClaw Setup Wizard"
 echo "========================================"
 echo ""
 
-echo "正在安装 OpenClaw..."
+echo "Installing OpenClaw..."
 npm install -g openclaw@latest
 
+openclaw_cmd="$(resolve_openclaw_cmd || true)"
+if [ -z "$openclaw_cmd" ]; then
+  echo "OpenClaw executable was not found. Please close this window and restart the app."
+  echo ""
+  read -p "Press Enter to close this window..."
+  exit 1
+fi
+
 echo ""
-echo "初始化配置..."
-openclaw config set gateway.mode local 2>/dev/null || true
+echo "Initializing configuration..."
+"$openclaw_cmd" config set gateway.mode local 2>/dev/null || true
 
 mkdir -p ~/.openclawcn/agents/main/sessions
 mkdir -p ~/.openclawcn/agents/main/agent
 mkdir -p ~/.openclawcn/credentials
 
 echo ""
-echo "安装完成！"
-openclaw --version
+echo "Installation complete!"
+"$openclaw_cmd" --version
 echo ""
-read -p "按回车键关闭此窗口..."
+read -p "Press Enter to close this window..."
 "#;
 
         let script_path = "/tmp/openclaw_install_openclaw.command";
         std::fs::write(script_path, script_content)
-            .map_err(|e| format!("创建脚本失败: {}", e))?;
+            .map_err(|e| format!("Failed to create or launch installer script: {}", e))?;
         
         std::process::Command::new("chmod")
             .args(["+x", script_path])
             .output()
-            .map_err(|e| format!("设置权限失败: {}", e))?;
+            .map_err(|e| format!("Failed to create or launch installer script: {}", e))?;
         
         std::process::Command::new("open")
             .arg(script_path)
             .spawn()
-            .map_err(|e| format!("启动终端失败: {}", e))?;
+            .map_err(|e| format!("Failed to create or launch installer script: {}", e))?;
         
-        Ok("已打开安装终端".to_string())
+        Ok("Opened install terminal".to_string())
     } else {
-        // Linux
         let script_content = r#"#!/bin/bash
+resolve_openclaw_cmd() {
+  if command -v openclaw >/dev/null 2>&1; then
+    command -v openclaw
+    return 0
+  fi
+
+  local global_prefix=""
+  global_prefix="$(npm prefix -g 2>/dev/null || true)"
+  if [ -n "$global_prefix" ]; then
+    if [ -x "$global_prefix/bin/openclaw" ]; then
+      printf '%s\n' "$global_prefix/bin/openclaw"
+      return 0
+    fi
+    if [ -x "$global_prefix/openclaw" ]; then
+      printf '%s\n' "$global_prefix/openclaw"
+      return 0
+    fi
+    PATH="$global_prefix/bin:$global_prefix:$PATH"
+    export PATH
+  fi
+
+  for candidate in "$HOME/.openclawcn/npm-global/bin/openclaw" "$HOME/.npm-global/bin/openclaw"; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 clear
 echo "========================================"
-echo "    OpenClaw 安装向导"
+echo "    OpenClaw Setup Wizard"
 echo "========================================"
 echo ""
 
-echo "正在安装 OpenClaw..."
+echo "Installing OpenClaw..."
 npm install -g openclaw@latest
 
-echo ""
-echo "初始化配置..."
-openclaw config set gateway.mode local 2>/dev/null || true
+openclaw_cmd="$(resolve_openclaw_cmd || true)"
+if [ -z "$openclaw_cmd" ]; then
+  echo "OpenClaw executable was not found. Please close this window and restart the app."
+  echo ""
+  read -p "Press Enter to close this window..."
+  exit 1
+fi
 
-mkdir -p ~/.openclawcn/agents/main/sessions
-mkdir -p ~/.openclawcn/agents/main/agent
-mkdir -p ~/.openclawcn/credentials
+echo ""
+echo "Initializing configuration..."
+"$openclaw_cmd" config set gateway.mode local 2>/dev/null || true
 
 echo ""
-echo "安装完成！"
-openclaw --version
+echo "Installation complete!"
+"$openclaw_cmd" --version
 echo ""
-read -p "按回车键关闭..."
+read -p "Press Enter to close this window..."
 "#;
         
         let script_path = "/tmp/openclaw_install_openclaw.sh";
         std::fs::write(script_path, script_content)
-            .map_err(|e| format!("创建脚本失败: {}", e))?;
+            .map_err(|e| format!("Failed to create or launch installer script: {}", e))?;
         
         std::process::Command::new("chmod")
             .args(["+x", script_path])
             .output()
-            .map_err(|e| format!("设置权限失败: {}", e))?;
+            .map_err(|e| format!("Failed to create or launch installer script: {}", e))?;
         
-        // 尝试不同的终端
         let terminals = ["gnome-terminal", "xfce4-terminal", "konsole", "xterm"];
+        let mut launched = false;
+        
         for term in terminals {
             if std::process::Command::new(term)
                 .args(["--", script_path])
                 .spawn()
-                .is_ok()
+                .is_ok() 
             {
-                return Ok("已打开安装终端".to_string());
+                launched = true;
+                break;
             }
         }
         
-        Err("无法启动终端，请手动运行: npm install -g openclaw".to_string())
+        if launched {
+            Ok("Opened install terminal".to_string())
+        } else {
+            Err("Unable to launch terminal. Please run: npm install -g openclaw".to_string())
+        }
     }
 }
-
-/// 卸载 OpenClaw
 #[command]
 pub async fn uninstall_openclaw() -> Result<InstallResult, String> {
     info!("[卸载OpenClaw] 开始卸载 OpenClaw...");

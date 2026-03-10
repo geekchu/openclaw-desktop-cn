@@ -21,7 +21,6 @@ export type ConfigProps = {
   loading: boolean;
   saving: boolean;
   applying: boolean;
-  updating: boolean;
   connected: boolean;
   schema: unknown;
   schemaLoading: boolean;
@@ -41,7 +40,7 @@ export type ConfigProps = {
   onReload: () => void;
   onSave: () => void;
   onApply: () => void;
-  onUpdate: () => void;
+
   // One-stop access props
   onestop: OnestopProps;
 };
@@ -481,10 +480,8 @@ export function renderConfig(props: ConfigProps) {
   const canApply =
     props.connected &&
     !props.applying &&
-    !props.updating &&
     hasChanges &&
     (props.formMode === "raw" ? true : canSaveForm);
-  const canUpdate = props.connected && !props.applying && !props.updating;
   const selectedTags = new Set(getTagFilters(props.searchQuery));
 
   return html`
@@ -711,13 +708,6 @@ export function renderConfig(props: ConfigProps) {
               @click=${props.onApply}
             >
               ${props.applying ? "应用中…" : "应用"}
-            </button>
-            <button
-              class="btn btn--sm"
-              ?disabled=${!canUpdate}
-              @click=${props.onUpdate}
-            >
-              ${props.updating ? "更新中…" : "更新"}
             </button>
           </div>
         </div>
