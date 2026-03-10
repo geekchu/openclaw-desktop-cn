@@ -343,19 +343,27 @@ export class SystemSettingsView extends LitElement {
     this.lanAccessBusy = true;
     try {
       const newValue = !this.lanAccess;
+      const oldValue = this.lanAccess;
       // 保存桌面配置
       await invoke("save_desktop_config", { config: { lanAccess: newValue } });
       // 同时更新主配置：开启局域网访问时需要设置 dangerouslyAllowHostHeaderOriginFallback
       // 否则 Gateway 会因为缺少 allowedOrigins 而启动失败
-      await invoke("save_config", {
-        config: {
-          gateway: {
-            controlUi: {
-              dangerouslyAllowHostHeaderOriginFallback: newValue,
+      try {
+        await invoke("save_config", {
+          config: {
+            gateway: {
+              controlUi: {
+                dangerouslyAllowHostHeaderOriginFallback: newValue,
+              },
             },
           },
-        },
-      });
+        });
+      } catch (configErr) {
+        // save_config 失败，回滚 desktop.json
+        console.error("保存主配置失败，回滚桌面配置:", configErr);
+        await invoke("save_desktop_config", { config: { lanAccess: oldValue } });
+        throw configErr;
+      }
       this.lanAccess = newValue;
       // 提示用户需要重启
       const modeName = newValue ? "局域网访问" : "仅本地访问";

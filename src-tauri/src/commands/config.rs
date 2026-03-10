@@ -88,6 +88,21 @@ pub async fn get_config() -> Result<Value, String> {
     result
 }
 
+/// 深度合并 JSON 对象（递归合并嵌套对象，防止覆盖丢失）
+fn deep_merge_config(base: &mut Value, patch: &Value) {
+    match (base, patch) {
+        (Value::Object(base_map), Value::Object(patch_map)) => {
+            for (k, v) in patch_map {
+                let entry = base_map.entry(k.clone()).or_insert(json!(null));
+                deep_merge_config(entry, v);
+            }
+        }
+        (base, patch) => {
+            *base = patch.clone();
+        }
+    }
+}
+
 /// 保存配置
 #[command]
 pub async fn save_config(config: Value) -> Result<String, String> {
@@ -116,7 +131,12 @@ pub async fn save_config(config: Value) -> Result<String, String> {
         "[保存配置] 配置内容: {}",
         serde_json::to_string_pretty(&config).unwrap_or_default()
     );
-    match save_openclaw_config(&config) {
+
+    // 先读取现有配置，然后深度合并新配置（防止覆盖丢失其他配置项）
+    let mut existing = load_openclaw_config().unwrap_or_else(|_| json!({}));
+    deep_merge_config(&mut existing, &config);
+
+    match save_openclaw_config(&existing) {
         Ok(_) => {
             info!("[保存配置] ✓ 配置保存成功");
             Ok("配置已保存".to_string())
