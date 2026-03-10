@@ -1523,7 +1523,7 @@ export class OpenClawConfigChannels extends LitElement {
     const dmPolicy = typeof config.dmPolicy === "string" ? config.dmPolicy.trim() : "";
     const allowFrom = this.parseAllowlist(config.allowFrom);
     if (dmPolicy === "allowlist" && allowFrom.length === 0) {
-      return "Allowlist mode requires DM allowlist entries";
+      return "白名单模式需要配置私聊白名单";
     }
     if (
       dmPolicy === "open" &&
@@ -1532,20 +1532,20 @@ export class OpenClawConfigChannels extends LitElement {
       ) &&
       !allowFrom.includes("*")
     ) {
-      return "Open mode requires * in DM allowlist";
+      return "开放模式需要在私聊白名单中添加 *";
     }
 
     if (channel.channel_type === "slack") {
       const mode = typeof config.mode === "string" && config.mode.trim() ? config.mode.trim() : "socket";
       if (!config.botToken || String(config.botToken).trim() === "") {
-        return "Bot Token is required";
+        return "Bot Token 为必填项";
       }
       if (mode === "http") {
         if (!config.signingSecret || String(config.signingSecret).trim() === "") {
-          return "HTTP mode requires Signing Secret";
+          return "HTTP 模式需要配置 Signing Secret";
         }
       } else if (!config.appToken || String(config.appToken).trim() === "") {
-        return "Socket Mode requires App Token";
+        return "Socket 模式需要配置 App Token";
       }
     }
 
@@ -1781,12 +1781,12 @@ export class OpenClawConfigChannels extends LitElement {
       this.handleChannelSelect(channel.id, refreshedChannels);
       this.testResult = {
         success: true,
-        message: "Saved configuration successfully",
+        message: "配置保存成功",
         error: null,
       };
     } catch (e) {
       console.error("Save failed:", e);
-      this.testResult = { success: false, message: "Failed to save configuration", error: String(e) };
+      this.testResult = { success: false, message: "配置保存失败", error: String(e) };
     } finally {
       this.saving = false;
     }
@@ -1839,6 +1839,12 @@ export class OpenClawConfigChannels extends LitElement {
         );
       }
       return appToken !== undefined && appToken !== null && String(appToken).trim() !== "";
+    }
+
+    // WhatsApp 和 iMessage 是基于 session 登录的渠道，不需要配置 token
+    // 只要 dmPolicy 有效就认为已配置（用户可以点击登录按钮）
+    if (channel.channel_type === "whatsapp" || channel.channel_type === "imessage") {
+      return true;
     }
 
     const requiredFields = info.fields.filter((field) => field.required);

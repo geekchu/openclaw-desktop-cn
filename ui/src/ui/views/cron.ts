@@ -1189,12 +1189,12 @@ export function renderCron(props: CronProps) {
                                 .value as CronFormState["failureAlertMode"],
                             })}
                         >
-                          <option value="inherit">Inherit global setting</option>
-                          <option value="disabled">Disable for this job</option>
-                          <option value="custom">Custom per-job settings</option>
+                          <option value="inherit">继承全局设置</option>
+                          <option value="disabled">禁用此任务的告警</option>
+                          <option value="custom">自定义任务告警设置</option>
                         </select>
                         <div class="cron-help">
-                          Control when this job sends repeated-failure alerts.
+                          控制此任务何时发送重复失败告警。
                         </div>
                       </label>
                       ${
@@ -1217,7 +1217,7 @@ export function renderCron(props: CronProps) {
                                     })}
                                   placeholder="2"
                                 />
-                                <div class="cron-help">Consecutive errors before alerting.</div>
+                                <div class="cron-help">连续失败多少次后发送告警。</div>
                                 ${renderFieldError(
                                   props.fieldErrors.failureAlertAfter,
                                   errorIdForField("failureAlertAfter"),
@@ -1241,7 +1241,7 @@ export function renderCron(props: CronProps) {
                                     })}
                                   placeholder="3600"
                                 />
-                                <div class="cron-help">Minimum seconds between alerts.</div>
+                                <div class="cron-help">告警之间的最小间隔秒数。</div>
                                 ${renderFieldError(
                                   props.fieldErrors.failureAlertCooldownSeconds,
                                   errorIdForField("failureAlertCooldownSeconds"),
@@ -1717,9 +1717,9 @@ function renderRun(entry: CronRunLogEntry, basePath: string) {
   const usage = entry.usage;
   const usageSummary =
     usage && typeof usage.total_tokens === "number"
-      ? `${usage.total_tokens} tokens`
+      ? `${usage.total_tokens} 令牌`
       : usage && typeof usage.input_tokens === "number" && typeof usage.output_tokens === "number"
-        ? `${usage.input_tokens} in / ${usage.output_tokens} out`
+        ? `${usage.input_tokens} 输入 / ${usage.output_tokens} 输出`
         : null;
   return html`
     <div class="list-item cron-run-entry">

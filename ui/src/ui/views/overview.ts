@@ -62,8 +62,8 @@ export function renderOverview(props: OverviewProps) {
             href="https://docs.openclaw.ai/web/control-ui#device-pairing-first-connection"
             target=${EXTERNAL_LINK_TARGET}
             rel=${buildExternalLinkRel()}
-            title="Device pairing docs (opens in new tab)"
-            >Docs: Device pairing</a
+            title="设备配对文档（在新标签页打开）"
+            >文档: 设备配对</a
           >
         </div>
       </div>
@@ -119,8 +119,8 @@ export function renderOverview(props: OverviewProps) {
               href="https://docs.openclaw.ai/web/dashboard"
               target=${EXTERNAL_LINK_TARGET}
               rel=${buildExternalLinkRel()}
-              title="Control UI auth docs (opens in new tab)"
-              >Docs: Control UI auth</a
+              title="控制面板认证文档（在新标签页打开）"
+              >文档: 控制面板认证</a
             >
           </div>
         </div>
@@ -135,8 +135,8 @@ export function renderOverview(props: OverviewProps) {
             href="https://docs.openclaw.ai/web/dashboard"
             target=${EXTERNAL_LINK_TARGET}
             rel=${buildExternalLinkRel()}
-            title="Control UI auth docs (opens in new tab)"
-            >Docs: Control UI auth</a
+            title="控制面板认证文档（在新标签页打开）"
+            >文档: 控制面板认证</a
           >
         </div>
       </div>
@@ -174,8 +174,8 @@ export function renderOverview(props: OverviewProps) {
             href="https://docs.openclaw.ai/gateway/tailscale"
             target=${EXTERNAL_LINK_TARGET}
             rel=${buildExternalLinkRel()}
-            title="Tailscale Serve docs (opens in new tab)"
-            >Docs: Tailscale Serve</a
+            title="Tailscale Serve 文档（在新标签页打开）"
+            >文档: Tailscale Serve</a
           >
           <span class="muted"> · </span>
           <a
@@ -183,8 +183,8 @@ export function renderOverview(props: OverviewProps) {
             href="https://docs.openclaw.ai/web/control-ui#insecure-http"
             target=${EXTERNAL_LINK_TARGET}
             rel=${buildExternalLinkRel()}
-            title="Insecure HTTP docs (opens in new tab)"
-            >Docs: Insecure HTTP</a
+            title="不安全 HTTP 文档（在新标签页打开）"
+            >文档: 不安全 HTTP</a
           >
         </div>
       </div>

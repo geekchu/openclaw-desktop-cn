@@ -152,7 +152,7 @@ export function renderAgentTools(params: {
         params.toolsCatalogError
           ? html`
               <div class="callout warn" style="margin-top: 12px">
-                Could not load runtime tool catalog. Showing fallback list.
+                无法加载运行时工具目录。显示备用列表。
               </div>
             `
           : nothing
@@ -295,7 +295,7 @@ export function renderAgentTools(params: {
       ${
         params.toolsCatalogLoading
           ? html`
-              <div class="card-sub" style="margin-top: 10px">Refreshing tool catalog…</div>
+              <div class="card-sub" style="margin-top: 10px">正在刷新工具目录…</div>
             `
           : nothing
       }

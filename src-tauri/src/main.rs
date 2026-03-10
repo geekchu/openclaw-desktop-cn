@@ -285,7 +285,7 @@ fn main() {
                         @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
                         @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1;text-shadow:0 0 8px rgba(255,255,255,.3)}}
                     </style></head>
-                    <body><div class="logo-container"><div class="logo">🦞</div></div><div class="spinner"></div><div class="text">STARTING CORE...</div></body>`;
+                    <body><div class="logo-container"><div class="logo">🦞</div></div><div class="spinner"></div><div class="text">正在启动...</div></body>`;
                 "#);
             }
 

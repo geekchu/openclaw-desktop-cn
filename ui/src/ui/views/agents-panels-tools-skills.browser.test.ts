@@ -97,6 +97,6 @@ describe("agents tools panel (browser)", () => {
     );
     await Promise.resolve();
 
-    expect(container.textContent ?? "").toContain("Could not load runtime tool catalog");
+    expect(container.textContent ?? "").toContain("无法加载运行时工具目录");
   });
 });

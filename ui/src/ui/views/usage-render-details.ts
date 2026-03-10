@@ -678,7 +678,7 @@ function renderTimeSeriesCompact(
               ${formatTokens(filteredOutput + filteredInput + filteredCacheRead + filteredCacheWrite)} · 
               ${formatCost(filteredPoints.reduce((s, p) => s + (p.cost || 0), 0))}
             `
-            : html`${points.length} msgs · ${formatTokens(cumTokens)} · ${formatCost(cumCost)}`
+            : html`${points.length} 消息 · ${formatTokens(cumTokens)} · ${formatCost(cumCost)}`
         }
       </div>
       ${
