@@ -257,6 +257,46 @@ try {
       "",
     ].join("\n");
     writeFileSync(join(targetRoot, "index.cjs"), shimSource, "utf-8");
+
+    // Copy skills directories declared in openclaw.plugin.json
+    if (existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+        if (Array.isArray(manifest.skills)) {
+          for (const skillPath of manifest.skills) {
+            if (typeof skillPath !== "string") {
+              continue;
+            }
+            // Skills can be relative paths (e.g. "skills/qqbot-cron") or
+            // node_modules paths (e.g. "node_modules/@tloncorp/tlon-skill")
+            const srcSkillDir = join(sourceRoot, skillPath);
+            const destSkillDir = join(targetRoot, skillPath);
+            if (existsSync(srcSkillDir)) {
+              mkdirSync(dirname(destSkillDir), { recursive: true });
+              if (process.platform === "win32") {
+                try {
+                  execSync(
+                    `robocopy "${srcSkillDir}" "${destSkillDir}" /E /NFL /NDL /NJH /NJS /NP /XD node_modules .git`,
+                    { windowsHide: true },
+                  );
+                } catch (err) {
+                  if (err.status >= 8) {
+                    throw err;
+                  }
+                }
+              } else {
+                execSync(`cp -R "${srcSkillDir}" "${destSkillDir}"`);
+              }
+              console.log(`[build-bundle] Copied skill: extensions/${ext.name}/${skillPath}`);
+            } else {
+              console.log(`[build-bundle] Warning: skill not found: ${srcSkillDir}`);
+            }
+          }
+        }
+      } catch {
+        // manifest parse error, skip skills
+      }
+    }
   }
   console.log(`[build-bundle] Created ${extensions.length} bundled extension shims.`);
 } catch (err) {
