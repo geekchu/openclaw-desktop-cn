@@ -782,7 +782,9 @@ pub fn load_openclaw_env_vars() -> HashMap<String, String> {
 
 /// 检查端口是否可用（未被占用）
 pub fn is_port_available(port: u16) -> bool {
-    TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok()
+    let lan_access = get_lan_access_setting();
+    let host = if lan_access { "0.0.0.0" } else { "127.0.0.1" };
+    std::net::TcpListener::bind(format!("{}:{}", host, port)).is_ok()
 }
 
 /// 从指定端口开始向下查找可用端口

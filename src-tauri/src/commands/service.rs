@@ -190,6 +190,16 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
     // 轮询等待端口开始监听及 HTTP 就绪（最多 60 秒）
     info!("[服务] 等待 Gateway HTTP 存活探活 (60秒), 端口: {}...", port);
     if gm.wait_for_ready(60) {
+        // 启动成功，通知前端重新导航
+        let url = match crate::read_gateway_token() {
+            Some(token) => format!("http://localhost:{}?token={}", port, token),
+            None => format!("http://localhost:{}", port),
+        };
+        let _ = app.emit("gateway-ready", url.as_str());
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.navigate(url.parse().unwrap());
+        }
+        
         if let Some(pid) = check_port_listening(port) {
             info!("[服务] ✓ 启动成功, PID: {}, 端口: {}", pid, port);
             return Ok(format!("服务已启动，PID: {}, 端口: {}", pid, port));

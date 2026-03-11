@@ -325,12 +325,14 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
                     consecutive_failures = 0;
                     update_tray_status(handle, true);
                     send_notification(handle, &format!("Gateway 已自动重启 (端口 {})", port));
-                    // 重新读取 token 以确保认证正常
                     let url = match crate::read_gateway_token() {
                         Some(token) => format!("http://localhost:{}?token={}", port, token),
                         None => format!("http://localhost:{}", port),
                     };
                     let _ = handle.emit("gateway-ready", url.as_str());
+                    if let Some(window) = handle.get_webview_window("main") {
+                        let _ = window.navigate(url.parse().unwrap());
+                    }
                 } else {
                     consecutive_failures += 1;
                     error!("[Gateway] 自动重启超时 (连续失败 {}次)", consecutive_failures);

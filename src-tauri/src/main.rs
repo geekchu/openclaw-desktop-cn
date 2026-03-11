@@ -197,8 +197,22 @@ fn main() {
                             let handle = app.clone();
                             std::thread::spawn(move || {
                                 let gm = handle.state::<gateway::GatewayManager>();
-                                if let Err(e) = gm.start() {
-                                    log::error!("[Tray] 启动 Gateway 失败: {}", e);
+                                match gm.start() {
+                                    Ok(port) => {
+                                        if gm.wait_for_ready(60) {
+                                            let url = if let Some(token) = read_gateway_token() {
+                                                format!("http://localhost:{}?token={}", port, token)
+                                            } else {
+                                                format!("http://localhost:{}", port)
+                                            };
+                                            if let Some(window) = handle.get_webview_window("main") {
+                                                let _ = window.navigate(url.parse().unwrap());
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("[Tray] 启动 Gateway 失败: {}", e);
+                                    }
                                 }
                             });
                         }
@@ -215,8 +229,22 @@ fn main() {
                                 let gm = handle.state::<gateway::GatewayManager>();
                                 gm.stop();
                                 std::thread::sleep(std::time::Duration::from_secs(1));
-                                if let Err(e) = gm.start() {
-                                    log::error!("[Tray] 重启 Gateway 失败: {}", e);
+                                match gm.start() {
+                                    Ok(port) => {
+                                        if gm.wait_for_ready(60) {
+                                            let url = if let Some(token) = read_gateway_token() {
+                                                format!("http://localhost:{}?token={}", port, token)
+                                            } else {
+                                                format!("http://localhost:{}", port)
+                                            };
+                                            if let Some(window) = handle.get_webview_window("main") {
+                                                let _ = window.navigate(url.parse().unwrap());
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("[Tray] 重启 Gateway 失败: {}", e);
+                                    }
                                 }
                             });
                         }
