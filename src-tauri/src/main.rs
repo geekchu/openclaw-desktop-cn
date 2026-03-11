@@ -314,14 +314,14 @@ fn main() {
                 let mut startup_navigated = false;
 
                 match gm.start() {
-                    Ok(_) => {
+                    Ok(port) => {
                         let _ = handle.emit("gateway-status", "正在等待 Gateway 就绪...");
                         if gm.wait_for_ready(300) {
                             // Gateway 就绪，导航 webview 到 gateway URL
                             let url = if let Some(token) = read_gateway_token() {
-                                format!("http://localhost:28789?token={}", token)
+                                format!("http://localhost:{}?token={}", port, token)
                             } else {
-                                "http://localhost:28789".to_string()
+                                format!("http://localhost:{}", port)
                             };
                             let _ = handle.emit("gateway-ready", url.as_str());
                             // 使用 Tauri navigate API（绕过 webview 安全策略限制）

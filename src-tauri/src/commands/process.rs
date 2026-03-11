@@ -1,5 +1,5 @@
 use crate::utils::shell;
-use tauri::command;
+use tauri::{command, Manager};
 use log::{info, debug};
 
 /// 检查 OpenClaw 是否已安装
@@ -54,17 +54,20 @@ pub async fn get_openclaw_version() -> Result<Option<String>, String> {
 
 /// 检查端口是否被占用（通过尝试连接 openclaw gateway）
 #[command]
-pub async fn check_port_in_use(port: u16) -> Result<bool, String> {
+pub async fn check_port_in_use(app: tauri::AppHandle, port: u16) -> Result<bool, String> {
     info!("[进程检查] 检查端口 {} 是否被占用...", port);
     
     // 使用 openclaw health 检查 gateway 是否在运行
-    // 如果 port 是默认的 28789，直接使用 openclaw health
-    if port == 28789 {
-        debug!("[进程检查] 使用 openclaw health 检查端口 28789...");
+    let gm = app.state::<crate::gateway::GatewayManager>();
+    let current_gateway_port = gm.get_port();
+
+    // 如果 port 是当前 gateway 的 port，直接使用 openclaw health
+    if port == current_gateway_port {
+        debug!("[进程检查] 使用 openclaw health 检查当前网关端口 {}...", port);
         let result = shell::run_openclaw(&["health", "--timeout", "2000"]);
         // 如果 health 命令成功，说明端口被 gateway 占用
         let in_use = result.is_ok();
-        info!("[进程检查] 端口 28789 状态: {}", if in_use { "被占用" } else { "空闲" });
+        info!("[进程检查] 当前网关端口 {} 状态: {}", port, if in_use { "被占用" } else { "空闲" });
         return Ok(in_use);
     }
     

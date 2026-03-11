@@ -1,6 +1,5 @@
-use std::process::{Command, Output};
+﻿use std::process::{Command, Output};
 use std::io;
-use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use crate::utils::platform;
@@ -13,22 +12,6 @@ use std::os::windows::process::CommandExt;
 /// Windows CREATE_NO_WINDOW 标志，用于隐藏控制台窗口
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-/// 读取桌面配置中的 lanAccess 设置
-/// 返回 true 表示开放局域网访问（--bind lan），false 表示仅本地（--bind loopback）
-fn get_lan_access_setting() -> bool {
-    let config_dir = platform::get_config_dir();
-    let path = format!("{}/desktop.json", config_dir);
-
-    if let Ok(content) = file::read_file(&path) {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-            if let Some(lan_access) = json.get("lanAccess").and_then(|v| v.as_bool()) {
-                return lan_access;
-            }
-        }
-    }
-    false // 默认仅本地访问
-}
 
 /// 获取 npm 全局安装前缀目录：~/.openclawcn/npm-global
 /// 将 npm -g 安装目标从内嵌 node-runtime 重定向到用户目录，
@@ -453,55 +436,36 @@ fn get_unix_node_paths() -> Vec<String> {
 /// 获取 openclaw 可执行文件路径
 /// 检测多个可能的安装路径，因为 GUI 应用不继承用户 shell 的 PATH
 pub fn get_openclaw_path() -> Option<String> {
-    if let Some(bin_dir) = get_npm_global_bin_dir() {
-        let candidate_paths = if platform::is_windows() {
-            vec![
-                Path::new(&bin_dir).join("openclaw.cmd"),
-                Path::new(&bin_dir).join("openclaw"),
-            ]
-        } else {
-            vec![Path::new(&bin_dir).join("openclaw")]
-        };
-
-        for candidate in candidate_paths {
-            if candidate.exists() {
-                let path = candidate.to_string_lossy().to_string();
-                info!("[Shell] Found openclaw at {}", path);
-                return Some(path);
-            }
-        }
-    }
-
-    // Windows: check common global npm locations
+    // Windows: 检查常见的 npm 全局安装路径
     if platform::is_windows() {
         let possible_paths = get_windows_openclaw_paths();
         for path in possible_paths {
             if std::path::Path::new(&path).exists() {
-                info!("[Shell] Found openclaw at {}", path);
+                info!("[Shell] 在 {} 找到 openclaw", path);
                 return Some(path);
             }
         }
     } else {
-        // Unix: check common global npm locations
+        // Unix: 检查常见的 npm 全局安装路径
         let possible_paths = get_unix_openclaw_paths();
         for path in possible_paths {
             if std::path::Path::new(&path).exists() {
-                info!("[Shell] Found openclaw at {}", path);
+                info!("[Shell] 在 {} 找到 openclaw", path);
                 return Some(path);
             }
         }
     }
     
-    // Fallback: check whether openclaw is in PATH
+    // 回退：检查是否在 PATH 中
     if command_exists("openclaw") {
         return Some("openclaw".to_string());
     }
     
-    // Final fallback: ask the user shell
+    // 最后尝试：通过用户 shell 查找
     if !platform::is_windows() {
         if let Ok(path) = run_bash_output("source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; which openclaw 2>/dev/null") {
             if !path.is_empty() && std::path::Path::new(&path).exists() {
-                info!("[Shell] Found openclaw via user shell: {}", path);
+                info!("[Shell] 通过用户 shell 找到 openclaw: {}", path);
                 return Some(path);
             }
         }
@@ -510,11 +474,11 @@ pub fn get_openclaw_path() -> Option<String> {
     None
 }
 
-/// Get likely Unix openclaw install paths
+/// 获取 Unix 系统上可能的 openclaw 安装路径
 fn get_unix_openclaw_paths() -> Vec<String> {
     let mut paths = Vec::new();
     
-    // Common global npm install paths
+    // npm 全局安装路径
     paths.push("/usr/local/bin/openclaw".to_string());
     paths.push("/opt/homebrew/bin/openclaw".to_string()); // Homebrew on Apple Silicon
     paths.push("/usr/bin/openclaw".to_string());
@@ -522,15 +486,16 @@ fn get_unix_openclaw_paths() -> Vec<String> {
     if let Some(home) = dirs::home_dir() {
         let home_str = home.display().to_string();
         
-        // User-scoped global npm installs
+        // npm 全局安装到用户目录
         paths.push(format!("{}/.npm-global/bin/openclaw", home_str));
-        paths.push(format!("{}/.openclawcn/npm-global/bin/openclaw", home_str));
         
-        // nvm global package paths for likely Node versions
+        // nvm 安装的 npm 全局包（需要找到正确的 node 版本目录）
+        // 先检查常见版本
         for version in ["v22.0.0", "v22.1.0", "v22.2.0", "v22.11.0", "v22.12.0", "v23.0.0"] {
             paths.push(format!("{}/.nvm/versions/node/{}/bin/openclaw", home_str, version));
         }
         
+        // 检查 nvm current（尝试读取 .nvmrc 或 default）
         let nvm_default = format!("{}/.nvm/alias/default", home_str);
         if let Ok(version) = std::fs::read_to_string(&nvm_default) {
             let version = version.trim();
@@ -539,12 +504,23 @@ fn get_unix_openclaw_paths() -> Vec<String> {
             }
         }
         
+        // fnm
         paths.push(format!("{}/.fnm/aliases/default/bin/openclaw", home_str));
+        
+        // volta
         paths.push(format!("{}/.volta/bin/openclaw", home_str));
+        
+        // pnpm 全局安装
         paths.push(format!("{}/.pnpm/bin/openclaw", home_str));
-        paths.push(format!("{}/Library/pnpm/openclaw", home_str)); // macOS pnpm default path
+        paths.push(format!("{}/Library/pnpm/openclaw", home_str)); // macOS pnpm 默认路径
+        
+        // asdf
         paths.push(format!("{}/.asdf/shims/openclaw", home_str));
+        
+        // mise (formerly rtx)
         paths.push(format!("{}/.local/share/mise/shims/openclaw", home_str));
+        
+        // yarn 全局安装
         paths.push(format!("{}/.yarn/bin/openclaw", home_str));
         paths.push(format!("{}/.config/yarn/global/node_modules/.bin/openclaw", home_str));
     }
@@ -552,36 +528,34 @@ fn get_unix_openclaw_paths() -> Vec<String> {
     paths
 }
 
-/// Get likely Windows openclaw install paths
+/// 获取 Windows 上可能的 openclaw 安装路径
 fn get_windows_openclaw_paths() -> Vec<String> {
     let mut paths = Vec::new();
     
-    // 1. nvm4w install path
-    paths.push(r"C:\nvm4w\nodejs\openclaw.cmd".to_string());
+    // 1. nvm4w 安装路径
+    paths.push("C:\\nvm4w\\nodejs\\openclaw.cmd".to_string());
     
-    // 2. User-scoped global npm paths
-    if let Ok(appdata) = std::env::var("APPDATA") {
-        paths.push(format!(r"{}\npm\openclaw.cmd", appdata));
-    }
+    // 2. 用户目录下的 npm 全局路径
     if let Some(home) = dirs::home_dir() {
-        let npm_path = format!(r"{}\AppData\Roaming\npm\openclaw.cmd", home.display());
+        let npm_path = format!("{}\\AppData\\Roaming\\npm\\openclaw.cmd", home.display());
         paths.push(npm_path);
     }
     
-    // 3. Program Files Node.js path
-    paths.push(r"C:\Program Files\nodejs\openclaw.cmd".to_string());
+    // 3. Program Files 下的 nodejs
+    paths.push("C:\\Program Files\\nodejs\\openclaw.cmd".to_string());
     
     paths
 }
 
-/// Get the gateway bundle entrypoint path
-/// Returns `(bundle_dir, entry_point)` when available
+/// 获取 gateway bundle 目录下的入口文件路径
+/// 返回 (bundle_dir, entry_point) 或 None
 pub fn get_bundle_entry() -> Option<(String, String)> {
     if let Ok(bundle_dir) = std::env::var("OPENCLAW_GATEWAY_BUNDLE_DIR") {
         let entry = Path::new(&bundle_dir).join("openclaw.mjs");
         if entry.exists() {
             return Some((bundle_dir, entry.to_string_lossy().to_string()));
         }
+        // 也检查 dist/entry.js（直接运行编译产物）
         let dist_entry = Path::new(&bundle_dir).join("dist").join("entry.js");
         if dist_entry.exists() {
             return Some((bundle_dir, dist_entry.to_string_lossy().to_string()));
@@ -780,42 +754,10 @@ pub fn load_openclaw_env_vars() -> HashMap<String, String> {
 
 
 
-/// 检查端口是否可用（未被占用）
-pub fn is_port_available(port: u16) -> bool {
-    TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok()
-}
-
-/// 从指定端口开始向下查找可用端口
-/// 返回第一个可用的端口，如果都不可用则返回 None
-pub fn find_available_port(start_port: u16, min_port: u16) -> Option<u16> {
-    let mut port = start_port;
-    loop {
-        if is_port_available(port) {
-            info!("[Shell] 找到可用端口: {}", port);
-            return Some(port);
-        }
-        info!("[Shell] 端口 {} 已被占用，尝试下一个", port);
-        if port <= min_port {
-            break;
-        }
-        port -= 1;
-    }
-    warn!("[Shell] 在 {}-{} 范围内未找到可用端口", min_port, start_port);
-    None
-}
-
 /// 后台启动 openclaw gateway 并返回 Child handle
 /// 优先使用 bundle 模式（node + openclaw.mjs），回退到全局 openclaw 命令
-/// port: 指定启动的端口号
-pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process::Child> {
-    info!("[Shell] 后台启动 openclaw gateway (with handle), 端口: {}...", port);
-
-    let port_str = port.to_string();
-
-    // 读取局域网访问设置
-    let lan_access = get_lan_access_setting();
-    let bind_mode = if lan_access { "lan" } else { "loopback" };
-    info!("[Shell] Gateway 绑定模式: {} (lanAccess={})", bind_mode, lan_access);
+pub fn spawn_openclaw_gateway_with_handle() -> io::Result<std::process::Child> {
+    info!("[Shell] 后台启动 openclaw gateway (with handle)...");
 
     let user_env_vars = load_openclaw_env_vars();
     info!("[Shell] 已加载 {} 个环境变量", user_env_vars.len());
@@ -846,7 +788,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
 
         let mut cmd = Command::new(&node_path);
         cmd.arg(&entry_point);
-        cmd.args(["gateway", "--port", &port_str, "--bind", bind_mode, "--desktop-internal", "--force", "--allow-unconfigured"]);
+        cmd.args(["gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         cmd.current_dir(&bundle_dir);
 
         for (key, value) in &user_env_vars {
@@ -856,7 +798,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
         cmd.env("OPENCLAW_DESKTOP", "1");
         cmd.env("OPENCLAW_NO_RESPAWN", "1");
-        cmd.env("OPENCLAW_GATEWAY_PORT", &port_str);
+        cmd.env("OPENCLAW_GATEWAY_PORT", "28789");
         cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
@@ -876,7 +818,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
             });
         info!("[Shell] Gateway 日志目录: {}", log_dir);
         let log_path = std::path::Path::new(&log_dir);
-        let separator = format!("\n--- gateway start {} (port {}) ---\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), port);
+        let separator = format!("\n--- gateway start {} ---\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
         match std::fs::OpenOptions::new().create(true).append(true).open(log_path.join("gateway.stdout.log")) {
             Ok(mut f) => {
                 use std::io::Write;
@@ -903,7 +845,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         info!("[Shell] 启动 gateway 进程: {:?}", cmd);
         return match cmd.spawn() {
             Ok(child) => {
-                info!("[Shell] Gateway 进程已启动, PID: {}, 端口: {}", child.id(), port);
+                info!("[Shell] Gateway 进程已启动, PID: {}", child.id());
                 Ok(child)
             }
             Err(e) => {
@@ -935,7 +877,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
     })?;
 
     info!("[Shell] [开发模式] 回退到全局 openclaw: {}", openclaw_path);
-
+    
     // 将 openclaw 所在目录加入 PATH
     if let Some(parent) = Path::new(&openclaw_path).parent() {
         let parent_str = parent.to_string_lossy();
@@ -945,11 +887,11 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
 
     let mut cmd = if openclaw_path.ends_with(".cmd") {
         let mut c = Command::new("cmd");
-        c.args(["/c", &openclaw_path, "gateway", "--port", &port_str, "--bind", bind_mode, "--desktop-internal", "--force", "--allow-unconfigured"]);
+        c.args(["/c", &openclaw_path, "gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         c
     } else {
         let mut c = Command::new(&openclaw_path);
-        c.args(["gateway", "--port", &port_str, "--bind", bind_mode, "--desktop-internal", "--force", "--allow-unconfigured"]);
+        c.args(["gateway", "--port", "28789", "--bind", "loopback", "--desktop-internal", "--force", "--allow-unconfigured"]);
         c
     };
 
@@ -960,7 +902,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
     cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
     cmd.env("OPENCLAW_DESKTOP", "1");
     cmd.env("OPENCLAW_NO_RESPAWN", "1");
-    cmd.env("OPENCLAW_GATEWAY_PORT", &port_str);
+    cmd.env("OPENCLAW_GATEWAY_PORT", "28789");
     cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
     if let Some(ref prefix) = npm_prefix {
         cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
@@ -973,10 +915,10 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
     cmd.stdout(std::process::Stdio::null());
     cmd.stderr(std::process::Stdio::null());
 
-    info!("[Shell] [开发模式] 启动 gateway 进程, 端口: {}...", port);
+    info!("[Shell] [开发模式] 启动 gateway 进程...");
     match cmd.spawn() {
         Ok(child) => {
-            info!("[Shell] Gateway 进程已启动, PID: {}, 端口: {}", child.id(), port);
+            info!("[Shell] Gateway 进程已启动, PID: {}", child.id());
             Ok(child)
         }
         Err(e) => {

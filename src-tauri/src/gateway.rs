@@ -1,7 +1,7 @@
 use std::net::TcpStream;
 use std::process::Child;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::time::Duration;
 use log::{info, warn, error};
 use tauri::AppHandle;
@@ -12,11 +12,17 @@ use tauri_plugin_notification::NotificationExt;
 use crate::utils::shell;
 use crate::TrayState;
 
+/// 默认端口
+pub const DEFAULT_PORT: u16 = 28789;
+/// 最小端口（向下搜索的下限）
+pub const MIN_PORT: u16 = 28700;
+
 /// Gateway 进程管理器
 /// 负责启动、停止、健康检查 openclaw gateway 子进程
 pub struct GatewayManager {
     child: Mutex<Option<Child>>,
-    port: u16,
+    /// 当前使用的端口（可能因端口占用而动态变化）
+    port: AtomicU16,
     /// 更新期间设置为 true，阻止健康检查线程自动重启 gateway
     suppress_restart: AtomicBool,
 }
@@ -25,9 +31,19 @@ impl GatewayManager {
     pub fn new(port: u16) -> Self {
         Self {
             child: Mutex::new(None),
-            port,
+            port: AtomicU16::new(port),
             suppress_restart: AtomicBool::new(false),
         }
+    }
+
+    /// 获取当前使用的端口
+    pub fn get_port(&self) -> u16 {
+        self.port.load(Ordering::SeqCst)
+    }
+
+    /// 设置端口
+    fn set_port(&self, port: u16) {
+        self.port.store(port, Ordering::SeqCst);
     }
 
     /// 设置抑制自动重启标志（更新前调用）
@@ -40,7 +56,7 @@ impl GatewayManager {
         self.suppress_restart.load(Ordering::SeqCst)
     }
 
-    pub fn start(&self) -> Result<(), String> {
+    pub fn start(&self) -> Result<u16, String> {
         let mut guard = self.child.lock().unwrap();
 
         // 检查之前是否已经拉起了存活的底层终端句柄，如果有则拦截覆盖
@@ -48,7 +64,7 @@ impl GatewayManager {
             match child.try_wait() {
                 Ok(None) => {
                     info!("[Gateway] 进程句柄已在追踪运行状态中，拦截并发启动");
-                    return Ok(());
+                    return Ok(self.get_port());
                 }
                 _ => {} // 已抛弃或已死亡的僵尸，允许覆写注入新的
             }
@@ -56,14 +72,23 @@ impl GatewayManager {
 
         info!("[Gateway] 启动 gateway 进程...");
 
-        let child = shell::spawn_openclaw_gateway_with_handle()
+        // 查找可用端口
+        let port = shell::find_available_port(DEFAULT_PORT, MIN_PORT)
+            .ok_or_else(|| format!("在 {}-{} 范围内未找到可用端口", MIN_PORT, DEFAULT_PORT))?;
+
+        if port != DEFAULT_PORT {
+            info!("[Gateway] 默认端口 {} 被占用，使用端口 {}", DEFAULT_PORT, port);
+        }
+
+        let child = shell::spawn_openclaw_gateway_with_handle(port)
             .map_err(|e| format!("启动 gateway 失败: {}", e))?;
 
-        info!("[Gateway] gateway 进程已启动, PID: {}", child.id());
+        info!("[Gateway] gateway 进程已启动, PID: {}, 端口: {}", child.id(), port);
 
+        self.set_port(port);
         *guard = Some(child);
 
-        Ok(())
+        Ok(port)
     }
 
     /// 停止 gateway 子进程
@@ -118,7 +143,8 @@ impl GatewayManager {
     /// （包括 auth、config、设备配对模块）已全部初始化
     pub fn is_ready(&self) -> bool {
         use std::io::{Read, Write};
-        let addr = format!("127.0.0.1:{}", self.port);
+        let port = self.get_port();
+        let addr = format!("127.0.0.1:{}", port);
         let mut stream = match TcpStream::connect_timeout(
             &addr.parse().unwrap(),
             Duration::from_millis(500),
@@ -129,7 +155,7 @@ impl GatewayManager {
         let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
         let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
         // 发送最简 HTTP 请求
-        let request = format!("GET / HTTP/1.0\r\nHost: 127.0.0.1:{}\r\n\r\n", self.port);
+        let request = format!("GET / HTTP/1.0\r\nHost: 127.0.0.1:{}\r\n\r\n", port);
         if stream.write_all(request.as_bytes()).is_err() {
             return false;
         }
@@ -258,9 +284,10 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
             if !navigated {
                 navigated = true;
                 info!("[Gateway] 健康检查发现 gateway 已就绪，执行延迟导航");
+                let port = gm.get_port();
                 let url = match crate::read_gateway_token() {
-                    Some(token) => format!("http://localhost:{}?token={}", gm.port, token),
-                    None => format!("http://localhost:{}", gm.port),
+                    Some(token) => format!("http://localhost:{}?token={}", port, token),
+                    None => format!("http://localhost:{}", port),
                 };
                 let _ = handle.emit("gateway-ready", url.as_str());
                 if let Some(window) = handle.get_webview_window("main") {
@@ -291,17 +318,17 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
         let _ = handle.emit("gateway-status", "Gateway 已断开，正在重启...");
 
         match gm.start() {
-            Ok(_) => {
+            Ok(port) => {
                 let _ = handle.emit("gateway-status", "正在等待 Gateway 重启...");
                 if gm.wait_for_ready(60) {
-                    info!("[Gateway] 自动重启成功");
+                    info!("[Gateway] 自动重启成功，端口: {}", port);
                     consecutive_failures = 0;
                     update_tray_status(handle, true);
-                    send_notification(handle, "Gateway 已自动重启");
+                    send_notification(handle, &format!("Gateway 已自动重启 (端口 {})", port));
                     // 重新读取 token 以确保认证正常
                     let url = match crate::read_gateway_token() {
-                        Some(token) => format!("http://localhost:{}?token={}", gm.port, token),
-                        None => format!("http://localhost:{}", gm.port),
+                        Some(token) => format!("http://localhost:{}?token={}", port, token),
+                        None => format!("http://localhost:{}", port),
                     };
                     let _ = handle.emit("gateway-ready", url.as_str());
                 } else {

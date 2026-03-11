@@ -6,7 +6,7 @@ use crate::utils::{file, platform, shell};
 use log::{debug, error, info, warn};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use tauri::command;
+use tauri::{command, AppHandle, Manager};
 
 fn desktop_supported_channel_types() -> Vec<(&'static str, &'static str, Vec<&'static str>)> {
     vec![
@@ -271,12 +271,14 @@ pub async fn get_or_create_gateway_token() -> Result<String, String> {
 
 /// 获取 Dashboard URL（带 token）
 #[command]
-pub async fn get_dashboard_url() -> Result<String, String> {
+pub async fn get_dashboard_url(app: AppHandle) -> Result<String, String> {
     info!("[Dashboard URL] 获取 Dashboard URL...");
-    
+
+    let gm = app.state::<crate::gateway::GatewayManager>();
+    let port = gm.get_port();
     let token = get_or_create_gateway_token().await?;
-    let url = format!("http://localhost:28789?token={}", token);
-    
+    let url = format!("http://localhost:{}?token={}", port, token);
+
     info!("[Dashboard URL] ✓ URL: {}...", &url[..50.min(url.len())]);
     Ok(url)
 }

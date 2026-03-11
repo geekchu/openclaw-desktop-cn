@@ -1,6 +1,6 @@
-use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
+﻿use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
 use crate::utils::{platform, shell};
-use tauri::{command, Manager};
+use tauri::command;
 use log::{info, warn, debug};
 
 /// 去除 ANSI 转义序列（颜色代码等）
@@ -272,195 +272,6 @@ fn channel_requires_linked_status(channel_type: &str) -> bool {
 
 /// 从文本输出解析渠道状态
 /// 格式: "- Telegram default: enabled, configured, mode:polling, token:config"
-#[cfg(target_os = "windows")]
-fn powershell_single_quote(value: &str) -> String {
-    value.replace("'", "''")
-}
-#[cfg(not(target_os = "windows"))]
-fn sh_single_quote(value: &str) -> String {
-    value.replace("'", r#"'"'"'"#)
-}
-
-#[cfg(not(target_os = "windows"))]
-fn build_unix_openclaw_launcher(app: &tauri::AppHandle) -> Result<(String, String), String> {
-    let mut path_parts: Vec<String> = Vec::new();
-    let mut extra_env: Vec<(String, String)> = shell::load_openclaw_env_vars().into_iter().collect();
-
-    extra_env.push(("OPENCLAW_GATEWAY_TOKEN".to_string(), shell::session_gateway_token().to_string()));
-    extra_env.push(("OPENCLAW_DESKTOP".to_string(), "1".to_string()));
-    extra_env.push(("OPENCLAW_NO_RESPAWN".to_string(), "1".to_string()));
-    let gm = app.state::<crate::gateway::GatewayManager>();
-    let port = gm.get_port();
-    extra_env.push(("OPENCLAW_GATEWAY_PORT".to_string(), port.to_string()));
-    extra_env.push(("OPENCLAW_STATE_DIR".to_string(), platform::get_config_dir()));
-
-    if let Some(prefix) = shell::get_npm_global_prefix() {
-        extra_env.push((
-            "NPM_CONFIG_PREFIX".to_string(),
-            prefix.to_string_lossy().to_string(),
-        ));
-    }
-
-    let launcher = if let (Some(node_path), Some((bundle_dir, entry_point))) =
-        (shell::get_node_path(), shell::get_bundle_entry())
-    {
-        if let Some(parent) = std::path::Path::new(&node_path).parent() {
-            path_parts.push(parent.display().to_string());
-        }
-        extra_env.push(("OPENCLAW_GATEWAY_BUNDLE_DIR".to_string(), bundle_dir));
-        format!(
-            "'{}' '{}'",
-            sh_single_quote(&node_path),
-            sh_single_quote(&entry_point)
-        )
-    } else {
-        let openclaw_path = shell::get_openclaw_path().ok_or_else(|| {
-            "OpenClaw CLI is unavailable and bundled runtime could not be found".to_string()
-        })?;
-        if let Some(parent) = std::path::Path::new(&openclaw_path).parent() {
-            path_parts.push(parent.display().to_string());
-        }
-        format!("'{}'", sh_single_quote(&openclaw_path))
-    };
-
-    if let Some(bin_dir) = shell::get_npm_global_bin_dir() {
-        if !bin_dir.trim().is_empty() {
-            path_parts.push(bin_dir);
-        }
-    }
-
-    let base_path = shell::get_extended_path();
-    if !base_path.trim().is_empty() {
-        path_parts.push(base_path);
-    }
-
-    let mut env_lines = format!("export PATH='{}'\n", sh_single_quote(&path_parts.join(":")));
-    for (key, value) in extra_env {
-        env_lines.push_str(&format!("export {}='{}'\n", key, sh_single_quote(&value)));
-    }
-
-    Ok((env_lines, launcher))
-}
-
-
-#[cfg(target_os = "windows")]
-fn build_windows_whatsapp_login_script(app: &tauri::AppHandle) -> Result<String, String> {
-    let mut extended_path = shell::get_extended_path();
-
-    if let Some(bin_dir) = shell::get_npm_global_bin_dir() {
-        if !bin_dir.trim().is_empty() {
-            extended_path = format!("{};{}", bin_dir, extended_path);
-        }
-    }
-
-    let mut extra_env: Vec<(String, String)> = shell::load_openclaw_env_vars().into_iter().collect();
-    extra_env.push(("OPENCLAW_GATEWAY_TOKEN".to_string(), shell::session_gateway_token().to_string()));
-    extra_env.push(("OPENCLAW_DESKTOP".to_string(), "1".to_string()));
-    extra_env.push(("OPENCLAW_NO_RESPAWN".to_string(), "1".to_string()));
-    let gm = app.state::<crate::gateway::GatewayManager>();
-    let port = gm.get_port();
-    extra_env.push(("OPENCLAW_GATEWAY_PORT".to_string(), port.to_string()));
-    extra_env.push(("OPENCLAW_STATE_DIR".to_string(), platform::get_config_dir()));
-
-    if let Some(prefix) = shell::get_npm_global_prefix() {
-        extra_env.push((
-            "NPM_CONFIG_PREFIX".to_string(),
-            prefix.to_string_lossy().to_string(),
-        ));
-    }
-
-    let launcher = if let (Some(node_path), Some((bundle_dir, entry_point))) =
-        (shell::get_node_path(), shell::get_bundle_entry())
-    {
-        if let Some(parent) = std::path::Path::new(&node_path).parent() {
-            extended_path = format!("{};{}", parent.display(), extended_path);
-        }
-        extra_env.push(("OPENCLAW_GATEWAY_BUNDLE_DIR".to_string(), bundle_dir));
-        format!(
-            "& '{}' '{}'",
-            powershell_single_quote(&node_path),
-            powershell_single_quote(&entry_point)
-        )
-    } else {
-        let openclaw_path = shell::get_openclaw_path().ok_or_else(|| {
-            "OpenClaw CLI is unavailable and bundled runtime could not be found".to_string()
-        })?;
-        if let Some(parent) = std::path::Path::new(&openclaw_path).parent() {
-            extended_path = format!("{};{}", parent.display(), extended_path);
-        }
-        format!("& '{}'", powershell_single_quote(&openclaw_path))
-    };
-
-    let mut env_lines = String::new();
-    env_lines.push_str(&format!(
-        "$env:PATH = '{}'
-",
-        powershell_single_quote(&extended_path)
-    ));
-    for (key, value) in extra_env {
-        env_lines.push_str(&format!(
-            "$env:{} = '{}'
-",
-            key,
-            powershell_single_quote(&value)
-        ));
-    }
-
-    Ok(format!(
-        r#"$ErrorActionPreference = 'Stop'
-{}
-Clear-Host
-Write-Host '========================================================'
-Write-Host '            WhatsApp Login Wizard                       '
-Write-Host '========================================================'
-Write-Host ''
-
-function Invoke-OpenClaw {{
-  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$CliArgs)
-  {} @CliArgs
-  if ($LASTEXITCODE -ne $null -and $LASTEXITCODE -ne 0) {{
-    throw "openclaw command failed with exit code $LASTEXITCODE"
-  }}
-}}
-
-try {{
-  Write-Host 'Step 1/3: Enable WhatsApp plugin...'
-  Invoke-OpenClaw plugins enable whatsapp | Out-Null
-  Invoke-OpenClaw config set --strict-json plugins.entries.whatsapp.enabled true | Out-Null
-  Invoke-OpenClaw config set channels.whatsapp.dmPolicy pairing | Out-Null
-  Invoke-OpenClaw config set channels.whatsapp.groupPolicy allowlist | Out-Null
-  Write-Host 'OK: plugin enabled'
-  Write-Host ''
-
-  Write-Host 'Step 2/3: Restart gateway...'
-  try {{
-    Invoke-OpenClaw gateway stop | Out-Null
-  }} catch {{
-    Write-Host 'Info: gateway was not running, continuing...'
-  }}
-  Start-Sleep -Seconds 2
-  Invoke-OpenClaw gateway start | Out-Null
-  Write-Host 'OK: gateway restarted'
-  Write-Host ''
-
-  Write-Host 'Step 3/3: Start WhatsApp login...'
-  Write-Host 'Scan the QR code with WhatsApp on your phone.'
-  Write-Host ''
-  Invoke-OpenClaw channels login --channel whatsapp --verbose
-  Write-Host ''
-  Write-Host 'OK: login flow finished'
-}} catch {{
-  Write-Host ''
-  Write-Host ('ERROR: ' + $_.Exception.Message) -ForegroundColor Red
-}}
-
-Write-Host ''
-Read-Host 'Press Enter to close'
-"#,
-        env_lines, launcher
-    ))
-}
-
 fn parse_channel_status_text(output: &str, channel_type: &str) -> Option<(bool, bool, bool, String)> {
     let channel_lower = channel_type.to_lowercase();
     
@@ -742,35 +553,32 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 
 /// 启动渠道登录（如 WhatsApp 扫码）
 #[command]
-pub async fn start_channel_login(app: tauri::AppHandle, channel_type: String) -> Result<String, String> {
+pub async fn start_channel_login(channel_type: String) -> Result<String, String> {
     info!("[渠道登录] 开始渠道登录流程: {}", channel_type);
     
     match channel_type.as_str() {
         "whatsapp" => {
             info!("[渠道登录] WhatsApp 登录流程...");
+            // 先在后台启用插件
             info!("[渠道登录] 启用 whatsapp 插件...");
             let _ = shell::run_openclaw(&["plugins", "enable", "whatsapp"]);
             
             #[cfg(target_os = "macos")]
             {
                 let env_path = platform::get_env_file_path();
-                let (env_lines, launcher) = build_unix_openclaw_launcher(&app)?;
+                // 创建一个临时脚本文件
+                // 流程：1. 启用插件 2. 重启 Gateway 3. 登录
                 let script_content = format!(
                     r#"#!/bin/bash
-source '{}' 2>/dev/null || true
-{}
+source {} 2>/dev/null
 clear
-echo "╔══════════════════════════════════════════════════╗"
+echo "╔════════════════════════════════════════════════════════╗"
 echo "║           📱 WhatsApp 登录向导                          ║"
-echo "╚══════════════════════════════════════════════════╝"
+echo "╚════════════════════════════════════════════════════════╝"
 echo ""
 
-invoke_openclaw() {{
-  {} "$@"
-}}
-
 echo "步骤 1/3: 启用 WhatsApp 插件..."
-invoke_openclaw plugins enable whatsapp 2>/dev/null || true
+openclaw plugins enable whatsapp 2>/dev/null || true
 
 # 确保 whatsapp 在 plugins.allow 数组中
 python3 << 'PYEOF'
@@ -814,9 +622,11 @@ echo "✅ 插件已启用"
 echo ""
 
 echo "步骤 2/3: 重启 Gateway 使插件生效..."
-invoke_openclaw gateway stop 2>/dev/null || true
+# 使用 openclaw 命令停止和启动 gateway
+openclaw gateway stop 2>/dev/null || true
 sleep 2
-invoke_openclaw gateway start 2>/dev/null || invoke_openclaw gateway --port $OPENCLAW_GATEWAY_PORT --bind lan &
+# 启动 gateway 服务
+openclaw gateway start 2>/dev/null || openclaw gateway --port 28789 --bind lan &
 sleep 3
 echo "✅ Gateway 已重启"
 echo ""
@@ -824,27 +634,27 @@ echo ""
 echo "步骤 3/3: 启动 WhatsApp 登录..."
 echo "请使用 WhatsApp 手机 App 扫描下方二维码"
 echo ""
-invoke_openclaw channels login --channel whatsapp --verbose
+openclaw channels login --channel whatsapp --verbose
 echo ""
-echo "════════════════════════════════════════════════"
+echo "════════════════════════════════════════════════════════"
 echo "登录完成！"
 echo ""
 read -p "按回车键关闭此窗口..."
 "#,
-                    sh_single_quote(&env_path),
-                    env_lines,
-                    launcher
+                    env_path
                 );
                 
                 let script_path = "/tmp/openclaw_whatsapp_login.command";
                 std::fs::write(script_path, script_content)
                     .map_err(|e| format!("创建脚本失败: {}", e))?;
                 
+                // 设置可执行权限
                 std::process::Command::new("chmod")
                     .args(["+x", script_path])
                     .output()
                     .map_err(|e| format!("设置权限失败: {}", e))?;
                 
+                // 使用 open 命令打开 .command 文件（会自动在新终端窗口中执行）
                 std::process::Command::new("open")
                     .arg(script_path)
                     .spawn()
@@ -854,24 +664,18 @@ read -p "按回车键关闭此窗口..."
             #[cfg(target_os = "linux")]
             {
                 let env_path = platform::get_env_file_path();
-                let (env_lines, launcher) = build_unix_openclaw_launcher(&app)?;
+                // 创建脚本
                 let script_content = format!(
                     r#"#!/bin/bash
-source '{}' 2>/dev/null || true
-{}
+source {} 2>/dev/null
 clear
 echo "📱 WhatsApp 登录向导"
 echo ""
-invoke_openclaw() {{
-  {} "$@"
-}}
-invoke_openclaw channels login --channel whatsapp --verbose
+openclaw channels login --channel whatsapp --verbose
 echo ""
 read -p "按回车键关闭..."
 "#,
-                    sh_single_quote(&env_path),
-                    env_lines,
-                    launcher
+                    env_path
                 );
                 
                 let script_path = "/tmp/openclaw_whatsapp_login.sh";
@@ -883,6 +687,7 @@ read -p "按回车键关闭..."
                     .output()
                     .map_err(|e| format!("设置权限失败: {}", e))?;
                 
+                // 尝试不同的终端模拟器
                 let terminals = ["gnome-terminal", "xfce4-terminal", "konsole", "xterm"];
                 let mut launched = false;
                 
@@ -905,10 +710,36 @@ read -p "按回车键关闭..."
             #[cfg(target_os = "windows")]
             {
                 let script_path = std::env::temp_dir().join("openclaw-whatsapp-login.ps1");
-                let script_content = build_windows_whatsapp_login_script(&app)?;
+                let script_content = r#"
+$ErrorActionPreference = 'Continue'
+Clear-Host
+Write-Host '╔════════════════════════════════════════════════════════╗'
+Write-Host '║           WhatsApp 登录向导                           ║'
+Write-Host '╚════════════════════════════════════════════════════════╝'
+Write-Host ''
+Write-Host '步骤 1/3: 启用 WhatsApp 插件...'
+openclaw plugins enable whatsapp 2>$null | Out-Null
+openclaw config set --strict-json plugins.entries.whatsapp.enabled true 2>$null | Out-Null
+openclaw config set channels.whatsapp.dmPolicy pairing 2>$null | Out-Null
+openclaw config set channels.whatsapp.groupPolicy allowlist 2>$null | Out-Null
+Write-Host '✅ 插件已启用'
+Write-Host ''
+Write-Host '步骤 2/3: 重启 Gateway 使插件生效...'
+openclaw gateway stop 2>$null | Out-Null
+Start-Sleep -Seconds 2
+openclaw gateway start 2>$null | Out-Null
+Write-Host '✅ Gateway 已重启'
+Write-Host ''
+Write-Host '步骤 3/3: 启动 WhatsApp 登录...'
+Write-Host '请使用 WhatsApp 手机 App 扫描二维码'
+Write-Host ''
+openclaw channels login --channel whatsapp --verbose
+Write-Host ''
+Read-Host '登录流程结束，按回车关闭窗口'
+"#;
 
                 std::fs::write(&script_path, script_content)
-                    .map_err(|e| format!("Failed to create PowerShell script: {}", e))?;
+                    .map_err(|e| format!("创建 PowerShell 脚本失败: {}", e))?;
 
                 std::process::Command::new("powershell.exe")
                     .args([
@@ -922,7 +753,7 @@ read -p "按回车键关闭..."
                         ),
                     ])
                     .spawn()
-                    .map_err(|e| format!("Failed to launch PowerShell terminal: {}", e))?;
+                    .map_err(|e| format!("启动 PowerShell 终端失败: {}", e))?;
             }
 
             Ok("已启动 WhatsApp 登录终端".to_string())
@@ -930,7 +761,6 @@ read -p "按回车键关闭..."
         _ => Err(format!("不支持 {} 的登录向导", channel_type)),
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -12,8 +12,6 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-const SERVICE_PORT: u16 = 28789;
-
 /// 检测端口是否有服务在监听，返回 PID
 /// 简单直接：端口被占用 = 服务运行中
 fn check_port_listening(port: u16) -> Option<u32> {
@@ -134,9 +132,13 @@ fn get_process_uptime_seconds(pid: u32) -> Option<u64> {
 
 /// 获取服务状态（简单版：直接检查端口占用）
 #[command]
-pub async fn get_service_status() -> Result<ServiceStatus, String> {
+pub async fn get_service_status(app: AppHandle) -> Result<ServiceStatus, String> {
+    // 从 GatewayManager 获取当前端口
+    let gm = app.state::<GatewayManager>();
+    let port = gm.get_port();
+
     // 简单直接：检查端口是否被占用
-    let pid = check_port_listening(SERVICE_PORT);
+    let pid = check_port_listening(port);
     let running = pid.is_some();
 
     let memory_mb = pid.and_then(get_process_memory_mb);
@@ -145,7 +147,7 @@ pub async fn get_service_status() -> Result<ServiceStatus, String> {
     Ok(ServiceStatus {
         running,
         pid,
-        port: SERVICE_PORT,
+        port,
         uptime_seconds,
         memory_mb,
         cpu_percent: None,
@@ -156,9 +158,9 @@ pub async fn get_service_status() -> Result<ServiceStatus, String> {
 #[command]
 pub async fn start_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 启动服务...");
-    
+
     // 检查是否已经运行
-    let status = get_service_status().await?;
+    let status = get_service_status(app.clone()).await?;
     if status.running {
         info!("[服务] 服务已在运行中");
         return Err("服务已在运行中".to_string());
@@ -183,17 +185,17 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
     // 直接后台启动 gateway，通过 GatewayManager 绝对控股 PID
     info!("[服务] 后台集权管理启动 gateway...");
     let gm = app.state::<GatewayManager>();
-    gm.start().map_err(|e| format!("启动服务失败: {}", e))?;
-    
+    let port = gm.start().map_err(|e| format!("启动服务失败: {}", e))?;
+
     // 轮询等待端口开始监听及 HTTP 就绪（最多 60 秒）
-    info!("[服务] 等待 Gateway HTTP 存活探活 (60秒)...");
+    info!("[服务] 等待 Gateway HTTP 存活探活 (60秒), 端口: {}...", port);
     if gm.wait_for_ready(60) {
-        if let Some(pid) = check_port_listening(SERVICE_PORT) {
-            info!("[服务] ✓ 启动成功, PID: {}", pid);
-            return Ok(format!("服务已启动，PID: {}", pid));
+        if let Some(pid) = check_port_listening(port) {
+            info!("[服务] ✓ 启动成功, PID: {}, 端口: {}", pid, port);
+            return Ok(format!("服务已启动，PID: {}, 端口: {}", pid, port));
         }
         info!("[服务] ✓ HTTP已就绪，但端口识别延迟");
-        return Ok("服务已启动".to_string());
+        return Ok(format!("服务已启动，端口: {}", port));
     }
     
     info!("[服务] 等待超时，HTTP 或端口仍未就绪");
@@ -204,15 +206,15 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
 #[command]
 pub async fn stop_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 停止服务...");
-    
+
     let gm = app.state::<GatewayManager>();
     gm.set_suppress_restart(true);
     gm.stop();
     gm.set_suppress_restart(false);
-    
+
     std::thread::sleep(std::time::Duration::from_millis(500));
-    
-    let status = get_service_status().await?;
+
+    let status = get_service_status(app).await?;
     if status.running {
         Err(format!("无法停止服务，PID: {:?}", status.pid))
     } else {
@@ -247,13 +249,14 @@ fn force_kill_port_holder(port: u16) {
 pub async fn stop_gateway(app: AppHandle) -> Result<(), String> {
     info!("[服务] 更新前停止 Gateway...");
     let gm = app.state::<GatewayManager>();
+    let port = gm.get_port();
     // 抑制健康检查线程自动重启，防止安装期间 gateway 被拉起
     gm.set_suppress_restart(true);
     gm.stop();
     std::thread::sleep(std::time::Duration::from_secs(1));
 
     // 兜底：如果端口仍被占用（孤儿进程、上次崩溃残留等），强制杀掉
-    force_kill_port_holder(SERVICE_PORT);
+    force_kill_port_holder(port);
 
     info!("[服务] Gateway 已停止，可以安全更新");
     Ok(())
@@ -268,22 +271,22 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
     gm.stop();
     std::thread::sleep(std::time::Duration::from_secs(1));
 
-    gm.start().map_err(|e| format!("重启 Gateway 失败: {}", e))?;
+    let port = gm.start().map_err(|e| format!("重启 Gateway 失败: {}", e))?;
 
     if gm.wait_for_ready(60) {
         // 重启成功，通知前端重新导航
         let url = match crate::read_gateway_token() {
-            Some(token) => format!("http://localhost:{}?token={}", 28789, token),
-            None => format!("http://localhost:{}", 28789),
+            Some(token) => format!("http://localhost:{}?token={}", port, token),
+            None => format!("http://localhost:{}", port),
         };
         let _ = app.emit("gateway-ready", url.as_str());
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.navigate(url.parse().unwrap());
         }
-        info!("[服务] ✓ 重启成功");
-        Ok("服务已重启".to_string())
+        info!("[服务] ✓ 重启成功，端口: {}", port);
+        Ok(format!("服务已重启，端口: {}", port))
     } else {
-        Err("Gateway 重启超时（15秒）".to_string())
+        Err("Gateway 重启超时（60秒）".to_string())
     }
 }
 
