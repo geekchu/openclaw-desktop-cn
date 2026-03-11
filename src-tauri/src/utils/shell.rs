@@ -625,6 +625,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
+        cmd.env("OPENCLAW_GATEWAY_PORT", crate::gateway::GLOBAL_GATEWAY_PORT.load(std::sync::atomic::Ordering::SeqCst).to_string());
         cmd.env("OPENCLAW_DESKTOP", "1");
         cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
         cmd.env("PATH", &extended_path);
@@ -680,6 +681,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
+            .env("OPENCLAW_GATEWAY_PORT", crate::gateway::GLOBAL_GATEWAY_PORT.load(std::sync::atomic::Ordering::SeqCst).to_string())
             .env("OPENCLAW_DESKTOP", "1")
             .env("OPENCLAW_STATE_DIR", platform::get_config_dir())
             .env("PATH", &extended_path);
@@ -698,6 +700,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
+            .env("OPENCLAW_GATEWAY_PORT", crate::gateway::GLOBAL_GATEWAY_PORT.load(std::sync::atomic::Ordering::SeqCst).to_string())
             .env("OPENCLAW_DESKTOP", "1")
             .env("OPENCLAW_STATE_DIR", platform::get_config_dir())
             .env("PATH", &extended_path);

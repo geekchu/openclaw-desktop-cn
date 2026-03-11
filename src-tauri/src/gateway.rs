@@ -17,6 +17,9 @@ pub const DEFAULT_PORT: u16 = 28789;
 /// 最小端口（向下搜索的下限）
 pub const MIN_PORT: u16 = 28700;
 
+/// 全局共享的 Gateway 端口引用，供不依赖 Tauri AppHandle 的底层的 shell 脚本直接获取
+pub static GLOBAL_GATEWAY_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(28789);
+
 /// Gateway 进程管理器
 /// 负责启动、停止、健康检查 openclaw gateway 子进程
 pub struct GatewayManager {
@@ -44,6 +47,7 @@ impl GatewayManager {
     /// 设置端口
     fn set_port(&self, port: u16) {
         self.port.store(port, Ordering::SeqCst);
+        GLOBAL_GATEWAY_PORT.store(port, Ordering::SeqCst);
     }
 
     /// 设置抑制自动重启标志（更新前调用）
@@ -265,7 +269,11 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
     let max_consecutive_failures = 3;
     let backoff_interval = Duration::from_secs(60);
     let mut consecutive_failures: u32 = 0;
-    let mut navigated = already_navigated;
+    let mut last_navigated_port: Option<u16> = if already_navigated {
+        Some(handle.state::<GatewayManager>().get_port())
+    } else {
+        None
+    };
 
     loop {
         let wait = if consecutive_failures >= max_consecutive_failures {
@@ -280,14 +288,19 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
         if gm.is_ready() {
             consecutive_failures = 0;
             update_tray_status(handle, true);
-            // 如果还没 navigate 过（初始启动超时后 gateway 才就绪），立即跳转
-            if !navigated {
-                navigated = true;
-                info!("[Gateway] 健康检查发现 gateway 已就绪，执行延迟导航");
-                let port = gm.get_port();
+            // 检查是否需要导航（如果之前未导航过，或是端口发生了变换）
+            let current_port = gm.get_port();
+            let needs_navigation = match last_navigated_port {
+                Some(p) => p != current_port,
+                None => true,
+            };
+
+            if needs_navigation {
+                last_navigated_port = Some(current_port);
+                info!("[Gateway] 健康检查发现 gateway 就绪且端口需更新，执行导航到新端口");
                 let url = match crate::read_gateway_token() {
-                    Some(token) => format!("http://localhost:{}?token={}", port, token),
-                    None => format!("http://localhost:{}", port),
+                    Some(token) => format!("http://localhost:{}?token={}", current_port, token),
+                    None => format!("http://localhost:{}", current_port),
                 };
                 let _ = handle.emit("gateway-ready", url.as_str());
                 if let Some(window) = handle.get_webview_window("main") {
@@ -333,6 +346,7 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
                     if let Some(window) = handle.get_webview_window("main") {
                         let _ = window.navigate(url.parse().unwrap());
                     }
+                    last_navigated_port = Some(port);
                 } else {
                     consecutive_failures += 1;
                     error!("[Gateway] 自动重启超时 (连续失败 {}次)", consecutive_failures);
