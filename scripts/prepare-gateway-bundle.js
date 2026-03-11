@@ -201,17 +201,33 @@ if (process.env.BUILD_CONFIG === "release") {
     }
 
     // 3. Junk file extensions to remove
-    const junkExtensions = new Set([".map", ".md", ".ts", ".mts", ".cts", ".d.ts", ".d.mts", ".d.cts"]);
+    const junkExtensions = new Set([
+      ".map",
+      ".md",
+      ".ts",
+      ".mts",
+      ".cts",
+      ".d.ts",
+      ".d.mts",
+      ".d.cts",
+    ]);
 
     // 4. Junk file basenames (case-insensitive)
-    const junkBasenames = /^(?:LICENSE|LICENCE|README|CHANGELOG|HISTORY|CHANGES|AUTHORS|CONTRIBUTORS)(?:\..+)?$/i;
+    const junkBasenames =
+      /^(?:LICENSE|LICENCE|README|CHANGELOG|HISTORY|CHANGES|AUTHORS|CONTRIBUTORS)(?:\..+)?$/i;
 
     // 5. Directories that are never needed at runtime
     const junkDirs = new Set([
-      "test", "tests", "__tests__",
-      "testing", "__mocks__",
-      "example", "examples",
-      ".github", ".vscode", ".idea",
+      "test",
+      "tests",
+      "__tests__",
+      "testing",
+      "__mocks__",
+      "example",
+      "examples",
+      ".github",
+      ".vscode",
+      ".idea",
     ]);
 
     // Walk node_modules and remove junk
@@ -234,13 +250,19 @@ if (process.env.BUILD_CONFIG === "release") {
         } else if (entry.isFile()) {
           const name = entry.name;
           // Get the effective extension, handling compound extensions like .d.ts
-          const ext = name.endsWith(".d.ts") ? ".d.ts"
-            : name.endsWith(".d.mts") ? ".d.mts"
-            : name.endsWith(".d.cts") ? ".d.cts"
-            : name.slice(name.lastIndexOf("."));
+          const ext = name.endsWith(".d.ts")
+            ? ".d.ts"
+            : name.endsWith(".d.mts")
+              ? ".d.mts"
+              : name.endsWith(".d.cts")
+                ? ".d.cts"
+                : name.slice(name.lastIndexOf("."));
           const isJunk = junkExtensions.has(ext) || junkBasenames.test(name);
-          if (isJunk) {
-            try { rmSync(fullPath); totalRemoved++; } catch {}
+          if (isJunk && name !== "SKILL.md") {
+            try {
+              rmSync(fullPath);
+              totalRemoved++;
+            } catch {}
           }
         }
       }
@@ -384,6 +406,46 @@ console.log(
 console.log("\n[bundle] === Step 5: 安装生产依赖（含 extension 依赖）===");
 run("npm install --omit=dev --install-strategy=hoisted", { cwd: bundleDir });
 
+// Step 5.5: 解析 extension 中声明在 node_modules 内的 skills 路径
+// 某些 extension（如 tlon）的 openclaw.plugin.json 中 skills 路径指向 node_modules 子目录
+// 但 robocopy /XD node_modules 排除了整个 node_modules 树，导致这些 skills 未被复制
+// 这里从已安装的顶层 node_modules 中把它们复制到 extension 目录下
+console.log("\n[bundle] === Step 5.5: 解析 extension node_modules skills ===");
+if (existsSync(extDir)) {
+  for (const extName of readdirSync(extDir)) {
+    const pluginJsonPath = join(extDir, extName, "openclaw.plugin.json");
+    if (!existsSync(pluginJsonPath)) {
+      continue;
+    }
+    let pluginJson;
+    try {
+      pluginJson = JSON.parse(readFileSync(pluginJsonPath, "utf-8"));
+    } catch {
+      continue;
+    }
+    const skills = pluginJson.skills;
+    if (!Array.isArray(skills)) {
+      continue;
+    }
+    for (const skillPath of skills) {
+      if (typeof skillPath !== "string" || !skillPath.startsWith("node_modules/")) {
+        continue;
+      }
+      // e.g. "node_modules/@tloncorp/tlon-skill" → resolve from bundle's top-level node_modules
+      const pkgName = skillPath.replace(/^node_modules\//, "");
+      const srcSkillDir = join(bundleDir, "node_modules", pkgName);
+      const destSkillDir = join(extDir, extName, skillPath);
+      if (existsSync(srcSkillDir)) {
+        console.log(`[bundle] 复制 extension/${extName} skill: ${skillPath}`);
+        mkdirSync(dirname(destSkillDir), { recursive: true });
+        copyIfExists(srcSkillDir, destSkillDir);
+      } else {
+        console.log(`[bundle] 警告: extension/${extName} skill 源不存在: ${srcSkillDir}`);
+      }
+    }
+  }
+}
+
 // Step 6: 删除桌面版不需要的重量级包
 console.log("\n[bundle] === Step 6: 删除桌面版不需要的重量级包 ===");
 {
@@ -473,6 +535,8 @@ console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
     "jest.config.js",
     "jest.config.ts",
   ]);
+  // SKILL.md 是 skill 入口文件，不能被当作文档删除
+  const protectedFiles = new Set(["SKILL.md"]);
   // 注意：.d.ts 等复合扩展名无法通过 lastIndexOf(".") 匹配，
   // 所以这里只放单段扩展名，复合扩展名通过 endsWith 判断
   const extsToRemove = new Set([".map"]);
@@ -494,14 +558,15 @@ console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
         }
       } else {
         const shouldRemove =
-          filesToRemove.has(entry.name) ||
+          !protectedFiles.has(entry.name) &&
+          (filesToRemove.has(entry.name) ||
           extsToRemove.has(entry.name.slice(entry.name.lastIndexOf("."))) ||
           entry.name.endsWith(".d.ts") ||
           entry.name.endsWith(".d.mts") ||
           entry.name.endsWith(".d.cts") ||
           entry.name.endsWith(".js.map") ||
           entry.name.endsWith(".ts.map") ||
-          entry.name.endsWith(".mjs.map");
+          entry.name.endsWith(".mjs.map"));
         if (shouldRemove) {
           rmSync(fullPath, { force: true });
           removedCount++;
