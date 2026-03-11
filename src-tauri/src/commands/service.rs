@@ -191,14 +191,7 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 等待 Gateway HTTP 存活探活 (60秒), 端口: {}...", port);
     if gm.wait_for_ready(60) {
         // 启动成功，通知前端重新导航
-        let url = match crate::read_gateway_token() {
-            Some(token) => format!("http://localhost:{}?token={}", port, token),
-            None => format!("http://localhost:{}", port),
-        };
-        let _ = app.emit("gateway-ready", url.as_str());
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.navigate(url.parse().unwrap());
-        }
+        crate::gateway::navigate_webview_to_gateway(&app, port);
         
         if let Some(pid) = check_port_listening(port) {
             info!("[服务] ✓ 启动成功, PID: {}, 端口: {}", pid, port);
@@ -285,14 +278,7 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
 
     if gm.wait_for_ready(60) {
         // 重启成功，通知前端重新导航
-        let url = match crate::read_gateway_token() {
-            Some(token) => format!("http://localhost:{}?token={}", port, token),
-            None => format!("http://localhost:{}", port),
-        };
-        let _ = app.emit("gateway-ready", url.as_str());
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.navigate(url.parse().unwrap());
-        }
+        crate::gateway::navigate_webview_to_gateway(&app, port);
         info!("[服务] ✓ 重启成功，端口: {}", port);
         Ok(format!("服务已重启，端口: {}", port))
     } else {

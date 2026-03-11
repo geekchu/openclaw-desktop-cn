@@ -28,6 +28,8 @@ pub struct GatewayManager {
     port: AtomicU16,
     /// 更新期间设置为 true，阻止健康检查线程自动重启 gateway
     suppress_restart: AtomicBool,
+    /// 最后一次引导前端 WebView 导航过的有效端口
+    last_navigated_port: AtomicU16,
 }
 
 impl GatewayManager {
@@ -36,7 +38,16 @@ impl GatewayManager {
             child: Mutex::new(None),
             port: AtomicU16::new(port),
             suppress_restart: AtomicBool::new(false),
+            last_navigated_port: AtomicU16::new(0),
         }
+    }
+
+    pub fn get_last_navigated_port(&self) -> u16 {
+        self.last_navigated_port.load(Ordering::SeqCst)
+    }
+
+    pub fn set_last_navigated_port(&self, port: u16) {
+        self.last_navigated_port.store(port, Ordering::SeqCst);
     }
 
     /// 获取当前使用的端口
@@ -264,16 +275,11 @@ fn update_tray_status(handle: &AppHandle, running: bool) {
 /// 健康检查循环：每 10 秒检查一次 gateway 状态
 /// 如果 gateway 不响应且子进程已退出，自动尝试重启（最多 3 次连续失败后退避）
 /// `already_navigated`: 启动线程是否已经成功导航到 gateway URL
-pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
+pub fn health_check_loop(handle: &AppHandle) {
     let check_interval = Duration::from_secs(10);
     let max_consecutive_failures = 3;
     let backoff_interval = Duration::from_secs(60);
     let mut consecutive_failures: u32 = 0;
-    let mut last_navigated_port: Option<u16> = if already_navigated {
-        Some(handle.state::<GatewayManager>().get_port())
-    } else {
-        None
-    };
 
     loop {
         let wait = if consecutive_failures >= max_consecutive_failures {
@@ -290,22 +296,10 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
             update_tray_status(handle, true);
             // 检查是否需要导航（如果之前未导航过，或是端口发生了变换）
             let current_port = gm.get_port();
-            let needs_navigation = match last_navigated_port {
-                Some(p) => p != current_port,
-                None => true,
-            };
 
-            if needs_navigation {
-                last_navigated_port = Some(current_port);
+            if gm.get_last_navigated_port() != current_port {
                 info!("[Gateway] 健康检查发现 gateway 就绪且端口需更新，执行导航到新端口");
-                let url = match crate::read_gateway_token() {
-                    Some(token) => format!("http://localhost:{}?token={}", current_port, token),
-                    None => format!("http://localhost:{}", current_port),
-                };
-                let _ = handle.emit("gateway-ready", url.as_str());
-                if let Some(window) = handle.get_webview_window("main") {
-                    let _ = window.navigate(url.parse().unwrap());
-                }
+                navigate_webview_to_gateway(handle, current_port);
             }
             continue; // 正常运行
         }
@@ -338,15 +332,7 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
                     consecutive_failures = 0;
                     update_tray_status(handle, true);
                     send_notification(handle, &format!("Gateway 已自动重启 (端口 {})", port));
-                    let url = match crate::read_gateway_token() {
-                        Some(token) => format!("http://localhost:{}?token={}", port, token),
-                        None => format!("http://localhost:{}", port),
-                    };
-                    let _ = handle.emit("gateway-ready", url.as_str());
-                    if let Some(window) = handle.get_webview_window("main") {
-                        let _ = window.navigate(url.parse().unwrap());
-                    }
-                    last_navigated_port = Some(port);
+                    navigate_webview_to_gateway(handle, port);
                 } else {
                     consecutive_failures += 1;
                     error!("[Gateway] 自动重启超时 (连续失败 {}次)", consecutive_failures);
@@ -368,4 +354,24 @@ pub fn health_check_loop(handle: &AppHandle, already_navigated: bool) {
             }
         }
     }
+}
+
+/// 统一的 WebView 导航助手函数，带防抖保护避免冗余跳转
+pub fn navigate_webview_to_gateway(handle: &AppHandle, port: u16) {
+    let gm = handle.state::<GatewayManager>();
+    if gm.get_last_navigated_port() == port {
+        return; // 防抖：如果在其它线程刚做过该端口的导航，就跳过
+    }
+
+    let url = match crate::read_gateway_token() {
+        Some(token) => format!("http://localhost:{}?token={}", port, token),
+        None => format!("http://localhost:{}", port),
+    };
+
+    let _ = handle.emit("gateway-ready", url.as_str());
+    if let Some(window) = handle.get_webview_window("main") {
+        let _ = window.navigate(url.parse().unwrap());
+    }
+    
+    gm.set_last_navigated_port(port);
 }

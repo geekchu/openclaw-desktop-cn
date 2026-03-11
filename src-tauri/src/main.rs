@@ -200,14 +200,7 @@ fn main() {
                                 match gm.start() {
                                     Ok(port) => {
                                         if gm.wait_for_ready(60) {
-                                            let url = if let Some(token) = read_gateway_token() {
-                                                format!("http://localhost:{}?token={}", port, token)
-                                            } else {
-                                                format!("http://localhost:{}", port)
-                                            };
-                                            if let Some(window) = handle.get_webview_window("main") {
-                                                let _ = window.navigate(url.parse().unwrap());
-                                            }
+                                            crate::gateway::navigate_webview_to_gateway(&handle, port);
                                         }
                                     }
                                     Err(e) => {
@@ -232,14 +225,7 @@ fn main() {
                                 match gm.start() {
                                     Ok(port) => {
                                         if gm.wait_for_ready(60) {
-                                            let url = if let Some(token) = read_gateway_token() {
-                                                format!("http://localhost:{}?token={}", port, token)
-                                            } else {
-                                                format!("http://localhost:{}", port)
-                                            };
-                                            if let Some(window) = handle.get_webview_window("main") {
-                                                let _ = window.navigate(url.parse().unwrap());
-                                            }
+                                            crate::gateway::navigate_webview_to_gateway(&handle, port);
                                         }
                                     }
                                     Err(e) => {
@@ -339,24 +325,12 @@ fn main() {
 
                 // 发送状态：正在启动
                 let _ = handle.emit("gateway-status", "正在启动 Gateway...");
-                let mut startup_navigated = false;
-
                 match gm.start() {
                     Ok(port) => {
                         let _ = handle.emit("gateway-status", "正在等待 Gateway 就绪...");
                         if gm.wait_for_ready(300) {
                             // Gateway 就绪，导航 webview 到 gateway URL
-                            let url = if let Some(token) = read_gateway_token() {
-                                format!("http://localhost:{}?token={}", port, token)
-                            } else {
-                                format!("http://localhost:{}", port)
-                            };
-                            let _ = handle.emit("gateway-ready", url.as_str());
-                            // 使用 Tauri navigate API（绕过 webview 安全策略限制）
-                            if let Some(window) = handle.get_webview_window("main") {
-                                let _ = window.navigate(url.parse().unwrap());
-                            }
-                            startup_navigated = true;
+                            gateway::navigate_webview_to_gateway(&handle, port);
                         } else {
                             let _ = handle.emit("gateway-status", "Gateway 启动超时");
                             gateway::send_startup_timeout_notification(&handle);
@@ -368,7 +342,7 @@ fn main() {
                 }
 
                 // 启动健康检查循环（阻塞当前线程）
-                gateway::health_check_loop(&handle, startup_navigated);
+                gateway::health_check_loop(&handle);
             });
 
             Ok(())

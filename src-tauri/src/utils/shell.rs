@@ -784,10 +784,14 @@ pub fn load_openclaw_env_vars() -> HashMap<String, String> {
 
 
 /// 检查端口是否可用（未被占用）
+/// 同时检查 127.0.0.1 和 0.0.0.0，确保无论 lanAccess 设置如何，端口都真正可用
 pub fn is_port_available(port: u16) -> bool {
-    let lan_access = get_lan_access_setting();
-    let host = if lan_access { "0.0.0.0" } else { "127.0.0.1" };
-    std::net::TcpListener::bind(format!("{}:{}", host, port)).is_ok()
+    // 必须同时检查 loopback 和 any，因为：
+    // - 如果 127.0.0.1:port 被占用，绑定 0.0.0.0:port 会失败
+    // - 如果 0.0.0.0:port 被占用，绑定 127.0.0.1:port 也会失败
+    let loopback_ok = TcpListener::bind(format!("127.0.0.1:{}", port)).is_ok();
+    let any_ok = TcpListener::bind(format!("0.0.0.0:{}", port)).is_ok();
+    loopback_ok && any_ok
 }
 
 /// 从指定端口开始向下查找可用端口
