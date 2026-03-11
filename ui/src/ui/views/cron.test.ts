@@ -698,7 +698,7 @@ describe("cron view", () => {
     );
 
     const runDueButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Run if due",
+      (btn) => btn.textContent?.trim() === "到期时运行",
     );
     expect(runDueButton).not.toBeUndefined();
     runDueButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));

@@ -283,8 +283,8 @@ function fieldLabelForKey(
     payloadThinking: t("cron.form.thinking"),
     timeoutSeconds: t("cron.form.timeoutSeconds"),
     deliveryTo: t("cron.form.to"),
-    failureAlertAfter: "Failure alert after",
-    failureAlertCooldownSeconds: "Failure alert cooldown",
+    failureAlertAfter: "失败告警阈值",
+    failureAlertCooldownSeconds: "失败告警冷却时间",
   };
   return labels[key];
 }
@@ -1562,7 +1562,7 @@ function renderJob(job: CronJob, props: CronProps) {
               selectAnd(() => props.onRun(job, "due"));
             }}
           >
-            Run if due
+            到期时运行
           </button>
           <button
             class="btn"
