@@ -1536,7 +1536,8 @@ export class OpenClawConfigChannels extends LitElement {
     }
 
     if (channel.channel_type === "slack") {
-      const mode = typeof config.mode === "string" && config.mode.trim() ? config.mode.trim() : "socket";
+      const mode =
+        typeof config.mode === "string" && config.mode.trim() ? config.mode.trim() : "socket";
       if (!config.botToken || String(config.botToken).trim() === "") {
         return "Bot Token 为必填项";
       }
@@ -1714,7 +1715,7 @@ export class OpenClawConfigChannels extends LitElement {
         form[field.key] = "";
       });
 
-      this.selectedChannelConfig = { ...(channel.config || {}) };
+      this.selectedChannelConfig = { ...channel.config };
 
       for (const key of editableKeys) {
         const value = channel.config?.[key];
@@ -1827,7 +1828,8 @@ export class OpenClawConfigChannels extends LitElement {
       const mode = typeof modeRaw === "string" && modeRaw.trim() ? modeRaw.trim() : "socket";
       const appToken = channel.config.appToken;
       const signingSecret = channel.config.signingSecret;
-      const hasBotToken = botToken !== undefined && botToken !== null && String(botToken).trim() !== "";
+      const hasBotToken =
+        botToken !== undefined && botToken !== null && String(botToken).trim() !== "";
       if (!hasBotToken) {
         return false;
       }
@@ -1839,12 +1841,6 @@ export class OpenClawConfigChannels extends LitElement {
         );
       }
       return appToken !== undefined && appToken !== null && String(appToken).trim() !== "";
-    }
-
-    // WhatsApp 和 iMessage 是基于 session 登录的渠道，不需要配置 token
-    // 只要 dmPolicy 有效就认为已配置（用户可以点击登录按钮）
-    if (channel.channel_type === "whatsapp" || channel.channel_type === "imessage") {
-      return true;
     }
 
     const requiredFields = info.fields.filter((field) => field.required);

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyConfigSnapshot,
   applyConfig,
-  runUpdate,
   saveConfig,
   updateConfigFormValue,
   type ConfigState,
@@ -33,7 +32,6 @@ function createState(): ConfigState {
     configValid: null,
     connected: false,
     lastError: null,
-    updateRunning: false,
     onestopSelectedModel: "",
   };
 }
@@ -270,21 +268,5 @@ describe("saveConfig", () => {
     };
     expect(parsed.gateway.port).toBe("28789");
     expect(params.baseHash).toBe("hash-save-2");
-  });
-});
-
-describe("runUpdate", () => {
-  it("sends update.run with session key", async () => {
-    const request = vi.fn().mockResolvedValue({});
-    const state = createState();
-    state.connected = true;
-    state.client = { request } as unknown as ConfigState["client"];
-    state.applySessionKey = "agent:main:whatsapp:dm:+15555550123";
-
-    await runUpdate(state);
-
-    expect(request).toHaveBeenCalledWith("update.run", {
-      sessionKey: "agent:main:whatsapp:dm:+15555550123",
-    });
   });
 });
