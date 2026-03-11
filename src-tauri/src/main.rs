@@ -36,7 +36,7 @@ fn resolve_gateway_bundle_dir(app: &tauri::App) -> PathBuf {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let project_root = PathBuf::from(manifest_dir).parent().unwrap().to_path_buf();
         log::info!("[Main] 开发模式 - gateway 目录（项目根）: {}", project_root.display());
-        return project_root;
+        project_root
     }
 
     // 生产模式：检查 resource_dir/gateway-bundle/

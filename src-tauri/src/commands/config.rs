@@ -963,7 +963,7 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
     
     let channel_types = desktop_supported_channel_types();
     
-    let array_fields = vec!["allowFrom", "groupAllowFrom"];
+    let array_fields = ["allowFrom", "groupAllowFrom"];
     
     for (channel_id, channel_type, test_fields) in channel_types {
         let channel_config = channels_obj.get(channel_id);
@@ -982,11 +982,7 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
                                 .filter_map(|item| {
                                     if let Some(s) = item.as_str() {
                                         Some(s.to_string())
-                                    } else if let Some(n) = item.as_i64() {
-                                        Some(n.to_string())
-                                    } else {
-                                        None
-                                    }
+                                    } else { item.as_i64().map(|n| n.to_string()) }
                                 })
                                 .collect();
                             map.insert(k.clone(), json!(strings.join(", ")));
@@ -1069,8 +1065,8 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
     }
     
     // 这些字段只用于测试，不保存到 openclaw.json，而是保存到 env 文件
-    let test_only_fields = vec!["userId", "testChatId", "testChannelId"];
-    let array_fields = vec!["allowFrom", "groupAllowFrom"];
+    let test_only_fields = ["userId", "testChatId", "testChannelId"];
+    let array_fields = ["allowFrom", "groupAllowFrom"];
     
     // 构建渠道配置
     let mut channel_obj = json!({});

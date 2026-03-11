@@ -1,7 +1,7 @@
 use crate::models::ServiceStatus;
 use crate::utils::shell;
 use crate::gateway::GatewayManager;
-use tauri::{command, AppHandle, Emitter, Manager};
+use tauri::{command, AppHandle, Manager};
 use std::process::Command;
 use log::{info, warn};
 
