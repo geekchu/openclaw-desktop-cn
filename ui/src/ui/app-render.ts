@@ -334,7 +334,7 @@ export function renderApp(state: AppViewState) {
         </div>
       </aside>
       <main class="content ${isChat ? "content--chat" : ""} ${state.tab === "terminal" ? "content--terminal" : ""}">
-        ${ /* 桌面版使用 Tauri 自带的更新机制，不显示原版 gateway 级别的更新横幅 */ nothing }
+        ${/* 桌面版使用 Tauri 自带的更新机制，不显示原版 gateway 级别的更新横幅 */ nothing}
         <section class="content-header">
           <div>
             ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}

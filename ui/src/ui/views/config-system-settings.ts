@@ -372,7 +372,9 @@ export class SystemSettingsView extends LitElement {
         if (t?.core?.invoke) {
           try {
             await t.core.invoke("stop_gateway");
-          } catch { /* best-effort */ }
+          } catch {
+            /* best-effort */
+          }
           t.core.invoke("plugin:process|restart");
         }
       }
@@ -1192,14 +1194,18 @@ export class SystemSettingsView extends LitElement {
             </label>
           </div>
 
-          ${this.lanAccess ? html`
+          ${
+            this.lanAccess
+              ? html`
             <div style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;">
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
                 <div style="flex: 1; min-width: 0;">
                   <div style="font-size: 12px; color: var(--muted, #71717a); margin-bottom: 4px;">Gateway Token（其他设备连接时需要）</div>
                   <div style="font-family: monospace; font-size: 13px; color: var(--text, #e4e4e7); word-break: break-all;">${this.gatewayToken || "（未配置，请在配置文件中设置 gateway.auth.token）"}</div>
                 </div>
-                ${this.gatewayToken ? html`
+                ${
+                  this.gatewayToken
+                    ? html`
                   <button
                     class="copy-token-btn"
                     style="
@@ -1223,10 +1229,14 @@ export class SystemSettingsView extends LitElement {
                       (e.target as HTMLElement).style.borderColor = "var(--border, #27272a)";
                     }}
                   >复制</button>
-                ` : nothing}
+                `
+                    : nothing
+                }
               </div>
             </div>
-          ` : nothing}
+          `
+              : nothing
+          }
         </div>
 
       </div>`;

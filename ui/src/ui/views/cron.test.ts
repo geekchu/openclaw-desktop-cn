@@ -466,9 +466,7 @@ describe("cron view", () => {
       container,
     );
 
-    expect(container.textContent).toContain(
-      "可选。留空以使用网关默认超时行为。",
-    );
+    expect(container.textContent).toContain("可选。留空以使用网关默认超时行为。");
     expect(container.textContent).toContain("需要抖动？使用高级");
   });
 

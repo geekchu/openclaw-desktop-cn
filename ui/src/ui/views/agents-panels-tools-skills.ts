@@ -151,9 +151,7 @@ export function renderAgentTools(params: {
       ${
         params.toolsCatalogError
           ? html`
-              <div class="callout warn" style="margin-top: 12px">
-                无法加载运行时工具目录。显示备用列表。
-              </div>
+              <div class="callout warn" style="margin-top: 12px">无法加载运行时工具目录。显示备用列表。</div>
             `
           : nothing
       }

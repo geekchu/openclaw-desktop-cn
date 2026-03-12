@@ -138,9 +138,7 @@ function renderFallbackIndicator(status: FallbackIndicatorStatus | null | undefi
     .filter(Boolean)
     .join(" • ");
   const message =
-    phase === "cleared"
-      ? `回退已清除: ${status.selected}`
-      : `回退活动中: ${status.active}`;
+    phase === "cleared" ? `回退已清除: ${status.selected}` : `回退活动中: ${status.active}`;
   const className =
     phase === "cleared"
       ? "compaction-indicator compaction-indicator--fallback-cleared"
