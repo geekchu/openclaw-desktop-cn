@@ -36,7 +36,8 @@ if (existsSync(extensionsDir)) {
     }
 
     // We only bundle extensions that have a clear entry point
-    const entryCandidates = ["index.ts", "index.js", "src/index.ts", "src/index.js"];
+    // Prioritize compiled dist/ output over source files to ensure proper module resolution
+    const entryCandidates = ["dist/index.js", "index.ts", "index.js", "src/index.ts", "src/index.js"];
     const entry = entryCandidates.find((c) => existsSync(join(extPath, c)));
 
     if (entry) {
@@ -63,7 +64,7 @@ for (let i = 0; i < extensions.length; i++) {
   syntheticContent += `__BUNDLED_EXTENSIONS__['${ext.name}'] = ext_${i};\n`;
 }
 
-syntheticContent += `\nglobalThis.__BUNDLED_EXTENSIONS__ = __BUNDLED_EXTENSIONS__;\n\n`;
+syntheticContent += `\n(function() { globalThis.__BUNDLED_EXTENSIONS__ = __BUNDLED_EXTENSIONS__; })();\n\n`;
 
 // Finally import the main app entry
 syntheticContent += `import '${join(projectRoot, "dist/entry.js").replace(/\\/g, "/")}';\n`;
@@ -88,6 +89,8 @@ try {
     format: "esm",
     platform: "node",
     target: "node22",
+    // Disable tree-shaking to ensure __BUNDLED_EXTENSIONS__ assignment is preserved
+    treeShaking: false,
     banner: {
       // Polyfill `require`, `__filename`, and `__dirname` in ESM format so CJS modules don't crash
       js: "import * as __esm_banner_module from 'module'; import * as __esm_banner_url from 'url'; import * as __esm_banner_path from 'path'; const require = __esm_banner_module.createRequire(import.meta.url); const __filename = __esm_banner_url.fileURLToPath(import.meta.url); const __dirname = __esm_banner_path.dirname(__filename);",
@@ -196,7 +199,7 @@ try {
     includePackage(match[1]);
   }
 
-  for (const pkgName of ["playwright-core", "ffmpeg-static"]) {
+  for (const pkgName of ["playwright-core", "ffmpeg-static", "@tloncorp/tlon-skill"]) {
     includePackage(pkgName);
   }
 
@@ -206,7 +209,7 @@ try {
     type: "module",
     main: "openclaw.mjs",
     dependencies: Object.fromEntries(
-      [...requiredDeps.entries()].sort(([a], [b]) => a.localeCompare(b)),
+      [...requiredDeps.entries()].toSorted(([a], [b]) => a.localeCompare(b)),
     ),
     optionalDependencies: {},
   };
