@@ -50,11 +50,15 @@ console.log(`[build-bundle] Found ${extensions.length} extensions to bundle stat
 
 // 2. Generate synthetic entry file
 const syntheticEntryPath = join(artifactsDir, "gateway-bundle-entry.js");
+
+// globalThis.__BUNDLED_EXTENSIONS__ is initialized in the esbuild banner (runs first)
+// Here we just get a reference to it and populate it with extension modules
 let syntheticContent = `// Auto-generated entry point for single-file esbuild bundling
 import '${join(projectRoot, "dist/warning-filter.js").replace(/\\/g, "/")}';
 
-// Import all extensions to force them into the bundle
-const __BUNDLED_EXTENSIONS__ = {};\n`;
+// Get reference to the object initialized in banner
+const __BUNDLED_EXTENSIONS__ = globalThis.__BUNDLED_EXTENSIONS__;
+`;
 
 for (let i = 0; i < extensions.length; i++) {
   const ext = extensions[i];
@@ -64,9 +68,7 @@ for (let i = 0; i < extensions.length; i++) {
   syntheticContent += `__BUNDLED_EXTENSIONS__['${ext.name}'] = ext_${i};\n`;
 }
 
-syntheticContent += `\n(function() { globalThis.__BUNDLED_EXTENSIONS__ = __BUNDLED_EXTENSIONS__; })();\n\n`;
-
-// Finally import the main app entry
+// Finally import the main app entry (globalThis.__BUNDLED_EXTENSIONS__ is already set above)
 syntheticContent += `import '${join(projectRoot, "dist/entry.js").replace(/\\/g, "/")}';\n`;
 
 writeFileSync(syntheticEntryPath, syntheticContent, "utf-8");
@@ -93,7 +95,9 @@ try {
     treeShaking: false,
     banner: {
       // Polyfill `require`, `__filename`, and `__dirname` in ESM format so CJS modules don't crash
-      js: "import * as __esm_banner_module from 'module'; import * as __esm_banner_url from 'url'; import * as __esm_banner_path from 'path'; const require = __esm_banner_module.createRequire(import.meta.url); const __filename = __esm_banner_url.fileURLToPath(import.meta.url); const __dirname = __esm_banner_path.dirname(__filename);",
+      // CRITICAL: Also initialize globalThis.__BUNDLED_EXTENSIONS__ HERE in the banner
+      // so it exists BEFORE any module code runs (including init_entry())
+      js: "import * as __esm_banner_module from 'module'; import * as __esm_banner_url from 'url'; import * as __esm_banner_path from 'path'; const require = __esm_banner_module.createRequire(import.meta.url); const __filename = __esm_banner_url.fileURLToPath(import.meta.url); const __dirname = __esm_banner_path.dirname(__filename); globalThis.__BUNDLED_EXTENSIONS__ = {};",
     },
     // Keep names to try to preserve __dirname as best as possible,
     // though realistically we depend on config dir resolution.
@@ -199,7 +203,7 @@ try {
     includePackage(match[1]);
   }
 
-  for (const pkgName of ["playwright-core", "ffmpeg-static", "@tloncorp/tlon-skill"]) {
+  for (const pkgName of ["playwright-core", "ffmpeg-static", "@tloncorp/tlon-skill", "@vector-im/matrix-bot-sdk"]) {
     includePackage(pkgName);
   }
 

@@ -458,29 +458,8 @@ Write-Host ''
 Read-Host 'Press Enter to close'
 "#,
         env_lines, launcher
-    ))
-}
 
-fn parse_channel_status_text(output: &str, channel_type: &str) -> Option<(bool, bool, bool, String)> {
-    let channel_lower = channel_type.to_lowercase();
-    
-    for line in output.lines() {
-        let line = line.trim();
-        // 匹配 "- Telegram default: ..." 格式
-        if line.starts_with("- ") && line.to_lowercase().contains(&channel_lower) {
-            // 解析状态
-            let enabled = line.contains("enabled");
-            let configured = line.contains("configured") && !line.contains("not configured");
-            let linked = line.contains("linked");
-            
-            // 提取状态描述（冒号后面的部分）
-            let status_part = line.split(':').skip(1).collect::<Vec<&str>>().join(":");
-            let status_msg = status_part.trim().to_string();
-            
-            return Some((enabled, configured, linked, status_msg));
-        }
-    }
-    None
+    ))
 }
 
 /// 测试渠道连接（检查状态并发送测试消息）
@@ -489,77 +468,45 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
     info!("[渠道测试] 测试渠道: {}", channel_type);
     let channel_lower = channel_type.to_lowercase();
     
-    // 使用 openclaw channels status 检查渠道状态（不加 --json，因为可能不支持）
+    // 使用 openclaw channels status --json 检查渠道状态
     info!("[渠道测试] 步骤1: 检查渠道状态...");
-    let status_result = shell::run_openclaw(&["channels", "status"]);
+    let status_result = shell::run_openclaw(&["channels", "status", "--json"]);
     
     let mut channel_ok = false;
     let mut status_message = String::new();
     let mut debug_info = String::new();
-    
     match &status_result {
         Ok(output) => {
             info!("[渠道测试] status 命令执行成功");
             let clean_output = strip_ansi_codes(output);
 
-            // 尝试从文本输出解析状态
-            if let Some((enabled, configured, linked, status_msg)) = parse_channel_status_text(&clean_output, &channel_type) {
-                debug_info = format!("enabled={}, configured={}, linked={}", enabled, configured, linked);
-                info!("[渠道测试] {} 状态: {}", channel_type, debug_info);
-                
-                if !configured {
-                    info!("[渠道测试] {} 未配置", channel_type);
-                    return Ok(ChannelTestResult {
-                        success: false,
-                        channel: channel_type.clone(),
-                        message: format!("{} 未配置", channel_type),
-                        error: Some(format!("请先在消息渠道设置中配置 {} 的凭据并保存，然后重启 Gateway", channel_type)),
-                    });
-                }
-                
-                channel_ok = if channel_requires_linked_status(&channel_type) {
-                    configured && linked
-                } else {
-                    configured
-                };
-                status_message = if linked {
-                    "已链接".to_string()
-                } else if channel_requires_linked_status(&channel_type) {
-                    "等待扫码登录".to_string()
-                } else if !status_msg.is_empty() {
-                    status_msg
-                } else {
-                    "已配置".to_string()
-                };
-            } else {
-                // 尝试 JSON 解析（作为备选）
-                if let Some(json_str) = extract_json_from_output(&clean_output) {
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                        if let Some(channels) = json.get("channels").and_then(|c| c.as_object()) {
-                            if let Some(ch) = channels.get(&channel_lower) {
-                                let configured = ch.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
-                                let linked = ch.get("linked").and_then(|v| v.as_bool()).unwrap_or(false);
-                                channel_ok = if channel_requires_linked_status(&channel_type) {
-                                    configured && linked
-                                } else {
-                                    configured
-                                };
-                                status_message = if linked {
-                                    "已链接".to_string()
-                                } else if channel_requires_linked_status(&channel_type) {
-                                    "等待扫码登录".to_string()
-                                } else {
-                                    "已配置".to_string()
-                                };
-                            }
+            // 使用 JSON 解析
+            if let Some(json_str) = extract_json_from_output(&clean_output) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    if let Some(channels) = json.get("channels").and_then(|c| c.as_object()) {
+                        if let Some(ch) = channels.get(&channel_lower) {
+                            let configured = ch.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
+                            let linked = ch.get("linked").and_then(|v| v.as_bool()).unwrap_or(false);
+                            channel_ok = if channel_requires_linked_status(&channel_type) {
+                                configured && linked
+                            } else {
+                                configured
+                            };
+                            status_message = if linked {
+                                "已链接".to_string()
+                            } else if channel_requires_linked_status(&channel_type) {
+                                "等待扫码登录".to_string()
+                            } else {
+                                "已配置".to_string()
+                            };
                         }
                     }
                 }
-                
-                if !channel_ok {
-                    debug_info = format!("无法解析 {} 的状态", channel_type);
-                    info!("[渠道测试] {}", debug_info);
-                }
+            }
+            
+            if !channel_ok {
+                debug_info = format!("无法解析 {} 的状态", channel_type);
+                info!("[渠道测试] {}", debug_info);
             }
         }
         Err(e) => {
