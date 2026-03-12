@@ -512,6 +512,17 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                             } else {
                                 "已配置".to_string()
                             };
+                            
+                            // 渠道已配置但需要链接状态（如 WhatsApp 需要扫码）
+                            if !channel_ok && channel_requires_linked_status(&channel_type) {
+                                info!("[渠道测试] {} 已配置但未链接", channel_type);
+                                return Ok(ChannelTestResult {
+                                    success: false,
+                                    channel: channel_type.clone(),
+                                    message: format!("{} {}", channel_type, status_message),
+                                    error: Some(format!("请先扫码登录 {}，然后重试", channel_type)),
+                                });
+                            }
                         }
                     }
                 }

@@ -618,7 +618,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
         }
 
         let mut cmd = Command::new(&node_path);
-        cmd.arg(&entry_point);
+        cmd.args(["--no-deprecation", &entry_point]);
         cmd.args(args);
         cmd.current_dir(&bundle_dir);
         for (key, value) in &user_env_vars {
@@ -854,7 +854,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         }
 
         let mut cmd = Command::new(&node_path);
-        cmd.arg(&entry_point);
+        cmd.args(["--no-deprecation", &entry_point]);
         cmd.args(["gateway", "--port", &port_str, "--bind", bind_mode, "--desktop-internal", "--force", "--allow-unconfigured"]);
         cmd.current_dir(&bundle_dir);
 

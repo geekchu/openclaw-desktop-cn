@@ -28,6 +28,13 @@ const ALLOWED_TLON_COMMANDS = new Set([
  * Find the tlon binary from the skill package
  */
 function findTlonBinary(): string {
+  if (process.platform === "win32") {
+    console.log(
+      `[tlon] @tloncorp/tlon-skill lacks Windows native binaries. Falling back to PATH lookup for 'tlon'`,
+    );
+    return "tlon";
+  }
+
   // Check in node_modules/.bin
   const skillBin = join(__dirname, "node_modules", ".bin", "tlon");
   console.log(`[tlon] Checking for binary at: ${skillBin}, exists: ${existsSync(skillBin)}`);
@@ -96,6 +103,7 @@ function runTlonCommand(binary: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, args, {
       env: process.env,
+      shell: process.platform === "win32",
     });
 
     let stdout = "";

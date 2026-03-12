@@ -159,6 +159,31 @@ console.log("\n[bundle] === Step 0.5: 精简 Node.js 运行环境 ===");
 console.log("\n[bundle] === Step 1: 编译 TypeScript ===");
 run("pnpm build");
 
+// Step 1.5: 编译 extensions（部分 extension 需要 tsc 编译）
+console.log("\n[bundle] === Step 1.5: 编译 extensions ===");
+{
+  const extSrcDir = join(projectRoot, "extensions");
+  if (existsSync(extSrcDir)) {
+    for (const name of readdirSync(extSrcDir)) {
+      const extPath = join(extSrcDir, name);
+      const extPkgPath = join(extPath, "package.json");
+      if (!existsSync(extPkgPath)) {
+        continue;
+      }
+      // 检查是否有 build 脚本
+      const extPkg = JSON.parse(readFileSync(extPkgPath, "utf-8"));
+      if (extPkg.scripts?.build) {
+        console.log(`[bundle] 编译 extension: ${name}`);
+        try {
+          run("pnpm build", { cwd: extPath });
+        } catch (err) {
+          console.log(`[bundle] 警告: extension ${name} 编译失败，继续...`);
+        }
+      }
+    }
+  }
+}
+
 // Step 2: 编译 Control UI
 console.log("\n[bundle] === Step 2: 编译 Control UI ===");
 run("pnpm ui:build");
@@ -560,13 +585,13 @@ console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
         const shouldRemove =
           !protectedFiles.has(entry.name) &&
           (filesToRemove.has(entry.name) ||
-          extsToRemove.has(entry.name.slice(entry.name.lastIndexOf("."))) ||
-          entry.name.endsWith(".d.ts") ||
-          entry.name.endsWith(".d.mts") ||
-          entry.name.endsWith(".d.cts") ||
-          entry.name.endsWith(".js.map") ||
-          entry.name.endsWith(".ts.map") ||
-          entry.name.endsWith(".mjs.map"));
+            extsToRemove.has(entry.name.slice(entry.name.lastIndexOf("."))) ||
+            entry.name.endsWith(".d.ts") ||
+            entry.name.endsWith(".d.mts") ||
+            entry.name.endsWith(".d.cts") ||
+            entry.name.endsWith(".js.map") ||
+            entry.name.endsWith(".ts.map") ||
+            entry.name.endsWith(".mjs.map"));
         if (shouldRemove) {
           rmSync(fullPath, { force: true });
           removedCount++;

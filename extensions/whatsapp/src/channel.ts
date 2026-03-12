@@ -392,7 +392,7 @@ export const whatsappPlugin: ChannelPlugin<ResolvedWhatsAppAccount> = {
         accountId: account.accountId,
         name: account.name,
         enabled: account.enabled,
-        configured: true,
+        configured: linked,
         linked,
         running: runtime?.running ?? false,
         connected: runtime?.connected ?? false,

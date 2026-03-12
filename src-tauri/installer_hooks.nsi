@@ -13,6 +13,9 @@
 
 !macro NSIS_HOOK_PREINSTALL
   !insertmacro KillGatewayStatus
+
+  ; 3. 清理旧版本的 gateway-bundle 目录，防止残留文件导致插件加载警告
+  RMDir /r "$INSTDIR\gateway-bundle"
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL

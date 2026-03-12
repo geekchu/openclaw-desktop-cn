@@ -150,13 +150,13 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
                 #[cfg(target_os = "windows")]
                 {
                     let bat_path = wrapper_dir.join("openclaw.cmd");
-                    let bat_content = "@echo off\r\n\"%OPENCLAW_INTERNAL_NODE%\" \"%OPENCLAW_INTERNAL_ENTRY%\" %*\r\n";
+                    let bat_content = "@echo off\r\n\"%OPENCLAW_INTERNAL_NODE%\" --no-deprecation \"%OPENCLAW_INTERNAL_ENTRY%\" %*\r\n";
                     let _ = std::fs::write(&bat_path, bat_content);
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
                     let sh_path = wrapper_dir.join("openclaw");
-                    let sh_content = "#!/bin/sh\nexec \"$OPENCLAW_INTERNAL_NODE\" \"$OPENCLAW_INTERNAL_ENTRY\" \"$@\"\n";
+                    let sh_content = "#!/bin/sh\nexec \"$OPENCLAW_INTERNAL_NODE\" --no-deprecation \"$OPENCLAW_INTERNAL_ENTRY\" \"$@\"\n";
                     let _ = std::fs::write(&sh_path, sh_content);
                     let _ = std::fs::set_permissions(&sh_path, std::fs::Permissions::from_mode(0o755));
                 }
