@@ -51,13 +51,11 @@ console.log(`[build-bundle] Found ${extensions.length} extensions to bundle stat
 // 2. Generate synthetic entry file
 const syntheticEntryPath = join(artifactsDir, "gateway-bundle-entry.js");
 
-// globalThis.__BUNDLED_EXTENSIONS__ is initialized in the esbuild banner (runs first)
-// Here we just get a reference to it and populate it with extension modules
+// CRITICAL: We must populate globalThis.__BUNDLED_EXTENSIONS__ BEFORE entry.js runs.
+// ESM static imports are hoisted and their side effects run before other statements.
+// Solution: Use dynamic import() for entry.js so it runs AFTER our assignments.
 let syntheticContent = `// Auto-generated entry point for single-file esbuild bundling
 import '${join(projectRoot, "dist/warning-filter.js").replace(/\\/g, "/")}';
-
-// Get reference to the object initialized in banner
-const __BUNDLED_EXTENSIONS__ = globalThis.__BUNDLED_EXTENSIONS__;
 `;
 
 for (let i = 0; i < extensions.length; i++) {
@@ -65,11 +63,17 @@ for (let i = 0; i < extensions.length; i++) {
   // resolve absolute path for extension entry
   const absEntry = resolve(artifactsDir, ext.entry).replace(/\\/g, "/");
   syntheticContent += `import * as ext_${i} from '${absEntry}';\n`;
-  syntheticContent += `__BUNDLED_EXTENSIONS__['${ext.name}'] = ext_${i};\n`;
 }
 
-// Finally import the main app entry (globalThis.__BUNDLED_EXTENSIONS__ is already set above)
-syntheticContent += `import '${join(projectRoot, "dist/entry.js").replace(/\\/g, "/")}';\n`;
+// Assign all extensions to globalThis BEFORE importing entry.js
+syntheticContent += `\n// Populate globalThis.__BUNDLED_EXTENSIONS__ with all extension modules\n`;
+for (let i = 0; i < extensions.length; i++) {
+  const ext = extensions[i];
+  syntheticContent += `globalThis.__BUNDLED_EXTENSIONS__['${ext.name}'] = ext_${i};\n`;
+}
+
+// Use dynamic import for entry.js so it runs AFTER the assignments above
+syntheticContent += `\n// Dynamic import ensures entry.js runs after extensions are registered\nawait import('${join(projectRoot, "dist/entry.js").replace(/\\/g, "/")}');\n`;
 
 writeFileSync(syntheticEntryPath, syntheticContent, "utf-8");
 
