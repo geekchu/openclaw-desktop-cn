@@ -481,12 +481,25 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
             let clean_output = strip_ansi_codes(output);
 
             // 使用 JSON 解析
+            let mut json_parsed = false;
             if let Some(json_str) = extract_json_from_output(&clean_output) {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
                     if let Some(channels) = json.get("channels").and_then(|c| c.as_object()) {
                         if let Some(ch) = channels.get(&channel_lower) {
+                            json_parsed = true;
                             let configured = ch.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
                             let linked = ch.get("linked").and_then(|v| v.as_bool()).unwrap_or(false);
+                            
+                            if !configured {
+                                info!("[渠道测试] {} 未配置", channel_type);
+                                return Ok(ChannelTestResult {
+                                    success: false,
+                                    channel: channel_type.clone(),
+                                    message: format!("{} 未配置", channel_type),
+                                    error: Some(format!("请先在消息渠道设置中配置 {} 的凭据并保存，然后重启 Gateway", channel_type)),
+                                });
+                            }
+                            
                             channel_ok = if channel_requires_linked_status(&channel_type) {
                                 configured && linked
                             } else {
@@ -504,7 +517,7 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                 }
             }
             
-            if !channel_ok {
+            if !channel_ok && !json_parsed {
                 debug_info = format!("无法解析 {} 的状态", channel_type);
                 info!("[渠道测试] {}", debug_info);
             }

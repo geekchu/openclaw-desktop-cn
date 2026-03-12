@@ -272,12 +272,60 @@ export async function channelsStatusCommand(
     if (!cfg) {
       return;
     }
-    const snapshot = await readConfigFileSnapshot();
+    const configSnapshot = await readConfigFileSnapshot();
     const mode = cfg.gateway?.mode === "remote" ? "remote" : "local";
+
+    if (opts.json) {
+      // Build config-only JSON payload so Tauri diagnostics can parse channel status
+      const plugins = listChannelPlugins();
+      const channels: Record<string, Record<string, unknown>> = {};
+      const channelAccounts: Record<string, Array<Record<string, unknown>>> = {};
+      const channelOrder: string[] = [];
+      const channelLabels: Record<string, string> = {};
+      const channelDefaultAccountId: Record<string, string> = {};
+
+      for (const plugin of plugins) {
+        const accountIds = plugin.config.listAccountIds(cfg);
+        if (!accountIds.length) {
+          continue;
+        }
+        const snapshots: ChannelAccountSnapshot[] = [];
+        for (const accountId of accountIds) {
+          const snapshot = await buildChannelAccountSnapshot({
+            plugin,
+            cfg,
+            accountId,
+          });
+          snapshots.push(snapshot);
+        }
+        const defaultSnapshot = snapshots[0];
+        channelOrder.push(plugin.id);
+        channelLabels[plugin.id] = plugin.meta?.label ?? plugin.id;
+        channelDefaultAccountId[plugin.id] = defaultSnapshot?.accountId ?? "default";
+        channels[plugin.id] = {
+          configured: snapshots.some((s) => s.configured === true),
+          linked: snapshots.some((s) => (s as Record<string, unknown>).linked === true),
+        };
+        channelAccounts[plugin.id] = snapshots.map((s) => ({ ...s }));
+      }
+
+      const payload = {
+        ts: Date.now(),
+        gatewayReachable: false,
+        channelOrder,
+        channelLabels,
+        channels,
+        channelAccounts,
+        channelDefaultAccountId,
+      };
+      runtime.log(JSON.stringify(payload, null, 2));
+      return;
+    }
+
     runtime.log(
       (
         await formatConfigChannelsStatusLines(cfg, {
-          path: snapshot.path,
+          path: configSnapshot.path,
           mode,
         })
       ).join("\n"),
