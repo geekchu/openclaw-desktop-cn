@@ -174,12 +174,12 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <button
-              disabled
-              className="w-full bg-gray-50 text-[#ccc] py-3 rounded-xl cursor-not-allowed text-sm font-medium border border-gray-100"
+            <a
+              href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.7_x64-setup.exe"
+              className="w-full block text-center bg-gradient-to-r from-[#0078d4] to-[#005a9e] text-white py-3 rounded-xl text-sm font-medium shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
             >
-              Windows 版即将推出
-            </button>
+              下载 Windows 版 (v0.2.7)
+            </a>
           </div>
 
           <div className="bg-white border border-gray-100 rounded-2xl p-5 md:p-6 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
