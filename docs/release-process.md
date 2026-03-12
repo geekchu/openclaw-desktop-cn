@@ -168,23 +168,22 @@ git push && git push --tags
 
 1. 在 PowerShell/Terminal 中执行 `.\build.ps1`。
 
-> 💡 **提示**：`build.ps1` 会自动设置 `BUILD_CONFIG=release` 环境变量（触发极速单文件后端打包优化），并从 `~/.tauri/openclaw.key` 读取私钥设置环境变量，同时自带 `cargo clean` 机制以确保产物完全无幽灵缓存。
+> 💡 **提示**：`build.ps1` 会自动设置 `BUILD_CONFIG=release` 环境变量，并从 `~/.tauri/openclaw.key` 读取私钥设置环境变量，同时自带 `cargo clean` 机制以确保产物完全无幽灵缓存。
 >
 > 说明：请统一使用 `build.ps1`；它会通过 PowerShell 的 `ReadAllText()` 读取完整的多行私钥，避免批处理脚本读取首行导致签名失败。
 
 #### macOS（在 Mac 机器上执行）
 
 ```bash
-# 设置签名环境变量及打包优化变量
+# 设置签名环境变量
 export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/openclaw.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="123"
-export BUILD_CONFIG="release"
 
 # 构建
 pnpm installer:build
 ```
 
-**构建脚本自动完成：** 环境检查 → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 Vite UI 构建 + `esbuild` 极速单文件 `gateway-bundle` 打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
+**构建脚本自动完成：** 环境检查 → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 UI 构建 + gateway 代码打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
 
 > ⚠️ `pnpm installer:build` 在 **release** 模式下会对签名环境变量做 fail-fast 检查；如果缺少 `TAURI_SIGNING_PRIVATE_KEY`（或加密私钥缺少 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`），脚本会直接退出，而不是继续产出无法发布自动更新的半成品。
 
@@ -192,7 +191,6 @@ pnpm installer:build
 >
 > ```bash
 > cd src-tauri; cargo clean; cd ..
-> export BUILD_CONFIG="release"
 > pnpm installer:build
 > ```
 >
@@ -594,12 +592,11 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 ### 构建脚本
 
 | 文件                                | 用途                                                                        |
-| ----------------------------------- | --------------------------------------------------------------------------- |
-| `scripts/build-installer.js`        | 统一构建入口（环境检查→依赖→构建→收集产物）                                 |
-| `scripts/prepare-gateway-bundle.js` | beforeBuildCommand，打包 gateway 代码（含 UI 构建、依赖去重、文件清理优化） |
-| `scripts/build-gateway-bundle.mjs`  | esbuild 单文件打包（release 模式，由 prepare-gateway-bundle.js 调用）       |
-| `scripts/download-node.js`          | 下载 Node.js 运行时嵌入安装包                                               |
-| `.npmrc`                            | npm 注册表镜像（`registry.npmmirror.com`）+ 允许构建脚本列表                |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| `scripts/build-installer.js`        | 统一构建入口（环境检查→依赖→构建→收集产物）                      |
+| `scripts/prepare-gateway-bundle.js` | beforeBuildCommand，打包 gateway 代码（含 UI 构建、依赖安装）    |
+| `scripts/download-node.js`          | 下载 Node.js 运行时嵌入安装包                                    |
+| `.npmrc`                            | npm 注册表镜像（`registry.npmmirror.com`）+ 允许构建脚本列表     |
 
 ### 发布脚本
 
