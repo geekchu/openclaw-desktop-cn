@@ -34,7 +34,7 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["nsis"],
+    "targets": ["dmg", "nsis"],
     "resources": {
       "gateway-bundle": "gateway-bundle",
       "node-runtime": "node-runtime"
