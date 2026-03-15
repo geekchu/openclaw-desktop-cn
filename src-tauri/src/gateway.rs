@@ -165,13 +165,17 @@ impl GatewayManager {
             Duration::from_millis(500),
         ) {
             Ok(s) => s,
-            Err(_) => return false,
+            Err(e) => {
+                warn!("[Gateway] is_ready: TCP 连接失败: {}", e);
+                return false;
+            }
         };
         let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
         let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
         // 发送最简 HTTP 请求
         let request = format!("GET / HTTP/1.0\r\nHost: 127.0.0.1:{}\r\n\r\n", port);
-        if stream.write_all(request.as_bytes()).is_err() {
+        if let Err(e) = stream.write_all(request.as_bytes()) {
+            warn!("[Gateway] is_ready: HTTP 请求发送失败: {}", e);
             return false;
         }
         // 只需读到 HTTP 响应头即可确认 gateway 完全就绪
@@ -179,9 +183,22 @@ impl GatewayManager {
         match stream.read(&mut buf) {
             Ok(n) if n >= 4 => {
                 let response = String::from_utf8_lossy(&buf[..n]);
-                response.starts_with("HTTP/")
+                let ready = response.starts_with("HTTP/");
+                if ready {
+                    info!("[Gateway] is_ready: 收到 HTTP 响应，gateway 就绪");
+                } else {
+                    warn!("[Gateway] is_ready: 响应不是 HTTP: {:?}", response);
+                }
+                ready
             }
-            _ => false,
+            Ok(n) => {
+                warn!("[Gateway] is_ready: 响应太短 ({} bytes)", n);
+                false
+            }
+            Err(e) => {
+                warn!("[Gateway] is_ready: 读取响应失败: {}", e);
+                false
+            }
         }
     }
 
@@ -360,18 +377,35 @@ pub fn health_check_loop(handle: &AppHandle) {
 pub fn navigate_webview_to_gateway(handle: &AppHandle, port: u16) {
     let gm = handle.state::<GatewayManager>();
     if gm.get_last_navigated_port() == port {
+        info!("[Gateway] navigate_webview_to_gateway: 防抖跳过 (port={})", port);
         return; // 防抖：如果在其它线程刚做过该端口的导航，就跳过
     }
 
+    // 使用 127.0.0.1 而不是 localhost，避免某些 WebView 的安全限制
     let url = match crate::read_gateway_token() {
-        Some(token) => format!("http://localhost:{}?token={}", port, token),
-        None => format!("http://localhost:{}", port),
+        Some(token) => {
+            info!("[Gateway] navigate_webview_to_gateway: 使用 token");
+            format!("http://127.0.0.1:{}?token={}", port, token)
+        }
+        None => {
+            info!("[Gateway] navigate_webview_to_gateway: 无 token");
+            format!("http://127.0.0.1:{}", port)
+        }
     };
 
+    info!("[Gateway] navigate_webview_to_gateway: 导航到 {}", url);
     let _ = handle.emit("gateway-ready", url.as_str());
+
+    // 使用 JavaScript 执行导航，因为 window.navigate() 在某些情况下不生效
     if let Some(window) = handle.get_webview_window("main") {
-        let _ = window.navigate(url.parse().unwrap());
+        let js = format!("window.location.href = '{}';", url);
+        match window.eval(&js) {
+            Ok(_) => info!("[Gateway] navigate_webview_to_gateway: JS 导航已执行"),
+            Err(e) => error!("[Gateway] navigate_webview_to_gateway: JS 导航失败: {}", e),
+        }
+    } else {
+        error!("[Gateway] navigate_webview_to_gateway: 找不到 main 窗口");
     }
-    
+
     gm.set_last_navigated_port(port);
 }

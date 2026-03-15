@@ -1223,53 +1223,9 @@ pub fn ensure_channel_plugins_enabled() -> Result<(), String> {
         debug!("[插件初始化] 所有内置渠道插件已在配置中");
     }
 
-    // 确保内置渠道默认开启
-    let mut config = load_openclaw_config()?;
-    if config.get("channels").is_none() {
-        config["channels"] = json!({});
-    }
-    let channels = config["channels"].as_object_mut()
-        .ok_or("channels 不是对象")?;
-    let mut channel_changed = false;
-    if !channels.contains_key("feishu") {
-        channels.insert("feishu".to_string(), json!({
-            "appId": "",
-            "appSecret": "",
-            "enabled": true
-        }));
-        info!("[渠道初始化] 已为飞书渠道创建默认配置");
-        channel_changed = true;
-    }
-    if !channels.contains_key("dingtalk") {
-        channels.insert("dingtalk".to_string(), json!({
-            "clientId": "",
-            "clientSecret": "",
-            "enabled": true
-        }));
-        info!("[渠道初始化] 已为钉钉渠道创建默认配置");
-        channel_changed = true;
-    }
-    if !channels.contains_key("wecom") {
-        channels.insert("wecom".to_string(), json!({
-            "token": "",
-            "encodingAesKey": "",
-            "enabled": true
-        }));
-        info!("[渠道初始化] 已为企业微信渠道创建默认配置");
-        channel_changed = true;
-    }
-    if !channels.contains_key("qqbot") {
-        channels.insert("qqbot".to_string(), json!({
-            "appId": "",
-            "clientSecret": "",
-            "enabled": true
-        }));
-        info!("[渠道初始化] 已为QQ渠道创建默认配置");
-        channel_changed = true;
-    }
-    if channel_changed {
-        save_openclaw_config(&config)?;
-    }
+    // 注意：不再预写 channels.* 配置，因为 gateway 在加载插件之前会验证配置，
+    // 如果 channels 中包含未知的 channel id 会导致启动失败。
+    // 用户需要通过 UI 手动配置渠道。
 
     Ok(())
 }
