@@ -272,7 +272,7 @@ fn main() {
 
             // 全新安装检测：如果 openclaw.json 不存在，清除 WebView2 缓存
             // 防止旧的 device auth token 残留在 localStorage 中导致 "device token mismatch"
-            // 必须在 splash 注入和 gateway 启动之前执行，给异步清除留出足够时间
+            // 必须在 gateway 启动之前执行，给异步清除留出足够时间
             {
                 let config_path = utils::platform::get_config_file_path();
                 if !std::path::Path::new(&config_path).exists() {
@@ -283,25 +283,8 @@ fn main() {
                 }
             }
 
-            // 注入 Splash 启动画面
-            // webview 初始 URL 为 about:blank（避免加载 control-ui JS 触发 WebSocket 连接），
-            // 通过 eval 注入纯 HTML/CSS 的 splash 画面
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.eval(r#"
-                    document.documentElement.innerHTML = `
-                    <head><meta charset="utf-8"><style>
-                        body{margin:0;background:radial-gradient(circle at center, #1a1a1a 0%, #050505 100%);display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;}
-                        .logo-container{animation:float 4s ease-in-out infinite;margin-bottom:24px;display:flex;justify-content:center;align-items:center;}
-                        .logo{font-size:80px;filter:drop-shadow(0 0 15px rgba(255,60,60,0.2));}
-                        .spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,.1);border-top-color:rgba(255,255,255,.9);border-radius:50%;animation:spin 1s cubic-bezier(0.68,-0.55,0.265,1.55) infinite;box-shadow:0 0 10px rgba(255,255,255,0.1);}
-                        .text{color:rgba(255,255,255,.6);font-size:14px;margin-top:20px;letter-spacing:1px;animation:pulse 2s ease-in-out infinite;}
-                        @keyframes float{0%,100%{transform:translateY(0px)}50%{transform:translateY(-10px)}}
-                        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-                        @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1;text-shadow:0 0 8px rgba(255,255,255,.3)}}
-                    </style></head>
-                    <body><div class="logo-container"><div class="logo">🦞</div></div><div class="spinner"></div><div class="text">正在启动...</div></body>`;
-                "#);
-            }
+            // Splash 启动画面已通过 tauri.conf.json 的 data URL 直接显示
+            // 无需额外的 eval 注入
 
             // 异步启动 gateway + 等待就绪 + 通知前端
             let handle = app.handle().clone();
