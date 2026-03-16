@@ -833,7 +833,13 @@ pub async fn delete_provider(provider_name: String) -> Result<String, String> {
         .and_then(|v| v.as_str())
     {
         if primary.starts_with(&format!("{}/", provider_name)) {
-            config["agents"]["defaults"]["model"]["primary"] = json!(null);
+            // 删除 primary key 而不是设置为 null，避免配置文件中残留 "primary": null
+            if let Some(model_obj) = config
+                .pointer_mut("/agents/defaults/model")
+                .and_then(|v| v.as_object_mut())
+            {
+                model_obj.remove("primary");
+            }
         }
     }
 

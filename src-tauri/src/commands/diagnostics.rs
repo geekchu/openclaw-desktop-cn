@@ -184,17 +184,17 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
 #[command]
 pub async fn test_ai_connection() -> Result<AITestResult, String> {
     info!("[AI测试] 开始测试 AI 连接...");
-    
+
     // 获取当前配置的 provider
     let start = std::time::Instant::now();
-    
+
     // 使用 openclaw 命令测试连接
     info!("[AI测试] 执行: openclaw agent --local --to +1234567890 --message 回复 OK");
     let result = shell::run_openclaw(&["agent", "--local", "--to", "+1234567890", "--message", "回复 OK"]);
-    
+
     let latency = start.elapsed().as_millis() as u64;
     info!("[AI测试] 命令执行完成, 耗时: {}ms", latency);
-    
+
     match result {
         Ok(output) => {
             debug!("[AI测试] 原始输出: {}", output);
@@ -204,17 +204,57 @@ pub async fn test_ai_connection() -> Result<AITestResult, String> {
                 .filter(|l: &&str| !l.contains("ExperimentalWarning"))
                 .collect::<Vec<&str>>()
                 .join("\n");
-            
-            let success = !filtered.to_lowercase().contains("error")
-                && !filtered.contains("401")
-                && !filtered.contains("403");
-            
+
+            // 改进的成功判断逻辑：
+            // 1. 检查是否有明确的错误模式（API 错误、认证错误等）
+            // 2. 避免误判 AI 回复中包含 "error" 单词的情况
+            // 3. HTTP 状态码需要带上下文检查，避免误判普通数字
+            let lower = filtered.to_lowercase();
+            let has_api_error = lower.contains("api error")
+                || lower.contains("api_error")
+                || lower.contains("authentication failed")
+                || lower.contains("invalid api key")
+                || lower.contains("unauthorized")
+                || lower.contains("rate limit")
+                || lower.contains("quota exceeded")
+                || lower.contains("connection refused")
+                || lower.contains("timeout")
+                || lower.contains("econnrefused")
+                || lower.contains("enotfound")
+                || lower.contains("fetch failed")
+                || lower.contains("network error");
+            // HTTP 状态码需要带上下文检查（如 "status 401" 或 "error 401" 或 "code: 401"）
+            let has_http_error = lower.contains("status 401")
+                || lower.contains("status: 401")
+                || lower.contains("error 401")
+                || lower.contains("code 401")
+                || lower.contains("code: 401")
+                || lower.contains("status 403")
+                || lower.contains("status: 403")
+                || lower.contains("error 403")
+                || lower.contains("code 403")
+                || lower.contains("code: 403")
+                || lower.contains("status 429")
+                || lower.contains("status: 429")
+                || lower.contains("error 429")
+                || lower.contains("code 429")
+                || lower.contains("code: 429")
+                || lower.contains("status 500")
+                || lower.contains("status: 500")
+                || lower.contains("error 500")
+                || lower.contains("status 502")
+                || lower.contains("status: 502")
+                || lower.contains("status 503")
+                || lower.contains("status: 503");
+
+            let success = !has_api_error && !has_http_error;
+
             if success {
                 info!("[AI测试] ✓ AI 连接测试成功");
             } else {
                 warn!("[AI测试] ✗ AI 连接测试失败: {}", filtered);
             }
-            
+
             Ok(AITestResult {
                 success,
                 provider: "current".to_string(),

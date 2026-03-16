@@ -310,6 +310,12 @@ export class CustomProvidersView extends LitElement {
         }),
       );
       this.error = `✓ 已切换模型，请在聊天中发送 /new 开启新会话`;
+      // 5 秒后自动清除成功提示
+      setTimeout(() => {
+        if (this.error?.startsWith("✓")) {
+          this.error = null;
+        }
+      }, 5000);
     } catch (e) {
       this.error = "切换模型失败: " + String(e);
     }
@@ -400,12 +406,18 @@ export class CustomProvidersView extends LitElement {
     this.editingProvider = provider;
     this.formProviderName = provider.name;
     this.formBaseUrl = provider.base_url;
-    this.formApiType = provider.models[0]?.api_type || "openai-completions";
     this.formSelectedModels = provider.models.map((m) => m.id);
 
+    // 先尝试匹配官方 provider
     this.selectedOfficial =
       this.officialProviders.find((p) => provider.name.includes(p.id) || p.id === provider.name) ||
       null;
+
+    // API 类型优先级：模型配置 > 官方 provider > 默认值
+    this.formApiType =
+      provider.models[0]?.api_type ||
+      this.selectedOfficial?.api_type ||
+      "openai-completions";
   }
 
   selectOfficialProvider(provider: OfficialProvider) {
