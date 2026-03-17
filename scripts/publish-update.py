@@ -100,25 +100,49 @@ def collect_artifacts(version):
             }
             print(f"  [OK] Windows NSIS: {f.name}")
 
-    # macOS
-    macos_dir = BUNDLE_BASE / "macos"
-    if macos_dir.is_dir():
-        f, sig_file = pick_signed_artifact(
-            macos_dir,
-            lambda file_path: file_path.name.endswith(".app.tar.gz") and not file_path.name.endswith(".sig"),
-            lambda file_path: Path(str(file_path) + ".sig"),
-        )
-        if f and sig_file:
-            platforms["darwin-aarch64"] = {
-                "file": f,
-                "sig": sig_file.read_text(encoding="utf-8").strip(),
-            }
-            print(f"  [OK] macOS (aarch64): {f.name}")
-        # .dmg for website downloads
-        dmg_file = pick_latest_artifact(macos_dir, lambda file_path: file_path.name.endswith(".dmg"))
-        if dmg_file:
-            extra_uploads.append(dmg_file)
-            print(f"  [OK] macOS DMG: {dmg_file.name}")
+    # macOS - 检查多个可能的目录（原生构建 + 跨架构构建）
+    # 原生构建: target/release/bundle/macos/
+    # 跨架构构建: target/<arch>/release/bundle/macos/
+    macos_bundle_dirs = [
+        ("darwin-aarch64", BUNDLE_BASE / "macos"),  # 原生 ARM 构建
+        ("darwin-aarch64", PROJECT_ROOT / "src-tauri" / "target" / "aarch64-apple-darwin" / "release" / "bundle" / "macos"),
+        ("darwin-x86_64", PROJECT_ROOT / "src-tauri" / "target" / "x86_64-apple-darwin" / "release" / "bundle" / "macos"),
+    ]
+
+    # DMG 目录（用于官网下载）
+    macos_dmg_dirs = [
+        BUNDLE_BASE / "dmg",
+        PROJECT_ROOT / "src-tauri" / "target" / "aarch64-apple-darwin" / "release" / "bundle" / "dmg",
+        PROJECT_ROOT / "src-tauri" / "target" / "x86_64-apple-darwin" / "release" / "bundle" / "dmg",
+    ]
+
+    for platform_key, macos_dir in macos_bundle_dirs:
+        if platform_key in platforms:
+            continue  # 已找到该架构的产物
+        if macos_dir.is_dir():
+            f, sig_file = pick_signed_artifact(
+                macos_dir,
+                lambda file_path: file_path.name.endswith(".app.tar.gz") and not file_path.name.endswith(".sig"),
+                lambda file_path: Path(str(file_path) + ".sig"),
+            )
+            if f and sig_file:
+                # 为 macOS 文件添加架构后缀，避免不同架构文件互相覆盖
+                arch_suffix = "aarch64" if "aarch64" in platform_key else "x64"
+                remote_name = f.name.replace(".app.tar.gz", f"_{arch_suffix}.app.tar.gz")
+                platforms[platform_key] = {
+                    "file": f,
+                    "sig": sig_file.read_text(encoding="utf-8").strip(),
+                    "remote_name": remote_name,  # 上传到服务器时使用的文件名
+                }
+                print(f"  [OK] macOS ({platform_key}): {f.name} -> {remote_name}")
+
+    # 收集所有 DMG 文件用于官网下载
+    for dmg_dir in macos_dmg_dirs:
+        if dmg_dir.is_dir():
+            dmg_file = pick_latest_artifact(dmg_dir, lambda file_path: file_path.name.endswith(".dmg"))
+            if dmg_file and dmg_file not in extra_uploads:
+                extra_uploads.append(dmg_file)
+                print(f"  [OK] macOS DMG: {dmg_file.name}")
 
     # Linux AppImage
     appimage_dir = BUNDLE_BASE / "appimage"
@@ -166,7 +190,8 @@ def build_latest_json(version, platforms):
     # 合并：已有条目为基础，本次构建覆盖
     merged = dict(existing_platforms)
     for platform_key, info in platforms.items():
-        filename = info["file"].name
+        # 使用 remote_name（如果有）作为 URL 文件名，否则使用原文件名
+        filename = info.get("remote_name", info["file"].name)
         merged[platform_key] = {
             "url": f"{CDN_BASE}/{filename}",
             "signature": info["sig"],
@@ -245,7 +270,9 @@ def main():
     try:
         # 上传安装包
         for platform_key, info in platforms.items():
-            upload(sftp, info["file"], f"{REMOTE_DIR}/artifacts/{info['file'].name}")
+            # 使用 remote_name（如果有）作为远程文件名
+            remote_name = info.get("remote_name", info["file"].name)
+            upload(sftp, info["file"], f"{REMOTE_DIR}/artifacts/{remote_name}")
 
         # 上传额外文件（如 .dmg）
         for f in extra_uploads:

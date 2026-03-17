@@ -856,11 +856,12 @@ export class CustomProvidersView extends LitElement {
                         <button
                           class="onestop-custom-btn-text onestop-custom-btn-text--switch"
                           title="切换后请发送 /new 开启新会话"
+                          ?disabled=${model.is_primary}
                           @click=${(e: Event) => {
                             e.stopPropagation();
                             this.handleSwitchModel(model.full_id);
                           }}
-                        >切换</button>
+                        >${model.is_primary ? "✓ 当前" : "切换"}</button>
                       </div>
                       </div>
                     `,

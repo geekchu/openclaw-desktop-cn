@@ -8,7 +8,8 @@
 - [自动更新机制](#自动更新机制)
 - [latest.json 格式参考](#latestjson-格式参考)
 - [服务器维护](#服务器维护)
-- [代码签名（后续）](#代码签名后续)
+- [macOS 代码签名与公证（一次性设置）](#macos-代码签名与公证一次性设置)
+- [Windows 代码签名（后续）](#windows-代码签名后续)
 - [故障排查](#故障排查)
 - [相关文件索引](#相关文件索引)
 
@@ -59,9 +60,9 @@
 
 | 工具                 | 最低版本 | 安装方式                                 |
 | -------------------- | -------- | ---------------------------------------- |
-| Node.js              | >= 22    | https://nodejs.org/                      |
+| Node.js              | >= 22    | [nodejs.org](https://nodejs.org/)        |
 | pnpm                 | 最新     | `npm install -g pnpm`                    |
-| Rust (rustc + cargo) | stable   | https://rustup.rs/                       |
+| Rust (rustc + cargo) | stable   | [rustup.rs](https://rustup.rs/)          |
 | cargo-tauri          | 2.x      | `cargo install tauri-cli --version "^2"` |
 | Python 3             | >= 3.7   | 发布脚本需要                             |
 | paramiko (Python 包) | 最新     | `pip install paramiko`                   |
@@ -91,7 +92,7 @@
 - 如果在多台机器上构建，需要将同一份私钥复制到每台机器的 `~/.tauri/` 目录
 - 公钥和私钥必须配对，否则客户端验签会失败
 - ⚠️ **必须设置密码**：空密码在 Windows PowerShell 中会导致签名失败（"Wrong password" 错误）
-- 当前密钥密码：`123`（构建时需要设置 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 环境变量）
+- 构建时通过 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 环境变量传入私钥密码；不要把真实密码写进文档、脚本或 Git
 
 ### 3. 服务器初始化（已完成）
 
@@ -176,17 +177,26 @@ git push && git push --tags
 
 ```bash
 # 设置签名环境变量
+export SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
 export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/openclaw.key)"
-export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="123"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<你的 minisign 私钥密码>"
 
-# 构建
-pnpm installer:build
+# 构建 Apple Silicon (M 系列) 版本
+pnpm installer:build:mac-arm
+
+# 构建 Intel 版本
+pnpm installer:build:mac-intel
 ```
+
+**架构选择说明：**
+
+- `mac-arm`: 仅 Apple Silicon (M1/M2/M3)，体积最小，推荐 M 系列用户
+- `mac-intel`: 仅 Intel x86_64，适用于旧款 Mac
+- 当前发版流程按架构分别构建、分别签名、分别公证；不再使用 Universal 包
 
 **构建脚本自动完成：** 环境检查 → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 UI 构建 + gateway 代码打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
 
 > ⚠️ `pnpm installer:build` 在 **release** 模式下会对签名环境变量做 fail-fast 检查；如果缺少 `TAURI_SIGNING_PRIVATE_KEY`（或加密私钥缺少 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`），脚本会直接退出，而不是继续产出无法发布自动更新的半成品。
-
 > ⚠️ **首次构建或修改前端代码/配置后**，建议先清除 Cargo 编译缓存再构建：
 >
 > ```bash
@@ -199,18 +209,99 @@ pnpm installer:build
 
 #### 构建产物
 
-| 平台    | 原始路径                                    | 产物文件                   |
-| ------- | ------------------------------------------- | -------------------------- |
-| Windows | `src-tauri/target/release/bundle/nsis/`     | `*_x64-setup.exe` + `.sig` |
-| macOS   | `src-tauri/target/release/bundle/macos/`    | `*.app.tar.gz` + `.sig`    |
-| Linux   | `src-tauri/target/release/bundle/appimage/` | `*.AppImage` + `.sig`      |
+| 平台          | 原始路径                                                      | 产物文件                                         |
+| ------------- | ------------------------------------------------------------- | ------------------------------------------------ |
+| Windows       | `src-tauri/target/release/bundle/nsis/`                       | `*_x64-setup.exe` + `.sig`                       |
+| macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/macos/` | `*.app` + `*.app.tar.gz` + `.sig`                |
+| macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/`   | `*_aarch64.dmg`                                  |
+| macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/macos/`  | `*.app` + `*.app.tar.gz` + `.sig`                |
+| macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/`    | `*_x64.dmg`                                      |
+| Linux         | `src-tauri/target/release/bundle/appimage/`                   | `*.AppImage` + `.sig`                            |
 
 所有产物会被自动复制到 `dist/installers/` 目录。
 
-> **注意：** `tauri.conf.json` 中 `bundle.targets` 设为 `["nsis"]`（仅 NSIS），不构建 MSI。
-> MSI 构建在 Windows 上会因中文路径（WiX 不支持 Unicode 产品名）而失败，且自动更新不需要 MSI。
+**macOS 产物说明：**
 
-### 步骤 4：发布到更新服务器
+- `.app`：签名、公证、staple 操作的原始应用 bundle，位于 `bundle/macos/` 目录
+- `.app.tar.gz` + `.sig`：Tauri 自动更新实际使用的产物，需在 `.app` 完成 staple 后重新打包/重新签名
+- `.dmg`：官网下载使用的安装包，位于 `bundle/dmg/` 目录
+- `publish-update.py` 会自动收集 `.app.tar.gz`、`.sig` 和 `.dmg`
+
+> **注意：** `tauri.conf.json` 中 `bundle.targets` 设为 `["app", "dmg", "nsis"]`，会同时构建 .app、.dmg 和 NSIS 安装包。
+> MSI 构建在 Windows 上会因中文路径（WiX 不支持 Unicode 产品名）而失败，所以不包含 MSI。
+
+### 步骤 4：macOS 代码签名与公证
+
+> 此步骤仅 macOS 需要。Windows 版本暂无代码签名，可跳过。
+
+构建完成后，需要对 macOS 产物进行 Apple 代码签名和公证，否则用户安装时会提示"无法验证开发者"。
+
+```bash
+# 以 ARM 版本为例（Intel 时将 TARGET 改为 x86_64-apple-darwin，ARCH_SUFFIX 改为 x64）
+export SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/openclaw.key)"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<你的 minisign 私钥密码>"
+
+VERSION="0.3.0"
+TARGET="aarch64-apple-darwin"
+ARCH_SUFFIX="aarch64"
+BUNDLE_DIR="src-tauri/target/${TARGET}/release/bundle"
+APP_NAME="OpenClaw桌面版.app"
+APP_PATH="${BUNDLE_DIR}/macos/${APP_NAME}"
+APP_TAR="${BUNDLE_DIR}/macos/${APP_NAME}.tar.gz"
+APP_ZIP="/tmp/${APP_NAME%.app}-${ARCH_SUFFIX}.zip"
+DMG_PATH="${BUNDLE_DIR}/dmg/OpenClaw桌面版_${VERSION}_${ARCH_SUFFIX}.dmg"
+
+# 1. 使用 Developer ID Application 证书对 .app 深度签名
+scripts/codesign-mac-app.sh "$APP_PATH"
+
+# 2. 严格校验签名，再查看详情
+codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+codesign -dv --verbose=4 "$APP_PATH"
+
+# 3. 先对 .app 单独做 notarization，并在通过后 staple .app 本体
+rm -f "$APP_ZIP"
+ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
+STAPLE_APP_PATH="$APP_PATH" scripts/notarize-mac-artifact.sh "$APP_ZIP"
+xcrun stapler validate "$APP_PATH"
+
+# 4. 用已经 staple 的 .app 重新打包 updater 用的 .app.tar.gz
+rm -f "$APP_TAR" "${APP_TAR}.sig"
+tar -czf "$APP_TAR" -C "${BUNDLE_DIR}/macos" "$APP_NAME"
+
+# 5. 重新生成 updater 的 minisign 签名
+cargo tauri signer sign "$APP_TAR" -f ~/.tauri/openclaw.key -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+
+# 6. 用已经 staple 的 .app 重新生成 DMG（用于官网下载）
+#    这里复用 Tauri bundler 的 DMG 脚本和默认布局参数，保留 App 图标位置、Applications 拖拽链接和卷图标
+rm -f "$DMG_PATH"
+"$BUNDLE_DIR/dmg/bundle_dmg.sh" \
+  --volname "OpenClaw桌面版" \
+  --icon "$APP_NAME" 180 170 \
+  --app-drop-link 480 170 \
+  --window-size 660 400 \
+  --hide-extension "$APP_NAME" \
+  --volicon "$BUNDLE_DIR/dmg/icon.icns" \
+  "$DMG_PATH" \
+  "$APP_PATH"
+
+# 7. 对 DMG 做 notarization，并 staple DMG 本身
+scripts/notarize-mac-artifact.sh "$DMG_PATH"
+xcrun stapler validate "$DMG_PATH"
+
+# 8. 最终 Gatekeeper 验证
+spctl -a -vvv -t execute "$APP_PATH"
+spctl -a -vvv -t open "$DMG_PATH"
+```
+
+**注意：**
+
+- Tauri 自动更新下载的是 `.app.tar.gz`，不是 `.dmg`
+- `.app.tar.gz` 本身不会向 Apple 单独提交公证；正确做法是先公证并 staple 其中的 `.app`，再重新打包 `.app.tar.gz` 并重新生成 `.sig`
+- `.dmg` 仍需单独公证并 staple，因为官网下载走的是 DMG 分发链路
+- 当前仓库未在 `tauri.conf.json` 中自定义 DMG 背景图或窗口位置，上面的 `bundle_dmg.sh` 参数使用的是 Tauri 默认布局：app 图标 `(180,170)`、Applications 链接 `(480,170)`、窗口大小 `660x400`
+
+### 步骤 5：发布到更新服务器
 
 #### 方式 A：使用脚本（推荐）
 
@@ -230,14 +321,14 @@ DEPLOY_SSH_PASSWORD=xxx python scripts/publish-update.py 0.3.0
 
 脚本自动完成：
 
-1. 扫描 `src-tauri/target/release/bundle/` 下各平台的安装包和 `.sig` 文件
+1. 扫描构建产物目录（包括 `src-tauri/target/release/bundle/` 和跨架构目录如 `src-tauri/target/aarch64-apple-darwin/release/bundle/`）
 2. 通过 HTTPS 获取服务器现有的 `latest.json`，如果版本号相同则**合并**平台条目（不会覆盖其他平台）
 3. 读取 `.sig` 签名内容，生成/更新 `latest.json`（纯 Python，不依赖 jq）
 4. paramiko 单连接：mkdir → sftp 上传所有产物 → sftp 上传 latest.json
 
 > **跨平台发布时**，可以在各自机器上分别运行 `publish-update.py`（版本号保持一致），
 > 脚本会自动合并已有的平台条目。例如：先在 Windows 上发布（写入 `windows-x86_64`），
-> 再在 macOS 上发布（追加 `darwin-aarch64`，保留 `windows-x86_64`）。
+> 再在 macOS 上发布（追加 `darwin-aarch64` 和 `darwin-x86_64`，保留 `windows-x86_64`）。
 
 #### 方式 B：手动操作
 
@@ -276,7 +367,7 @@ cat > /var/www/openclaw-update/latest.json << 'EOF'
 EOF
 ```
 
-### 步骤 5：更新官网下载链接
+### 步骤 6：更新官网下载链接
 
 修改 `openclawcn_web/src/app/page.tsx` 中的版本号和文件名：
 
@@ -286,16 +377,23 @@ href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-se
 下载 Windows 版 (v0.3.0)
 ```
 
-**macOS 首次发版时（仅需操作一次）：** 将 disabled 按钮替换为真实下载链接：
+**macOS 下载链接：** 需要提供两个版本（Apple Silicon 和 Intel）：
 
 ```tsx
-// 找到 macOS 区域的 <button disabled> ... macOS 版即将推出 </button>
-// 替换为：
+// macOS Apple Silicon (M1/M2/M3)
 <a
   href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_aarch64.dmg"
   className="...（复制 Windows 按钮的 className）"
 >
-  下载 macOS 版 (v0.3.0)
+  下载 macOS 版 - Apple Silicon (v0.3.0)
+</a>
+
+// macOS Intel
+<a
+  href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64.dmg"
+  className="...（复制 Windows 按钮的 className）"
+>
+  下载 macOS 版 - Intel (v0.3.0)
 </a>
 ```
 
@@ -316,7 +414,7 @@ git commit -m "chore: update website download link to v0.3.0"
 git push
 ```
 
-### 步骤 6：验证
+### 步骤 7：验证
 
 ```bash
 # 检查 latest.json 可访问且内容正确
@@ -332,7 +430,7 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 - `signature` 字段不为空
 - 安装包 URL 返回 200
 
-### 步骤 7：端到端测试
+### 步骤 8：端到端测试
 
 1. 安装**旧版本**（当前已发布的版本）
 2. 启动应用，等待 15 秒后应出现更新横幅；或进入「系统设置 → 软件更新」手动检查
@@ -411,7 +509,11 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6..."
     },
     "darwin-aarch64": {
-      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版.app.tar.gz",
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_aarch64.app.tar.gz",
+      "signature": "..."
+    },
+    "darwin-x86_64": {
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_x64.app.tar.gz",
       "signature": "..."
     },
     "linux-x86_64": {
@@ -438,15 +540,15 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 
 **Tauri 平台标识：**
 
-| 标识             | 对应平台                    |
-| ---------------- | --------------------------- |
-| `windows-x86_64` | Windows 64 位               |
-| `darwin-aarch64` | macOS Apple Silicon（默认） |
-| `linux-x86_64`   | Linux 64 位                 |
+| 标识             | 对应平台                         |
+| ---------------- | -------------------------------- |
+| `windows-x86_64` | Windows 64 位                    |
+| `darwin-aarch64` | macOS Apple Silicon (M1/M2/M3)   |
+| `darwin-x86_64`  | macOS Intel                      |
+| `linux-x86_64`   | Linux 64 位                      |
 
-> macOS 当前仅发布 Apple Silicon (aarch64) 版本。Intel Mac 用户需手动下载安装。
-> 如需支持 Intel Mac，可构建 universal binary（`cargo tauri build --target universal-apple-darwin`），
-> 然后在 `publish-update.py` 中同时添加 `darwin-x86_64` 条目。
+> macOS 同时发布 Apple Silicon (aarch64) 和 Intel (x86_64) 两个版本。
+> 用户根据自己的 Mac 型号选择对应版本下载。
 
 ---
 
@@ -500,28 +602,129 @@ rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 
 ---
 
-## 代码签名（后续）
+## macOS 代码签名与公证（一次性设置）
 
-当前没有代码签名证书，用户安装时会看到平台安全警告：
+macOS 应用需要经过代码签名和 Apple 公证才能让用户顺利安装（否则会提示"无法验证开发者"）。
 
-| 平台    | 行为                                     | 解决方式                                |
-| ------- | ---------------------------------------- | --------------------------------------- |
-| Windows | SmartScreen 弹窗"Windows 已保护你的电脑" | 点击"更多信息" → "仍要运行"             |
-| macOS   | 提示"无法验证开发者"                     | 右键 → 打开，或在「安全性与隐私」中允许 |
+### 前置条件
 
-### 后续获取证书
+- Apple Developer Program 会员（$99/年）
+- macOS 系统 + Xcode Command Line Tools
 
-**Windows (Authenticode)：**
+### 1. 创建 Developer ID Application 证书
+
+1. 登录 [Apple Developer](https://developer.apple.com/account)
+2. 进入 **Certificates, Identifiers & Profiles** → **Certificates**
+3. 点击 **+** 创建新证书
+4. 选择 **Developer ID Application**（用于分发给 Mac App Store 以外的用户）
+5. 选择 **G2 Sub-CA**（Xcode 11.4.1 or later）
+6. 按提示在 Keychain Access 中创建 CSR（Certificate Signing Request）：
+   - 打开 **钥匙串访问** → 菜单 **钥匙串访问** → **证书助理** → **从证书颁发机构请求证书**
+   - 填写邮箱，选择"存储到磁盘"
+7. 上传 CSR，下载生成的 `.cer` 文件
+8. 双击 `.cer` 文件安装到 Keychain（如果提示权限问题，拖到"登录"钥匙串）
+
+### 2. 验证证书安装
+
+```bash
+# 查看已安装的签名证书
+security find-identity -p codesigning -v
+
+# 应该看到类似输出：
+# 1) ABCD1234... "Developer ID Application: Your Name (TEAMID)"
+```
+
+### 3. 创建 App Store Connect API 密钥（用于公证）
+
+1. 登录 [App Store Connect](https://appstoreconnect.apple.com)
+2. 进入 **用户和访问** → **密钥** → **App Store Connect API** → **个人密钥**
+3. 点击 **+** 创建新密钥，权限选择 **Developer** 或 **管理**
+4. 下载 `.p8` 密钥文件（只能下载一次！）
+5. 记录 **Key ID** 和页面顶部的 **Issuer ID**
+
+### 4. 配置环境变量
+
+```bash
+# 创建密钥目录并移动 .p8 文件
+mkdir -p ~/.apple-keys
+mv ~/Downloads/AuthKey_*.p8 ~/.apple-keys/
+
+# 在 ~/.zshrc 中添加（替换为你的实际值）
+cat >> ~/.zshrc << 'EOF'
+
+# Apple 公证 API 密钥
+export NOTARYTOOL_KEY="$HOME/.apple-keys/AuthKey_XXXXXX.p8"
+export NOTARYTOOL_KEY_ID="XXXXXX"
+export NOTARYTOOL_ISSUER="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+EOF
+
+source ~/.zshrc
+```
+
+> **安全提示**：`.p8` 密钥文件应妥善保管，不要提交到 Git。
+
+也可以使用 `notarytool` 的 Keychain profile（更适合长期使用）：
+
+```bash
+xcrun notarytool store-credentials "openclaw-notary" \
+  --key "$HOME/.apple-keys/AuthKey_XXXXXX.p8" \
+  --key-id "XXXXXX" \
+  --issuer "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+export NOTARYTOOL_PROFILE="openclaw-notary"
+```
+
+> 配置了 `NOTARYTOOL_PROFILE` 后，`scripts/notarize-mac-artifact.sh` 会优先使用它，而不是直接读取 `.p8` 路径。
+
+### 签名脚本说明
+
+| 脚本                              | 用途                                           |
+| --------------------------------- | ---------------------------------------------- |
+| `scripts/codesign-mac-app.sh`     | 对 .app 进行深度签名（含 Frameworks、Sparkle） |
+| `scripts/notarize-mac-artifact.sh`| 提交到 Apple 公证服务并 staple                 |
+
+**codesign-mac-app.sh 环境变量：**
+
+- `SIGN_IDENTITY`: 指定签名证书；正式发版时应显式设为 `Developer ID Application: ...`
+- `CODESIGN_TIMESTAMP`: 时间戳模式，`auto`（默认）/`on`/`off`
+- `DISABLE_LIBRARY_VALIDATION`: 设为 `1` 可跳过库验证，仅开发调试用
+
+**notarize-mac-artifact.sh 环境变量：**
+
+- `NOTARYTOOL_KEY`: App Store Connect API 密钥 `.p8` 路径
+- `NOTARYTOOL_KEY_ID`: API Key ID
+- `NOTARYTOOL_ISSUER`: API Issuer ID
+- `STAPLE_APP_PATH`: 公证后要 staple 的 `.app` 路径
+
+### 常见问题
+
+- `errSecInternalComponent`
+  原因：Keychain 访问权限问题
+  解决：在 Keychain Access 中解锁登录钥匙串
+- `The signature is invalid`
+  原因：签名后修改了 app 内容
+  解决：重新签名
+- `rejected (the code signature is invalid)`
+  原因：签名不完整或证书问题
+  解决：检查证书是否过期，重新深度签名
+- 公证失败 `Invalid signature`
+  原因：未启用 hardened runtime
+  解决：脚本默认启用，检查是否手动覆盖了选项
+- 公证超时
+  原因：Apple 服务器繁忙
+  解决：稍后重试，或检查 [Apple 系统状态](https://developer.apple.com/system-status/)
+
+---
+
+## Windows 代码签名（后续）
+
+当前没有 Windows 代码签名证书，用户安装时会看到 SmartScreen 警告。
+
+### 获取证书
 
 - 购买 OV/EV 代码签名证书（DigiCert / Sectigo / GlobalSign，约 $200-600/年）
 - 在 `tauri.conf.json` 中配置 `bundle.windows.certificateThumbprint`
 - EV 证书可立即消除 SmartScreen 警告；OV 证书需积累信誉
-
-**macOS (Developer ID)：**
-
-- 加入 Apple Developer Program（$99/年）
-- 创建 Developer ID Application 证书
-- 使用项目中已有的 `scripts/codesign-mac-app.sh` 和 `scripts/notarize-mac-artifact.sh` 进行签名和公证
 
 ---
 
@@ -591,12 +794,10 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### 构建脚本
 
-| 文件                                | 用途                                                                        |
-| ----------------------------------- | ---------------------------------------------------------------- |
-| `scripts/build-installer.js`        | 统一构建入口（环境检查→依赖→构建→收集产物）                      |
-| `scripts/prepare-gateway-bundle.js` | beforeBuildCommand，打包 gateway 代码（含 UI 构建、依赖安装）    |
-| `scripts/download-node.js`          | 下载 Node.js 运行时嵌入安装包                                    |
-| `.npmrc`                            | npm 注册表镜像（`registry.npmmirror.com`）+ 允许构建脚本列表     |
+- `scripts/build-installer.js`: 统一构建入口（环境检查→依赖→构建→收集产物）
+- `scripts/prepare-gateway-bundle.js`: `beforeBuildCommand`，打包 gateway 代码（含 UI 构建、依赖安装）
+- `scripts/download-node.js`: 下载 Node.js 运行时嵌入安装包
+- `.npmrc`: npm 注册表镜像（`registry.npmmirror.com`）+ 允许构建脚本列表
 
 ### 发布脚本
 
@@ -628,3 +829,17 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 | --------------------------- | -------------------------------------------------------------- |
 | `~/.tauri/openclaw.key`     | minisign 私钥（**不可泄露，不可提交 Git**）                    |
 | `~/.tauri/openclaw.key.pub` | minisign 公钥（内容需与 `tauri.conf.json` 中的 `pubkey` 一致） |
+
+### macOS 签名脚本
+
+| 文件                                | 用途                                                 |
+| ----------------------------------- | ---------------------------------------------------- |
+| `scripts/codesign-mac-app.sh`       | 对 .app 进行深度签名（含 Frameworks、Sparkle 等）    |
+| `scripts/notarize-mac-artifact.sh`  | 提交到 Apple 公证服务并 staple                       |
+
+### macOS 签名密钥（本地）
+
+| 文件/位置                           | 用途                                                 |
+| ----------------------------------- | ---------------------------------------------------- |
+| Keychain 中的证书                   | Developer ID Application 证书（用于代码签名）        |
+| `~/.apple-keys/AuthKey_*.p8`        | App Store Connect API 密钥（用于公证，**不可泄露**） |

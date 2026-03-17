@@ -3213,8 +3213,14 @@
   color: #8bb4d8;
 }
 
-.onestop-custom-btn-text--switch:hover {
+.onestop-custom-btn-text--switch:hover:not(:disabled) {
   color: #a8cbea;
+}
+
+.onestop-custom-btn-text--switch:disabled {
+  color: #22c55e;
+  cursor: default;
+  opacity: 0.8;
 }
 
 .onestop-custom-btn-icon {

@@ -814,8 +814,6 @@ export function renderOnestop(props: OnestopProps) {
           : nothing
       }
 
-
-
       <!-- Tab Navigation — 分段控制器 -->
       <div class="onestop-switcher">
         <button
