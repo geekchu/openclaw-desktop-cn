@@ -563,7 +563,7 @@ export function renderApp(state: AppViewState) {
           : nothing
       }
       </div>
-      <main class="content ${isChat ? "content--chat" : ""}">
+      <main class="content ${isChat ? "content--chat" : ""} ${state.tab === "terminal" ? "content--terminal" : ""}">
         ${
           state.updateAvailable &&
           state.updateAvailable.latestVersion !== state.updateAvailable.currentVersion &&
@@ -1904,7 +1904,12 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "terminal"
-            ? lazyRender(lazyTerminal, (m) => m.renderTerminal(state))
+            ? lazyRender(lazyTerminal, (m) =>
+                m.renderTerminal({
+                  active: true,
+                  gatewayUrl: "",
+                }),
+              )
             : nothing
         }
       </main>
