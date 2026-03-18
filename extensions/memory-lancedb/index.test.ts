@@ -275,6 +275,61 @@ describe("memory plugin e2e", () => {
     expect(detectCategory("The server is running on port 3000")).toBe("fact");
     expect(detectCategory("Random note")).toBe("other");
   });
+
+  test("resolveMemoryBackendKind uses local file fallback on darwin-x64", async () => {
+    const { resolveMemoryBackendKind } = await import("./index.js");
+
+    expect(resolveMemoryBackendKind({ platform: "darwin", arch: "x64" })).toBe("local-file");
+    expect(resolveMemoryBackendKind({ platform: "darwin", arch: "arm64" })).toBe("lancedb");
+    expect(resolveMemoryBackendKind({ platform: "win32", arch: "x64" })).toBe("lancedb");
+  });
+
+  test("local file backend stores and searches memories without LanceDB", async () => {
+    const { createMemoryStore } = await import("./index.js");
+    const store = createMemoryStore({ dbPath, vectorDim: 3, backend: "local-file" });
+
+    const stored = await store.store({
+      text: "The user prefers dark mode for all applications",
+      vector: [0.1, 0.2, 0.3],
+      importance: 0.8,
+      category: "preference",
+    });
+
+    expect(await store.count()).toBe(1);
+
+    const results = await store.search([0.1, 0.2, 0.3], 5, 0.5);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.entry.id).toBe(stored.id);
+    expect(results[0]?.entry.text).toContain("dark mode");
+
+    await expect(store.delete("not-a-uuid")).rejects.toThrow("Invalid memory ID format");
+    expect(await store.delete(stored.id)).toBe(true);
+    expect(await store.count()).toBe(0);
+  });
+
+  test("local file backend serializes concurrent writes", async () => {
+    const { createMemoryStore } = await import("./index.js");
+    const store = createMemoryStore({ dbPath, vectorDim: 2, backend: "local-file" });
+
+    await Promise.all([
+      store.store({
+        text: "first memory",
+        vector: [0.1, 0.2],
+        importance: 0.7,
+        category: "other",
+      }),
+      store.store({
+        text: "second memory",
+        vector: [0.2, 0.1],
+        importance: 0.7,
+        category: "other",
+      }),
+    ]);
+
+    expect(await store.count()).toBe(2);
+    const results = await store.search([0.1, 0.2], 10, 0);
+    expect(results).toHaveLength(2);
+  });
 });
 
 // Live tests that require OpenAI API key and actually use LanceDB

@@ -7,6 +7,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import type * as LanceDB from "@lancedb/lancedb";
 import { Type } from "@sinclair/typebox";
 import OpenAI from "openai";
@@ -36,6 +38,14 @@ const loadLanceDB = async (): Promise<typeof import("@lancedb/lancedb")> => {
   }
 };
 
+type MemoryBackendKind = "lancedb" | "local-file";
+
+export function resolveMemoryBackendKind(
+  runtime: Pick<NodeJS.Process, "platform" | "arch"> = process,
+): MemoryBackendKind {
+  return runtime.platform === "darwin" && runtime.arch === "x64" ? "local-file" : "lancedb";
+}
+
 type MemoryEntry = {
   id: string;
   text: string;
@@ -50,13 +60,22 @@ type MemorySearchResult = {
   score: number;
 };
 
+type MemoryStore = {
+  store(entry: Omit<MemoryEntry, "id" | "createdAt">): Promise<MemoryEntry>;
+  search(vector: number[], limit?: number, minScore?: number): Promise<MemorySearchResult[]>;
+  delete(id: string): Promise<boolean>;
+  count(): Promise<number>;
+};
+
 // ============================================================================
-// LanceDB Provider
+// Storage backends
 // ============================================================================
 
 const TABLE_NAME = "memories";
+const LOCAL_FILE_NAME = "memories.json";
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-class MemoryDB {
+class LanceMemoryDB implements MemoryStore {
   private db: LanceDB.Connection | null = null;
   private table: LanceDB.Table | null = null;
   private initPromise: Promise<void> | null = null;
@@ -142,8 +161,7 @@ class MemoryDB {
   async delete(id: string): Promise<boolean> {
     await this.ensureInitialized();
     // Validate UUID format to prevent injection
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(id)) {
+    if (!UUID_REGEX.test(id)) {
       throw new Error(`Invalid memory ID format: ${id}`);
     }
     await this.table!.delete(`id = '${id}'`);
@@ -154,6 +172,151 @@ class MemoryDB {
     await this.ensureInitialized();
     return this.table!.countRows();
   }
+}
+
+class LocalFileMemoryDB implements MemoryStore {
+  private entries: MemoryEntry[] | null = null;
+  private loadPromise: Promise<void> | null = null;
+  private mutationPromise: Promise<void> = Promise.resolve();
+
+  constructor(private readonly dbPath: string) {}
+
+  private get filePath(): string {
+    return path.join(this.dbPath, LOCAL_FILE_NAME);
+  }
+
+  private async ensureLoaded(): Promise<void> {
+    if (this.entries) {
+      return;
+    }
+    if (this.loadPromise) {
+      return this.loadPromise;
+    }
+    this.loadPromise = this.doLoad();
+    return this.loadPromise;
+  }
+
+  private async doLoad(): Promise<void> {
+    await fs.mkdir(this.dbPath, { recursive: true });
+    try {
+      const raw = await fs.readFile(this.filePath, "utf8");
+      const parsed = JSON.parse(raw);
+      this.entries = Array.isArray(parsed) ? parsed.filter(isMemoryEntry) : [];
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") {
+        throw new Error(`memory-lancedb: failed to read local memory file. ${String(err)}`, {
+          cause: err,
+        });
+      }
+      this.entries = [];
+    }
+  }
+
+  private async persist(): Promise<void> {
+    const tempPath = `${this.filePath}.tmp`;
+    const content = JSON.stringify(this.entries ?? [], null, 2);
+    await fs.writeFile(tempPath, content, "utf8");
+    await fs.rename(tempPath, this.filePath);
+  }
+
+  private async runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.mutationPromise.then(operation, operation);
+    this.mutationPromise = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return next;
+  }
+
+  async store(entry: Omit<MemoryEntry, "id" | "createdAt">): Promise<MemoryEntry> {
+    return this.runExclusive(async () => {
+      await this.ensureLoaded();
+
+      const fullEntry: MemoryEntry = {
+        ...entry,
+        id: randomUUID(),
+        createdAt: Date.now(),
+      };
+
+      this.entries!.push(fullEntry);
+      await this.persist();
+      return fullEntry;
+    });
+  }
+
+  async search(vector: number[], limit = 5, minScore = 0.5): Promise<MemorySearchResult[]> {
+    await this.ensureLoaded();
+
+    return this.entries!
+      .filter((entry) => entry.vector.length === vector.length)
+      .map((entry) => ({
+        entry,
+        score: similarityFromL2(vector, entry.vector),
+      }))
+      .filter((result) => result.score >= minScore)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    return this.runExclusive(async () => {
+      await this.ensureLoaded();
+      if (!UUID_REGEX.test(id)) {
+        throw new Error(`Invalid memory ID format: ${id}`);
+      }
+      const before = this.entries!.length;
+      this.entries = this.entries!.filter((entry) => entry.id !== id);
+      if (this.entries.length === before) {
+        return false;
+      }
+      await this.persist();
+      return true;
+    });
+  }
+
+  async count(): Promise<number> {
+    await this.ensureLoaded();
+    return this.entries!.length;
+  }
+}
+
+function isMemoryEntry(value: unknown): value is MemoryEntry {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const entry = value as Record<string, unknown>;
+  return (
+    typeof entry.id === "string" &&
+    typeof entry.text === "string" &&
+    Array.isArray(entry.vector) &&
+    entry.vector.every((item) => typeof item === "number") &&
+    typeof entry.importance === "number" &&
+    typeof entry.category === "string" &&
+    MEMORY_CATEGORIES.includes(entry.category as MemoryCategory) &&
+    typeof entry.createdAt === "number"
+  );
+}
+
+function similarityFromL2(left: number[], right: number[]): number {
+  let distance = 0;
+  for (let i = 0; i < left.length; i++) {
+    const delta = left[i]! - right[i]!;
+    distance += delta * delta;
+  }
+  return 1 / (1 + distance);
+}
+
+export function createMemoryStore(params: {
+  dbPath: string;
+  vectorDim: number;
+  backend?: MemoryBackendKind;
+}): MemoryStore {
+  const backend = params.backend ?? resolveMemoryBackendKind();
+  if (backend === "local-file") {
+    return new LocalFileMemoryDB(params.dbPath);
+  }
+  return new LanceMemoryDB(params.dbPath, params.vectorDim);
 }
 
 // ============================================================================
@@ -302,10 +465,19 @@ const memoryPlugin = {
     const { model, dimensions, apiKey, baseUrl } = cfg.embedding;
 
     const vectorDim = dimensions ?? vectorDimsForModel(model);
-    const db = new MemoryDB(resolvedDbPath, vectorDim);
+    const backend = resolveMemoryBackendKind();
+    const db = createMemoryStore({ dbPath: resolvedDbPath, vectorDim, backend });
     const embeddings = new Embeddings(apiKey, model, baseUrl, dimensions);
 
-    api.logger.info(`memory-lancedb: plugin registered (db: ${resolvedDbPath}, lazy init)`);
+    if (backend === "local-file") {
+      api.logger.warn(
+        "memory-lancedb: darwin-x64 detected; using local file fallback because upstream @lancedb/lancedb does not ship a macOS Intel binary",
+      );
+    }
+
+    api.logger.info(
+      `memory-lancedb: plugin registered (backend: ${backend}, db: ${resolvedDbPath}, lazy init)`,
+    );
 
     // ========================================================================
     // Tools
@@ -665,7 +837,7 @@ const memoryPlugin = {
       id: "memory-lancedb",
       start: () => {
         api.logger.info(
-          `memory-lancedb: initialized (db: ${resolvedDbPath}, model: ${cfg.embedding.model})`,
+          `memory-lancedb: initialized (backend: ${backend}, db: ${resolvedDbPath}, model: ${cfg.embedding.model})`,
         );
       },
       stop: () => {

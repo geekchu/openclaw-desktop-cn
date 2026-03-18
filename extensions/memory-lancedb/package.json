@@ -2,7 +2,7 @@
   "name": "@openclaw/memory-lancedb",
   "version": "2026.3.12",
   "private": true,
-  "description": "OpenClaw LanceDB-backed long-term memory plugin with auto-recall/capture",
+  "description": "OpenClaw long-term memory plugin with LanceDB and Intel Mac local-file fallback",
   "type": "module",
   "dependencies": {
     "@lancedb/lancedb": "^0.26.2",
