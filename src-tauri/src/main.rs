@@ -119,7 +119,10 @@ fn main() {
                     let host = url.host_str().unwrap_or("");
                     let allowed = url.scheme() == "tauri"
                         || host == "localhost"
-                        || host == "127.0.0.1";
+                        || host == "127.0.0.1"
+                        || host == "tauri.localhost"
+                        || host == "ipc.localhost"
+                        || host == "asset.localhost";
                     if !allowed {
                         log::warn!("[Navigation] 阻止导航到: {}", url);
                     }
