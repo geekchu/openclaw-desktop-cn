@@ -1369,6 +1369,8 @@ export class SystemSettingsView extends LitElement {
     this.updateDone = false;
     this.updateInstalled = false;
     this.updateRestarting = false;
+    this.updateDownloading = false;
+    this.updateProgress = 0;
 
     const result = await checkForUpdate();
     switch (result.status) {
