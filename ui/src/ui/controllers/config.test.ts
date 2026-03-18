@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyConfigSnapshot,
   applyConfig,
+  ensureAgentConfigEntry,
+  findAgentConfigEntryIndex,
+  runUpdate,
   saveConfig,
   updateConfigFormValue,
   type ConfigState,
@@ -32,7 +35,7 @@ function createState(): ConfigState {
     configValid: null,
     connected: false,
     lastError: null,
-    onestopSelectedModel: "",
+    updateRunning: false,
   };
 }
 
@@ -50,7 +53,7 @@ describe("applyConfigSnapshot", () => {
     const state = createState();
     state.configFormMode = "form";
     state.configFormDirty = true;
-    state.configForm = { gateway: { mode: "local", port: 28789 } };
+    state.configForm = { gateway: { mode: "local", port: 18789 } };
     state.configRaw = "{\n}\n";
 
     applyConfigSnapshot(state, {
@@ -61,7 +64,7 @@ describe("applyConfigSnapshot", () => {
     });
 
     expect(state.configRaw).toBe(
-      '{\n  "gateway": {\n    "mode": "local",\n    "port": 28789\n  }\n}\n',
+      '{\n  "gateway": {\n    "mode": "local",\n    "port": 18789\n  }\n}\n',
     );
   });
 
@@ -119,12 +122,12 @@ describe("updateConfigFormValue", () => {
       raw: "{}",
     };
 
-    updateConfigFormValue(state, ["gateway", "port"], 28789);
+    updateConfigFormValue(state, ["gateway", "port"], 18789);
 
     expect(state.configFormDirty).toBe(true);
     expect(state.configForm).toEqual({
       channels: { telegram: { botToken: "t" } },
-      gateway: { mode: "local", port: 28789 },
+      gateway: { mode: "local", port: 18789 },
     });
   });
 
@@ -137,11 +140,94 @@ describe("updateConfigFormValue", () => {
       raw: "{\n}\n",
     };
 
-    updateConfigFormValue(state, ["gateway", "port"], 28789);
+    updateConfigFormValue(state, ["gateway", "port"], 18789);
 
     expect(state.configRaw).toBe(
-      '{\n  "gateway": {\n    "mode": "local",\n    "port": 28789\n  }\n}\n',
+      '{\n  "gateway": {\n    "mode": "local",\n    "port": 18789\n  }\n}\n',
     );
+  });
+});
+
+describe("agent config helpers", () => {
+  it("finds explicit agent entries", () => {
+    expect(
+      findAgentConfigEntryIndex(
+        {
+          agents: {
+            list: [{ id: "main" }, { id: "assistant" }],
+          },
+        },
+        "assistant",
+      ),
+    ).toBe(1);
+  });
+
+  it("creates an agent override entry when editing an inherited agent", () => {
+    const state = createState();
+    state.configSnapshot = {
+      config: {
+        agents: {
+          defaults: { model: "openai/gpt-5" },
+        },
+        tools: { profile: "messaging" },
+      },
+      valid: true,
+      issues: [],
+      raw: "{\n}\n",
+    };
+
+    const index = ensureAgentConfigEntry(state, "main");
+
+    expect(index).toBe(0);
+    expect(state.configFormDirty).toBe(true);
+    expect(state.configForm).toEqual({
+      agents: {
+        defaults: { model: "openai/gpt-5" },
+        list: [{ id: "main" }],
+      },
+      tools: { profile: "messaging" },
+    });
+  });
+
+  it("reuses the existing agent entry instead of duplicating it", () => {
+    const state = createState();
+    state.configSnapshot = {
+      config: {
+        agents: {
+          list: [{ id: "main", model: "openai/gpt-5" }],
+        },
+      },
+      valid: true,
+      issues: [],
+      raw: "{\n}\n",
+    };
+
+    const index = ensureAgentConfigEntry(state, "main");
+
+    expect(index).toBe(0);
+    expect(state.configFormDirty).toBe(false);
+    expect(state.configForm).toBeNull();
+  });
+
+  it("reuses an agent entry that already exists in the pending form state", () => {
+    const state = createState();
+    state.configSnapshot = {
+      config: {},
+      valid: true,
+      issues: [],
+      raw: "{\n}\n",
+    };
+
+    updateConfigFormValue(state, ["agents", "list", 0, "id"], "main");
+
+    const index = ensureAgentConfigEntry(state, "main");
+
+    expect(index).toBe(0);
+    expect(state.configForm).toEqual({
+      agents: {
+        list: [{ id: "main" }],
+      },
+    });
   });
 });
 
@@ -175,7 +261,7 @@ describe("applyConfig", () => {
     state.applySessionKey = "agent:main:web:dm:test";
     state.configFormMode = "form";
     state.configForm = {
-      gateway: { port: "28789", debug: "true" },
+      gateway: { port: "18789", debug: "true" },
     };
     state.configSchema = {
       type: "object",
@@ -203,7 +289,7 @@ describe("applyConfig", () => {
       gateway: { port: unknown; debug: unknown };
     };
     expect(typeof parsed.gateway.port).toBe("number");
-    expect(parsed.gateway.port).toBe(28789);
+    expect(parsed.gateway.port).toBe(18789);
     expect(parsed.gateway.debug).toBe(true);
     expect(params.baseHash).toBe("hash-apply-1");
     expect(params.sessionKey).toBe("agent:main:web:dm:test");
@@ -218,7 +304,7 @@ describe("saveConfig", () => {
     state.client = { request } as unknown as ConfigState["client"];
     state.configFormMode = "form";
     state.configForm = {
-      gateway: { port: "28789", enabled: "false" },
+      gateway: { port: "18789", enabled: "false" },
     };
     state.configSchema = {
       type: "object",
@@ -242,7 +328,7 @@ describe("saveConfig", () => {
       gateway: { port: unknown; enabled: unknown };
     };
     expect(typeof parsed.gateway.port).toBe("number");
-    expect(parsed.gateway.port).toBe(28789);
+    expect(parsed.gateway.port).toBe(18789);
     expect(parsed.gateway.enabled).toBe(false);
     expect(params.baseHash).toBe("hash-save-1");
   });
@@ -254,7 +340,7 @@ describe("saveConfig", () => {
     state.client = { request } as unknown as ConfigState["client"];
     state.configFormMode = "form";
     state.configForm = {
-      gateway: { port: "28789" },
+      gateway: { port: "18789" },
     };
     state.configSchema = "invalid-schema";
     state.configSnapshot = { hash: "hash-save-2" };
@@ -266,7 +352,23 @@ describe("saveConfig", () => {
     const parsed = JSON.parse(params.raw) as {
       gateway: { port: unknown };
     };
-    expect(parsed.gateway.port).toBe("28789");
+    expect(parsed.gateway.port).toBe("18789");
     expect(params.baseHash).toBe("hash-save-2");
+  });
+});
+
+describe("runUpdate", () => {
+  it("sends update.run with session key", async () => {
+    const request = vi.fn().mockResolvedValue({});
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+    state.applySessionKey = "agent:main:whatsapp:dm:+15555550123";
+
+    await runUpdate(state);
+
+    expect(request).toHaveBeenCalledWith("update.run", {
+      sessionKey: "agent:main:whatsapp:dm:+15555550123",
+    });
   });
 });

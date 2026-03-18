@@ -1,4 +1,4 @@
-import type { ChannelAccountSnapshot } from "openclaw/plugin-sdk";
+import type { ChannelAccountSnapshot, ChannelStatusIssue } from "openclaw/plugin-sdk/zalo";
 
 type ZaloAccountStatus = {
   accountId?: unknown;
@@ -25,8 +25,8 @@ function readZaloAccountStatus(value: ChannelAccountSnapshot): ZaloAccountStatus
   };
 }
 
-export function collectZaloStatusIssues(accounts: ChannelAccountSnapshot[]): any[] {
-  const issues: any[] = [];
+export function collectZaloStatusIssues(accounts: ChannelAccountSnapshot[]): ChannelStatusIssue[] {
+  const issues: ChannelStatusIssue[] = [];
   for (const entry of accounts) {
     const account = readZaloAccountStatus(entry);
     if (!account) {

@@ -5,11 +5,22 @@ export const TAB_GROUPS = [
   { label: "chat", tabs: ["chat"] },
   {
     label: "control",
-    tabs: ["overview", "instances", "sessions", "usage", "cron"],
+    tabs: ["overview", "channels", "instances", "sessions", "usage", "cron"],
   },
   { label: "agent", tabs: ["agents", "skills", "nodes"] },
-  { label: "settings", tabs: ["config", "debug", "logs"] },
-  { label: "tools", tabs: ["terminal"] },
+  {
+    label: "settings",
+    tabs: [
+      "config",
+      "communications",
+      "appearance",
+      "automation",
+      "infrastructure",
+      "aiAgents",
+      "debug",
+      "logs",
+    ],
+  },
 ] as const;
 
 export type Tab =
@@ -24,9 +35,13 @@ export type Tab =
   | "nodes"
   | "chat"
   | "config"
+  | "communications"
+  | "appearance"
+  | "automation"
+  | "infrastructure"
+  | "aiAgents"
   | "debug"
-  | "logs"
-  | "terminal";
+  | "logs";
 
 const TAB_PATHS: Record<Tab, string> = {
   agents: "/agents",
@@ -40,9 +55,13 @@ const TAB_PATHS: Record<Tab, string> = {
   nodes: "/nodes",
   chat: "/chat",
   config: "/config",
+  communications: "/communications",
+  appearance: "/appearance",
+  automation: "/automation",
+  infrastructure: "/infrastructure",
+  aiAgents: "/ai-agents",
   debug: "/debug",
   logs: "/logs",
-  terminal: "/terminal",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -150,13 +169,20 @@ export function iconForTab(tab: Tab): IconName {
       return "monitor";
     case "config":
       return "settings";
+    case "communications":
+      return "send";
+    case "appearance":
+      return "spark";
+    case "automation":
+      return "terminal";
+    case "infrastructure":
+      return "globe";
+    case "aiAgents":
+      return "brain";
     case "debug":
       return "bug";
     case "logs":
       return "scrollText";
-
-    case "terminal":
-      return "terminal";
     default:
       return "folder";
   }

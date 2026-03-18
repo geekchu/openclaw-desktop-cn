@@ -1,7 +1,8 @@
+import { exec } from "node:child_process";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../../agents/agent-scope.js";
 import { listChannelPlugins } from "../../channels/plugins/index.js";
 import {
-  CONFIG_PATH,
+  createConfigIO,
   loadConfig,
   parseConfigJson5,
   readConfigFileSnapshot,
@@ -10,6 +11,7 @@ import {
   validateConfigObjectWithPlugins,
   writeConfigFile,
 } from "../../config/config.js";
+import { formatConfigIssueLines } from "../../config/issue-format.js";
 import { applyLegacyMigrations } from "../../config/legacy.js";
 import { applyMergePatch } from "../../config/merge-patch.js";
 import {
@@ -17,16 +19,20 @@ import {
   redactConfigSnapshot,
   restoreRedactedValues,
 } from "../../config/redact-snapshot.js";
-import { buildConfigSchema, type ConfigSchemaResponse } from "../../config/schema.js";
+import {
+  buildConfigSchema,
+  lookupConfigSchema,
+  type ConfigSchemaResponse,
+} from "../../config/schema.js";
 import { extractDeliveryInfo } from "../../config/sessions.js";
-import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import type { ConfigValidationIssue, OpenClawConfig } from "../../config/types.openclaw.js";
 import {
   formatDoctorNonInteractiveHint,
   type RestartSentinelPayload,
   writeRestartSentinel,
 } from "../../infra/restart-sentinel.js";
 import { scheduleGatewaySigusr1Restart } from "../../infra/restart.js";
-import { loadOpenClawPluginsAsync } from "../../plugins/loader.js";
+import { loadOpenClawPlugins } from "../../plugins/loader.js";
 import { diffConfigPaths } from "../config-reload.js";
 import {
   formatControlPlaneActor,
@@ -36,9 +42,12 @@ import {
 import {
   ErrorCodes,
   errorShape,
+  formatValidationErrors,
   validateConfigApplyParams,
   validateConfigGetParams,
   validateConfigPatchParams,
+  validateConfigSchemaLookupParams,
+  validateConfigSchemaLookupResult,
   validateConfigSchemaParams,
   validateConfigSetParams,
 } from "../protocol/index.js";
@@ -46,6 +55,8 @@ import { resolveBaseHashParam } from "./base-hash.js";
 import { parseRestartRequestParams } from "./restart-request.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
 import { assertValidParams } from "./validation.js";
+
+const MAX_CONFIG_ISSUES_IN_ERROR_MESSAGE = 3;
 
 function requireConfigBaseHash(
   params: unknown,
@@ -113,12 +124,20 @@ function parseRawConfigOrRespond(
   return rawValue;
 }
 
-async function parseValidateConfigFromRawOrRespond(
+function sanitizeLookupPathForLog(path: string): string {
+  const sanitized = Array.from(path, (char) => {
+    const code = char.charCodeAt(0);
+    return code < 0x20 || code === 0x7f ? "?" : char;
+  }).join("");
+  return sanitized.length > 120 ? `${sanitized.slice(0, 117)}...` : sanitized;
+}
+
+function parseValidateConfigFromRawOrRespond(
   params: unknown,
   requestName: string,
   snapshot: Awaited<ReturnType<typeof readConfigFileSnapshot>>,
   respond: RespondFn,
-): Promise<{ config: OpenClawConfig; schema: ConfigSchemaResponse } | null> {
+): { config: OpenClawConfig; schema: ConfigSchemaResponse } | null {
   const rawValue = parseRawConfigOrRespond(params, requestName, respond);
   if (!rawValue) {
     return null;
@@ -128,7 +147,7 @@ async function parseValidateConfigFromRawOrRespond(
     respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, parsedRes.error));
     return null;
   }
-  const schema = await loadSchemaWithPluginsAsync();
+  const schema = loadSchemaWithPlugins();
   const restored = restoreRedactedValues(parsedRes.parsed, snapshot.config, schema.uiHints);
   if (!restored.ok) {
     respond(
@@ -143,13 +162,27 @@ async function parseValidateConfigFromRawOrRespond(
     respond(
       false,
       undefined,
-      errorShape(ErrorCodes.INVALID_REQUEST, "invalid config", {
+      errorShape(ErrorCodes.INVALID_REQUEST, summarizeConfigValidationIssues(validated.issues), {
         details: { issues: validated.issues },
       }),
     );
     return null;
   }
   return { config: validated.config, schema };
+}
+
+function summarizeConfigValidationIssues(issues: ReadonlyArray<ConfigValidationIssue>): string {
+  const trimmed = issues.slice(0, MAX_CONFIG_ISSUES_IN_ERROR_MESSAGE);
+  const lines = formatConfigIssueLines(trimmed, "", { normalizeRoot: true })
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) {
+    return "invalid config";
+  }
+  const hiddenCount = Math.max(0, issues.length - lines.length);
+  return `invalid config: ${lines.join("; ")}${
+    hiddenCount > 0 ? ` (+${hiddenCount} more issue${hiddenCount === 1 ? "" : "s"})` : ""
+  }`;
 }
 
 function resolveConfigRestartRequest(params: unknown): {
@@ -182,6 +215,7 @@ function buildConfigRestartSentinelPayload(params: {
   threadId: ReturnType<typeof extractDeliveryInfo>["threadId"];
   note: string | undefined;
 }): RestartSentinelPayload {
+  const configPath = createConfigIO().configPath;
   return {
     kind: params.kind,
     status: "ok",
@@ -193,7 +227,7 @@ function buildConfigRestartSentinelPayload(params: {
     doctorHint: formatDoctorNonInteractiveHint(),
     stats: {
       mode: params.mode,
-      root: CONFIG_PATH,
+      root: configPath,
     },
   };
 }
@@ -208,10 +242,10 @@ async function tryWriteRestartSentinelPayload(
   }
 }
 
-async function loadSchemaWithPluginsAsync(): Promise<ConfigSchemaResponse> {
+function loadSchemaWithPlugins(): ConfigSchemaResponse {
   const cfg = loadConfig();
   const workspaceDir = resolveAgentWorkspaceDir(cfg, resolveDefaultAgentId(cfg));
-  const pluginRegistry = await loadOpenClawPluginsAsync({
+  const pluginRegistry = loadOpenClawPlugins({
     config: cfg,
     cache: true,
     workspaceDir,
@@ -248,54 +282,48 @@ export const configHandlers: GatewayRequestHandlers = {
     if (!assertValidParams(params, validateConfigGetParams, "config.get", respond)) {
       return;
     }
-    try {
-      const snapshot = await readConfigFileSnapshot();
-      const schema = await loadSchemaWithPluginsAsync();
-      const redacted = redactConfigSnapshot(snapshot, schema.uiHints);
-      // Strip server-only fields that the UI never reads.
-      const { parsed: _p, resolved: _r, ...slim } = redacted;
-
-      // Safety: isolate and remove any field that can't be serialized
-      // (e.g. values that would push JSON.stringify past V8's string limit)
-      for (const key of Object.keys(slim)) {
-        try {
-          JSON.stringify((slim as Record<string, unknown>)[key]);
-        } catch {
-          console.error(`[config.get] field "${key}" cannot be serialized, removing`);
-          delete (slim as Record<string, unknown>)[key];
-        }
-      }
-      respond(true, slim, undefined);
-    } catch (err) {
-      console.error(
-        `[config.get] FAILED: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`,
-      );
-      respond(
-        false,
-        undefined,
-        errorShape(
-          ErrorCodes.UNAVAILABLE,
-          `config.get failed: ${err instanceof Error ? err.message : String(err)}`,
-        ),
-      );
-    }
+    const snapshot = await readConfigFileSnapshot();
+    const schema = loadSchemaWithPlugins();
+    respond(true, redactConfigSnapshot(snapshot, schema.uiHints), undefined);
   },
-  "config.schema": async ({ params, respond }) => {
+  "config.schema": ({ params, respond }) => {
     if (!assertValidParams(params, validateConfigSchemaParams, "config.schema", respond)) {
       return;
     }
-    try {
-      respond(true, await loadSchemaWithPluginsAsync(), undefined);
-    } catch (err) {
+    respond(true, loadSchemaWithPlugins(), undefined);
+  },
+  "config.schema.lookup": ({ params, respond, context }) => {
+    if (
+      !assertValidParams(params, validateConfigSchemaLookupParams, "config.schema.lookup", respond)
+    ) {
+      return;
+    }
+    const path = (params as { path: string }).path;
+    const schema = loadSchemaWithPlugins();
+    const result = lookupConfigSchema(schema, path);
+    if (!result) {
       respond(
         false,
         undefined,
-        errorShape(
-          ErrorCodes.UNAVAILABLE,
-          `config.schema failed: ${err instanceof Error ? err.message : String(err)}`,
-        ),
+        errorShape(ErrorCodes.INVALID_REQUEST, "config schema path not found"),
       );
+      return;
     }
+    if (!validateConfigSchemaLookupResult(result)) {
+      const errors = validateConfigSchemaLookupResult.errors ?? [];
+      context.logGateway.warn(
+        `config.schema.lookup produced invalid payload for ${sanitizeLookupPathForLog(path)}: ${formatValidationErrors(errors)}`,
+      );
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "config.schema.lookup returned invalid payload", {
+          details: { errors },
+        }),
+      );
+      return;
+    }
+    respond(true, result, undefined);
   },
   "config.set": async ({ params, respond }) => {
     if (!assertValidParams(params, validateConfigSetParams, "config.set", respond)) {
@@ -305,12 +333,7 @@ export const configHandlers: GatewayRequestHandlers = {
     if (!requireConfigBaseHash(params, snapshot, respond)) {
       return;
     }
-    const parsed = await parseValidateConfigFromRawOrRespond(
-      params,
-      "config.set",
-      snapshot,
-      respond,
-    );
+    const parsed = parseValidateConfigFromRawOrRespond(params, "config.set", snapshot, respond);
     if (!parsed) {
       return;
     }
@@ -319,7 +342,7 @@ export const configHandlers: GatewayRequestHandlers = {
       true,
       {
         ok: true,
-        path: CONFIG_PATH,
+        path: createConfigIO().configPath,
         config: redactConfigObject(parsed.config, parsed.schema.uiHints),
       },
       undefined,
@@ -373,7 +396,7 @@ export const configHandlers: GatewayRequestHandlers = {
     const merged = applyMergePatch(snapshot.config, parsedRes.parsed, {
       mergeObjectArraysById: true,
     });
-    const schemaPatch = await loadSchemaWithPluginsAsync();
+    const schemaPatch = loadSchemaWithPlugins();
     const restoredMerge = restoreRedactedValues(merged, snapshot.config, schemaPatch.uiHints);
     if (!restoredMerge.ok) {
       respond(
@@ -393,7 +416,7 @@ export const configHandlers: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, "invalid config", {
+        errorShape(ErrorCodes.INVALID_REQUEST, summarizeConfigValidationIssues(validated.issues), {
           details: { issues: validated.issues },
         }),
       );
@@ -436,7 +459,7 @@ export const configHandlers: GatewayRequestHandlers = {
       true,
       {
         ok: true,
-        path: CONFIG_PATH,
+        path: createConfigIO().configPath,
         config: redactConfigObject(validated.config, schemaPatch.uiHints),
         restart,
         sentinel: {
@@ -455,12 +478,7 @@ export const configHandlers: GatewayRequestHandlers = {
     if (!requireConfigBaseHash(params, snapshot, respond)) {
       return;
     }
-    const parsed = await parseValidateConfigFromRawOrRespond(
-      params,
-      "config.apply",
-      snapshot,
-      respond,
-    );
+    const parsed = parseValidateConfigFromRawOrRespond(params, "config.apply", snapshot, respond);
     if (!parsed) {
       return;
     }
@@ -501,7 +519,7 @@ export const configHandlers: GatewayRequestHandlers = {
       true,
       {
         ok: true,
-        path: CONFIG_PATH,
+        path: createConfigIO().configPath,
         config: redactConfigObject(parsed.config, parsed.schema.uiHints),
         restart,
         sentinel: {
@@ -511,5 +529,20 @@ export const configHandlers: GatewayRequestHandlers = {
       },
       undefined,
     );
+  },
+  "config.openFile": ({ params, respond }) => {
+    if (!assertValidParams(params, validateConfigGetParams, "config.openFile", respond)) {
+      return;
+    }
+    const configPath = createConfigIO().configPath;
+    const platform = process.platform;
+    const cmd = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
+    exec(`${cmd} ${JSON.stringify(configPath)}`, (err) => {
+      if (err) {
+        respond(true, { ok: false, path: configPath, error: err.message }, undefined);
+        return;
+      }
+      respond(true, { ok: true, path: configPath }, undefined);
+    });
   },
 };

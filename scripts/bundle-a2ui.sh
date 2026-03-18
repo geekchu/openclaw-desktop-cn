@@ -7,7 +7,7 @@ on_error() {
 }
 trap on_error ERR
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && (pwd -W 2>/dev/null || pwd))"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HASH_FILE="$ROOT_DIR/src/canvas-host/a2ui/.bundle.hash"
 OUTPUT_FILE="$ROOT_DIR/src/canvas-host/a2ui/a2ui.bundle.js"
 A2UI_RENDERER_DIR="$ROOT_DIR/vendor/a2ui/renderers/lit"
@@ -32,21 +32,13 @@ INPUT_PATHS=(
 )
 
 compute_hash() {
-  ROOT_DIR="$ROOT_DIR" pnpm -s exec node --input-type=module - "${INPUT_PATHS[@]}" <<'NODE'
+  ROOT_DIR="$ROOT_DIR" node --input-type=module --eval '
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-function normalizeHostPath(input) {
-  if (process.platform === "win32" && /^\/mnt\/[A-Za-z]\//.test(input)) {
-    const drive = input[5].toUpperCase();
-    return `${drive}:${input.slice(6).replace(/\//g, "\\")}`;
-  }
-  return input;
-}
-
-const rootDir = normalizeHostPath(process.env.ROOT_DIR ?? process.cwd());
-const inputs = process.argv.slice(2).map(normalizeHostPath);
+const rootDir = process.env.ROOT_DIR ?? process.cwd();
+const inputs = process.argv.slice(1);
 const files = [];
 
 async function walk(entryPath) {
@@ -81,7 +73,7 @@ for (const filePath of files) {
 }
 
 process.stdout.write(hash.digest("hex"));
-NODE
+' "${INPUT_PATHS[@]}"
 }
 
 current_hash="$(compute_hash)"
@@ -94,8 +86,8 @@ if [[ -f "$HASH_FILE" ]]; then
 fi
 
 pnpm -s exec tsc -p "$A2UI_RENDERER_DIR/tsconfig.json"
-if pnpm -s exec rolldown --version >/dev/null 2>&1; then
-  pnpm -s exec rolldown -c "$A2UI_APP_DIR/rolldown.config.mjs"
+if command -v rolldown >/dev/null 2>&1 && rolldown --version >/dev/null 2>&1; then
+  rolldown -c "$A2UI_APP_DIR/rolldown.config.mjs"
 else
   pnpm -s dlx rolldown -c "$A2UI_APP_DIR/rolldown.config.mjs"
 fi

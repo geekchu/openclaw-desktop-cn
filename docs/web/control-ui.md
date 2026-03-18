@@ -10,7 +10,7 @@ title: "Control UI"
 
 The Control UI is a small **Vite + Lit** single-page app served by the Gateway:
 
-- default: `http://<host>:28789/`
+- default: `http://<host>:18789/`
 - optional prefix: set `gateway.controlUi.basePath` (e.g. `/openclaw`)
 
 It speaks **directly to the Gateway WebSocket** on the same port.
@@ -19,7 +19,7 @@ It speaks **directly to the Gateway WebSocket** on the same port.
 
 If the Gateway is running on the same computer, open:
 
-- [http://127.0.0.1:28789/](http://127.0.0.1:28789/) (or [http://localhost:28789/](http://localhost:28789/))
+- [http://127.0.0.1:18789/](http://127.0.0.1:18789/) (or [http://localhost:18789/](http://localhost:18789/))
 
 If the page fails to load, start the Gateway first: `openclaw gateway`.
 
@@ -27,7 +27,7 @@ Auth is supplied during the WebSocket handshake via:
 
 - `connect.params.auth.token`
 - `connect.params.auth.password`
-  The dashboard settings panel lets you store a token; passwords are not persisted.
+  The dashboard settings panel keeps a token for the current browser tab session and selected gateway URL; passwords are not persisted.
   The onboarding wizard generates a gateway token by default, so paste it here on first connect.
 
 ## Device pairing (first connection)
@@ -60,18 +60,27 @@ you revoke it with `openclaw devices revoke --device <id> --role <role>`. See
 - Each browser profile generates a unique device ID, so switching browsers or
   clearing browser data will require re-pairing.
 
+## Language support
+
+The Control UI can localize itself on first load based on your browser locale, and you can override it later from the language picker in the Access card.
+
+- Supported locales: `en`, `zh-CN`, `zh-TW`, `pt-BR`, `de`, `es`
+- Non-English translations are lazy-loaded in the browser.
+- The selected locale is saved in browser storage and reused on future visits.
+- Missing translation keys fall back to English.
+
 ## What it can do (today)
 
 - Chat with the model via Gateway WS (`chat.history`, `chat.send`, `chat.abort`, `chat.inject`)
 - Stream tool calls + live tool output cards in Chat (agent events)
 - Channels: WhatsApp/Telegram/Discord/Slack + plugin channels (Mattermost, etc.) status + QR login + per-channel config (`channels.status`, `web.login.*`, `config.patch`)
 - Instances: presence list + refresh (`system-presence`)
-- Sessions: list + per-session thinking/verbose overrides (`sessions.list`, `sessions.patch`)
+- Sessions: list + per-session thinking/fast/verbose/reasoning overrides (`sessions.list`, `sessions.patch`)
 - Cron jobs: list/add/edit/run/enable/disable + run history (`cron.*`)
 - Skills: status, enable/disable, install, API key updates (`skills.*`)
 - Nodes: list + caps (`node.list`)
 - Exec approvals: edit gateway or node allowlists + ask policy for `exec host=gateway/node` (`exec.approvals.*`)
-- Config: view/edit `~/.openclawcn/openclaw.json` (`config.get`, `config.set`)
+- Config: view/edit `~/.openclaw/openclaw.json` (`config.get`, `config.set`)
 - Config: apply + restart with validation (`config.apply`) and wake the last active session
 - Config writes include a base-hash guard to prevent clobbering concurrent edits
 - Config schema + form rendering (`config.schema`, including plugin + channel schemas); Raw JSON editor remains available
@@ -138,7 +147,7 @@ openclaw gateway --bind tailnet --token "$(openssl rand -hex 32)"
 
 Then open:
 
-- `http://<tailscale-ip>:28789/` (or your configured `gateway.controlUi.basePath`)
+- `http://<tailscale-ip>:18789/` (or your configured `gateway.controlUi.basePath`)
 
 Paste the token into the UI settings (sent as `connect.params.auth.token`).
 
@@ -151,7 +160,7 @@ OpenClaw **blocks** Control UI connections without device identity.
 **Recommended fix:** use HTTPS (Tailscale Serve) or open the UI locally:
 
 - `https://<magicdns>/` (Serve)
-- `http://127.0.0.1:28789/` (on the gateway host)
+- `http://127.0.0.1:18789/` (on the gateway host)
 
 **Insecure-auth toggle behavior:**
 
@@ -165,7 +174,12 @@ OpenClaw **blocks** Control UI connections without device identity.
 }
 ```
 
-`allowInsecureAuth` does not bypass Control UI device identity or pairing checks.
+`allowInsecureAuth` is a local compatibility toggle only:
+
+- It allows localhost Control UI sessions to proceed without device identity in
+  non-secure HTTP contexts.
+- It does not bypass pairing checks.
+- It does not relax remote (non-localhost) device identity requirements.
 
 **Break-glass only:**
 
@@ -204,7 +218,7 @@ For local development (separate dev server):
 pnpm ui:dev # auto-installs UI deps on first run
 ```
 
-Then point the UI at your Gateway WS URL (e.g. `ws://127.0.0.1:28789`).
+Then point the UI at your Gateway WS URL (e.g. `ws://127.0.0.1:18789`).
 
 ## Debugging/testing: dev server + remote Gateway
 
@@ -216,19 +230,20 @@ locally but the Gateway runs elsewhere.
 2. Open a URL like:
 
 ```text
-http://localhost:5173/?gatewayUrl=ws://<gateway-host>:28789
+http://localhost:5173/?gatewayUrl=ws://<gateway-host>:18789
 ```
 
 Optional one-time auth (if needed):
 
 ```text
-http://localhost:5173/?gatewayUrl=wss://<gateway-host>:28789&token=<gateway-token>
+http://localhost:5173/?gatewayUrl=wss://<gateway-host>:18789#token=<gateway-token>
 ```
 
 Notes:
 
 - `gatewayUrl` is stored in localStorage after load and removed from the URL.
-- `token` is stored in localStorage; `password` is kept in memory only.
+- `token` is imported from the URL fragment, stored in sessionStorage for the current browser tab session and selected gateway URL, and stripped from the URL; it is not stored in localStorage.
+- `password` is kept in memory only.
 - When `gatewayUrl` is set, the UI does not fall back to config or environment credentials.
   Provide `token` (or `password`) explicitly. Missing explicit credentials is an error.
 - Use `wss://` when the Gateway is behind TLS (Tailscale Serve, HTTPS proxy, etc.).

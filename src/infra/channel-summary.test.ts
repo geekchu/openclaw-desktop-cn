@@ -1,64 +1,84 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createEmptyPluginRegistry, type PluginRegistry } from "../plugins/registry.js";
-import { getActivePluginRegistry, setActivePluginRegistry } from "../plugins/runtime.js";
-import { createChannelTestPluginBase, createTestRegistry } from "../test-utils/channel-plugins.js";
-import { buildChannelSummary } from "./channel-summary.js";
+import { describe, expect, it, vi } from "vitest";
+import type { ChannelPlugin } from "../channels/plugins/types.js";
+
+vi.mock("../channels/plugins/index.js", () => ({
+  listChannelPlugins: vi.fn(),
+}));
+
+const { buildChannelSummary } = await import("./channel-summary.js");
+const { listChannelPlugins } = await import("../channels/plugins/index.js");
+
+function makeSlackHttpSummaryPlugin(): ChannelPlugin {
+  return {
+    id: "slack",
+    meta: {
+      id: "slack",
+      label: "Slack",
+      selectionLabel: "Slack",
+      docsPath: "/channels/slack",
+      blurb: "test",
+    },
+    capabilities: { chatTypes: ["direct"] },
+    config: {
+      listAccountIds: () => ["primary"],
+      defaultAccountId: () => "primary",
+      inspectAccount: (cfg) =>
+        (cfg as { marker?: string }).marker === "source"
+          ? {
+              accountId: "primary",
+              name: "Primary",
+              enabled: true,
+              configured: true,
+              mode: "http",
+              botToken: "xoxb-http",
+              signingSecret: "",
+              botTokenSource: "config",
+              signingSecretSource: "config", // pragma: allowlist secret
+              botTokenStatus: "available",
+              signingSecretStatus: "configured_unavailable", // pragma: allowlist secret
+            }
+          : {
+              accountId: "primary",
+              name: "Primary",
+              enabled: true,
+              configured: false,
+              mode: "http",
+              botToken: "xoxb-http",
+              botTokenSource: "config",
+              botTokenStatus: "available",
+            },
+      resolveAccount: () => ({
+        accountId: "primary",
+        name: "Primary",
+        enabled: true,
+        configured: false,
+        mode: "http",
+        botToken: "xoxb-http",
+        botTokenSource: "config",
+        botTokenStatus: "available",
+      }),
+      isConfigured: (account) => Boolean((account as { configured?: boolean }).configured),
+      isEnabled: () => true,
+    },
+    actions: {
+      listActions: () => ["send"],
+    },
+  };
+}
 
 describe("buildChannelSummary", () => {
-  let previousRegistry: PluginRegistry | null = null;
+  it("preserves Slack HTTP signing-secret unavailable state from source config", async () => {
+    vi.mocked(listChannelPlugins).mockReturnValue([makeSlackHttpSummaryPlugin()]);
 
-  beforeEach(() => {
-    previousRegistry = getActivePluginRegistry();
-  });
+    const lines = await buildChannelSummary({ marker: "resolved", channels: {} } as never, {
+      colorize: false,
+      includeAllowFrom: false,
+      sourceConfig: { marker: "source", channels: {} } as never,
+    });
 
-  afterEach(() => {
-    setActivePluginRegistry(previousRegistry ?? createEmptyPluginRegistry());
-  });
-
-  it("keeps rendering when one plugin crashes", async () => {
-    setActivePluginRegistry(
-      createTestRegistry([
-        {
-          pluginId: "telegram",
-          source: "test",
-          plugin: {
-            ...createChannelTestPluginBase({
-              id: "telegram",
-              label: "Telegram",
-              config: {
-                listAccountIds: () => ["default"],
-                resolveAccount: () => ({ configured: true }),
-                isConfigured: async () => true,
-              },
-            }),
-          },
-        },
-        {
-          pluginId: "broken",
-          source: "test",
-          plugin: {
-            ...createChannelTestPluginBase({
-              id: "broken",
-              label: "Broken",
-              config: {
-                listAccountIds: () => ["default"],
-                resolveAccount: () => {
-                  throw new TypeError("Cannot read properties of undefined (reading 'get')");
-                },
-              },
-            }),
-          },
-        },
-      ]),
+    expect(lines).toContain("Slack: configured");
+    expect(lines).toContain(
+      "  - primary (Primary) (bot:config, signing:config, secret unavailable in this command path)",
     );
-
-    const lines = await buildChannelSummary({}, { colorize: false });
-
-    expect(lines).toContain("Telegram: configured");
-    expect(
-      lines.some((line) =>
-        line.includes("Broken: error (Cannot read properties of undefined (reading 'get'))"),
-      ),
-    ).toBe(true);
   });
 });

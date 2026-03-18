@@ -1,27 +1,8 @@
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
-import { resolveCommandResolution } from "../infra/exec-approvals-analysis.js";
-import {
-  type ExecAsk,
-  type ExecHost,
-  type ExecSecurity,
-  type ExecApprovalsFile,
-  addAllowlistEntry,
-  evaluateShellAllowlist,
-  maxAsk,
-  minSecurity,
-  requiresExecApproval,
-  resolveSafeBins,
-  recordAllowlistUse,
-  resolveExecApprovals,
-  resolveExecApprovalsFromFile,
-  buildSafeShellCommand,
-  buildSafeBinsShellCommand,
-} from "../infra/exec-approvals.js";
+import { type ExecHost, loadExecApprovals, maxAsk, minSecurity } from "../infra/exec-approvals.js";
 import { resolveExecSafeBinRuntimePolicy } from "../infra/exec-safe-bin-runtime-policy.js";
-import { buildNodeShellCommand } from "../infra/node-shell.js";
 import {
   getShellPathFromLoginShell,
   resolveShellEnvFallbackTimeoutMs,
@@ -53,7 +34,6 @@ import type {
   ExecToolDefaults,
   ExecToolDetails,
 } from "./bash-tools.exec-types.js";
-import type { BashSandboxConfig } from "./bash-tools.shared.js";
 import {
   buildSandboxEnv,
   clampWithDefault,
@@ -344,7 +324,8 @@ export function createExecTool(
       if (elevatedRequested && elevatedMode === "full") {
         security = "full";
       }
-      const configuredAsk = defaults?.ask ?? "on-miss";
+      // Keep local exec defaults in sync with exec-approvals.json when tools.exec.ask is unset.
+      const configuredAsk = defaults?.ask ?? loadExecApprovals().defaults?.ask ?? "on-miss";
       const requestedAsk = normalizeExecAsk(params.ask);
       let ask = maxAsk(configuredAsk, requestedAsk ?? configuredAsk);
       const bypassApprovals = elevatedRequested && elevatedMode === "full";

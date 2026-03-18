@@ -20,6 +20,7 @@ export type ConfigState = {
   configIssues: unknown[];
   configSaving: boolean;
   configApplying: boolean;
+  updateRunning: boolean;
   configSnapshot: ConfigSnapshot | null;
   configSchema: unknown;
   configSchemaVersion: string | null;
@@ -33,8 +34,6 @@ export type ConfigState = {
   configActiveSection: string | null;
   configActiveSubsection: string | null;
   lastError: string | null;
-  // 一站式接入选中模型（纯 UI 状态，需从配置恢复）
-  onestopSelectedModel: string;
 };
 
 export async function loadConfig(state: ConfigState) {
@@ -79,49 +78,26 @@ export function applyConfigSchema(state: ConfigState, res: ConfigSchemaResponse)
 
 export function applyConfigSnapshot(state: ConfigState, snapshot: ConfigSnapshot) {
   state.configSnapshot = snapshot;
-
-  let rawFromSnapshot: string;
-  try {
-    rawFromSnapshot =
-      typeof snapshot.raw === "string"
-        ? snapshot.raw
-        : snapshot.config && typeof snapshot.config === "object"
-          ? serializeConfigForm(snapshot.config)
-          : state.configRaw;
-  } catch {
-    rawFromSnapshot = state.configRaw || "{}\n";
-  }
-
-  try {
-    if (!state.configFormDirty || state.configFormMode === "raw") {
-      state.configRaw = rawFromSnapshot;
-    } else if (state.configForm) {
-      state.configRaw = serializeConfigForm(state.configForm);
-    } else {
-      state.configRaw = rawFromSnapshot;
-    }
-  } catch {
+  const rawFromSnapshot =
+    typeof snapshot.raw === "string"
+      ? snapshot.raw
+      : snapshot.config && typeof snapshot.config === "object"
+        ? serializeConfigForm(snapshot.config)
+        : state.configRaw;
+  if (!state.configFormDirty || state.configFormMode === "raw") {
+    state.configRaw = rawFromSnapshot;
+  } else if (state.configForm) {
+    state.configRaw = serializeConfigForm(state.configForm);
+  } else {
     state.configRaw = rawFromSnapshot;
   }
-
   state.configValid = typeof snapshot.valid === "boolean" ? snapshot.valid : null;
   state.configIssues = Array.isArray(snapshot.issues) ? snapshot.issues : [];
 
   if (!state.configFormDirty) {
-    // Use the config object directly if cloning fails — better than leaving configForm null
-    const cfg = snapshot.config ?? {};
-    state.configForm = cloneConfigObject(cfg);
-    state.configFormOriginal = cloneConfigObject(cfg);
+    state.configForm = cloneConfigObject(snapshot.config ?? {});
+    state.configFormOriginal = cloneConfigObject(snapshot.config ?? {});
     state.configRawOriginal = rawFromSnapshot;
-  }
-
-  // 从配置恢复一站式选中模型（重启后 onestopSelectedModel 为空）
-  if (!state.onestopSelectedModel) {
-    const cfg = snapshot.config as Record<string, any> | undefined;
-    const primary = cfg?.agents?.defaults?.model?.primary as string | undefined;
-    if (primary?.startsWith("onestop/")) {
-      state.onestopSelectedModel = primary.slice("onestop/".length);
-    }
   }
 }
 
@@ -161,7 +137,7 @@ export async function saveConfig(state: ConfigState) {
     const raw = serializeFormForSubmit(state);
     const baseHash = state.configSnapshot?.hash;
     if (!baseHash) {
-      state.lastError = "配置哈希缺失；请重新加载后重试。";
+      state.lastError = "Config hash missing; reload and retry.";
       return;
     }
     await state.client.request("config.set", { raw, baseHash });
@@ -184,7 +160,7 @@ export async function applyConfig(state: ConfigState) {
     const raw = serializeFormForSubmit(state);
     const baseHash = state.configSnapshot?.hash;
     if (!baseHash) {
-      state.lastError = "配置哈希缺失；请重新加载后重试。";
+      state.lastError = "Config hash missing; reload and retry.";
       return;
     }
     await state.client.request("config.apply", {
@@ -198,6 +174,31 @@ export async function applyConfig(state: ConfigState) {
     state.lastError = String(err);
   } finally {
     state.configApplying = false;
+  }
+}
+
+export async function runUpdate(state: ConfigState) {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  state.updateRunning = true;
+  state.lastError = null;
+  try {
+    const res = await state.client.request<{
+      ok?: boolean;
+      result?: { status?: string; reason?: string };
+    }>("update.run", {
+      sessionKey: state.applySessionKey,
+    });
+    if (res && res.ok === false) {
+      const status = res.result?.status ?? "error";
+      const reason = res.result?.reason ?? "Update failed.";
+      state.lastError = `Update ${status}: ${reason}`;
+    }
+  } catch (err) {
+    state.lastError = String(err);
+  } finally {
+    state.updateRunning = false;
   }
 }
 
@@ -222,5 +223,61 @@ export function removeConfigFormValue(state: ConfigState, path: Array<string | n
   state.configFormDirty = true;
   if (state.configFormMode === "form") {
     state.configRaw = serializeConfigForm(base);
+  }
+}
+
+export function findAgentConfigEntryIndex(
+  config: Record<string, unknown> | null,
+  agentId: string,
+): number {
+  const normalizedAgentId = agentId.trim();
+  if (!normalizedAgentId) {
+    return -1;
+  }
+  const list = (config as { agents?: { list?: unknown[] } } | null)?.agents?.list;
+  if (!Array.isArray(list)) {
+    return -1;
+  }
+  return list.findIndex(
+    (entry) =>
+      entry &&
+      typeof entry === "object" &&
+      "id" in entry &&
+      (entry as { id?: string }).id === normalizedAgentId,
+  );
+}
+
+export function ensureAgentConfigEntry(state: ConfigState, agentId: string): number {
+  const normalizedAgentId = agentId.trim();
+  if (!normalizedAgentId) {
+    return -1;
+  }
+  const source =
+    state.configForm ?? (state.configSnapshot?.config as Record<string, unknown> | null);
+  const existingIndex = findAgentConfigEntryIndex(source, normalizedAgentId);
+  if (existingIndex >= 0) {
+    return existingIndex;
+  }
+  const list = (source as { agents?: { list?: unknown[] } } | null)?.agents?.list;
+  const nextIndex = Array.isArray(list) ? list.length : 0;
+  updateConfigFormValue(state, ["agents", "list", nextIndex, "id"], normalizedAgentId);
+  return nextIndex;
+}
+
+export async function openConfigFile(state: ConfigState): Promise<void> {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    await state.client.request("config.openFile", {});
+  } catch {
+    const path = state.configSnapshot?.path;
+    if (path) {
+      try {
+        await navigator.clipboard.writeText(path);
+      } catch {
+        // ignore
+      }
+    }
   }
 }

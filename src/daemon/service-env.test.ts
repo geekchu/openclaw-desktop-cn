@@ -263,21 +263,21 @@ describe("buildServiceEnvironment", () => {
   it("sets minimal PATH and gateway vars", () => {
     const env = buildServiceEnvironment({
       env: { HOME: "/home/user" },
-      port: 28789,
-      token: "secret",
+      port: 18789,
     });
     expect(env.HOME).toBe("/home/user");
     if (process.platform === "win32") {
-      expect(env.PATH).toBe("");
+      expect(env).not.toHaveProperty("PATH");
     } else {
       expect(env.PATH).toContain("/usr/bin");
     }
-    expect(env.OPENCLAW_GATEWAY_PORT).toBe("28789");
-    expect(env.OPENCLAW_GATEWAY_TOKEN).toBe("secret");
+    expect(env.OPENCLAW_GATEWAY_PORT).toBe("18789");
+    expect(env.OPENCLAW_GATEWAY_TOKEN).toBeUndefined();
     expect(env.OPENCLAW_SERVICE_MARKER).toBe("openclaw");
     expect(env.OPENCLAW_SERVICE_KIND).toBe("gateway");
     expect(typeof env.OPENCLAW_SERVICE_VERSION).toBe("string");
     expect(env.OPENCLAW_SYSTEMD_UNIT).toBe("openclaw-gateway.service");
+    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("OpenClaw Gateway");
     if (process.platform === "darwin") {
       expect(env.OPENCLAW_LAUNCHD_LABEL).toBe("ai.openclaw.gateway");
     }
@@ -302,9 +302,10 @@ describe("buildServiceEnvironment", () => {
   it("uses profile-specific unit and label", () => {
     const env = buildServiceEnvironment({
       env: { HOME: "/home/user", OPENCLAW_PROFILE: "work" },
-      port: 28789,
+      port: 18789,
     });
     expect(env.OPENCLAW_SYSTEMD_UNIT).toBe("openclaw-gateway-work.service");
+    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("OpenClaw Gateway (work)");
     if (process.platform === "darwin") {
       expect(env.OPENCLAW_LAUNCHD_LABEL).toBe("ai.openclaw.work");
     }
@@ -328,6 +329,20 @@ describe("buildServiceEnvironment", () => {
     expect(env.NO_PROXY).toBe("localhost,127.0.0.1");
     expect(env.http_proxy).toBe("http://proxy.local:7890");
     expect(env.all_proxy).toBe("socks5://proxy.local:1080");
+  });
+
+  it("omits PATH on Windows so Scheduled Tasks can inherit the current shell path", () => {
+    const env = buildServiceEnvironment({
+      env: {
+        HOME: "C:\\Users\\alice",
+        PATH: "C:\\Windows\\System32;C:\\Tools\\rg",
+      },
+      port: 18789,
+      platform: "win32",
+    });
+
+    expect(env).not.toHaveProperty("PATH");
+    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("OpenClaw Gateway");
   });
 });
 
@@ -451,7 +466,7 @@ describe("shared Node TLS env defaults", () => {
 describe("resolveGatewayStateDir", () => {
   it("uses the default state dir when no overrides are set", () => {
     const env = { HOME: "/Users/test" };
-    expect(resolveGatewayStateDir(env)).toBe(path.join("/Users/test", ".openclawcn"));
+    expect(resolveGatewayStateDir(env)).toBe(path.join("/Users/test", ".openclaw"));
   });
 
   it("appends the profile suffix when set", () => {
@@ -461,7 +476,7 @@ describe("resolveGatewayStateDir", () => {
 
   it("treats default profiles as the base state dir", () => {
     const env = { HOME: "/Users/test", OPENCLAW_PROFILE: "Default" };
-    expect(resolveGatewayStateDir(env)).toBe(path.join("/Users/test", ".openclawcn"));
+    expect(resolveGatewayStateDir(env)).toBe(path.join("/Users/test", ".openclaw"));
   });
 
   it("uses OPENCLAW_STATE_DIR when provided", () => {

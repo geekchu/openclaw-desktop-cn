@@ -9,6 +9,7 @@ onlyBuiltDependencies:
   - "@tloncorp/api"
   - "@matrix-org/matrix-sdk-crypto-nodejs"
   - "@napi-rs/canvas"
+  - "@tloncorp/api"
   - "@whiskeysockets/baileys"
   - authenticate-pam
   - esbuild

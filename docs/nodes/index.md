@@ -52,14 +52,23 @@ forwards `exec` calls to the **node host** when `host=node` is selected.
 
 - **Gateway host**: receives messages, runs the model, routes tool calls.
 - **Node host**: executes `system.run`/`system.which` on the node machine.
-- **Approvals**: enforced on the node host via `~/.openclawcn/exec-approvals.json`.
+- **Approvals**: enforced on the node host via `~/.openclaw/exec-approvals.json`.
+
+Approval note:
+
+- Approval-backed node runs bind exact request context.
+- For direct shell/runtime file executions, OpenClaw also best-effort binds one concrete local
+  file operand and denies the run if that file changes before execution.
+- If OpenClaw cannot identify exactly one concrete local file for an interpreter/runtime command,
+  approval-backed execution is denied instead of pretending full runtime coverage. Use sandboxing,
+  separate hosts, or an explicit trusted allowlist/full workflow for broader interpreter semantics.
 
 ### Start a node host (foreground)
 
 On the node machine:
 
 ```bash
-openclaw node run --host <gateway-host> --port 28789 --display-name "Build Node"
+openclaw node run --host <gateway-host> --port 18789 --display-name "Build Node"
 ```
 
 ### Remote gateway via SSH tunnel (loopback bind)
@@ -71,8 +80,8 @@ node host at the local end of the tunnel.
 Example (node host -> gateway host):
 
 ```bash
-# Terminal A (keep running): forward local 18790 -> gateway 127.0.0.1:28789
-ssh -N -L 18790:127.0.0.1:28789 user@gateway-host
+# Terminal A (keep running): forward local 18790 -> gateway 127.0.0.1:18789
+ssh -N -L 18790:127.0.0.1:18789 user@gateway-host
 
 # Terminal B: export the gateway token and connect through the tunnel
 export OPENCLAW_GATEWAY_TOKEN="<gateway-token>"
@@ -81,13 +90,18 @@ openclaw node run --host 127.0.0.1 --port 18790 --display-name "Build Node"
 
 Notes:
 
-- The token is `gateway.auth.token` from the gateway config (`~/.openclawcn/openclaw.json` on the gateway host).
-- `openclaw node run` reads `OPENCLAW_GATEWAY_TOKEN` for auth.
+- `openclaw node run` supports token or password auth.
+- Env vars are preferred: `OPENCLAW_GATEWAY_TOKEN` / `OPENCLAW_GATEWAY_PASSWORD`.
+- Config fallback is `gateway.auth.token` / `gateway.auth.password`.
+- In local mode, node host intentionally ignores `gateway.remote.token` / `gateway.remote.password`.
+- In remote mode, `gateway.remote.token` / `gateway.remote.password` are eligible per remote precedence rules.
+- If active local `gateway.auth.*` SecretRefs are configured but unresolved, node-host auth fails closed.
+- Legacy `CLAWDBOT_GATEWAY_*` env vars are intentionally ignored by node-host auth resolution.
 
 ### Start a node host (service)
 
 ```bash
-openclaw node install --host <gateway-host> --port 28789 --display-name "Build Node"
+openclaw node install --host <gateway-host> --port 18789 --display-name "Build Node"
 openclaw node restart
 ```
 
@@ -103,7 +117,7 @@ openclaw nodes status
 
 Naming options:
 
-- `--display-name` on `openclaw node run` / `openclaw node install` (persists in `~/.openclawcn/node.json` on the node).
+- `--display-name` on `openclaw node run` / `openclaw node install` (persists in `~/.openclaw/node.json` on the node).
 - `openclaw nodes rename --node <id|name|ip> --name "Build Node"` (gateway override).
 
 ### Allowlist the commands
@@ -115,7 +129,7 @@ openclaw approvals allowlist add --node <id|name|ip> "/usr/bin/uname"
 openclaw approvals allowlist add --node <id|name|ip> "/usr/bin/sw_vers"
 ```
 
-Approvals live on the node host at `~/.openclawcn/exec-approvals.json`.
+Approvals live on the node host at `~/.openclaw/exec-approvals.json`.
 
 ### Point exec at the node
 
@@ -214,7 +228,7 @@ Notes:
 
 ## Screen recordings (nodes)
 
-Nodes expose `screen.record` (mp4). Example:
+Supported nodes expose `screen.record` (mp4). Example:
 
 ```bash
 openclaw nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10
@@ -223,10 +237,9 @@ openclaw nodes screen record --node <idOrNameOrIp> --duration 10s --fps 10 --no-
 
 Notes:
 
-- `screen.record` requires the node app to be foregrounded.
-- Android will show the system screen-capture prompt before recording.
+- `screen.record` availability depends on node platform.
 - Screen recordings are clamped to `<= 60s`.
-- `--no-audio` disables microphone capture (supported on iOS/Android; macOS uses system capture audio).
+- `--no-audio` disables microphone capture on supported platforms.
 - Use `--screen <index>` to select a display when multiple screens are available.
 
 ## Location (nodes)
@@ -273,7 +286,6 @@ Available families:
 - `contacts.search`, `contacts.add`
 - `calendar.events`, `calendar.add`
 - `motion.activity`, `motion.pedometer`
-- `app.update`
 
 Example invokes:
 
@@ -286,7 +298,6 @@ openclaw nodes invoke --node <idOrNameOrIp> --command photos.latest --params '{"
 Notes:
 
 - Motion commands are capability-gated by available sensors.
-- `app.update` is permission + policy gated by the node runtime.
 
 ## System commands (node host / mac node)
 
@@ -313,7 +324,7 @@ Notes:
 - Node hosts ignore `PATH` overrides and strip dangerous startup/shell keys (`DYLD_*`, `LD_*`, `NODE_OPTIONS`, `PYTHON*`, `PERL*`, `RUBYOPT`, `SHELLOPTS`, `PS4`). If you need extra PATH entries, configure the node host service environment (or install tools in standard locations) instead of passing `PATH` via `--env`.
 - On macOS node mode, `system.run` is gated by exec approvals in the macOS app (Settings → Exec approvals).
   Ask/allowlist/full behave the same as the headless node host; denied prompts return `SYSTEM_RUN_DENIED`.
-- On headless node host, `system.run` is gated by exec approvals (`~/.openclawcn/exec-approvals.json`).
+- On headless node host, `system.run` is gated by exec approvals (`~/.openclaw/exec-approvals.json`).
 
 ## Exec node binding
 
@@ -353,14 +364,14 @@ or for running a minimal node alongside a server.
 Start it:
 
 ```bash
-openclaw node run --host <gateway-host> --port 28789
+openclaw node run --host <gateway-host> --port 18789
 ```
 
 Notes:
 
 - Pairing is still required (the Gateway will show a device pairing prompt).
-- The node host stores its node id, token, display name, and gateway connection info in `~/.openclawcn/node.json`.
-- Exec approvals are enforced locally via `~/.openclawcn/exec-approvals.json`
+- The node host stores its node id, token, display name, and gateway connection info in `~/.openclaw/node.json`.
+- Exec approvals are enforced locally via `~/.openclaw/exec-approvals.json`
   (see [Exec approvals](/tools/exec-approvals)).
 - On macOS, the headless node host executes `system.run` locally by default. Set
   `OPENCLAW_NODE_EXEC_HOST=app` to route `system.run` through the companion app exec host; add
