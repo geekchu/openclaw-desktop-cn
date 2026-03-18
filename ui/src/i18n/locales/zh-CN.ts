@@ -65,6 +65,7 @@ export const zh_CN: TranslationMap = {
     aiAgents: "代理、模型、技能、工具、记忆和会话设置。",
     debug: "网关快照、事件和手动 RPC 调用。",
     logs: "网关文件日志的实时追踪。",
+    terminal: "访问并控制底层终端环境。",
   },
   overview: {
     access: {
