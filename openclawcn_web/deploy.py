@@ -131,6 +131,20 @@ def main():
         add_header Cache-Control "no-cache" always;
         default_type application/json;
     }
+
+    location = /update/latest-macos.json {
+        alias /var/www/openclaw-update/latest-macos.json;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "no-cache" always;
+        default_type application/json;
+    }
+
+    location = /update/latest-windows.json {
+        alias /var/www/openclaw-update/latest-windows.json;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "no-cache" always;
+        default_type application/json;
+    }
 }
 """
         print("Writing nginx config for static site...")

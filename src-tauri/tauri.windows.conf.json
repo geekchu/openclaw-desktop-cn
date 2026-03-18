@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "version": "0.2.7",
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://openclawcn.net/update/latest-windows.json"]
+    }
+  }
+}

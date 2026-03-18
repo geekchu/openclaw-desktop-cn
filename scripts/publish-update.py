@@ -4,14 +4,22 @@ OpenClaw 更新发布脚本 (Python + paramiko)
 
 替代 publish-update.sh，解决 Windows 上 scp 多次输密码、jq 依赖、中文文件名编码等问题。
 
-用法: python scripts/publish-update.py <版本号>
-示例: python scripts/publish-update.py 0.3.0
+用法:
+  python scripts/publish-update.py <版本号> --platform macos
+  python scripts/publish-update.py <版本号> --platform windows
+  python scripts/publish-update.py <版本号> --platform all
+
+示例:
+  python scripts/publish-update.py 0.3.0 --platform macos
+  python scripts/publish-update.py 0.3.0 --platform windows
+  python scripts/publish-update.py 0.3.0 --platform all  # 旧版 Windows 客户端兼容 latest.json
 
 前提条件:
 1. 已完成 cargo tauri build（且设置了 TAURI_SIGNING_PRIVATE_KEY 环境变量）
 2. 服务器已通过 setup-update-server.sh + deploy-update-nginx.sh 初始化
 3. pip install paramiko（如未安装）
 """
+import argparse
 import getpass
 import json
 import os
@@ -32,12 +40,41 @@ except ImportError:
 HOST = "47.57.241.17"
 USER = "root"
 REMOTE_DIR = "/var/www/openclaw-update"
-UPDATE_URL = "https://openclawcn.net/update/latest.json"
 CDN_BASE = "https://cdn.openclawcn.net/update/artifacts"
+UPDATE_METADATA = {
+    "all": {
+        "path": "latest.json",
+        "url": "https://openclawcn.net/update/latest.json",
+        # latest.json 仅保留给旧版 Windows 客户端，始终只写入 Windows 条目
+        "platforms": {"windows-x86_64"},
+    },
+    "macos": {
+        "path": "latest-macos.json",
+        "url": "https://openclawcn.net/update/latest-macos.json",
+        "platforms": {"darwin-aarch64", "darwin-x86_64"},
+    },
+    "windows": {
+        "path": "latest-windows.json",
+        "url": "https://openclawcn.net/update/latest-windows.json",
+        "platforms": {"windows-x86_64"},
+    },
+}
 
 # 项目根目录（脚本在 scripts/ 下）
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BUNDLE_BASE = PROJECT_ROOT / "src-tauri" / "target" / "release" / "bundle"
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="发布 OpenClaw Tauri updater 元数据")
+    parser.add_argument("version", help="要发布的安装包版本号")
+    parser.add_argument(
+        "--platform",
+        choices=("all", "macos", "windows"),
+        required=True,
+        help="发布目标平台；all 表示额外写入旧版 Windows 客户端读取的 latest.json",
+    )
+    return parser.parse_args()
 
 
 def get_password():
@@ -49,7 +86,7 @@ def get_password():
     return getpass.getpass(f"SSH password for {USER}@{HOST}: ")
 
 
-def collect_artifacts(version):
+def collect_artifacts(version, release_platform):
     """扫描 bundle 目录，收集各平台产物。返回 (platforms_dict, extra_uploads)。"""
     platforms = {}
     extra_uploads = []
@@ -159,37 +196,53 @@ def collect_artifacts(version):
             }
             print(f"  [OK] Linux AppImage: {f.name}")
 
+    allowed_platforms = UPDATE_METADATA[release_platform]["platforms"]
+    if allowed_platforms is not None:
+        platforms = {
+            platform_key: info
+            for platform_key, info in platforms.items()
+            if platform_key in allowed_platforms
+        }
+        if release_platform != "macos":
+            extra_uploads = []
+
     return platforms, extra_uploads
 
 
-def fetch_existing_json():
-    """通过 HTTPS 获取服务器现有 latest.json，失败返回 None。"""
+def fetch_existing_json(update_url):
+    """通过 HTTPS 获取服务器现有 updater 元数据，失败返回 None。"""
     try:
-        req = Request(UPDATE_URL, headers={"User-Agent": "publish-update/1.0"})
+        req = Request(update_url, headers={"User-Agent": "publish-update/1.0"})
         with urlopen(req, timeout=10) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except HTTPError as e:
         if e.code == 404:
-            print("  服务器上还没有 latest.json，将创建全新 latest.json")
+            print("  服务器上还没有目标平台 updater 元数据，将创建全新文件")
             return None
-        raise RuntimeError(f"无法获取服务器 latest.json (HTTP {e.code}): {e.reason}") from e
+        raise RuntimeError(f"无法获取服务器 updater 元数据 (HTTP {e.code}): {e.reason}") from e
     except (URLError, UnicodeDecodeError, json.JSONDecodeError, OSError) as e:
-        raise RuntimeError(f"无法获取服务器 latest.json: {e}") from e
+        raise RuntimeError(f"无法获取服务器 updater 元数据: {e}") from e
 
 
-def build_latest_json(version, platforms):
-    """生成 latest.json 内容，同版本时合并已有平台条目。"""
+def build_latest_json(version, platforms, update_url, allowed_platforms):
+    """生成 updater 元数据内容，同版本时仅合并目标元数据允许的平台条目。"""
     pub_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    existing = fetch_existing_json()
+    existing = fetch_existing_json(update_url)
     existing_platforms = {}
     if existing and existing.get("version") == version:
         existing_platforms = existing.get("platforms", {})
+        if allowed_platforms is not None:
+            existing_platforms = {
+                platform_key: info
+                for platform_key, info in existing_platforms.items()
+                if platform_key in allowed_platforms
+            }
         print(f"  服务器上已有 v{version}，将合并平台条目")
     elif existing:
-        print(f"  服务器上版本为 v{existing.get('version')}，将创建全新 latest.json")
+        print(f"  服务器上版本为 v{existing.get('version')}，将创建全新 updater 元数据")
     else:
-        print(f"  将创建全新 latest.json")
+        print(f"  将创建全新 updater 元数据")
 
     # 合并：已有条目为基础，本次构建覆盖
     merged = dict(existing_platforms)
@@ -233,25 +286,28 @@ def upload(sftp, local_path, remote_path):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(f"用法: python {sys.argv[0]} <版本号>")
-        print(f"示例: python {sys.argv[0]} 0.3.0")
-        sys.exit(1)
+    args = parse_args()
+    version = args.version
+    release_platform = args.platform
+    update_meta = UPDATE_METADATA[release_platform]
+    update_url = update_meta["url"]
+    update_filename = update_meta["path"]
+    allowed_platforms = update_meta["platforms"]
 
-    version = sys.argv[1]
-    print(f"=== 发布 OpenClaw v{version} 更新到 {HOST} ===\n")
+    print(f"=== 发布 OpenClaw v{version} 更新到 {HOST} ===")
+    print(f"=== 目标平台: {release_platform} ===\n")
 
     # 1. 收集产物
     print("[1/4] 扫描构建产物...")
-    platforms, extra_uploads = collect_artifacts(version)
+    platforms, extra_uploads = collect_artifacts(version, release_platform)
     if not platforms:
-        print("ERROR: 未找到任何构建产物。请先运行 cargo tauri build。")
+        print("ERROR: 未找到目标平台的构建产物。请先运行对应平台的 cargo tauri build。")
         sys.exit(1)
 
-    # 2. 生成 latest.json
-    print("\n[2/4] 生成 latest.json...")
+    # 2. 生成 updater 元数据
+    print("\n[2/4] 生成 updater 元数据...")
     try:
-        latest = build_latest_json(version, platforms)
+        latest = build_latest_json(version, platforms, update_url, allowed_platforms)
     except RuntimeError as e:
         print(f"ERROR: {e}")
         sys.exit(1)
@@ -286,9 +342,9 @@ def main():
         for f in extra_uploads:
             upload(sftp, f, f"{REMOTE_DIR}/artifacts/{f.name}")
 
-        # 上传 latest.json
-        print(f"  >> latest.json -> {REMOTE_DIR}/latest.json")
-        with sftp.open(f"{REMOTE_DIR}/latest.json", "w") as remote_f:
+        # 上传 updater 元数据
+        print(f"  >> {update_filename} -> {REMOTE_DIR}/{update_filename}")
+        with sftp.open(f"{REMOTE_DIR}/{update_filename}", "w") as remote_f:
             remote_f.write(latest_str)
     finally:
         sftp.close()
@@ -296,7 +352,7 @@ def main():
     ssh.close()
 
     print(f"\n=== 发布完成! ===")
-    print(f"  更新端点: {UPDATE_URL}")
+    print(f"  更新端点: {update_url}")
     print(f"  安装包CDN: {CDN_BASE}/")
     print(f"\n  别忘了更新官网下载链接!")
     print(f"  1. 修改 openclawcn_web/src/app/page.tsx 中的版本号和文件名")

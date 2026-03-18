@@ -6,7 +6,7 @@
 - [环境准备（一次性）](#环境准备一次性)
 - [每次发版流程](#每次发版流程)
 - [自动更新机制](#自动更新机制)
-- [latest.json 格式参考](#latestjson-格式参考)
+- [updater 元数据格式参考](#updater-元数据格式参考)
 - [服务器维护](#服务器维护)
 - [macOS 代码签名与公证（一次性设置）](#macos-代码签名与公证一次性设置)
 - [Windows 代码签名（后续）](#windows-代码签名后续)
@@ -21,9 +21,11 @@
 ┌──────────────────┐                    ┌───────────────────────────────────┐
 │  客户端 App       │   检查更新 (HTTPS)  │  openclawcn.net                   │
 │  (Tauri v2)      │ ──────────────────→ │  Nginx 静态文件服务                │
-│                  │  ← latest.json     │                                   │
+│                  │  ← latest-*.json   │                                   │
 │                  │                    │  /var/www/openclaw-update/         │
 │                  │  ← 下载安装包       │    ├── latest.json                 │
+│                  │                    │    ├── latest-macos.json           │
+│                  │                    │    ├── latest-windows.json         │
 │                  │                    │    └── artifacts/                  │
 │                  │                    │        ├── *-setup.exe             │
 └──────────────────┘                    │        ├── *.app.tar.gz            │
@@ -31,24 +33,56 @@
                                         └───────────────────────────────────┘
 
 构建机器 (Windows / macOS)                         更新服务器 (47.57.241.17)
-┌──────────────────┐   paramiko 上传产物 + latest.json  ┌───────────────────────┐
+┌──────────────────┐   paramiko 上传产物 + latest-*.json ┌───────────────────────┐
 │ pnpm installer:  │ ─────────────────────────────────→ │ /var/www/             │
 │   build          │   publish-update.py                │   openclaw-update/    │
 └──────────────────┘                                    └───────────────────────┘
-                                                      ↓ latest.json (元数据)
+                                                      ↓ latest-*.json (元数据)
                                                     openclawcn.net/update/
                                                       ↓ 安装包文件
                                                     cdn.openclawcn.net/update/artifacts/
 ```
 
-**关键配置文件：** `src-tauri/tauri.conf.json`
+**关键配置文件：** `src-tauri/tauri.conf.json`、`src-tauri/tauri.macos.conf.json`、`src-tauri/tauri.windows.conf.json`
 
 | 配置项                          | 值                                          | 说明                           |
 | ------------------------------- | ------------------------------------------- | ------------------------------ |
-| `version`                       | 当前版本号                                  | 客户端用于对比是否需要更新     |
-| `plugins.updater.endpoints`     | `https://openclawcn.net/update/latest.json` | 更新检查端点                   |
+| `version`                       | 当前平台版本号                              | 客户端用于对比是否需要更新     |
+| `plugins.updater.endpoints`     | macOS / Windows 各自的 `latest-*.json`      | 新版本客户端使用的平台独立更新端点 |
 | `plugins.updater.pubkey`        | minisign 公钥（Base64）                     | 验证安装包签名                 |
 | `bundle.createUpdaterArtifacts` | `true`                                      | 构建时自动生成 `.sig` 签名文件 |
+
+> `src-tauri/tauri.conf.json` 中的 `latest.json` 仅保留给**旧版 Windows 客户端**兼容使用。
+> 新版本客户端只使用 `latest-macos.json` / `latest-windows.json`。
+>
+> 当前桌面自动更新只支持**按平台拆分**，不支持 stable / beta / dev 这类**按发布渠道拆分**。
+> 如果后续需要分渠道更新，必须继续拆分 updater endpoint 和元数据文件，例如 `latest-macos-beta.json`、`latest-windows-beta.json`。
+
+### 分平台升级规则
+
+这套发布链路采用固定策略：
+
+- `latest.json`：仅旧版 Windows 客户端兼容使用，只允许出现 `windows-x86_64`
+- `latest-windows.json`：仅新版本 Windows 客户端使用，只允许出现 `windows-x86_64`
+- `latest-macos.json`：仅 macOS 客户端使用，允许出现 `darwin-aarch64` 和/或 `darwin-x86_64`
+
+必须按下面的规则执行：
+
+1. Windows 发版必须双写
+先发布 `latest-windows.json`，再发布 `latest.json`。两次发布使用同一个 Windows 安装包、同一个版本号、同一个 `.sig`。
+
+2. macOS 发版只单写
+macOS 发版时只更新 `latest-macos.json`。不要执行 `--platform all`，也不要把 darwin 条目写进 `latest.json`。
+
+3. `latest.json` 不能再承担跨平台入口
+它现在只服务旧版 Windows 客户端。即使将来同时发 macOS 和 Windows，也不要往 `latest.json` 里写 macOS 条目。
+
+4. Windows 双写缺一不可
+如果只执行了 `--platform windows`，新版本 Windows 客户端能升级，但旧版 Windows 客户端不会跟进。
+如果只执行了 `--platform all`，旧版 Windows 客户端能升级，但新版本 Windows 客户端会读不到最新元数据。
+
+5. 任一步失败都不要继续
+Windows 双写时，任意一步失败，都应先修复并重新执行缺失步骤，再继续官网更新或对外发布。
 
 ---
 
@@ -101,7 +135,7 @@
 - `/var/www/openclaw-update/` 目录已创建
 - `/var/www/openclaw-update/artifacts/` 目录已创建
 - Nginx `/update/` location 已添加到 `openclawcn.net` 站点配置
-- `latest.json` 占位文件已就位
+- `latest.json`、`latest-macos.json`、`latest-windows.json` 占位文件已就位
 
 如需在新服务器上重新部署：
 
@@ -119,7 +153,9 @@ ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 
 > **CDN 架构说明：**
 >
-> - `openclawcn.net/update/latest.json` — 更新元数据（版本号、签名），由原服务器直接提供
+> - `openclawcn.net/update/latest.json` — 旧版 Windows 客户端兼容元数据，仅保留 `windows-x86_64`
+> - `openclawcn.net/update/latest-macos.json` — macOS 更新元数据（版本号、签名），由原服务器直接提供
+> - `openclawcn.net/update/latest-windows.json` — Windows 更新元数据（版本号、签名），由原服务器直接提供
 > - `cdn.openclawcn.net/update/artifacts/` — 安装包二进制文件，通过 CDN 分发加速下载
 > - 当前 `cdn.openclawcn.net` 临时指向原服务器 `43.99.16.221`，后续切换 DNS 即可无缝迁移到真正的 CDN
 
@@ -129,31 +165,52 @@ ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 
 ### 步骤 1：更新版本号
 
-需要同步修改两个文件中的版本号（**必须一致**）：
+按目标平台修改对应配置文件中的版本号：
 
-**`src-tauri/tauri.conf.json`：**
+**macOS：`src-tauri/tauri.macos.conf.json`**
 
 ```json
 "version": "0.3.0"
 ```
 
-**`src-tauri/Cargo.toml`：**
+**Windows：`src-tauri/tauri.windows.conf.json`**
 
-```toml
-version = "0.3.0"
+```json
+"version": "0.3.0"
 ```
 
-> 新版本号必须严格大于当前已发布版本，否则客户端不会触发更新。
-> `Cargo.lock` 会在下次构建时自动同步，无需手动修改。
+> 新版本号必须严格大于该平台当前已发布版本，否则客户端不会触发更新。
+> `src-tauri/tauri.conf.json` 是跨平台兜底配置；桌面端正式发版以平台配置文件为准。
 
 ### 步骤 2：提交并打 Tag
 
+桌面版平台独立发版时，Git tag 也必须带平台后缀：
+
+- macOS：`v<version>-macos`
+- Windows：`v<version>-windows`
+
+例如只发 macOS：
+
 ```bash
-git add src-tauri/tauri.conf.json src-tauri/Cargo.toml
-git commit -m "release: v0.3.0"
-git tag v0.3.0
+git add src-tauri/tauri.macos.conf.json
+git commit -m "release: macOS v0.3.0"
+git tag v0.3.0-macos
 git push && git push --tags
 ```
+
+例如只发 Windows：
+
+```bash
+git add src-tauri/tauri.windows.conf.json
+git commit -m "release: Windows v0.3.0"
+git tag v0.3.0-windows
+git push && git push --tags
+```
+
+只发单个平台时，只创建对应平台的 tag。
+
+> ⚠️ 桌面版分平台发版后，不要再创建无平台后缀的桌面 release tag（例如 `v0.3.0`）。
+> 桌面版 tag 必须始终带平台后缀，避免把 macOS / Windows 的独立版本号混成一个公共发布标记。
 
 > ⚠️ 如果构建过程中需要修改配置并 `git commit --amend`，之后推送时需加 `--force`：
 >
@@ -308,33 +365,53 @@ spctl -a -vvv -t open "$DMG_PATH"
 
 #### 方式 A：使用脚本（推荐）
 
+**Windows 发版 checklist：**
+
 ```bash
 # 如未安装 paramiko，先安装
 pip install paramiko
 
-# 发布（会交互式输入 SSH 密码，只需输一次）
-python scripts/publish-update.py 0.3.0
+# 1. 先发布给新版本 Windows 客户端使用的 latest-windows.json
+python scripts/publish-update.py 0.3.0 --platform windows
+
+# 2. 再双写 latest.json，兼容旧版 Windows 客户端
+python scripts/publish-update.py 0.3.0 --platform all
+```
+
+执行要求：
+
+- 上面两条命令必须连续执行，缺一不可
+- 两条命令必须使用同一个版本号
+- 如果第一条失败，不要执行第二条
+- 如果第二条失败，先修复后补执行第二条，不要直接进入官网更新或对外发布
+
+**macOS 发版 checklist：**
+
+```bash
+# 发布 macOS（同版本下会合并 ARM / Intel 平台条目）
+python scripts/publish-update.py 0.3.0 --platform macos
 ```
 
 也可通过环境变量传入密码（CI 场景）：
 
 ```bash
-DEPLOY_SSH_PASSWORD=xxx python scripts/publish-update.py 0.3.0
+DEPLOY_SSH_PASSWORD=xxx python scripts/publish-update.py 0.3.0 --platform windows
 ```
 
 脚本自动完成：
 
 1. 扫描构建产物目录（包括 `src-tauri/target/release/bundle/` 和跨架构目录如 `src-tauri/target/aarch64-apple-darwin/release/bundle/`）
-2. 通过 HTTPS 获取服务器现有的 `latest.json`，如果版本号相同则**合并**平台条目（不会覆盖其他平台）
-3. 读取 `.sig` 签名内容，生成/更新 `latest.json`（纯 Python，不依赖 jq）
-4. paramiko 单连接：mkdir → sftp 上传所有产物 → sftp 上传 latest.json
+2. 通过 HTTPS 获取服务器现有的目标平台元数据，如果版本号相同则只合并该目标元数据允许的平台条目
+3. 读取 `.sig` 签名内容，生成/更新对应平台的 updater 元数据（纯 Python，不依赖 jq）
+4. paramiko 单连接：mkdir → sftp 上传所有产物 → sftp 上传对应平台的 updater 元数据
 
-> ⚠️ 如果服务器上已存在 `latest.json`，但脚本无法成功拉取或解析它，脚本会直接报错退出，而不是静默重建一个新的 `latest.json`。
-> 只有服务器返回 `404`（首次发布/文件不存在）时，脚本才会创建全新 `latest.json`。
+> ⚠️ 如果服务器上已存在目标平台的 updater 元数据，但脚本无法成功拉取或解析它，脚本会直接报错退出，而不是静默重建。
+> 只有服务器返回 `404`（首次发布/文件不存在）时，脚本才会创建全新的目标平台 updater 元数据。
 
-> **跨平台发布时**，可以在各自机器上分别运行 `publish-update.py`（版本号保持一致），
-> 脚本会自动合并已有的平台条目。例如：先在 Windows 上发布（写入 `windows-x86_64`），
-> 再在 macOS 上发布（追加 `darwin-aarch64` 和 `darwin-x86_64`，保留 `windows-x86_64`）。
+> **执行结论：**
+> Windows 发版 = `--platform windows` + `--platform all`
+> macOS 发版 = `--platform macos`
+> `latest.json` 永远只给旧版 Windows 客户端使用。
 
 #### 方式 B：手动操作
 
@@ -353,11 +430,29 @@ Write-Host $sig
 
 > ⚠️ 这里请使用**精确文件名**，不要用 `*setup.exe` 或 `*setup.exe.sig` 这类通配符；如果目录里残留旧版本产物，通配符很容易读错文件。
 
-**3) 在服务器上写入 latest.json**
+**3) 在服务器上写入 Windows updater 元数据**
 
 ```bash
 ssh root@47.57.241.17
 
+cat > /var/www/openclaw-update/latest-windows.json << 'EOF'
+{
+  "version": "0.3.0",
+  "notes": "v0.3.0 更新说明",
+  "pub_date": "2026-03-01T12:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe",
+      "signature": "粘贴 .sig 文件的完整内容"
+    }
+  }
+}
+EOF
+```
+
+旧版 Windows 客户端兼容时，还要同步写入 `latest.json`：
+
+```bash
 cat > /var/www/openclaw-update/latest.json << 'EOF'
 {
   "version": "0.3.0",
@@ -372,6 +467,9 @@ cat > /var/www/openclaw-update/latest.json << 'EOF'
 }
 EOF
 ```
+
+> macOS 手动发布时，只写 `latest-macos.json`。
+> 不要把 macOS 的条目写进 `latest.json`。
 
 ### 步骤 6：更新官网下载链接
 
@@ -422,23 +520,50 @@ git push
 
 ### 步骤 7：验证
 
+**Windows 发版后必须同时验证这两份元数据：**
+
 ```bash
-# 检查 latest.json 可访问且内容正确
+# Windows 发版时：检查新客户端 updater 元数据
+curl https://openclawcn.net/update/latest-windows.json
+
+# Windows 发版时：检查旧版 Windows 客户端兼容元数据
 curl https://openclawcn.net/update/latest.json
+```
+
+确认：
+
+- `latest-windows.json` 和 `latest.json` 的 `version` 完全一致
+- 两个文件里的 Windows 下载 URL 指向同一个安装包
+- 两个文件里的 `signature` 都不为空
+- `latest.json` 中只保留 `windows-x86_64`
+
+**macOS 发版后验证：**
+
+```bash
+
+# macOS 发版时：检查 macOS updater 元数据
+curl https://openclawcn.net/update/latest-macos.json
+```
+
+确认：
+
+- `latest-macos.json` 的 `version` 为本次 macOS 发布版本
+- `platforms` 中只包含 `darwin-aarch64` 和/或 `darwin-x86_64`
+- `signature` 不为空
+
+**安装包下载验证：**
+
+```bash
 
 # 检查安装包可下载（替换为实际文件名）
 curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe"
 ```
 
-确认：
-
-- `version` 字段为新版本号
-- `signature` 字段不为空
 - 安装包 URL 返回 200
 
 ### 步骤 8：端到端测试
 
-1. 安装**旧版本**（当前已发布的版本）
+1. 安装**旧版 Windows 版本**（当前已发布的版本）
 2. 启动应用，等待 15 秒后应出现更新横幅；或进入「系统设置 → 软件更新」手动检查
 3. 点击"立即更新"，确认下载进度条正常
 4. 下载完成后点击"立即重启"，确认更新后版本号正确
@@ -492,17 +617,17 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 
 ### 更新不触发的常见原因
 
-| 原因                                              | 排查方法                                                          |
-| ------------------------------------------------- | ----------------------------------------------------------------- |
-| `latest.json` 中的 `version` 不大于客户端当前版本 | `curl` 检查 `latest.json`                                         |
-| `.sig` 签名与安装包不匹配                         | 确认构建时设置了正确的 `TAURI_SIGNING_PRIVATE_KEY`                |
-| 公钥不匹配                                        | 比对 `tauri.conf.json` 的 `pubkey` 与 `~/.tauri/openclaw.key.pub` |
-| 网络不通                                          | 客户端能否访问 `openclawcn.net`                                   |
-| 缓存                                              | 服务器已设置 `Cache-Control: no-cache`，正常不会有此问题          |
+| 原因                                              | 排查方法                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------------ |
+| 目标平台 updater 元数据中的 `version` 不大于客户端当前版本 | 新版客户端检查对应平台的 `latest-*.json`；旧版 Windows 客户端检查 `latest.json` |
+| `.sig` 签名与安装包不匹配                         | 确认构建时设置了正确的 `TAURI_SIGNING_PRIVATE_KEY`                       |
+| 公钥不匹配                                        | 比对 `tauri.conf.json` 的 `pubkey` 与 `~/.tauri/openclaw.key.pub`        |
+| 网络不通                                          | 客户端能否访问 `openclawcn.net`                                          |
+| 缓存                                              | 服务器已设置 `Cache-Control: no-cache`，正常不会有此问题                 |
 
 ---
 
-## latest.json 格式参考
+## updater 元数据格式参考
 
 ```json
 {
@@ -530,6 +655,12 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 }
 ```
 
+常用写法约定：
+
+- `latest-windows.json`：只包含 `windows-x86_64`
+- `latest.json`：仅旧版 Windows 客户端兼容使用，也只包含 `windows-x86_64`
+- `latest-macos.json`：包含 `darwin-aarch64` 和/或 `darwin-x86_64`
+
 **字段说明：**
 
 | 字段                    | 必需 | 说明                                                 |
@@ -541,8 +672,8 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 | `platforms.*.url`       | 是   | 安装包下载 URL（HTTPS）                              |
 | `platforms.*.signature` | 是   | `.sig` 文件的完整内容（Base64 编码的 minisign 签名） |
 
-> 只需填写本次构建的目标平台，其他平台可省略。
-> 例如只发 Windows 版，`platforms` 中只需 `windows-x86_64`。
+> 只需填写该元数据文件负责的目标平台，其他平台可省略。
+> 例如当前策略下，`latest.json` 和 `latest-windows.json` 都只写 `windows-x86_64`。
 
 **Tauri 平台标识：**
 
@@ -589,6 +720,20 @@ location = /update/latest.json {
     add_header Cache-Control "no-cache" always;
     default_type application/json;
 }
+
+location = /update/latest-macos.json {
+    alias /var/www/openclaw-update/latest-macos.json;
+    add_header Access-Control-Allow-Origin "*" always;
+    add_header Cache-Control "no-cache" always;
+    default_type application/json;
+}
+
+location = /update/latest-windows.json {
+    alias /var/www/openclaw-update/latest-windows.json;
+    add_header Access-Control-Allow-Origin "*" always;
+    add_header Cache-Control "no-cache" always;
+    default_type application/json;
+}
 ```
 
 ### 清理旧版本产物
@@ -602,7 +747,7 @@ ssh root@47.57.241.17
 du -sh /var/www/openclaw-update/artifacts/*
 
 # 删除旧版本文件（保留最新版本）
-# 注意：不要删除 latest.json 中引用的文件
+# 注意：不要删除任一 `latest-*.json` 中引用的文件
 rm /var/www/openclaw-update/artifacts/OpenClaw桌面版_0.2.0_*
 ```
 
@@ -760,11 +905,11 @@ export NOTARYTOOL_PROFILE="openclaw-notary"
 
 ### 客户端更新相关
 
-| 问题               | 原因                               | 解决                                 |
-| ------------------ | ---------------------------------- | ------------------------------------ |
-| 客户端检测不到更新 | `latest.json` 版本号不大于当前版本 | 检查 `latest.json` 的 `version` 字段 |
-| 下载后验签失败     | 密钥对不匹配或 `.sig` 内容损坏     | 重新构建并确保使用正确的私钥         |
-| 更新横幅不出现     | 用户之前点了关闭                   | 去「系统设置 → 软件更新」手动检查    |
+| 问题               | 原因                               | 解决                                                                 |
+| ------------------ | ---------------------------------- | -------------------------------------------------------------------- |
+| 客户端检测不到更新 | 目标平台 updater 元数据版本号不大于当前版本 | 新版客户端检查对应平台 `latest-*.json`；旧版 Windows 客户端检查 `latest.json` |
+| 下载后验签失败     | 密钥对不匹配或 `.sig` 内容损坏     | 重新构建并确保使用正确的私钥                                         |
+| 更新横幅不出现     | 用户之前点了关闭                   | 去「系统设置 → 软件更新」手动检查                                    |
 
 ### 安装后 Gateway 启动相关
 
@@ -794,8 +939,10 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 | 文件                                  | 用途                                           |
 | ------------------------------------- | ---------------------------------------------- |
-| `src-tauri/tauri.conf.json`           | 版本号、更新端点、签名公钥、CSP 安全策略       |
-| `src-tauri/Cargo.toml`                | Rust crate 版本号（需与 tauri.conf.json 同步） |
+| `src-tauri/tauri.conf.json`           | 跨平台兜底配置、签名公钥、CSP、安全策略         |
+| `src-tauri/tauri.macos.conf.json`     | macOS 版本号、macOS updater endpoint           |
+| `src-tauri/tauri.windows.conf.json`   | Windows 版本号、Windows updater endpoint       |
+| `src-tauri/Cargo.toml`                | Rust crate 元数据                              |
 | `src-tauri/capabilities/default.json` | Tauri 权限配置（含 `updater:default`）         |
 
 ### 构建脚本
@@ -809,7 +956,7 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 | 文件                             | 用途                                                |
 | -------------------------------- | --------------------------------------------------- |
-| `scripts/publish-update.py`      | 一键发布（收集产物→生成 latest.json→paramiko 上传） |
+| `scripts/publish-update.py`      | 一键发布（收集产物→生成平台 updater 元数据→paramiko 上传） |
 | `scripts/setup-update-server.sh` | 服务器目录初始化（一次性）                          |
 | `scripts/deploy-update-nginx.sh` | 服务器 Nginx 配置部署（一次性）                     |
 | `scripts/deploy-cdn-nginx.sh`    | CDN 子域名 Nginx 配置 + SSL（一次性）               |

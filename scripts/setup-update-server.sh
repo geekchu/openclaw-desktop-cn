@@ -16,9 +16,14 @@ echo "🔧 初始化 OpenClaw 更新服务器..."
 mkdir -p "$WEBROOT/artifacts"
 echo "  ✅ 创建目录: $WEBROOT"
 
-# 创建占位 latest.json
-if [ ! -f "$WEBROOT/latest.json" ]; then
-  cat > "$WEBROOT/latest.json" << 'EOF'
+# 创建占位 updater 元数据
+for latest_file in latest.json latest-macos.json latest-windows.json; do
+  if [ -f "$WEBROOT/$latest_file" ]; then
+    echo "  ℹ $latest_file 已存在，跳过"
+    continue
+  fi
+
+  cat > "$WEBROOT/$latest_file" << 'EOF'
 {
   "version": "0.0.0",
   "notes": "暂无更新",
@@ -26,10 +31,8 @@ if [ ! -f "$WEBROOT/latest.json" ]; then
   "platforms": {}
 }
 EOF
-  echo "  ✅ 创建占位 latest.json"
-else
-  echo "  ℹ latest.json 已存在，跳过"
-fi
+  echo "  ✅ 创建占位 $latest_file"
+done
 
 echo ""
 echo "🎉 服务器目录初始化完成！"

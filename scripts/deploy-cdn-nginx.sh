@@ -13,9 +13,7 @@ ENABLED="/etc/nginx/sites-enabled/${DOMAIN}"
 UPDATE_DIR="/var/www/openclaw-update"
 
 # 检查是否已配置
-if [ -f "$CONF" ]; then
-  echo "INFO: ${DOMAIN} 配置已存在，跳过创建"
-else
+if [ ! -f "$CONF" ]; then
   echo ">>> 创建 Nginx 配置: ${CONF}"
   cat > "$CONF" << 'EOF'
 server {
@@ -33,8 +31,16 @@ server {
         charset utf-8;
     }
 
-    # 阻止访问 latest.json（更新元数据仅由 openclawcn.net 提供）
+    # 阻止访问 updater 元数据（仅由 openclawcn.net 提供）
     location /update/latest.json {
+        return 404;
+    }
+
+    location /update/latest-macos.json {
+        return 404;
+    }
+
+    location /update/latest-windows.json {
         return 404;
     }
 
@@ -48,6 +54,52 @@ EOF
   # 启用站点
   ln -sf "$CONF" "$ENABLED"
   echo "OK: 已创建并启用 ${DOMAIN} 配置"
+fi
+
+TMPF=$(mktemp)
+trap 'rm -f "$TMPF"' EXIT
+
+if ! grep -q 'location /update/latest.json' "$CONF" 2>/dev/null; then
+  cat >> "$TMPF" << 'EOF'
+
+    location /update/latest.json {
+        return 404;
+    }
+EOF
+fi
+
+if ! grep -q 'location /update/latest-macos.json' "$CONF" 2>/dev/null; then
+  cat >> "$TMPF" << 'EOF'
+
+    location /update/latest-macos.json {
+        return 404;
+    }
+EOF
+fi
+
+if ! grep -q 'location /update/latest-windows.json' "$CONF" 2>/dev/null; then
+  cat >> "$TMPF" << 'EOF'
+
+    location /update/latest-windows.json {
+        return 404;
+    }
+EOF
+fi
+
+if [ -s "$TMPF" ]; then
+  LAST_LOC=$(grep -n 'location / {' "$CONF" | tail -1 | cut -d: -f1)
+  if [ -z "$LAST_LOC" ]; then
+    echo "ERROR: Could not find 'location / {' in $CONF"
+    exit 1
+  fi
+
+  head -n $((LAST_LOC - 1)) "$CONF" > "${CONF}.new"
+  cat "$TMPF" >> "${CONF}.new"
+  tail -n +${LAST_LOC} "$CONF" >> "${CONF}.new"
+  mv "${CONF}.new" "$CONF"
+  echo "OK: 已补齐 updater 元数据 404 规则"
+else
+  echo "INFO: ${DOMAIN} updater 元数据 404 规则已存在，跳过"
 fi
 
 # 确保 artifacts 目录存在
