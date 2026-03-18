@@ -1226,10 +1226,7 @@ export async function runSubagentAnnounceFlow(params: {
 
     let pendingChildDescendantRuns = 0;
     try {
-      pendingChildDescendantRuns = Math.max(
-        0,
-        countPendingDescendantRuns(params.childSessionKey),
-      );
+      pendingChildDescendantRuns = Math.max(0, countPendingDescendantRuns(params.childSessionKey));
     } catch {
       // Best-effort only; fall back to direct announce behavior when unavailable.
     }

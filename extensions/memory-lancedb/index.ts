@@ -248,8 +248,7 @@ class LocalFileMemoryDB implements MemoryStore {
   async search(vector: number[], limit = 5, minScore = 0.5): Promise<MemorySearchResult[]> {
     await this.ensureLoaded();
 
-    return this.entries!
-      .filter((entry) => entry.vector.length === vector.length)
+    return this.entries!.filter((entry) => entry.vector.length === vector.length)
       .map((entry) => ({
         entry,
         score: similarityFromL2(vector, entry.vector),

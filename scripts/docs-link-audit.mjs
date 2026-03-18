@@ -112,7 +112,9 @@ for (const filePath of docFiles) {
 
 const docsConfig = JSON.parse(readFileSync(join(docsRoot, "docs.json"), "utf8"));
 const redirectSources = new Set((docsConfig.redirects ?? []).map((entry) => entry.source));
-const redirectDestinations = new Set((docsConfig.redirects ?? []).map((entry) => entry.destination));
+const redirectDestinations = new Set(
+  (docsConfig.redirects ?? []).map((entry) => entry.destination),
+);
 
 const navRefs = [];
 function collectPageRefs(pages) {
@@ -151,10 +153,7 @@ for (const page of navRefs) {
   }
 }
 
-const linkPatterns = [
-  /\[[^\]]+\]\((\/[^)\s]+)\)/gu,
-  /\b(?:href|src)=["'](\/[^"']+)["']/gu,
-];
+const linkPatterns = [/\[[^\]]+\]\((\/[^)\s]+)\)/gu, /\b(?:href|src)=["'](\/[^"']+)["']/gu];
 
 for (const filePath of docFiles) {
   const contents = readFileSync(filePath, "utf8");
@@ -177,7 +176,11 @@ for (const filePath of docFiles) {
         continue;
       }
 
-      if (!routes.has(target) && !redirectSources.has(target) && !redirectDestinations.has(target)) {
+      if (
+        !routes.has(target) &&
+        !redirectSources.has(target) &&
+        !redirectDestinations.has(target)
+      ) {
         problems.push(`${filePath} -> missing docs route ${rawTarget}`);
       }
     }

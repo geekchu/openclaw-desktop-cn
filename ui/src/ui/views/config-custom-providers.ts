@@ -415,9 +415,7 @@ export class CustomProvidersView extends LitElement {
 
     // API 类型优先级：模型配置 > 官方 provider > 默认值
     this.formApiType =
-      provider.models[0]?.api_type ||
-      this.selectedOfficial?.api_type ||
-      "openai-completions";
+      provider.models[0]?.api_type || this.selectedOfficial?.api_type || "openai-completions";
   }
 
   selectOfficialProvider(provider: OfficialProvider) {

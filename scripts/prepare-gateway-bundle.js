@@ -431,11 +431,12 @@ run("npm install --omit=dev --install-strategy=hoisted", {
 });
 
 if (isCrossTargetBundle(bundleTarget)) {
-  const targetSpecs = collectTargetOptionalDependencySpecs(join(bundleDir, "node_modules"), bundleTarget);
+  const targetSpecs = collectTargetOptionalDependencySpecs(
+    join(bundleDir, "node_modules"),
+    bundleTarget,
+  );
   if (targetSpecs.length > 0) {
-    console.log(
-      `[bundle] 检测到跨目标打包，补装 ${targetSpecs.length} 个目标平台原生可选依赖`,
-    );
+    console.log(`[bundle] 检测到跨目标打包，补装 ${targetSpecs.length} 个目标平台原生可选依赖`);
     // Force-install the target prebuilt packages into the bundle even when the
     // current build host has a different CPU architecture. We skip lifecycle
     // scripts here because these packages are already prebuilt artifacts.
