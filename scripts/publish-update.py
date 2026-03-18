@@ -173,7 +173,7 @@ def fetch_existing_json():
             print("  服务器上还没有 latest.json，将创建全新 latest.json")
             return None
         raise RuntimeError(f"无法获取服务器 latest.json (HTTP {e.code}): {e.reason}") from e
-    except (URLError, json.JSONDecodeError, OSError) as e:
+    except (URLError, UnicodeDecodeError, json.JSONDecodeError, OSError) as e:
         raise RuntimeError(f"无法获取服务器 latest.json: {e}") from e
 
 

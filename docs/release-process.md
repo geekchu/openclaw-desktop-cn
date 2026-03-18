@@ -197,6 +197,7 @@ pnpm installer:build:mac-intel
 **构建脚本自动完成：** 环境检查 → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 UI 构建 + gateway 代码打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
 
 > ⚠️ `pnpm installer:build` 在 **release** 模式下会对签名环境变量做 fail-fast 检查；如果缺少 `TAURI_SIGNING_PRIVATE_KEY`（或加密私钥缺少 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`），脚本会直接退出，而不是继续产出无法发布自动更新的半成品。
+> ⚠️ 在 macOS 上，release 构建还必须显式指定 `--target aarch64-apple-darwin` 或 `--target x86_64-apple-darwin`；脚本会直接拒绝未指定 target 或 `universal-apple-darwin` 的旧流程。
 > ⚠️ **首次构建或修改前端代码/配置后**，建议先清除 Cargo 编译缓存再构建：
 >
 > ```bash
@@ -210,14 +211,14 @@ pnpm installer:build:mac-intel
 
 #### 构建产物
 
-| 平台          | 原始路径                                                      | 产物文件                                         |
-| ------------- | ------------------------------------------------------------- | ------------------------------------------------ |
-| Windows       | `src-tauri/target/release/bundle/nsis/`                       | `*_x64-setup.exe` + `.sig`                       |
-| macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/macos/` | `*.app` + `*.app.tar.gz` + `.sig`                |
-| macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/`   | `*_aarch64.dmg`                                  |
-| macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/macos/`  | `*.app` + `*.app.tar.gz` + `.sig`                |
-| macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/`    | `*_x64.dmg`                                      |
-| Linux         | `src-tauri/target/release/bundle/appimage/`                   | `*.AppImage` + `.sig`                            |
+| 平台          | 原始路径                                                      | 产物文件                          |
+| ------------- | ------------------------------------------------------------- | --------------------------------- |
+| Windows       | `src-tauri/target/release/bundle/nsis/`                       | `*_x64-setup.exe` + `.sig`        |
+| macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/macos/` | `*.app` + `*.app.tar.gz` + `.sig` |
+| macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/`   | `*_aarch64.dmg`                   |
+| macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/macos/`  | `*.app` + `*.app.tar.gz` + `.sig` |
+| macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/`    | `*_x64.dmg`                       |
+| Linux         | `src-tauri/target/release/bundle/appimage/`                   | `*.AppImage` + `.sig`             |
 
 所有产物会被自动复制到 `dist/installers/` 目录。
 其中 macOS 的 updater 产物在复制时会追加架构后缀（如 `OpenClaw桌面版_aarch64.app.tar.gz`），避免 ARM / Intel 两次构建互相覆盖。
@@ -545,12 +546,12 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 
 **Tauri 平台标识：**
 
-| 标识             | 对应平台                         |
-| ---------------- | -------------------------------- |
-| `windows-x86_64` | Windows 64 位                    |
-| `darwin-aarch64` | macOS Apple Silicon (M1/M2/M3)   |
-| `darwin-x86_64`  | macOS Intel                      |
-| `linux-x86_64`   | Linux 64 位                      |
+| 标识             | 对应平台                       |
+| ---------------- | ------------------------------ |
+| `windows-x86_64` | Windows 64 位                  |
+| `darwin-aarch64` | macOS Apple Silicon (M1/M2/M3) |
+| `darwin-x86_64`  | macOS Intel                    |
+| `linux-x86_64`   | Linux 64 位                    |
 
 > macOS 同时发布 Apple Silicon (aarch64) 和 Intel (x86_64) 两个版本。
 > 用户根据自己的 Mac 型号选择对应版本下载。
@@ -683,10 +684,10 @@ export NOTARYTOOL_PROFILE="openclaw-notary"
 
 ### 签名脚本说明
 
-| 脚本                              | 用途                                           |
-| --------------------------------- | ---------------------------------------------- |
-| `scripts/codesign-mac-app.sh`     | 对 .app 进行深度签名（含 Frameworks、Sparkle） |
-| `scripts/notarize-mac-artifact.sh`| 提交到 Apple 公证服务并 staple                 |
+| 脚本                               | 用途                                           |
+| ---------------------------------- | ---------------------------------------------- |
+| `scripts/codesign-mac-app.sh`      | 对 .app 进行深度签名（含 Frameworks、Sparkle） |
+| `scripts/notarize-mac-artifact.sh` | 提交到 Apple 公证服务并 staple                 |
 
 **codesign-mac-app.sh 环境变量：**
 
@@ -837,14 +838,14 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### macOS 签名脚本
 
-| 文件                                | 用途                                                 |
-| ----------------------------------- | ---------------------------------------------------- |
-| `scripts/codesign-mac-app.sh`       | 对 .app 进行深度签名（含 Frameworks、Sparkle 等）    |
-| `scripts/notarize-mac-artifact.sh`  | 提交到 Apple 公证服务并 staple                       |
+| 文件                               | 用途                                              |
+| ---------------------------------- | ------------------------------------------------- |
+| `scripts/codesign-mac-app.sh`      | 对 .app 进行深度签名（含 Frameworks、Sparkle 等） |
+| `scripts/notarize-mac-artifact.sh` | 提交到 Apple 公证服务并 staple                    |
 
 ### macOS 签名密钥（本地）
 
-| 文件/位置                           | 用途                                                 |
-| ----------------------------------- | ---------------------------------------------------- |
-| Keychain 中的证书                   | Developer ID Application 证书（用于代码签名）        |
-| `~/.apple-keys/AuthKey_*.p8`        | App Store Connect API 密钥（用于公证，**不可泄露**） |
+| 文件/位置                    | 用途                                                 |
+| ---------------------------- | ---------------------------------------------------- |
+| Keychain 中的证书            | Developer ID Application 证书（用于代码签名）        |
+| `~/.apple-keys/AuthKey_*.p8` | App Store Connect API 密钥（用于公证，**不可泄露**） |

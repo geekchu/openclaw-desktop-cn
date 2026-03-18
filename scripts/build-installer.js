@@ -40,6 +40,20 @@ if (targetIndex !== -1 && args[targetIndex + 1]) {
   targetArch = args[targetIndex + 1];
 }
 
+function ensureSupportedMacTarget() {
+  if (targetArch === "universal-apple-darwin" || process.env.TAURI_UNIVERSAL === "1") {
+    throw new Error(
+      "macOS 发布流程已禁用 Universal 包，请改用 --target aarch64-apple-darwin 或 --target x86_64-apple-darwin",
+    );
+  }
+
+  if (process.platform === "darwin" && !isDebug && !targetArch) {
+    throw new Error(
+      "macOS release 构建必须显式指定 --target aarch64-apple-darwin 或 --target x86_64-apple-darwin",
+    );
+  }
+}
+
 function log(msg) {
   console.log(`[build] ${msg}`);
 }
@@ -360,6 +374,7 @@ function isInstallerFile(name) {
 
 function main() {
   const startTime = Date.now();
+  ensureSupportedMacTarget();
 
   const targetDesc = targetArch ? ` (target: ${targetArch})` : "";
   console.log(`\n  OpenClaw Desktop 安装包构建`);
