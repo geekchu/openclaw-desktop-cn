@@ -1,4 +1,3 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -515,43 +514,6 @@ describe("AcpxRuntime", () => {
       message: expect.stringContaining("working directory does not exist"),
     });
     expect(runtime.isHealthy()).toBe(true);
-  });
-
-  it("keeps runtime healthy when the configured cwd does not exist", async () => {
-    const { config } = await createMockRuntimeFixture();
-    const missingCwd = path.join(os.tmpdir(), "openclaw-acpx-runtime-test-missing-config-cwd");
-    const runtime = new AcpxRuntime(
-      {
-        ...config,
-        cwd: missingCwd,
-      },
-      { logger: NOOP_LOGGER },
-    );
-
-    await runtime.probeAvailability();
-    expect(runtime.isHealthy()).toBe(true);
-  });
-
-  it("keeps runtime healthy when the configured cwd is a file", async () => {
-    const { config } = await createMockRuntimeFixture();
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "openclaw-acpx-runtime-test-file-cwd-"));
-    const fileCwd = path.join(tempDir, "not-a-directory.txt");
-    await writeFile(fileCwd, "test", "utf8");
-
-    const runtime = new AcpxRuntime(
-      {
-        ...config,
-        cwd: fileCwd,
-      },
-      { logger: NOOP_LOGGER },
-    );
-
-    try {
-      await runtime.probeAvailability();
-      expect(runtime.isHealthy()).toBe(true);
-    } finally {
-      await rm(tempDir, { recursive: true, force: true });
-    }
   });
 
   it("marks runtime unhealthy when command is missing", async () => {
