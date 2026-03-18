@@ -336,7 +336,7 @@ OPENCLAW_LIVE_CLI_BACKEND=1 \
 
 ## 文档完整性检查
 
-文档编辑后运行文档检查：`pnpm docs:list`。
+文档编辑后运行文档检查：`pnpm check:docs`。
 
 ## 离线回归测试（CI 安全）
 

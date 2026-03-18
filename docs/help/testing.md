@@ -372,7 +372,7 @@ Useful env vars:
 
 ## Docs sanity
 
-Run docs checks after doc edits: `pnpm docs:list`.
+Run docs checks after doc edits: `pnpm check:docs`.
 
 ## Offline regression (CI-safe)
 

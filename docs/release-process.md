@@ -1,4 +1,12 @@
-# OpenClaw 桌面版 — 发版流程
+---
+title: "桌面版发版流程"
+summary: "OpenClaw 桌面版的构建、签名、公证、发布和回归检查流程。"
+---
+
+# OpenClaw 桌面版发版流程
+
+> 本页是当前唯一的桌面发版文档。
+> 旧入口 `/reference/RELEASING`、`/platforms/mac/release` 与相关说明已统一到这里。
 
 ## 目录
 
@@ -45,12 +53,10 @@
 
 **关键配置文件：** `src-tauri/tauri.conf.json`、`src-tauri/tauri.macos.conf.json`、`src-tauri/tauri.windows.conf.json`
 
-| 配置项                          | 值                                          | 说明                           |
-| ------------------------------- | ------------------------------------------- | ------------------------------ |
-| `version`                       | 当前平台版本号                              | 客户端用于对比是否需要更新     |
-| `plugins.updater.endpoints`     | macOS / Windows 各自的 `latest-*.json`      | 新版本客户端使用的平台独立更新端点 |
-| `plugins.updater.pubkey`        | minisign 公钥（Base64）                     | 验证安装包签名                 |
-| `bundle.createUpdaterArtifacts` | `true`                                      | 构建时自动生成 `.sig` 签名文件 |
+- `version`：当前平台版本号；客户端用它判断是否需要更新
+- `plugins.updater.endpoints`：macOS / Windows 各自的 `latest-*.json`；新版本客户端使用的平台独立更新端点
+- `plugins.updater.pubkey`：minisign 公钥（Base64）；用于验证安装包签名
+- `bundle.createUpdaterArtifacts`：`true`；构建时自动生成 `.sig` 签名文件
 
 > `src-tauri/tauri.conf.json` 中的 `latest.json` 仅保留给**旧版 Windows 客户端**兼容使用。
 > 新版本客户端只使用 `latest-macos.json` / `latest-windows.json`。
@@ -69,20 +75,20 @@
 必须按下面的规则执行：
 
 1. Windows 发版必须双写
-先发布 `latest-windows.json`，再发布 `latest.json`。两次发布使用同一个 Windows 安装包、同一个版本号、同一个 `.sig`。
+   先发布 `latest-windows.json`，再发布 `latest.json`。两次发布使用同一个 Windows 安装包、同一个版本号、同一个 `.sig`。
 
 2. macOS 发版只单写
-macOS 发版时只更新 `latest-macos.json`。不要执行 `--platform all`，也不要把 darwin 条目写进 `latest.json`。
+   macOS 发版时只更新 `latest-macos.json`。不要执行 `--platform all`，也不要把 darwin 条目写进 `latest.json`。
 
 3. `latest.json` 不能再承担跨平台入口
-它现在只服务旧版 Windows 客户端。即使将来同时发 macOS 和 Windows，也不要往 `latest.json` 里写 macOS 条目。
+   它现在只服务旧版 Windows 客户端。即使将来同时发 macOS 和 Windows，也不要往 `latest.json` 里写 macOS 条目。
 
 4. Windows 双写缺一不可
-如果只执行了 `--platform windows`，新版本 Windows 客户端能升级，但旧版 Windows 客户端不会跟进。
-如果只执行了 `--platform all`，旧版 Windows 客户端能升级，但新版本 Windows 客户端会读不到最新元数据。
+   如果只执行了 `--platform windows`，新版本 Windows 客户端能升级，但旧版 Windows 客户端不会跟进。
+   如果只执行了 `--platform all`，旧版 Windows 客户端能升级，但新版本 Windows 客户端会读不到最新元数据。
 
 5. 任一步失败都不要继续
-Windows 双写时，任意一步失败，都应先修复并重新执行缺失步骤，再继续官网更新或对外发布。
+   Windows 双写时，任意一步失败，都应先修复并重新执行缺失步骤，再继续官网更新或对外发布。
 
 ---
 
@@ -211,7 +217,6 @@ git push && git push --tags
 
 > ⚠️ 桌面版分平台发版后，不要再创建无平台后缀的桌面 release tag（例如 `v0.3.0`）。
 > 桌面版 tag 必须始终带平台后缀，避免把 macOS / Windows 的独立版本号混成一个公共发布标记。
-
 > ⚠️ 如果构建过程中需要修改配置并 `git commit --amend`，之后推送时需加 `--force`：
 >
 > ```bash
@@ -407,7 +412,6 @@ DEPLOY_SSH_PASSWORD=xxx python scripts/publish-update.py 0.3.0 --platform window
 
 > ⚠️ 如果服务器上已存在目标平台的 updater 元数据，但脚本无法成功拉取或解析它，脚本会直接报错退出，而不是静默重建。
 > 只有服务器返回 `404`（首次发布/文件不存在）时，脚本才会创建全新的目标平台 updater 元数据。
-
 > **执行结论：**
 > Windows 发版 = `--platform windows` + `--platform all`
 > macOS 发版 = `--platform macos`
@@ -617,13 +621,16 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 
 ### 更新不触发的常见原因
 
-| 原因                                              | 排查方法                                                                 |
-| ------------------------------------------------- | ------------------------------------------------------------------------ |
-| 目标平台 updater 元数据中的 `version` 不大于客户端当前版本 | 新版客户端检查对应平台的 `latest-*.json`；旧版 Windows 客户端检查 `latest.json` |
-| `.sig` 签名与安装包不匹配                         | 确认构建时设置了正确的 `TAURI_SIGNING_PRIVATE_KEY`                       |
-| 公钥不匹配                                        | 比对 `tauri.conf.json` 的 `pubkey` 与 `~/.tauri/openclaw.key.pub`        |
-| 网络不通                                          | 客户端能否访问 `openclawcn.net`                                          |
-| 缓存                                              | 服务器已设置 `Cache-Control: no-cache`，正常不会有此问题                 |
+- 目标平台 updater 元数据中的 `version` 不大于客户端当前版本：
+  新版客户端检查对应平台的 `latest-*.json`；旧版 Windows 客户端检查 `latest.json`
+- `.sig` 签名与安装包不匹配：
+  确认构建时设置了正确的 `TAURI_SIGNING_PRIVATE_KEY`
+- 公钥不匹配：
+  比对 `tauri.conf.json` 的 `pubkey` 与 `~/.tauri/openclaw.key.pub`
+- 网络不通：
+  检查客户端是否能访问 `openclawcn.net`
+- 缓存：
+  服务器已设置 `Cache-Control: no-cache`，正常不会有此问题
 
 ---
 
@@ -905,11 +912,12 @@ export NOTARYTOOL_PROFILE="openclaw-notary"
 
 ### 客户端更新相关
 
-| 问题               | 原因                               | 解决                                                                 |
-| ------------------ | ---------------------------------- | -------------------------------------------------------------------- |
-| 客户端检测不到更新 | 目标平台 updater 元数据版本号不大于当前版本 | 新版客户端检查对应平台 `latest-*.json`；旧版 Windows 客户端检查 `latest.json` |
-| 下载后验签失败     | 密钥对不匹配或 `.sig` 内容损坏     | 重新构建并确保使用正确的私钥                                         |
-| 更新横幅不出现     | 用户之前点了关闭                   | 去「系统设置 → 软件更新」手动检查                                    |
+- 客户端检测不到更新：
+  目标平台 updater 元数据版本号不大于当前版本。新版客户端检查对应平台 `latest-*.json`；旧版 Windows 客户端检查 `latest.json`
+- 下载后验签失败：
+  密钥对不匹配或 `.sig` 内容损坏；重新构建并确保使用正确的私钥
+- 更新横幅不出现：
+  用户之前点了关闭；去「系统设置 → 软件更新」手动检查
 
 ### 安装后 Gateway 启动相关
 
@@ -937,13 +945,11 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### 配置文件
 
-| 文件                                  | 用途                                           |
-| ------------------------------------- | ---------------------------------------------- |
-| `src-tauri/tauri.conf.json`           | 跨平台兜底配置、签名公钥、CSP、安全策略         |
-| `src-tauri/tauri.macos.conf.json`     | macOS 版本号、macOS updater endpoint           |
-| `src-tauri/tauri.windows.conf.json`   | Windows 版本号、Windows updater endpoint       |
-| `src-tauri/Cargo.toml`                | Rust crate 元数据                              |
-| `src-tauri/capabilities/default.json` | Tauri 权限配置（含 `updater:default`）         |
+- `src-tauri/tauri.conf.json`：跨平台兜底配置、签名公钥、CSP、安全策略
+- `src-tauri/tauri.macos.conf.json`：macOS 版本号、macOS updater endpoint
+- `src-tauri/tauri.windows.conf.json`：Windows 版本号、Windows updater endpoint
+- `src-tauri/Cargo.toml`：Rust crate 元数据
+- `src-tauri/capabilities/default.json`：Tauri 权限配置（含 `updater:default`）
 
 ### 构建脚本
 
@@ -954,12 +960,10 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### 发布脚本
 
-| 文件                             | 用途                                                |
-| -------------------------------- | --------------------------------------------------- |
-| `scripts/publish-update.py`      | 一键发布（收集产物→生成平台 updater 元数据→paramiko 上传） |
-| `scripts/setup-update-server.sh` | 服务器目录初始化（一次性）                          |
-| `scripts/deploy-update-nginx.sh` | 服务器 Nginx 配置部署（一次性）                     |
-| `scripts/deploy-cdn-nginx.sh`    | CDN 子域名 Nginx 配置 + SSL（一次性）               |
+- `scripts/publish-update.py`：一键发布（收集产物 → 生成平台 updater 元数据 → paramiko 上传）
+- `scripts/setup-update-server.sh`：服务器目录初始化（一次性）
+- `scripts/deploy-update-nginx.sh`：服务器 Nginx 配置部署（一次性）
+- `scripts/deploy-cdn-nginx.sh`：CDN 子域名 Nginx 配置 + SSL（一次性）
 
 ### 前端代码
 

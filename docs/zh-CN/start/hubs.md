@@ -160,7 +160,7 @@ x-i18n:
 - [macOS 权限](/platforms/mac/permissions)
 - [macOS 远程](/platforms/mac/remote)
 - [macOS 签名](/platforms/mac/signing)
-- [macOS 发布](/platforms/mac/release)
+- [桌面版发版流程](/release-process)
 - [macOS Gateway 网关 (launchd)](/platforms/mac/bundled-gateway)
 - [macOS XPC](/platforms/mac/xpc)
 - [macOS Skills](/platforms/mac/skills)
@@ -195,5 +195,5 @@ x-i18n:
 ## 测试 + 发布
 
 - [测试](/reference/test)
-- [发布检查清单](/reference/RELEASING)
+- [发版流程](/release-process)
 - [设备型号](/reference/device-models)

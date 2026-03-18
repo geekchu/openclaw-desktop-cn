@@ -195,14 +195,14 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="text-base md:text-lg font-bold text-[#1a1a2e]">macOS 版</h3>
-                <p className="text-[#bbb] text-xs md:text-sm">支持 macOS 12 及以上</p>
+                <p className="text-[#bbb] text-xs md:text-sm">当前维护中，暂时关闭下载</p>
               </div>
             </div>
             <button
               disabled
               className="w-full bg-gray-50 text-[#ccc] py-3 rounded-xl cursor-not-allowed text-sm font-medium border border-gray-100"
             >
-              macOS 版即将推出
+              macOS 版维护中
             </button>
           </div>
         </div>

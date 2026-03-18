@@ -201,7 +201,11 @@
     },
     {
       "source": "/RELEASING",
-      "destination": "/reference/RELEASING"
+      "destination": "/release-process"
+    },
+    {
+      "source": "/reference/RELEASING",
+      "destination": "/release-process"
     },
     {
       "source": "/agent",
@@ -469,7 +473,19 @@
     },
     {
       "source": "/mac/release",
-      "destination": "/platforms/mac/release"
+      "destination": "/release-process"
+    },
+    {
+      "source": "/platforms/mac/release",
+      "destination": "/release-process"
+    },
+    {
+      "source": "/zh-CN/reference/RELEASING",
+      "destination": "/release-process"
+    },
+    {
+      "source": "/zh-CN/platforms/mac/release",
+      "destination": "/release-process"
     },
     {
       "source": "/mac/remote",
@@ -1165,7 +1181,6 @@
                   "platforms/mac/permissions",
                   "platforms/mac/remote",
                   "platforms/mac/signing",
-                  "platforms/mac/release",
                   "platforms/mac/bundled-gateway",
                   "platforms/mac/xpc",
                   "platforms/mac/skills",
@@ -1351,8 +1366,8 @@
                 "pages": ["reference/credits"]
               },
               {
-                "group": "Release notes",
-                "pages": ["reference/RELEASING", "reference/test"]
+                "group": "Testing + release",
+                "pages": ["release-process", "reference/test"]
               },
               {
                 "group": "Experiments",
@@ -1751,7 +1766,6 @@
                   "zh-CN/platforms/mac/permissions",
                   "zh-CN/platforms/mac/remote",
                   "zh-CN/platforms/mac/signing",
-                  "zh-CN/platforms/mac/release",
                   "zh-CN/platforms/mac/bundled-gateway",
                   "zh-CN/platforms/mac/xpc",
                   "zh-CN/platforms/mac/skills",
@@ -1934,8 +1948,8 @@
                 "pages": ["zh-CN/reference/credits"]
               },
               {
-                "group": "发布说明",
-                "pages": ["zh-CN/reference/RELEASING", "zh-CN/reference/test"]
+                "group": "测试与发版",
+                "pages": ["release-process", "zh-CN/reference/test"]
               },
               {
                 "group": "实验性功能",
