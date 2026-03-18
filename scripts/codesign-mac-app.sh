@@ -202,6 +202,11 @@ sign_plain_item() {
   codesign --force ${options_args+"${options_args[@]}"} "${timestamp_args[@]}" --sign "$IDENTITY" "$target"
 }
 
+sign_runtime_item() {
+  local target="$1"
+  codesign --force ${options_args+"${options_args[@]}"} "${timestamp_args[@]}" --entitlements "$ENT_TMP_RUNTIME" --sign "$IDENTITY" "$target"
+}
+
 is_macho_file() {
   local target="$1"
   /usr/bin/file "$target" | /usr/bin/grep -q "Mach-O"
@@ -279,7 +284,16 @@ find "$APP_BUNDLE" -type f -print0 | while IFS= read -r -d '' f; do
       ;;
   esac
   echo "Signing embedded binary: $f"
-  sign_plain_item "$f"
+  case "$f" in
+    "$APP_BUNDLE"/Contents/Resources/node-runtime/*/bin/node)
+      # The bundled Node runtime runs as a separate child process, so it needs
+      # its own JIT entitlements instead of relying on the app bundle signature.
+      sign_runtime_item "$f"
+      ;;
+    *)
+      sign_plain_item "$f"
+      ;;
+  esac
 done
 
 # Sign main binary with app entitlements

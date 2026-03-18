@@ -250,7 +250,12 @@ function downloadNode() {
   logStep(2, "下载 Node.js 运行环境");
 
   log("运行 node scripts/download-node.js ...");
-  run("node scripts/download-node.js");
+  run("node scripts/download-node.js", {
+    env: {
+      ...process.env,
+      OPENCLAW_BUNDLE_TARGET_TRIPLE: targetArch || "",
+    },
+  });
   log("Node.js 运行环境就绪");
 }
 
@@ -268,7 +273,12 @@ function tauriBuild() {
   log("(beforeBuildCommand 将自动执行 prepare-gateway-bundle.js)");
 
   // beforeBuildCommand path is relative to cwd, so run from project root
-  run(cmd);
+  run(cmd, {
+    env: {
+      ...process.env,
+      OPENCLAW_BUNDLE_TARGET_TRIPLE: targetArch || "",
+    },
+  });
 
   log("Tauri 构建完成");
 }

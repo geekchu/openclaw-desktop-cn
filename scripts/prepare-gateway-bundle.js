@@ -99,6 +99,104 @@ function run(cmd, opts = {}) {
   execSync(cmd, { stdio: "inherit", cwd: projectRoot, windowsHide: true, ...opts });
 }
 
+function isCrossTargetBundle(bundleTarget) {
+  return bundleTarget.os !== process.platform || bundleTarget.cpu !== process.arch;
+}
+
+function resolveBundleTarget() {
+  const triple =
+    process.env.OPENCLAW_BUNDLE_TARGET_TRIPLE ||
+    process.env.TAURI_ENV_TARGET_TRIPLE ||
+    process.env.CARGO_BUILD_TARGET ||
+    "";
+
+  const mappings = [
+    { prefix: "aarch64-apple-darwin", os: "darwin", cpu: "arm64" },
+    { prefix: "x86_64-apple-darwin", os: "darwin", cpu: "x64" },
+    { prefix: "aarch64-unknown-linux", os: "linux", cpu: "arm64" },
+    { prefix: "x86_64-unknown-linux", os: "linux", cpu: "x64" },
+    { prefix: "aarch64-pc-windows", os: "win32", cpu: "arm64" },
+    { prefix: "x86_64-pc-windows", os: "win32", cpu: "x64" },
+    { prefix: "i686-pc-windows", os: "win32", cpu: "ia32" },
+  ];
+
+  for (const mapping of mappings) {
+    if (triple.startsWith(mapping.prefix)) {
+      return {
+        triple,
+        os: mapping.os,
+        cpu: mapping.cpu,
+      };
+    }
+  }
+
+  return {
+    triple: triple || `${process.arch}-${process.platform}`,
+    os: process.platform,
+    cpu: process.arch,
+  };
+}
+
+function listTopLevelPackageJsonPaths(nodeModulesDir) {
+  if (!existsSync(nodeModulesDir)) {
+    return [];
+  }
+
+  const packageJsonPaths = [];
+  for (const entry of readdirSync(nodeModulesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    if (entry.name.startsWith("@")) {
+      const scopeDir = join(nodeModulesDir, entry.name);
+      for (const scopedEntry of readdirSync(scopeDir, { withFileTypes: true })) {
+        if (!scopedEntry.isDirectory()) {
+          continue;
+        }
+        const pkgJsonPath = join(scopeDir, scopedEntry.name, "package.json");
+        if (existsSync(pkgJsonPath)) {
+          packageJsonPaths.push(pkgJsonPath);
+        }
+      }
+      continue;
+    }
+
+    const pkgJsonPath = join(nodeModulesDir, entry.name, "package.json");
+    if (existsSync(pkgJsonPath)) {
+      packageJsonPaths.push(pkgJsonPath);
+    }
+  }
+
+  return packageJsonPaths;
+}
+
+function collectTargetOptionalDependencySpecs(nodeModulesDir, bundleTarget) {
+  const targetToken = `${bundleTarget.os}-${bundleTarget.cpu}`;
+  const specs = new Map();
+
+  for (const pkgJsonPath of listTopLevelPackageJsonPaths(nodeModulesDir)) {
+    let pkg;
+    try {
+      pkg = JSON.parse(readFileSync(pkgJsonPath, "utf-8"));
+    } catch {
+      continue;
+    }
+
+    for (const [depName, depVersion] of Object.entries(pkg.optionalDependencies || {})) {
+      if (typeof depVersion !== "string") {
+        continue;
+      }
+      if (!depName.includes(targetToken)) {
+        continue;
+      }
+      specs.set(depName, depVersion);
+    }
+  }
+
+  return Array.from(specs, ([depName, depVersion]) => `${depName}@${depVersion}`);
+}
+
 function copyIfExists(src, dest) {
   if (existsSync(src)) {
     console.log(`[bundle] 复制 ${src} → ${dest}`);
@@ -324,7 +422,31 @@ console.log(
 
 // Step 5: 安装依赖（一次性安装根 + 所有 extension 的依赖）
 console.log("\n[bundle] === Step 5: 安装生产依赖（含 extension 依赖）===");
-run("npm install --omit=dev --install-strategy=hoisted", { cwd: bundleDir });
+const bundleTarget = resolveBundleTarget();
+console.log(
+  `[bundle] npm install 目标架构: triple=${bundleTarget.triple}, os=${bundleTarget.os}, cpu=${bundleTarget.cpu}`,
+);
+run("npm install --omit=dev --install-strategy=hoisted", {
+  cwd: bundleDir,
+});
+
+if (isCrossTargetBundle(bundleTarget)) {
+  const targetSpecs = collectTargetOptionalDependencySpecs(join(bundleDir, "node_modules"), bundleTarget);
+  if (targetSpecs.length > 0) {
+    console.log(
+      `[bundle] 检测到跨目标打包，补装 ${targetSpecs.length} 个目标平台原生可选依赖`,
+    );
+    // Force-install the target prebuilt packages into the bundle even when the
+    // current build host has a different CPU architecture. We skip lifecycle
+    // scripts here because these packages are already prebuilt artifacts.
+    run(`npm install --no-save --force --ignore-scripts ${targetSpecs.join(" ")}`, {
+      cwd: bundleDir,
+      env: {
+        ...process.env,
+      },
+    });
+  }
+}
 
 // Step 5.5: 解析 extension 中声明在 node_modules 内的 skills 路径
 // 某些 extension（如 tlon）的 openclaw.plugin.json 中 skills 路径指向 node_modules 子目录

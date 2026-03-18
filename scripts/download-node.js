@@ -4,12 +4,12 @@
  * download-node.js
  *
  * 从 nodejs.org 下载 Node.js 便携版到 src-tauri/node-runtime/{platform}/
- * 支持 Windows x64、macOS arm64、macOS x64 三个平台。
+ * 支持 Windows x64/arm64、macOS arm64/x64、Linux x64/arm64。
  *
  * 用法:
  *   node scripts/download-node.js                    # 只下载当前平台
- *   node scripts/download-node.js --all              # 下载全部三个平台
- *   node scripts/download-node.js --platform win-x64,darwin-arm64
+ *   node scripts/download-node.js --all              # 下载全部支持平台
+ *   node scripts/download-node.js --platform win-x64,win-arm64,darwin-arm64
  */
 
 import { execSync } from "node:child_process";
@@ -51,6 +51,10 @@ const PLATFORMS = {
     archiveName: `node-${NODE_VERSION}-win-x64`,
     archiveExt: "zip",
   },
+  "win-arm64": {
+    archiveName: `node-${NODE_VERSION}-win-arm64`,
+    archiveExt: "zip",
+  },
   "darwin-x64": {
     archiveName: `node-${NODE_VERSION}-darwin-x64`,
     archiveExt: "tar.gz",
@@ -69,12 +73,53 @@ const PLATFORMS = {
   },
 };
 
+function getPlatformFromTargetTriple(targetTriple) {
+  const triple = (targetTriple || "").trim();
+  if (!triple) {
+    return null;
+  }
+
+  const mappings = [
+    ["x86_64-pc-windows", "win-x64"],
+    ["aarch64-pc-windows", "win-arm64"],
+    ["aarch64-apple-darwin", "darwin-arm64"],
+    ["x86_64-apple-darwin", "darwin-x64"],
+    ["x86_64-unknown-linux", "linux-x64"],
+    ["aarch64-unknown-linux", "linux-arm64"],
+  ];
+
+  for (const [prefix, platformKey] of mappings) {
+    if (triple.startsWith(prefix)) {
+      return platformKey;
+    }
+  }
+
+  return null;
+}
+
+function getTargetPlatformFromEnv() {
+  const targetTriple =
+    process.env.OPENCLAW_BUNDLE_TARGET_TRIPLE ||
+    process.env.TAURI_ENV_TARGET_TRIPLE ||
+    process.env.CARGO_BUILD_TARGET ||
+    "";
+
+  const platformKey = getPlatformFromTargetTriple(targetTriple);
+  if (targetTriple && !platformKey) {
+    console.warn(`[download-node] 未识别的目标三元组，回退到当前平台: ${targetTriple}`);
+  }
+  return platformKey;
+}
+
 function getCurrentPlatform() {
   const platform = process.platform;
   const arch = process.arch;
 
   if (platform === "win32" && arch === "x64") {
     return "win-x64";
+  }
+  if (platform === "win32" && arch === "arm64") {
+    return "win-arm64";
   }
   if (platform === "darwin" && arch === "x64") {
     return "darwin-x64";
@@ -110,6 +155,12 @@ function parseArgs() {
       }
     }
     return requested;
+  }
+
+  // 若构建流程已指定目标三元组，则优先下载目标平台运行时
+  const targetPlatform = getTargetPlatformFromEnv();
+  if (targetPlatform) {
+    return [targetPlatform];
   }
 
   // 默认: 只下载当前平台
