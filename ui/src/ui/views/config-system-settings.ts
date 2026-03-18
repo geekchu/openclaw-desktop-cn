@@ -1415,6 +1415,7 @@ export class SystemSettingsView extends LitElement {
     const t = (window as any).__TAURI__;
     if (!t?.core?.invoke) {
       this.updateError = "Tauri API 不可用，请手动重启应用";
+      this.updateRestarting = false;
       return;
     }
 
