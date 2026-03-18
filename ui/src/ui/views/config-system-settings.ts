@@ -6,7 +6,7 @@
  */
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { checkForUpdate, downloadUpdate, installUpdate } from "./updater.js";
+import { checkForUpdate, downloadUpdate, installUpdate, closeUpdateResource } from "./updater.js";
 
 export const CLAW_CONFIG_SYSTEM = "claw-config-system";
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
@@ -77,6 +77,7 @@ export class SystemSettingsView extends LitElement {
   @state() private updateError = "";
   @state() private updateDone = false;
   @state() private updateInstalled = false;
+  @state() private updateRestarting = false;
   private _updateRid: number | null = null;
   private _downloadedBytesRid: number | null = null;
 
@@ -84,6 +85,20 @@ export class SystemSettingsView extends LitElement {
   override connectedCallback() {
     super.connectedCallback();
     this._loadConfig();
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    // 清理更新资源，防止泄漏
+    this._cleanupUpdateResources();
+  }
+
+  private async _cleanupUpdateResources() {
+    if (this._updateRid != null) {
+      await closeUpdateResource(this._updateRid);
+      this._updateRid = null;
+    }
+    this._downloadedBytesRid = null;
   }
 
   private async _loadConfig() {
@@ -1347,36 +1362,30 @@ export class SystemSettingsView extends LitElement {
 
   private async _handleCheckUpdate() {
     // 释放旧的更新资源
-    if (this._updateRid != null) {
-      try {
-        const t = (window as any).__TAURI__;
-        await t?.core?.invoke("plugin:updater|close", { rid: this._updateRid });
-      } catch {
-        /* ignore */
-      }
-    }
-    this._updateRid = null;
-    this._downloadedBytesRid = null;
+    await this._cleanupUpdateResources();
     this.updateChecking = true;
     this.updateError = "";
     this.updateAvailable = false;
     this.updateDone = false;
     this.updateInstalled = false;
-    try {
-      const result = await checkForUpdate();
-      if (result) {
+    this.updateRestarting = false;
+
+    const result = await checkForUpdate();
+    switch (result.status) {
+      case "available":
         this.updateAvailable = true;
         this.updateVersion = result.version;
         this.updateNotes = result.body;
         this._updateRid = result.rid;
-      } else {
-        this.updateDone = true; // 已是最新
-      }
-    } catch (e: any) {
-      this.updateError = String(e?.message || e);
-    } finally {
-      this.updateChecking = false;
+        break;
+      case "up-to-date":
+        this.updateDone = true;
+        break;
+      case "error":
+        this.updateError = result.message;
+        break;
     }
+    this.updateChecking = false;
   }
 
   private async _handleDownloadUpdate() {
@@ -1403,8 +1412,13 @@ export class SystemSettingsView extends LitElement {
   private async _handleRestart() {
     const t = (window as any).__TAURI__;
     if (!t?.core?.invoke) {
+      this.updateError = "Tauri API 不可用，请手动重启应用";
       return;
     }
+
+    this.updateRestarting = true;
+    this.updateError = "";
+
     // 先彻底关闭 Gateway 子进程，释放文件锁，防止安装更新时冲突
     try {
       await t.core.invoke("stop_gateway");
@@ -1418,14 +1432,30 @@ export class SystemSettingsView extends LitElement {
         // Windows NSIS 默认会在此步骤抛弃 Promise 直接强杀重启，代码执行不到这里。
         // 而在 macOS/Linux 设备上，该过程只在后台提取替换文件，随后秒返回成功。
         // 我们必须主动触发 Tauri 重启以使新版本生效。
-        t.core.invoke("plugin:process|restart");
+        try {
+          await t.core.invoke("plugin:process|restart");
+        } catch (restartErr) {
+          // 重启失败，提示用户手动重启
+          console.error("重启失败", restartErr);
+          this.updateError = "更新已安装，但自动重启失败。请手动关闭并重新打开应用。";
+          this.updateRestarting = false;
+        }
         return;
-      } catch (e) {
+      } catch (e: any) {
         console.error("更新安装失败", e);
+        this.updateError = `更新安装失败: ${e?.message || e}`;
+        this.updateRestarting = false;
+        return;
       }
     }
-    // 普通用户手动重启、或者更新失败兜底
-    t.core.invoke("plugin:process|restart");
+
+    // 普通用户手动重启（无更新包的情况）
+    try {
+      await t.core.invoke("plugin:process|restart");
+    } catch {
+      this.updateError = "重启失败，请手动关闭并重新打开应用";
+      this.updateRestarting = false;
+    }
   }
 
   private _renderUpdateCard() {
@@ -1445,8 +1475,17 @@ export class SystemSettingsView extends LitElement {
           <div class="update-row">
             <div class="update-info">
               <div class="toggle-text-primary">✅ 更新已下载完成，重启后生效</div>
+              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
             </div>
-            <button class="btn-primary" @click=${this._handleRestart}>重启应用</button>
+            <button class="btn-primary" ?disabled=${this.updateRestarting} @click=${this._handleRestart}>
+              ${
+                this.updateRestarting
+                  ? html`
+                      <span class="spinner spinner-sm"></span> 重启中…
+                    `
+                  : "重启应用"
+              }
+            </button>
           </div>
         `
             : this.updateDownloading

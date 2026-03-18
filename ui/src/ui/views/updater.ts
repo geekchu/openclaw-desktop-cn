@@ -1,38 +1,61 @@
 // ── 更新模块 ──
-// 仅保留手动检查更新 API，供系统设置页面调用
+// 手动检查更新 API，供系统设置页面调用
 // 使用 Tauri v2 plugin-updater API (Channel + rid 模式)
 
 function getTauri(): any {
   return (window as any).__TAURI__ ?? null;
 }
 
+/** 检查更新的结果类型 */
+export type CheckUpdateResult =
+  | { status: "available"; version: string; body: string; rid: number }
+  | { status: "up-to-date" }
+  | { status: "error"; message: string };
+
 /**
  * 手动检查更新，供系统设置页面调用。
- * 返回 { available, version, body, rid } 或 null
+ * 返回明确的状态：available（有更新）、up-to-date（已是最新）、error（检查失败）
  */
-export async function checkForUpdate(): Promise<{
-  available: boolean;
-  version: string;
-  body: string;
-  rid: number;
-} | null> {
+export async function checkForUpdate(): Promise<CheckUpdateResult> {
   const tauri = getTauri();
   if (!tauri?.core?.invoke) {
-    return null;
+    return { status: "error", message: "Tauri API 不可用" };
   }
 
-  const result = await tauri.core.invoke("plugin:updater|check");
-  if (result == null) {
-    return null;
-  }
+  try {
+    const result = await tauri.core.invoke("plugin:updater|check");
+    if (result == null) {
+      // Tauri v2 updater: null 表示没有可用更新（已是最新版本）
+      return { status: "up-to-date" };
+    }
 
-  // Tauri v2 返回 UpdateMetadata: { rid, currentVersion, version, date?, body?, rawJson }
-  return {
-    available: true,
-    version: result.version || "未知",
-    body: result.body || "",
-    rid: result.rid,
-  };
+    // Tauri v2 返回 UpdateMetadata: { rid, currentVersion, version, date?, body?, rawJson }
+    return {
+      status: "available",
+      version: result.version || "未知",
+      body: result.body || "",
+      rid: result.rid,
+    };
+  } catch (e: any) {
+    // 网络错误、服务器不可达、JSON 解析失败等
+    return { status: "error", message: String(e?.message || e) };
+  }
+}
+
+/**
+ * 关闭更新资源，释放 Tauri 侧的 rid。
+ * 在组件卸载或重新检查前调用，防止资源泄漏。
+ */
+export async function closeUpdateResource(rid: number): Promise<void> {
+  const tauri = getTauri();
+  if (!tauri?.core?.invoke) {
+    return;
+  }
+  try {
+    await tauri.core.invoke("plugin:updater|close", { rid });
+  } catch {
+    // ignore - 资源可能已被释放
+  }
 }
 
 /**

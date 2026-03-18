@@ -20,10 +20,12 @@ OpenClaw 更新发布脚本 (Python + paramiko)
 3. pip install paramiko（如未安装）
 """
 import argparse
+import base64
 import getpass
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -63,6 +65,7 @@ UPDATE_METADATA = {
 # 项目根目录（脚本在 scripts/ 下）
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BUNDLE_BASE = PROJECT_ROOT / "src-tauri" / "target" / "release" / "bundle"
+TAURI_CONF = PROJECT_ROOT / "src-tauri" / "tauri.conf.json"
 
 
 def parse_args():
@@ -74,7 +77,80 @@ def parse_args():
         required=True,
         help="发布目标平台；all 表示额外写入旧版 Windows 客户端读取的 latest.json",
     )
+    parser.add_argument(
+        "--skip-verify",
+        action="store_true",
+        help="跳过签名验证（不推荐，仅用于调试）",
+    )
     return parser.parse_args()
+
+
+def get_pubkey_from_config():
+    """从 tauri.conf.json 读取 updater 公钥。"""
+    if not TAURI_CONF.is_file():
+        return None
+    try:
+        with open(TAURI_CONF, "r", encoding="utf-8") as f:
+            conf = json.load(f)
+        pubkey_b64 = conf.get("plugins", {}).get("updater", {}).get("pubkey")
+        if pubkey_b64:
+            # 解码 Base64 得到原始公钥内容
+            return base64.b64decode(pubkey_b64).decode("utf-8").strip()
+        return None
+    except (json.JSONDecodeError, KeyError, UnicodeDecodeError, ValueError):
+        # ValueError 包含 base64.binascii.Error
+        return None
+
+
+def verify_signature(artifact_path, sig_content, pubkey_content):
+    """
+    使用 minisign 验证签名。
+    返回 (success: bool, message: str)
+    """
+    import tempfile
+    import shutil
+
+    # 检查 minisign 是否可用
+    minisign_cmd = shutil.which("minisign")
+    if not minisign_cmd:
+        # 尝试 cargo tauri signer verify（Tauri CLI 内置）
+        cargo_tauri = shutil.which("cargo-tauri") or shutil.which("tauri")
+        if cargo_tauri:
+            return (None, "minisign 未安装，跳过签名验证（建议安装 minisign 以启用验证）")
+        return (None, "minisign 未安装，跳过签名验证")
+
+    # 创建临时文件存放公钥和签名
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".pub", delete=False) as pk_file:
+        pk_file.write(pubkey_content)
+        pk_path = pk_file.name
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".sig", delete=False) as sig_file:
+        sig_file.write(sig_content)
+        sig_path = sig_file.name
+
+    try:
+        # minisign -Vm <file> -p <pubkey> -x <signature>
+        result = subprocess.run(
+            [minisign_cmd, "-Vm", str(artifact_path), "-p", pk_path, "-x", sig_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            return (True, "签名验证通过")
+        else:
+            return (False, f"签名验证失败: {result.stderr.strip() or result.stdout.strip()}")
+    except subprocess.TimeoutExpired:
+        return (False, "签名验证超时")
+    except Exception as e:
+        return (None, f"签名验证出错: {e}")
+    finally:
+        # 清理临时文件
+        try:
+            os.unlink(pk_path)
+            os.unlink(sig_path)
+        except OSError:
+            pass
 
 
 def get_password():
@@ -289,6 +365,7 @@ def main():
     args = parse_args()
     version = args.version
     release_platform = args.platform
+    skip_verify = args.skip_verify
     update_meta = UPDATE_METADATA[release_platform]
     update_url = update_meta["url"]
     update_filename = update_meta["path"]
@@ -298,14 +375,47 @@ def main():
     print(f"=== 目标平台: {release_platform} ===\n")
 
     # 1. 收集产物
-    print("[1/4] 扫描构建产物...")
+    print("[1/5] 扫描构建产物...")
     platforms, extra_uploads = collect_artifacts(version, release_platform)
     if not platforms:
         print("ERROR: 未找到目标平台的构建产物。请先运行对应平台的 cargo tauri build。")
         sys.exit(1)
 
-    # 2. 生成 updater 元数据
-    print("\n[2/4] 生成 updater 元数据...")
+    # 2. 验证签名（确保公钥与签名匹配）
+    print("\n[2/5] 验证签名...")
+    if skip_verify:
+        print("  ⚠️  跳过签名验证（--skip-verify）")
+    else:
+        pubkey = get_pubkey_from_config()
+        if not pubkey:
+            print("  ⚠️  无法从 tauri.conf.json 读取公钥，跳过签名验证")
+            print("     请确保 plugins.updater.pubkey 已正确配置")
+        else:
+            all_verified = True
+            for platform_key, info in platforms.items():
+                artifact_path = info["file"]
+                sig_content = info["sig"]
+                success, message = verify_signature(artifact_path, sig_content, pubkey)
+                if success is True:
+                    print(f"  [OK] {platform_key}: {message}")
+                elif success is False:
+                    print(f"  [FAIL] {platform_key}: {message}")
+                    all_verified = False
+                else:
+                    # success is None - 无法验证（minisign 未安装等）
+                    print(f"  [SKIP] {platform_key}: {message}")
+
+            if not all_verified:
+                print("\nERROR: 签名验证失败！")
+                print("可能原因：")
+                print("  1. 构建时使用的私钥与 tauri.conf.json 中的公钥不匹配")
+                print("  2. 签名文件损坏或被修改")
+                print("  3. 安装包文件在签名后被修改")
+                print("\n请检查密钥配置后重新构建，或使用 --skip-verify 跳过验证（不推荐）")
+                sys.exit(1)
+
+    # 3. 生成 updater 元数据
+    print("\n[3/5] 生成 updater 元数据...")
     try:
         latest = build_latest_json(version, platforms, update_url, allowed_platforms)
     except RuntimeError as e:
@@ -314,8 +424,8 @@ def main():
     latest_str = json.dumps(latest, indent=2, ensure_ascii=False)
     print(f"\n{latest_str}\n")
 
-    # 3. 获取密码并连接
-    print("[3/4] 连接服务器...")
+    # 4. 获取密码并连接
+    print("[4/5] 连接服务器...")
     password = get_password()
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -326,8 +436,8 @@ def main():
         sys.exit(1)
     print("  已连接!\n")
 
-    # 4. 上传
-    print("[4/4] 上传文件...")
+    # 5. 上传
+    print("[5/5] 上传文件...")
     ssh_exec(ssh, f"mkdir -p {REMOTE_DIR}/artifacts")
 
     sftp = ssh.open_sftp()
