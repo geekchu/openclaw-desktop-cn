@@ -126,6 +126,7 @@ const lazyLogs = createLazy(() => import("./views/logs.ts"));
 const lazyNodes = createLazy(() => import("./views/nodes.ts"));
 const lazySessions = createLazy(() => import("./views/sessions.ts"));
 const lazySkills = createLazy(() => import("./views/skills.ts"));
+const lazyTerminal = createLazy(() => import("./views/terminal.ts"));
 
 function lazyRender<M>(getter: () => M | null, render: (mod: M) => unknown) {
   const mod = getter();
@@ -1898,6 +1899,12 @@ export function renderApp(state: AppViewState) {
                   onScroll: (event) => state.handleLogsScroll(event),
                 }),
               )
+            : nothing
+        }
+
+        ${
+          state.tab === "terminal"
+            ? lazyRender(lazyTerminal, (m) => m.renderTerminal(state))
             : nothing
         }
       </main>
