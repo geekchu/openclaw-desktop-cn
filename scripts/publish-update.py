@@ -20,7 +20,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import urlopen, Request
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 try:
     import paramiko
@@ -128,7 +128,7 @@ def collect_artifacts(version):
             if f and sig_file:
                 # 为 macOS 文件添加架构后缀，避免不同架构文件互相覆盖
                 arch_suffix = "aarch64" if "aarch64" in platform_key else "x64"
-                remote_name = f.name.replace(".app.tar.gz", f"_{arch_suffix}.app.tar.gz")
+                remote_name = f.name.replace(".app.tar.gz", f"_{version}_{arch_suffix}.app.tar.gz")
                 platforms[platform_key] = {
                     "file": f,
                     "sig": sig_file.read_text(encoding="utf-8").strip(),
@@ -168,9 +168,13 @@ def fetch_existing_json():
         req = Request(UPDATE_URL, headers={"User-Agent": "publish-update/1.0"})
         with urlopen(req, timeout=10) as resp:
             return json.loads(resp.read().decode("utf-8"))
+    except HTTPError as e:
+        if e.code == 404:
+            print("  服务器上还没有 latest.json，将创建全新 latest.json")
+            return None
+        raise RuntimeError(f"无法获取服务器 latest.json (HTTP {e.code}): {e.reason}") from e
     except (URLError, json.JSONDecodeError, OSError) as e:
-        print(f"  无法获取服务器 latest.json: {e}")
-        return None
+        raise RuntimeError(f"无法获取服务器 latest.json: {e}") from e
 
 
 def build_latest_json(version, platforms):
@@ -246,7 +250,11 @@ def main():
 
     # 2. 生成 latest.json
     print("\n[2/4] 生成 latest.json...")
-    latest = build_latest_json(version, platforms)
+    try:
+        latest = build_latest_json(version, platforms)
+    except RuntimeError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
     latest_str = json.dumps(latest, indent=2, ensure_ascii=False)
     print(f"\n{latest_str}\n")
 

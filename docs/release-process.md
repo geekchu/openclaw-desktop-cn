@@ -201,7 +201,8 @@ pnpm installer:build:mac-intel
 >
 > ```bash
 > cd src-tauri; cargo clean; cd ..
-> pnpm installer:build
+> pnpm installer:build:mac-arm
+> pnpm installer:build:mac-intel
 > ```
 >
 > 原因：Tauri 的 `generate_context!()` proc macro 会在编译时嵌入 `frontendDist` 目录中的所有文件。
@@ -219,6 +220,7 @@ pnpm installer:build:mac-intel
 | Linux         | `src-tauri/target/release/bundle/appimage/`                   | `*.AppImage` + `.sig`                            |
 
 所有产物会被自动复制到 `dist/installers/` 目录。
+其中 macOS 的 updater 产物在复制时会追加架构后缀（如 `OpenClaw桌面版_aarch64.app.tar.gz`），避免 ARM / Intel 两次构建互相覆盖。
 
 **macOS 产物说明：**
 
@@ -325,6 +327,9 @@ DEPLOY_SSH_PASSWORD=xxx python scripts/publish-update.py 0.3.0
 2. 通过 HTTPS 获取服务器现有的 `latest.json`，如果版本号相同则**合并**平台条目（不会覆盖其他平台）
 3. 读取 `.sig` 签名内容，生成/更新 `latest.json`（纯 Python，不依赖 jq）
 4. paramiko 单连接：mkdir → sftp 上传所有产物 → sftp 上传 latest.json
+
+> ⚠️ 如果服务器上已存在 `latest.json`，但脚本无法成功拉取或解析它，脚本会直接报错退出，而不是静默重建一个新的 `latest.json`。
+> 只有服务器返回 `404`（首次发布/文件不存在）时，脚本才会创建全新 `latest.json`。
 
 > **跨平台发布时**，可以在各自机器上分别运行 `publish-update.py`（版本号保持一致），
 > 脚本会自动合并已有的平台条目。例如：先在 Windows 上发布（写入 `windows-x86_64`），
@@ -509,11 +514,11 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6..."
     },
     "darwin-aarch64": {
-      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_aarch64.app.tar.gz",
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_aarch64.app.tar.gz",
       "signature": "..."
     },
     "darwin-x86_64": {
-      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_x64.app.tar.gz",
+      "url": "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64.app.tar.gz",
       "signature": "..."
     },
     "linux-x86_64": {

@@ -12,7 +12,6 @@
  *   node scripts/build-installer.js --verbose    # 详细输出
  *   node scripts/build-installer.js --target aarch64-apple-darwin   # macOS ARM
  *   node scripts/build-installer.js --target x86_64-apple-darwin    # macOS Intel
- *   node scripts/build-installer.js --target universal-apple-darwin # macOS Universal
  */
 
 import { execSync } from "node:child_process";
@@ -78,6 +77,34 @@ function formatSize(bytes) {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getMacArchSuffix() {
+  if (targetArch === "aarch64-apple-darwin") {
+    return "aarch64";
+  }
+  if (targetArch === "x86_64-apple-darwin") {
+    return "x64";
+  }
+  return null;
+}
+
+function getCopiedArtifactName(name) {
+  const archSuffix = getMacArchSuffix();
+  if (!archSuffix) {
+    return name;
+  }
+  if (name.endsWith(".app.tar.gz.sig")) {
+    return name.replace(".app.tar.gz.sig", `_${archSuffix}.app.tar.gz.sig`);
+  }
+  if (name.endsWith(".app.tar.gz")) {
+    return name.replace(".app.tar.gz", `_${archSuffix}.app.tar.gz`);
+  }
+  return name;
+}
+
+function getArtifactCleanupNames(name) {
+  return new Set([name, getCopiedArtifactName(name)]);
 }
 
 function isEncryptedSigningKey(signingKey) {
@@ -283,11 +310,18 @@ function collectArtifacts() {
     log(`  ${a.name}  (${formatSize(a.size)})`);
   }
 
+  const copiedArtifactNames = new Set(
+    artifacts.flatMap((artifact) => Array.from(getArtifactCleanupNames(artifact.name))),
+  );
+
   // 清理旧产物
   if (existsSync(distInstallersDir)) {
     for (const entry of readdirSync(distInstallersDir)) {
       const fullPath = join(distInstallersDir, entry);
       if (statSync(fullPath).isFile() && isInstallerFile(entry)) {
+        if (targetArch && !copiedArtifactNames.has(entry)) {
+          continue;
+        }
         try {
           unlinkSync(fullPath);
         } catch {
@@ -300,7 +334,7 @@ function collectArtifacts() {
 
   log(`\n复制到 ${distInstallersDir}:`);
   for (const a of artifacts) {
-    const destPath = join(distInstallersDir, a.name);
+    const destPath = join(distInstallersDir, getCopiedArtifactName(a.name));
     cpSync(a.path, destPath);
     log(`  → ${destPath}`);
   }
@@ -330,7 +364,7 @@ function main() {
   const targetDesc = targetArch ? ` (target: ${targetArch})` : "";
   console.log(`\n  OpenClaw Desktop 安装包构建`);
   console.log(`  模式: ${buildProfile}${targetDesc}`);
-  console.log(`  平台: ${process.platform}-${process.arch}`);
+  console.log(`  主机: ${process.platform}-${process.arch}`);
   console.log(`  时间: ${new Date().toLocaleString()}\n`);
 
   checkEnvironment();
