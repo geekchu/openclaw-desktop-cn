@@ -68,15 +68,6 @@ interface AIConfigOverview {
   available_models: string[];
 }
 
-interface AITestResult {
-  success: boolean;
-  provider: string;
-  model: string;
-  response: string | null;
-  error: string | null;
-  latency_ms: number | null;
-}
-
 // ─── SVG Icons ──────────────────────────────────────────────
 
 const icons = {
@@ -125,11 +116,6 @@ const icons = {
       <polygon
         points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
       ></polygon>
-    </svg>
-  `,
-  zap: html`
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
     </svg>
   `,
   loader: html`
@@ -212,8 +198,6 @@ export class CustomProvidersView extends LitElement {
   @state() error: string | null = null;
   @state() officialProviders: OfficialProvider[] = [];
   @state() aiConfig: AIConfigOverview | null = null;
-  @state() testing = false;
-  @state() testResult: AITestResult | null = null;
 
   // Form State
   @state() showAddForm = false;
@@ -318,31 +302,6 @@ export class CustomProvidersView extends LitElement {
       }, 5000);
     } catch (e) {
       this.error = "切换模型失败: " + String(e);
-    }
-  }
-
-  async handleTestConnection() {
-    this.testing = true;
-    this.testResult = null;
-
-    try {
-      const result = await invoke<AITestResult>("test_ai_connection");
-      this.testResult = result;
-    } catch (e) {
-      this.testResult = {
-        success: false,
-        provider: "unknown",
-        model: "unknown",
-        response: null,
-        error: String(e),
-        latency_ms: null,
-      };
-    } finally {
-      this.testing = false;
-      // 10 秒后自动隐藏测试结果
-      setTimeout(() => {
-        this.testResult = null;
-      }, 10000);
     }
   }
 
@@ -992,48 +951,11 @@ export class CustomProvidersView extends LitElement {
               </div>
             </div>
             <div class="onestop-custom-overview__actions">
-              <button
-                class="onestop-custom-btn-secondary"
-                ?disabled=${this.testing || !this.aiConfig?.primary_model}
-                @click=${() => this.handleTestConnection()}
-              >
-                ${this.testing ? icons.loader : icons.zap}
-                测试连接
-              </button>
               <button class="onestop-custom-btn-primary" @click=${() => this.openAddForm()}>
                 ${icons.plus} 添加供应商
               </button>
             </div>
           </div>
-
-          <!-- 测试结果 -->
-          ${
-            this.testResult
-              ? html`
-                <div class="onestop-custom-test-result ${this.testResult.success ? "success" : "error"}">
-                  <div class="onestop-custom-test-result__compact-info">
-                    <span class="onestop-custom-test-result__status">
-                      ${this.testResult.success ? icons.check : icons.close}
-                      ${this.testResult.success ? "测试连接成功" : "测试连接失败"}
-                    </span>
-                    ${
-                      this.testResult.latency_ms
-                        ? html`<span class="onestop-custom-label__hint" style="font-family: var(--mono); margin-left: -4px;">${this.testResult.latency_ms}ms</span>`
-                        : nothing
-                    }
-                    ${
-                      this.testResult.error || this.testResult.response
-                        ? html`<span class="onestop-custom-test-result__compact-msg" title=${this.testResult.error || this.testResult.response}>${this.testResult.error || this.testResult.response}</span>`
-                        : nothing
-                    }
-                  </div>
-                  <button class="onestop-custom-btn-text" @click=${() => {
-                    this.testResult = null;
-                  }} style="flex-shrink: 0;">关闭</button>
-                </div>
-              `
-              : nothing
-          }
 
           <!-- 添加/编辑供应商表单 -->
           ${
