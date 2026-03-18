@@ -202,6 +202,24 @@ sign_plain_item() {
   codesign --force ${options_args+"${options_args[@]}"} "${timestamp_args[@]}" --sign "$IDENTITY" "$target"
 }
 
+is_macho_file() {
+  local target="$1"
+  /usr/bin/file "$target" | /usr/bin/grep -q "Mach-O"
+}
+
+resolve_main_executable() {
+  local plist="$APP_BUNDLE/Contents/Info.plist"
+  local executable=""
+  if [[ -f "$plist" ]]; then
+    executable="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist" 2>/dev/null || true)"
+  fi
+  if [[ -n "$executable" && -f "$APP_BUNDLE/Contents/MacOS/$executable" ]]; then
+    printf '%s\n' "$APP_BUNDLE/Contents/MacOS/$executable"
+    return 0
+  fi
+  find "$APP_BUNDLE/Contents/MacOS" -maxdepth 1 -type f | head -n1
+}
+
 team_id_for() {
   codesign -dv --verbose=4 "$1" 2>&1 | awk -F= '/^TeamIdentifier=/{print $2; exit}'
 }
@@ -221,7 +239,7 @@ verify_team_ids() {
 
   local mismatches=()
   while IFS= read -r -d '' f; do
-    if /usr/bin/file "$f" | /usr/bin/grep -q "Mach-O"; then
+    if is_macho_file "$f"; then
       local team
       team="$(team_id_for "$f" || true)"
       if [[ -z "$team" ]]; then
@@ -247,9 +265,27 @@ verify_team_ids() {
   fi
 }
 
-# Sign main binary
-if [ -f "$APP_BUNDLE/Contents/MacOS/OpenClaw" ]; then
-  echo "Signing main binary"; sign_item "$APP_BUNDLE/Contents/MacOS/OpenClaw" "$APP_ENTITLEMENTS"
+MAIN_EXECUTABLE="$(resolve_main_executable)"
+
+# Sign embedded Mach-O files outside Frameworks so gateway-bundle resources and
+# bundled runtimes inherit the same Team ID as the app bundle.
+find "$APP_BUNDLE" -type f -print0 | while IFS= read -r -d '' f; do
+  if ! is_macho_file "$f"; then
+    continue
+  fi
+  case "$f" in
+    "$MAIN_EXECUTABLE"|"$APP_BUNDLE"/Contents/Frameworks/*)
+      continue
+      ;;
+  esac
+  echo "Signing embedded binary: $f"
+  sign_plain_item "$f"
+done
+
+# Sign main binary with app entitlements
+if [[ -n "${MAIN_EXECUTABLE:-}" && -f "$MAIN_EXECUTABLE" ]]; then
+  echo "Signing main binary: $MAIN_EXECUTABLE"
+  sign_item "$MAIN_EXECUTABLE" "$APP_ENTITLEMENTS"
 fi
 
 # Sign Sparkle deeply if present
@@ -257,7 +293,7 @@ SPARKLE="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 if [ -d "$SPARKLE" ]; then
   echo "Signing Sparkle framework and helpers"
   find "$SPARKLE" -type f -print0 | while IFS= read -r -d '' f; do
-    if /usr/bin/file "$f" | /usr/bin/grep -q "Mach-O"; then
+    if is_macho_file "$f"; then
       sign_plain_item "$f"
     fi
   done
