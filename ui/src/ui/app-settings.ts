@@ -1,4 +1,3 @@
-import { roleScopesAllow } from "../../../src/shared/operator-scope-compat.js";
 import { refreshChat } from "./app-chat.ts";
 import {
   startLogsPolling,
@@ -10,10 +9,15 @@ import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
 import type { OpenClawApp } from "./app.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
-import { loadAgents } from "./controllers/agents.ts";
+import { loadAgents, loadToolsCatalog } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
 import { loadConfig, loadConfigSchema } from "./controllers/config.ts";
-import { loadCronJobs, loadCronRuns, loadCronStatus } from "./controllers/cron.ts";
+import {
+  loadCronJobs,
+  loadCronModelSuggestions,
+  loadCronRuns,
+  loadCronStatus,
+} from "./controllers/cron.ts";
 import { loadDebug } from "./controllers/debug.ts";
 import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
@@ -22,7 +26,6 @@ import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
-import { loadUsage } from "./controllers/usage.ts";
 import {
   inferBasePathFromPathname,
   normalizeBasePath,
@@ -33,15 +36,38 @@ import {
 } from "./navigation.ts";
 import { saveSettings, type UiSettings } from "./storage.ts";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition.ts";
-import { resolveTheme, type ResolvedTheme, type ThemeMode, type ThemeName } from "./theme.ts";
-import type { AgentsListResult, AttentionItem } from "./types.ts";
-import { resetChatViewState } from "./views/chat.ts";
+import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme.ts";
+import type { AgentsListResult } from "./types.ts";
+
+/**
+ * Detect if we are running inside a desktop WebView (Tauri + WebView2).
+ *
+ * In desktop mode, URL sync (pushState/replaceState) is skipped because
+ * WebView2 treats pathname changes as real navigation requests.
+ */
+let _isDesktopWebView = false;
+if (typeof window !== "undefined") {
+  const params = new URLSearchParams(window.location.search);
+  _isDesktopWebView =
+    params.get("desktop") === "1" ||
+    Boolean((window as unknown as Record<string, unknown>).__TAURI__) ||
+    Boolean((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__);
+
+  if (!_isDesktopWebView) {
+    const ua = navigator.userAgent;
+    const isEdgeWebView = ua.includes("Edg/") && !ua.includes("Electron");
+    const isLocalhost =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (isEdgeWebView && isLocalhost) {
+      _isDesktopWebView = true;
+    }
+  }
+}
 
 type SettingsHost = {
   settings: UiSettings;
   password?: string;
-  theme: ThemeName;
-  themeMode: ThemeMode;
+  theme: ThemeMode;
   themeResolved: ResolvedTheme;
   applySessionKey: string;
   sessionKey: string;
@@ -55,9 +81,9 @@ type SettingsHost = {
   agentsList?: AgentsListResult | null;
   agentsSelectedId?: string | null;
   agentsPanel?: "overview" | "files" | "tools" | "skills" | "channels" | "cron";
+  themeMedia: MediaQueryList | null;
+  themeMediaHandler: ((event: MediaQueryListEvent) => void) | null;
   pendingGatewayUrl?: string | null;
-  systemThemeCleanup?: (() => void) | null;
-  pendingGatewayToken?: string | null;
 };
 
 export function applySettings(host: SettingsHost, next: UiSettings) {
@@ -67,10 +93,9 @@ export function applySettings(host: SettingsHost, next: UiSettings) {
   };
   host.settings = normalized;
   saveSettings(normalized);
-  if (next.theme !== host.theme || next.themeMode !== host.themeMode) {
+  if (next.theme !== host.theme) {
     host.theme = next.theme;
-    host.themeMode = next.themeMode;
-    applyResolvedTheme(host, resolveTheme(next.theme, next.themeMode));
+    applyResolvedTheme(host, resolveTheme(next.theme));
   }
   host.applySessionKey = host.settings.lastActiveSessionKey;
 }
@@ -94,26 +119,18 @@ export function applySettingsFromUrl(host: SettingsHost) {
   const params = new URLSearchParams(url.search);
   const hashParams = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : url.hash);
 
-  const gatewayUrlRaw = params.get("gatewayUrl") ?? hashParams.get("gatewayUrl");
-  const nextGatewayUrl = gatewayUrlRaw?.trim() ?? "";
-  const gatewayUrlChanged = Boolean(nextGatewayUrl && nextGatewayUrl !== host.settings.gatewayUrl);
-  const tokenRaw = hashParams.get("token");
+  const tokenRaw = params.get("token") ?? hashParams.get("token");
   const passwordRaw = params.get("password") ?? hashParams.get("password");
   const sessionRaw = params.get("session") ?? hashParams.get("session");
+  const gatewayUrlRaw = params.get("gatewayUrl") ?? hashParams.get("gatewayUrl");
   let shouldCleanUrl = false;
-
-  if (params.has("token")) {
-    params.delete("token");
-    shouldCleanUrl = true;
-  }
 
   if (tokenRaw != null) {
     const token = tokenRaw.trim();
-    if (token && gatewayUrlChanged) {
-      host.pendingGatewayToken = token;
-    } else if (token && token !== host.settings.token) {
+    if (token && token !== host.settings.token) {
       applySettings(host, { ...host.settings, token });
     }
+    params.delete("token");
     hashParams.delete("token");
     shouldCleanUrl = true;
   }
@@ -138,14 +155,9 @@ export function applySettingsFromUrl(host: SettingsHost) {
   }
 
   if (gatewayUrlRaw != null) {
-    if (gatewayUrlChanged) {
-      host.pendingGatewayUrl = nextGatewayUrl;
-      if (!tokenRaw?.trim()) {
-        host.pendingGatewayToken = null;
-      }
-    } else {
-      host.pendingGatewayUrl = null;
-      host.pendingGatewayToken = null;
+    const gatewayUrl = gatewayUrlRaw.trim();
+    if (gatewayUrl && gatewayUrl !== host.settings.gatewayUrl) {
+      host.pendingGatewayUrl = gatewayUrl;
     }
     params.delete("gatewayUrl");
     hashParams.delete("gatewayUrl");
@@ -154,6 +166,9 @@ export function applySettingsFromUrl(host: SettingsHost) {
 
   if (!shouldCleanUrl) {
     return;
+  }
+  if (_isDesktopWebView) {
+    return; // WebView2 treats replaceState URL changes as navigation, causing flicker
   }
   url.search = params.toString();
   const nextHash = hashParams.toString();
@@ -165,36 +180,18 @@ export function setTab(host: SettingsHost, next: Tab) {
   applyTabSelection(host, next, { refreshPolicy: "always", syncUrl: true });
 }
 
-export function setTheme(host: SettingsHost, next: ThemeName, context?: ThemeTransitionContext) {
-  const resolved = resolveTheme(next, host.themeMode);
+export function setTheme(host: SettingsHost, next: ThemeMode, context?: ThemeTransitionContext) {
   const applyTheme = () => {
+    host.theme = next;
     applySettings(host, { ...host.settings, theme: next });
+    applyResolvedTheme(host, resolveTheme(next));
   };
   startThemeTransition({
-    nextTheme: resolved,
+    nextTheme: next,
     applyTheme,
     context,
-    currentTheme: host.themeResolved,
+    currentTheme: host.theme,
   });
-  syncSystemThemeListener(host);
-}
-
-export function setThemeMode(
-  host: SettingsHost,
-  next: ThemeMode,
-  context?: ThemeTransitionContext,
-) {
-  const resolved = resolveTheme(host.theme, next);
-  const applyMode = () => {
-    applySettings(host, { ...host.settings, themeMode: next });
-  };
-  startThemeTransition({
-    nextTheme: resolved,
-    applyTheme: applyMode,
-    context,
-    currentTheme: host.themeResolved,
-  });
-  syncSystemThemeListener(host);
 }
 
 export async function refreshActiveTab(host: SettingsHost) {
@@ -218,6 +215,7 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "agents") {
     await loadAgents(host as unknown as OpenClawApp);
+    await loadToolsCatalog(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as OpenClawApp);
     const agentIds = host.agentsList?.agents?.map((entry) => entry.id) ?? [];
     if (agentIds.length > 0) {
@@ -245,20 +243,14 @@ export async function refreshActiveTab(host: SettingsHost) {
     await loadExecApprovals(host as unknown as OpenClawApp);
   }
   if (host.tab === "chat") {
+    await loadConfig(host as unknown as OpenClawApp);
     await refreshChat(host as unknown as Parameters<typeof refreshChat>[0]);
     scheduleChatScroll(
       host as unknown as Parameters<typeof scheduleChatScroll>[0],
       !host.chatHasAutoScrolled,
     );
   }
-  if (
-    host.tab === "config" ||
-    host.tab === "communications" ||
-    host.tab === "appearance" ||
-    host.tab === "automation" ||
-    host.tab === "infrastructure" ||
-    host.tab === "aiAgents"
-  ) {
+  if (host.tab === "config") {
     await loadConfigSchema(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as OpenClawApp);
   }
@@ -285,19 +277,8 @@ export function inferBasePath() {
 }
 
 export function syncThemeWithSettings(host: SettingsHost) {
-  host.theme = host.settings.theme ?? "claw";
-  host.themeMode = host.settings.themeMode ?? "system";
-  applyResolvedTheme(host, resolveTheme(host.theme, host.themeMode));
-  syncSystemThemeListener(host);
-}
-
-export function attachThemeListener(host: SettingsHost) {
-  syncSystemThemeListener(host);
-}
-
-export function detachThemeListener(host: SettingsHost) {
-  host.systemThemeCleanup?.();
-  host.systemThemeCleanup = null;
+  host.theme = host.settings.theme ?? "system";
+  applyResolvedTheme(host, resolveTheme(host.theme));
 }
 
 export function applyResolvedTheme(host: SettingsHost, resolved: ResolvedTheme) {
@@ -306,52 +287,60 @@ export function applyResolvedTheme(host: SettingsHost, resolved: ResolvedTheme) 
     return;
   }
   const root = document.documentElement;
-  const themeMode = resolved.endsWith("light") ? "light" : "dark";
   root.dataset.theme = resolved;
-  root.dataset.themeMode = themeMode;
-  root.style.colorScheme = themeMode;
+  root.style.colorScheme = resolved;
+  // Broadcast theme to embedded iframes (e.g. Manager control panel)
+  for (const frame of Array.from(document.querySelectorAll("iframe"))) {
+    frame.contentWindow?.postMessage(
+      { type: "openclaw:theme", theme: resolved },
+      window.location.origin,
+    );
+  }
 }
 
-function syncSystemThemeListener(host: SettingsHost) {
-  // Clean up existing listener if mode is not "system"
-  if (host.themeMode !== "system") {
-    host.systemThemeCleanup?.();
-    host.systemThemeCleanup = null;
+export function attachThemeListener(host: SettingsHost) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return;
   }
-
-  // Skip if listener already attached for this host
-  if (host.systemThemeCleanup) {
-    return;
-  }
-
-  if (typeof globalThis.matchMedia !== "function") {
-    return;
-  }
-
-  const mql = globalThis.matchMedia("(prefers-color-scheme: light)");
-  const onChange = () => {
-    if (host.themeMode !== "system") {
+  host.themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+  host.themeMediaHandler = (event) => {
+    if (host.theme !== "system") {
       return;
     }
-    applyResolvedTheme(host, resolveTheme(host.theme, "system"));
+    applyResolvedTheme(host, event.matches ? "dark" : "light");
   };
-  if (typeof mql.addEventListener === "function") {
-    mql.addEventListener("change", onChange);
-    host.systemThemeCleanup = () => mql.removeEventListener("change", onChange);
+  if (typeof host.themeMedia.addEventListener === "function") {
+    host.themeMedia.addEventListener("change", host.themeMediaHandler);
     return;
   }
-  if (typeof mql.addListener === "function") {
-    mql.addListener(onChange);
-    host.systemThemeCleanup = () => mql.removeListener(onChange);
+  const legacy = host.themeMedia as MediaQueryList & {
+    addListener: (cb: (event: MediaQueryListEvent) => void) => void;
+  };
+  legacy.addListener(host.themeMediaHandler);
+}
+
+export function detachThemeListener(host: SettingsHost) {
+  if (!host.themeMedia || !host.themeMediaHandler) {
+    return;
   }
+  if (typeof host.themeMedia.removeEventListener === "function") {
+    host.themeMedia.removeEventListener("change", host.themeMediaHandler);
+    return;
+  }
+  const legacy = host.themeMedia as MediaQueryList & {
+    removeListener: (cb: (event: MediaQueryListEvent) => void) => void;
+  };
+  legacy.removeListener(host.themeMediaHandler);
+  host.themeMedia = null;
+  host.themeMediaHandler = null;
 }
 
 export function syncTabWithLocation(host: SettingsHost, replace: boolean) {
   if (typeof window === "undefined") {
     return;
   }
-  const resolved = tabFromPath(window.location.pathname, host.basePath) ?? "chat";
+  let resolved = tabFromPath(window.location.pathname, host.basePath) ?? "chat";
+  // When embedded in an iframe, the "manager" tab is suppressed — fall back to overview.
   setTabFromRoute(host, resolved);
   syncUrlWithTab(host, resolved, replace);
 }
@@ -360,7 +349,7 @@ export function onPopState(host: SettingsHost) {
   if (typeof window === "undefined") {
     return;
   }
-  const resolved = tabFromPath(window.location.pathname, host.basePath);
+  let resolved = tabFromPath(window.location.pathname, host.basePath);
   if (!resolved) {
     return;
   }
@@ -388,16 +377,9 @@ function applyTabSelection(
   next: Tab,
   options: { refreshPolicy: "always" | "connected"; syncUrl?: boolean },
 ) {
-  const prev = host.tab;
   if (host.tab !== next) {
     host.tab = next;
   }
-
-  // Cleanup chat module state when navigating away from chat
-  if (prev === "chat" && next !== "chat") {
-    resetChatViewState();
-  }
-
   if (next === "chat") {
     host.chatHasAutoScrolled = false;
   }
@@ -425,6 +407,9 @@ export function syncUrlWithTab(host: SettingsHost, tab: Tab, replace: boolean) {
   if (typeof window === "undefined") {
     return;
   }
+  if (_isDesktopWebView) {
+    return;
+  }
   const targetPath = normalizePath(pathForTab(tab, host.basePath));
   const currentPath = normalizePath(window.location.pathname);
   const url = new URL(window.location.href);
@@ -450,6 +435,9 @@ export function syncUrlWithSessionKey(host: SettingsHost, sessionKey: string, re
   if (typeof window === "undefined") {
     return;
   }
+  if (_isDesktopWebView) {
+    return;
+  }
   const url = new URL(window.location.href);
   url.searchParams.set("session", sessionKey);
   if (replace) {
@@ -460,143 +448,13 @@ export function syncUrlWithSessionKey(host: SettingsHost, sessionKey: string, re
 }
 
 export async function loadOverview(host: SettingsHost) {
-  const app = host as unknown as OpenClawApp;
-  await Promise.allSettled([
-    loadChannels(app, false),
-    loadPresence(app),
-    loadSessions(app),
-    loadCronStatus(app),
-    loadCronJobs(app),
-    loadDebug(app),
-    loadSkills(app),
-    loadUsage(app),
-    loadOverviewLogs(app),
+  await Promise.all([
+    loadChannels(host as unknown as OpenClawApp, false),
+    loadPresence(host as unknown as OpenClawApp),
+    loadSessions(host as unknown as OpenClawApp),
+    loadCronStatus(host as unknown as OpenClawApp),
+    loadDebug(host as unknown as OpenClawApp),
   ]);
-  buildAttentionItems(app);
-}
-
-export function hasOperatorReadAccess(
-  auth: { role?: string; scopes?: readonly string[] } | null,
-): boolean {
-  if (!auth?.scopes) {
-    return false;
-  }
-  return roleScopesAllow({
-    role: auth.role ?? "operator",
-    requestedScopes: ["operator.read"],
-    allowedScopes: auth.scopes,
-  });
-}
-
-export function hasMissingSkillDependencies(
-  missing: Record<string, unknown> | null | undefined,
-): boolean {
-  if (!missing) {
-    return false;
-  }
-  return Object.values(missing).some((value) => Array.isArray(value) && value.length > 0);
-}
-
-async function loadOverviewLogs(host: OpenClawApp) {
-  if (!host.client || !host.connected) {
-    return;
-  }
-  try {
-    const res = await host.client.request("logs.tail", {
-      cursor: host.overviewLogCursor || undefined,
-      limit: 100,
-      maxBytes: 50_000,
-    });
-    const payload = res as {
-      cursor?: number;
-      lines?: unknown;
-    };
-    const lines = Array.isArray(payload.lines)
-      ? payload.lines.filter((line): line is string => typeof line === "string")
-      : [];
-    host.overviewLogLines = [...host.overviewLogLines, ...lines].slice(-500);
-    if (typeof payload.cursor === "number") {
-      host.overviewLogCursor = payload.cursor;
-    }
-  } catch {
-    /* non-critical */
-  }
-}
-
-function buildAttentionItems(host: OpenClawApp) {
-  const items: AttentionItem[] = [];
-
-  if (host.lastError) {
-    items.push({
-      severity: "error",
-      icon: "x",
-      title: "Gateway Error",
-      description: host.lastError,
-    });
-  }
-
-  const hello = host.hello;
-  const auth = (hello as { auth?: { role?: string; scopes?: string[] } } | null)?.auth ?? null;
-  if (auth?.scopes && !hasOperatorReadAccess(auth)) {
-    items.push({
-      severity: "warning",
-      icon: "key",
-      title: "Missing operator.read scope",
-      description:
-        "This connection does not have the operator.read scope. Some features may be unavailable.",
-      href: "https://docs.openclaw.ai/web/dashboard",
-      external: true,
-    });
-  }
-
-  const skills = host.skillsReport?.skills ?? [];
-  const missingDeps = skills.filter((s) => !s.disabled && hasMissingSkillDependencies(s.missing));
-  if (missingDeps.length > 0) {
-    const names = missingDeps.slice(0, 3).map((s) => s.name);
-    const more = missingDeps.length > 3 ? ` +${missingDeps.length - 3} more` : "";
-    items.push({
-      severity: "warning",
-      icon: "zap",
-      title: "Skills with missing dependencies",
-      description: `${names.join(", ")}${more}`,
-    });
-  }
-
-  const blocked = skills.filter((s) => s.blockedByAllowlist);
-  if (blocked.length > 0) {
-    items.push({
-      severity: "warning",
-      icon: "shield",
-      title: `${blocked.length} skill${blocked.length > 1 ? "s" : ""} blocked`,
-      description: blocked.map((s) => s.name).join(", "),
-    });
-  }
-
-  const cronJobs = host.cronJobs ?? [];
-  const failedCron = cronJobs.filter((j) => j.state?.lastStatus === "error");
-  if (failedCron.length > 0) {
-    items.push({
-      severity: "error",
-      icon: "clock",
-      title: `${failedCron.length} cron job${failedCron.length > 1 ? "s" : ""} failed`,
-      description: failedCron.map((j) => j.name).join(", "),
-    });
-  }
-
-  const now = Date.now();
-  const overdue = cronJobs.filter(
-    (j) => j.enabled && j.state?.nextRunAtMs != null && now - j.state.nextRunAtMs > 300_000,
-  );
-  if (overdue.length > 0) {
-    items.push({
-      severity: "warning",
-      icon: "clock",
-      title: `${overdue.length} overdue job${overdue.length > 1 ? "s" : ""}`,
-      description: overdue.map((j) => j.name).join(", "),
-    });
-  }
-
-  host.attentionItems = items;
 }
 
 export async function loadChannelsTab(host: SettingsHost) {
@@ -608,12 +466,18 @@ export async function loadChannelsTab(host: SettingsHost) {
 }
 
 export async function loadCron(host: SettingsHost) {
-  const app = host as unknown as OpenClawApp;
-  const activeCronJobId = app.cronRunsScope === "job" ? app.cronRunsJobId : null;
+  const cronHost = host as unknown as OpenClawApp;
   await Promise.all([
-    loadChannels(app, false),
-    loadCronStatus(app),
-    loadCronJobs(app),
-    loadCronRuns(app, activeCronJobId),
+    loadChannels(host as unknown as OpenClawApp, false),
+    loadCronStatus(cronHost),
+    loadCronJobs(cronHost),
+    loadCronModelSuggestions(cronHost),
   ]);
+  if (cronHost.cronRunsScope === "all") {
+    await loadCronRuns(cronHost, null);
+    return;
+  }
+  if (cronHost.cronRunsJobId) {
+    await loadCronRuns(cronHost, cronHost.cronRunsJobId);
+  }
 }

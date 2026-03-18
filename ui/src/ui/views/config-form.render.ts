@@ -20,9 +20,6 @@ export type ConfigFormProps = {
   searchQuery?: string;
   activeSection?: string | null;
   activeSubsection?: string | null;
-  revealSensitive?: boolean;
-  isSensitivePathRevealed?: (path: Array<string | number>) => boolean;
-  onToggleSensitivePath?: (path: Array<string | number>) => void;
   onPatch: (path: Array<string | number>, value: unknown) => void;
 };
 
@@ -516,14 +513,20 @@ function matchesSearch(params: {
   const criteria = parseConfigSearchQuery(params.query);
   const q = criteria.text;
   const meta = SECTION_META[params.key];
-  const sectionMetaMatches =
-    q &&
-    (params.key.toLowerCase().includes(q) ||
-      (meta?.label ? meta.label.toLowerCase().includes(q) : false) ||
-      (meta?.description ? meta.description.toLowerCase().includes(q) : false));
 
-  if (sectionMetaMatches && criteria.tags.length === 0) {
+  // Check key name
+  if (q && params.key.toLowerCase().includes(q)) {
     return true;
+  }
+
+  // Check label and description
+  if (q && meta) {
+    if (meta.label.toLowerCase().includes(q)) {
+      return true;
+    }
+    if (meta.description.toLowerCase().includes(q)) {
+      return true;
+    }
   }
 
   return matchesNodeSearch({
@@ -650,9 +653,6 @@ export function renderConfigForm(props: ConfigFormProps) {
                     disabled: props.disabled ?? false,
                     showLabel: false,
                     searchCriteria,
-                    revealSensitive: props.revealSensitive ?? false,
-                    isSensitivePathRevealed: props.isSensitivePathRevealed,
-                    onToggleSensitivePath: props.onToggleSensitivePath,
                     onPatch: props.onPatch,
                   })}
                 </div>
@@ -688,9 +688,6 @@ export function renderConfigForm(props: ConfigFormProps) {
                     disabled: props.disabled ?? false,
                     showLabel: false,
                     searchCriteria,
-                    revealSensitive: props.revealSensitive ?? false,
-                    isSensitivePathRevealed: props.isSensitivePathRevealed,
-                    onToggleSensitivePath: props.onToggleSensitivePath,
                     onPatch: props.onPatch,
                   })}
                 </div>

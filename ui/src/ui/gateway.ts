@@ -5,11 +5,7 @@ import {
   type GatewayClientMode,
   type GatewayClientName,
 } from "../../../src/gateway/protocol/client-info.js";
-import {
-  ConnectErrorDetailCodes,
-  readConnectErrorRecoveryAdvice,
-  readConnectErrorDetailCode,
-} from "../../../src/gateway/protocol/connect-error-details.js";
+import { readConnectErrorDetailCode } from "../../../src/gateway/protocol/connect-error-details.js";
 import { clearDeviceAuthToken, loadDeviceAuthToken, storeDeviceAuthToken } from "./device-auth.ts";
 import { loadOrCreateDeviceIdentity, signDevicePayload } from "./device-identity.ts";
 import { generateUUID } from "./uuid.ts";
@@ -54,48 +50,6 @@ export function resolveGatewayErrorDetailCode(
   return readConnectErrorDetailCode(error?.details);
 }
 
-/**
- * Auth errors that won't resolve without user action — don't auto-reconnect.
- *
- * NOTE: AUTH_TOKEN_MISMATCH is intentionally NOT included here because the
- * browser client supports a bounded one-time retry with a cached device token
- * when the endpoint is trusted. Reconnect suppression for mismatch is handled
- * with client state (after retry budget is exhausted).
- */
-export function isNonRecoverableAuthError(error: GatewayErrorInfo | undefined): boolean {
-  if (!error) {
-    return false;
-  }
-  const code = resolveGatewayErrorDetailCode(error);
-  return (
-    code === ConnectErrorDetailCodes.AUTH_TOKEN_MISSING ||
-    code === ConnectErrorDetailCodes.AUTH_BOOTSTRAP_TOKEN_INVALID ||
-    code === ConnectErrorDetailCodes.AUTH_PASSWORD_MISSING ||
-    code === ConnectErrorDetailCodes.AUTH_PASSWORD_MISMATCH ||
-    code === ConnectErrorDetailCodes.AUTH_RATE_LIMITED ||
-    code === ConnectErrorDetailCodes.PAIRING_REQUIRED ||
-    code === ConnectErrorDetailCodes.CONTROL_UI_DEVICE_IDENTITY_REQUIRED ||
-    code === ConnectErrorDetailCodes.DEVICE_IDENTITY_REQUIRED
-  );
-}
-
-function isTrustedRetryEndpoint(url: string): boolean {
-  try {
-    const gatewayUrl = new URL(url, window.location.href);
-    const host = gatewayUrl.hostname.trim().toLowerCase();
-    const isLoopbackHost =
-      host === "localhost" || host === "::1" || host === "[::1]" || host === "127.0.0.1";
-    const isLoopbackIPv4 = host.startsWith("127.");
-    if (isLoopbackHost || isLoopbackIPv4) {
-      return true;
-    }
-    const pageUrl = new URL(window.location.href);
-    return gatewayUrl.host === pageUrl.host;
-  } catch {
-    return false;
-  }
-}
-
 export type GatewayHelloOk = {
   type: "hello-ok";
   protocol: number;
@@ -117,15 +71,6 @@ export type GatewayHelloOk = {
 type Pending = {
   resolve: (value: unknown) => void;
   reject: (err: unknown) => void;
-};
-
-type SelectedConnectAuth = {
-  authToken?: string;
-  authDeviceToken?: string;
-  authPassword?: string;
-  resolvedDeviceToken?: string;
-  storedToken?: string;
-  canFallbackToShared: boolean;
 };
 
 export type GatewayBrowserClientOptions = {
@@ -156,8 +101,6 @@ export class GatewayBrowserClient {
   private connectTimer: number | null = null;
   private backoffMs = 800;
   private pendingConnectError: GatewayErrorInfo | undefined;
-  private pendingDeviceTokenRetry = false;
-  private deviceTokenRetryBudgetUsed = false;
 
   constructor(private opts: GatewayBrowserClientOptions) {}
 
@@ -171,8 +114,6 @@ export class GatewayBrowserClient {
     this.ws?.close();
     this.ws = null;
     this.pendingConnectError = undefined;
-    this.pendingDeviceTokenRetry = false;
-    this.deviceTokenRetryBudgetUsed = false;
     this.flushPending(new Error("gateway client stopped"));
   }
 
@@ -194,17 +135,7 @@ export class GatewayBrowserClient {
       this.ws = null;
       this.flushPending(new Error(`gateway closed (${ev.code}): ${reason}`));
       this.opts.onClose?.({ code: ev.code, reason, error: connectError });
-      const connectErrorCode = resolveGatewayErrorDetailCode(connectError);
-      if (
-        connectErrorCode === ConnectErrorDetailCodes.AUTH_TOKEN_MISMATCH &&
-        this.deviceTokenRetryBudgetUsed &&
-        !this.pendingDeviceTokenRetry
-      ) {
-        return;
-      }
-      if (!isNonRecoverableAuthError(connectError)) {
-        this.scheduleReconnect();
-      }
+      this.scheduleReconnect();
     });
     this.ws.addEventListener("error", () => {
       // ignored; close handler will fire
@@ -245,27 +176,23 @@ export class GatewayBrowserClient {
     const scopes = ["operator.admin", "operator.approvals", "operator.pairing"];
     const role = "operator";
     let deviceIdentity: Awaited<ReturnType<typeof loadOrCreateDeviceIdentity>> | null = null;
-    let selectedAuth: SelectedConnectAuth = { canFallbackToShared: false };
+    let canFallbackToShared = false;
+    let authToken = this.opts.token;
 
     if (isSecureContext) {
       deviceIdentity = await loadOrCreateDeviceIdentity();
-      selectedAuth = this.selectConnectAuth({
-        role,
+      const storedToken = loadDeviceAuthToken({
         deviceId: deviceIdentity.deviceId,
-      });
-      if (this.pendingDeviceTokenRetry && selectedAuth.authDeviceToken) {
-        this.pendingDeviceTokenRetry = false;
-      }
+        role,
+      })?.token;
+      authToken = this.opts.token ?? storedToken;
+      canFallbackToShared = Boolean(storedToken && this.opts.token);
     }
-    const explicitGatewayToken = this.opts.token?.trim() || undefined;
-    const authToken = selectedAuth.authToken;
-    const deviceToken = selectedAuth.authDeviceToken ?? selectedAuth.resolvedDeviceToken;
     const auth =
-      authToken || selectedAuth.authPassword
+      authToken || this.opts.password
         ? {
             token: authToken,
-            deviceToken,
-            password: selectedAuth.authPassword,
+            password: this.opts.password,
           }
         : undefined;
 
@@ -306,7 +233,7 @@ export class GatewayBrowserClient {
       maxProtocol: 3,
       client: {
         id: this.opts.clientName ?? GATEWAY_CLIENT_NAMES.CONTROL_UI,
-        version: this.opts.clientVersion ?? "control-ui",
+        version: this.opts.clientVersion ?? "dev",
         platform: this.opts.platform ?? navigator.platform ?? "web",
         mode: this.opts.mode ?? GATEWAY_CLIENT_MODES.WEBCHAT,
         instanceId: this.opts.instanceId,
@@ -314,7 +241,7 @@ export class GatewayBrowserClient {
       role,
       scopes,
       device,
-      caps: ["tool-events"],
+      caps: [],
       auth,
       userAgent: navigator.userAgent,
       locale: navigator.language,
@@ -322,8 +249,6 @@ export class GatewayBrowserClient {
 
     void this.request<GatewayHelloOk>("connect", params)
       .then((hello) => {
-        this.pendingDeviceTokenRetry = false;
-        this.deviceTokenRetryBudgetUsed = false;
         if (hello?.auth?.deviceToken && deviceIdentity) {
           storeDeviceAuthToken({
             deviceId: deviceIdentity.deviceId,
@@ -336,28 +261,6 @@ export class GatewayBrowserClient {
         this.opts.onHello?.(hello);
       })
       .catch((err: unknown) => {
-        const connectErrorCode =
-          err instanceof GatewayRequestError ? resolveGatewayErrorDetailCode(err) : null;
-        const recoveryAdvice =
-          err instanceof GatewayRequestError ? readConnectErrorRecoveryAdvice(err.details) : {};
-        const retryWithDeviceTokenRecommended =
-          recoveryAdvice.recommendedNextStep === "retry_with_device_token";
-        const canRetryWithDeviceTokenHint =
-          recoveryAdvice.canRetryWithDeviceToken === true ||
-          retryWithDeviceTokenRecommended ||
-          connectErrorCode === ConnectErrorDetailCodes.AUTH_TOKEN_MISMATCH;
-        const shouldRetryWithDeviceToken =
-          !this.deviceTokenRetryBudgetUsed &&
-          !selectedAuth.authDeviceToken &&
-          Boolean(explicitGatewayToken) &&
-          Boolean(deviceIdentity) &&
-          Boolean(selectedAuth.storedToken) &&
-          canRetryWithDeviceTokenHint &&
-          isTrustedRetryEndpoint(this.opts.url);
-        if (shouldRetryWithDeviceToken) {
-          this.pendingDeviceTokenRetry = true;
-          this.deviceTokenRetryBudgetUsed = true;
-        }
         if (err instanceof GatewayRequestError) {
           this.pendingConnectError = {
             code: err.gatewayCode,
@@ -367,11 +270,7 @@ export class GatewayBrowserClient {
         } else {
           this.pendingConnectError = undefined;
         }
-        if (
-          selectedAuth.canFallbackToShared &&
-          deviceIdentity &&
-          connectErrorCode === ConnectErrorDetailCodes.AUTH_DEVICE_TOKEN_MISMATCH
-        ) {
+        if (canFallbackToShared && deviceIdentity) {
           clearDeviceAuthToken({ deviceId: deviceIdentity.deviceId, role });
         }
         this.ws?.close(CONNECT_FAILED_CLOSE_CODE, "connect failed");
@@ -435,43 +334,39 @@ export class GatewayBrowserClient {
     }
   }
 
-  private selectConnectAuth(params: { role: string; deviceId: string }): SelectedConnectAuth {
-    const explicitGatewayToken = this.opts.token?.trim() || undefined;
-    const authPassword = this.opts.password?.trim() || undefined;
-    const storedToken = loadDeviceAuthToken({
-      deviceId: params.deviceId,
-      role: params.role,
-    })?.token;
-    const shouldUseDeviceRetryToken =
-      this.pendingDeviceTokenRetry &&
-      Boolean(explicitGatewayToken) &&
-      Boolean(storedToken) &&
-      isTrustedRetryEndpoint(this.opts.url);
-    const resolvedDeviceToken = !(explicitGatewayToken || authPassword)
-      ? (storedToken ?? undefined)
-      : undefined;
-    const authToken = explicitGatewayToken ?? resolvedDeviceToken;
-    return {
-      authToken,
-      authDeviceToken: shouldUseDeviceRetryToken ? (storedToken ?? undefined) : undefined,
-      authPassword,
-      resolvedDeviceToken,
-      storedToken: storedToken ?? undefined,
-      canFallbackToShared: Boolean(storedToken && explicitGatewayToken),
-    };
-  }
-
-  request<T = unknown>(method: string, params?: unknown): Promise<T> {
+  request<T = unknown>(method: string, params?: unknown, timeoutMs: number = 15000): Promise<T> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      return Promise.reject(new Error("gateway not connected"));
+      return Promise.reject(
+        new GatewayRequestError({ code: "UNAVAILABLE", message: "gateway not connected" }),
+      );
     }
     const id = generateUUID();
     const frame = { type: "req", id, method, params };
-    const p = new Promise<T>((resolve, reject) => {
-      this.pending.set(id, { resolve: (v) => resolve(v as T), reject });
+
+    return new Promise<T>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        reject(
+          new GatewayRequestError({
+            code: "TIMEOUT",
+            message: `request ${method} timed out after ${timeoutMs}ms`,
+          }),
+        );
+      }, timeoutMs);
+
+      this.pending.set(id, {
+        resolve: (v) => {
+          clearTimeout(timeout);
+          resolve(v as T);
+        },
+        reject: (e) => {
+          clearTimeout(timeout);
+          reject(e);
+        },
+      });
+
+      this.ws!.send(JSON.stringify(frame));
     });
-    this.ws.send(JSON.stringify(frame));
-    return p;
   }
 
   private queueConnect() {

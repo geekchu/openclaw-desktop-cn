@@ -1,8 +1,5 @@
 import { html, nothing } from "lit";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { formatRelativeTimestamp } from "../format.ts";
-import { icons } from "../icons.ts";
-import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import {
   formatCronPayload,
   formatCronSchedule,
@@ -23,32 +20,32 @@ import { resolveChannelExtras as resolveChannelExtrasFromConfig } from "./channe
 function renderAgentContextCard(context: AgentContext, subtitle: string) {
   return html`
     <section class="card">
-      <div class="card-title">Agent Context</div>
+      <div class="card-title">代理上下文</div>
       <div class="card-sub">${subtitle}</div>
       <div class="agents-overview-grid" style="margin-top: 16px;">
         <div class="agent-kv">
-          <div class="label">Workspace</div>
+          <div class="label">工作区</div>
           <div class="mono">${context.workspace}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Primary Model</div>
+          <div class="label">主模型</div>
           <div class="mono">${context.model}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Identity Name</div>
+          <div class="label">身份名称</div>
           <div>${context.identityName}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Identity Avatar</div>
-          <div>${context.identityAvatar}</div>
+          <div class="label">身份表情</div>
+          <div>${context.identityEmoji}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Skills Filter</div>
+          <div class="label">技能筛选</div>
           <div>${context.skillsLabel}</div>
         </div>
         <div class="agent-kv">
-          <div class="label">Default</div>
-          <div>${context.isDefault ? "yes" : "no"}</div>
+          <div class="label">默认</div>
+          <div>${context.isDefault ? "是" : "否"}</div>
         </div>
       </div>
     </section>
@@ -144,22 +141,22 @@ export function renderAgentChannels(params: {
   const entries = resolveChannelEntries(params.snapshot);
   const lastSuccessLabel = params.lastSuccess
     ? formatRelativeTimestamp(params.lastSuccess)
-    : "never";
+    : "从未加载";
   return html`
     <section class="grid grid-cols-2">
-      ${renderAgentContextCard(params.context, "Workspace, identity, and model configuration.")}
+      ${renderAgentContextCard(params.context, "工作区、身份和模型配置。")}
       <section class="card">
         <div class="row" style="justify-content: space-between;">
           <div>
-            <div class="card-title">Channels</div>
-            <div class="card-sub">Gateway-wide channel status snapshot.</div>
+            <div class="card-title">频道</div>
+            <div class="card-sub">网关级别的频道状态快照。</div>
           </div>
           <button class="btn btn--sm" ?disabled=${params.loading} @click=${params.onRefresh}>
-            ${params.loading ? "Refreshing…" : "Refresh"}
+            ${params.loading ? "刷新中…" : "刷新"}
           </button>
         </div>
         <div class="muted" style="margin-top: 8px;">
-          Last refresh: ${lastSuccessLabel}
+          上次刷新：${lastSuccessLabel}
         </div>
         ${
           params.error
@@ -169,26 +166,24 @@ export function renderAgentChannels(params: {
         ${
           !params.snapshot
             ? html`
-                <div class="callout info" style="margin-top: 12px">Load channels to see live status.</div>
+                <div class="callout info" style="margin-top: 12px">加载频道以查看实时状态。</div>
               `
             : nothing
         }
         ${
           entries.length === 0
             ? html`
-                <div class="muted" style="margin-top: 16px">No channels found.</div>
+                <div class="muted" style="margin-top: 16px">未找到频道。</div>
               `
             : html`
                 <div class="list" style="margin-top: 16px;">
                   ${entries.map((entry) => {
                     const summary = summarizeChannelAccounts(entry.accounts);
                     const status = summary.total
-                      ? `${summary.connected}/${summary.total} connected`
-                      : "no accounts";
-                    const configLabel = summary.configured
-                      ? `${summary.configured} configured`
-                      : "not configured";
-                    const enabled = summary.total ? `${summary.enabled} enabled` : "disabled";
+                      ? `${summary.connected}/${summary.total} 已连接`
+                      : "无账户";
+                    const config = summary.configured ? `${summary.configured} 已配置` : "未配置";
+                    const enabled = summary.total ? `${summary.enabled} 已启用` : "已禁用";
                     const extras = resolveChannelExtrasFromConfig({
                       configForm: params.configForm,
                       channelId: entry.id,
@@ -202,23 +197,8 @@ export function renderAgentChannels(params: {
                         </div>
                         <div class="list-meta">
                           <div>${status}</div>
-                          <div>${configLabel}</div>
+                          <div>${config}</div>
                           <div>${enabled}</div>
-                          ${
-                            summary.configured === 0
-                              ? html`
-                                  <div>
-                                    <a
-                                      href="https://docs.openclaw.ai/channels"
-                                      target="_blank"
-                                      rel="noopener"
-                                      style="color: var(--accent); font-size: 12px"
-                                      >Setup guide</a
-                                    >
-                                  </div>
-                                `
-                              : nothing
-                          }
                           ${
                             extras.length > 0
                               ? extras.map(
@@ -246,35 +226,34 @@ export function renderAgentCron(params: {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
-  onRunNow: (jobId: string) => void;
 }) {
   const jobs = params.jobs.filter((job) => job.agentId === params.agentId);
   return html`
     <section class="grid grid-cols-2">
-      ${renderAgentContextCard(params.context, "Workspace and scheduling targets.")}
+      ${renderAgentContextCard(params.context, "工作区和调度目标。")}
       <section class="card">
         <div class="row" style="justify-content: space-between;">
           <div>
-            <div class="card-title">Scheduler</div>
-            <div class="card-sub">Gateway cron status.</div>
+            <div class="card-title">调度器</div>
+            <div class="card-sub">网关定时任务状态。</div>
           </div>
           <button class="btn btn--sm" ?disabled=${params.loading} @click=${params.onRefresh}>
-            ${params.loading ? "Refreshing…" : "Refresh"}
+            ${params.loading ? "刷新中…" : "刷新"}
           </button>
         </div>
         <div class="stat-grid" style="margin-top: 16px;">
           <div class="stat">
-            <div class="stat-label">Enabled</div>
+            <div class="stat-label">已启用</div>
             <div class="stat-value">
-              ${params.status ? (params.status.enabled ? "Yes" : "No") : "n/a"}
+              ${params.status ? (params.status.enabled ? "是" : "否") : "n/a"}
             </div>
           </div>
           <div class="stat">
-            <div class="stat-label">Jobs</div>
+            <div class="stat-label">任务数</div>
             <div class="stat-value">${params.status?.jobs ?? "n/a"}</div>
           </div>
           <div class="stat">
-            <div class="stat-label">Next wake</div>
+            <div class="stat-label">下次唤醒</div>
             <div class="stat-value">${formatNextRun(params.status?.nextWakeAtMs ?? null)}</div>
           </div>
         </div>
@@ -286,12 +265,12 @@ export function renderAgentCron(params: {
       </section>
     </section>
     <section class="card">
-      <div class="card-title">Agent Cron Jobs</div>
-      <div class="card-sub">Scheduled jobs targeting this agent.</div>
+      <div class="card-title">代理定时任务</div>
+      <div class="card-sub">此代理的计划任务。</div>
       ${
         jobs.length === 0
           ? html`
-              <div class="muted" style="margin-top: 16px">No jobs assigned.</div>
+              <div class="muted" style="margin-top: 16px">无分配任务。</div>
             `
           : html`
               <div class="list" style="margin-top: 16px;">
@@ -308,7 +287,7 @@ export function renderAgentCron(params: {
                         <div class="chip-row" style="margin-top: 6px;">
                           <span class="chip">${formatCronSchedule(job)}</span>
                           <span class="chip ${job.enabled ? "chip-ok" : "chip-warn"}">
-                            ${job.enabled ? "enabled" : "disabled"}
+                            ${job.enabled ? "已启用" : "已禁用"}
                           </span>
                           <span class="chip">${job.sessionTarget}</span>
                         </div>
@@ -316,12 +295,6 @@ export function renderAgentCron(params: {
                       <div class="list-meta">
                         <div class="mono">${formatCronState(job)}</div>
                         <div class="muted">${formatCronPayload(job)}</div>
-                        <button
-                          class="btn btn--sm"
-                          style="margin-top: 6px;"
-                          ?disabled=${!job.enabled}
-                          @click=${() => params.onRunNow(job.id)}
-                        >Run Now</button>
                       </div>
                     </div>
                   `,
@@ -360,20 +333,20 @@ export function renderAgentFiles(params: {
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
-          <div class="card-title">Core Files</div>
-          <div class="card-sub">Bootstrap persona, identity, and tool guidance.</div>
+          <div class="card-title">核心文件</div>
+          <div class="card-sub">启动设定、身份和工具指南。</div>
         </div>
         <button
           class="btn btn--sm"
           ?disabled=${params.agentFilesLoading}
           @click=${() => params.onLoadFiles(params.agentId)}
         >
-          ${params.agentFilesLoading ? "Loading…" : "Refresh"}
+          ${params.agentFilesLoading ? "加载中…" : "刷新"}
         </button>
       </div>
       ${
         list
-          ? html`<div class="muted mono" style="margin-top: 8px;">Workspace: ${list.workspace}</div>`
+          ? html`<div class="muted mono" style="margin-top: 8px;">工作区：${list.workspace}</div>`
           : nothing
       }
       ${
@@ -384,9 +357,7 @@ export function renderAgentFiles(params: {
       ${
         !list
           ? html`
-              <div class="callout info" style="margin-top: 12px">
-                Load the agent workspace files to edit core instructions.
-              </div>
+              <div class="callout info" style="margin-top: 12px">加载代理工作区文件以编辑核心指令。</div>
             `
           : html`
               <div class="agent-files-grid" style="margin-top: 16px;">
@@ -394,7 +365,7 @@ export function renderAgentFiles(params: {
                   ${
                     files.length === 0
                       ? html`
-                          <div class="muted">No files found.</div>
+                          <div class="muted">未找到文件。</div>
                         `
                       : files.map((file) =>
                           renderAgentFileRow(file, active, () => params.onSelectFile(file.name)),
@@ -405,7 +376,7 @@ export function renderAgentFiles(params: {
                   ${
                     !activeEntry
                       ? html`
-                          <div class="muted">Select a file to edit.</div>
+                          <div class="muted">选择一个文件进行编辑。</div>
                         `
                       : html`
                           <div class="agent-file-header">
@@ -416,32 +387,17 @@ export function renderAgentFiles(params: {
                             <div class="agent-file-actions">
                               <button
                                 class="btn btn--sm"
-                                title="Preview rendered markdown"
-                                @click=${(e: Event) => {
-                                  const btn = e.currentTarget as HTMLElement;
-                                  const dialog = btn
-                                    .closest(".agent-files-editor")
-                                    ?.querySelector("dialog");
-                                  if (dialog) {
-                                    dialog.showModal();
-                                  }
-                                }}
-                              >
-                                ${icons.eye} Preview
-                              </button>
-                              <button
-                                class="btn btn--sm"
                                 ?disabled=${!isDirty}
                                 @click=${() => params.onFileReset(activeEntry.name)}
                               >
-                                Reset
+                                重置
                               </button>
                               <button
                                 class="btn btn--sm primary"
                                 ?disabled=${params.agentFileSaving || !isDirty}
                                 @click=${() => params.onFileSave(activeEntry.name)}
                               >
-                                ${params.agentFileSaving ? "Saving…" : "Save"}
+                                ${params.agentFileSaving ? "保存中…" : "保存"}
                               </button>
                             </div>
                           </div>
@@ -449,15 +405,14 @@ export function renderAgentFiles(params: {
                             activeEntry.missing
                               ? html`
                                   <div class="callout info" style="margin-top: 10px">
-                                    This file is missing. Saving will create it in the agent workspace.
+                                    此文件缺失。保存将在代理工作区中创建该文件。
                                   </div>
                                 `
                               : nothing
                           }
-                          <label class="field agent-file-field" style="margin-top: 12px;">
-                            <span>Content</span>
+                          <label class="field" style="margin-top: 12px;">
+                            <span>内容</span>
                             <textarea
-                              class="agent-file-textarea"
                               .value=${draft}
                               @input=${(e: Event) =>
                                 params.onFileDraftChange(
@@ -466,30 +421,6 @@ export function renderAgentFiles(params: {
                                 )}
                             ></textarea>
                           </label>
-                          <dialog
-                            class="md-preview-dialog"
-                            @click=${(e: Event) => {
-                              const dialog = e.currentTarget as HTMLDialogElement;
-                              if (e.target === dialog) {
-                                dialog.close();
-                              }
-                            }}
-                          >
-                            <div class="md-preview-dialog__panel">
-                              <div class="md-preview-dialog__header">
-                                <div class="md-preview-dialog__title mono">${activeEntry.name}</div>
-                                <button
-                                  class="btn btn--sm"
-                                  @click=${(e: Event) => {
-                                    (e.currentTarget as HTMLElement).closest("dialog")?.close();
-                                  }}
-                                >${icons.x} Close</button>
-                              </div>
-                              <div class="md-preview-dialog__body sidebar-markdown">
-                                ${unsafeHTML(toSanitizedMarkdownHtml(draft))}
-                              </div>
-                            </div>
-                          </dialog>
                         `
                   }
                 </div>
@@ -502,7 +433,7 @@ export function renderAgentFiles(params: {
 
 function renderAgentFileRow(file: AgentFileEntry, active: string | null, onSelect: () => void) {
   const status = file.missing
-    ? "Missing"
+    ? "缺失"
     : `${formatBytes(file.size)} · ${formatRelativeTimestamp(file.updatedAtMs ?? null)}`;
   return html`
     <button
@@ -517,7 +448,7 @@ function renderAgentFileRow(file: AgentFileEntry, active: string | null, onSelec
       ${
         file.missing
           ? html`
-              <span class="agent-pill warn">missing</span>
+              <span class="agent-pill warn">缺失</span>
             `
           : nothing
       }

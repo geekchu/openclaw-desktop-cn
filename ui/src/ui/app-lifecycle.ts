@@ -23,13 +23,11 @@ import type { Tab } from "./navigation.ts";
 type LifecycleHost = {
   basePath: string;
   client?: { stop: () => void } | null;
-  connectGeneration: number;
   connected?: boolean;
   tab: Tab;
   assistantName: string;
   assistantAvatar: string | null;
   assistantAgentId: string | null;
-  serverVersion: string | null;
   chatHasAutoScrolled: boolean;
   chatManualRefreshInFlight: boolean;
   chatLoading: boolean;
@@ -46,10 +44,9 @@ type LifecycleHost = {
 };
 
 export function handleConnected(host: LifecycleHost) {
-  const connectGeneration = ++host.connectGeneration;
   host.basePath = inferBasePath();
+  void loadControlUiBootstrapConfig(host);
   applySettingsFromUrl(host as unknown as Parameters<typeof applySettingsFromUrl>[0]);
-  const bootstrapReady = loadControlUiBootstrapConfig(host);
   syncTabWithLocation(host as unknown as Parameters<typeof syncTabWithLocation>[0], true);
   syncThemeWithSettings(host as unknown as Parameters<typeof syncThemeWithSettings>[0]);
   attachThemeListener(host as unknown as Parameters<typeof attachThemeListener>[0]);
@@ -76,13 +73,7 @@ export function handleConnected(host: LifecycleHost) {
     }
   };
   window.addEventListener("message", host.messageHandler);
-
-  void bootstrapReady.finally(() => {
-    if (host.connectGeneration !== connectGeneration) {
-      return;
-    }
-    connectGateway(host as unknown as Parameters<typeof connectGateway>[0]);
-  });
+  connectGateway(host as unknown as Parameters<typeof connectGateway>[0]);
   startNodesPolling(host as unknown as Parameters<typeof startNodesPolling>[0]);
   if (host.tab === "logs") {
     startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);
@@ -97,7 +88,6 @@ export function handleFirstUpdated(host: LifecycleHost) {
 }
 
 export function handleDisconnected(host: LifecycleHost) {
-  host.connectGeneration += 1;
   window.removeEventListener("popstate", host.popStateHandler);
   if (host.messageHandler) {
     window.removeEventListener("message", host.messageHandler);

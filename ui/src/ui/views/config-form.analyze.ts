@@ -79,8 +79,7 @@ function normalizeSchemaNode(
     normalized.properties = normalizedProps;
 
     if (schema.additionalProperties === true) {
-      // Treat `true` as an untyped map schema so dynamic object keys can still be edited.
-      normalized.additionalProperties = {};
+      unsupported.add(pathLabel);
     } else if (schema.additionalProperties === false) {
       normalized.additionalProperties = false;
     } else if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
@@ -249,21 +248,11 @@ function normalizeUnion(
     return res;
   }
 
-  const renderableUnionTypes = new Set([
-    "string",
-    "number",
-    "integer",
-    "boolean",
-    "object",
-    "array",
-  ]);
+  const primitiveTypes = new Set(["string", "number", "integer", "boolean"]);
   if (
     remaining.length > 0 &&
     literals.length === 0 &&
-    remaining.every((entry) => {
-      const type = schemaType(entry);
-      return Boolean(type) && renderableUnionTypes.has(String(type));
-    })
+    remaining.every((entry) => entry.type && primitiveTypes.has(String(entry.type)))
   ) {
     return {
       schema: {

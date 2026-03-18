@@ -63,7 +63,6 @@ export async function patchSession(
   patch: {
     label?: string | null;
     thinkingLevel?: string | null;
-    fastMode?: boolean | null;
     verboseLevel?: string | null;
     reasoningLevel?: string | null;
   },
@@ -77,9 +76,6 @@ export async function patchSession(
   }
   if ("thinkingLevel" in patch) {
     params.thinkingLevel = patch.thinkingLevel;
-  }
-  if ("fastMode" in patch) {
-    params.fastMode = patch.fastMode;
   }
   if ("verboseLevel" in patch) {
     params.verboseLevel = patch.verboseLevel;

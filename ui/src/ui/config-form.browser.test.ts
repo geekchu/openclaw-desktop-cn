@@ -46,15 +46,12 @@ describe("config form renderer", () => {
         },
         unsupportedPaths: analysis.unsupportedPaths,
         value: {},
-        revealSensitive: true,
         onPatch,
       }),
       container,
     );
 
-    const tokenInput: HTMLInputElement | null = container.querySelector(
-      '#config-section-gateway input.cfg-input[type="text"]',
-    );
+    const tokenInput: HTMLInputElement | null = container.querySelector("input[type='password']");
     expect(tokenInput).not.toBeNull();
     if (!tokenInput) {
       return;
@@ -368,16 +365,13 @@ describe("config form renderer", () => {
           "models.providers.*.apiKey": { sensitive: true },
         },
         unsupportedPaths: analysis.unsupportedPaths,
-        value: { models: { providers: { openai: { apiKey: "old" } } } }, // pragma: allowlist secret
-        revealSensitive: true,
+        value: { models: { providers: { openai: { apiKey: "old" } } } },
         onPatch,
       }),
       container,
     );
 
-    const apiKeyInput: HTMLInputElement | null = container.querySelector(
-      "#config-section-models .cfg-map__item-value input.cfg-input[type='text']",
-    );
+    const apiKeyInput: HTMLInputElement | null = container.querySelector("input[type='password']");
     expect(apiKeyInput).not.toBeNull();
     if (!apiKeyInput) {
       return;
@@ -387,7 +381,7 @@ describe("config form renderer", () => {
     expect(onPatch).toHaveBeenCalledWith(["models", "providers", "openai", "apiKey"], "new-key");
   });
 
-  it("accepts renderable unions", () => {
+  it("flags unsupported unions", () => {
     const schema = {
       type: "object",
       properties: {
@@ -397,7 +391,7 @@ describe("config form renderer", () => {
       },
     };
     const analysis = analyzeConfigSchema(schema);
-    expect(analysis.unsupportedPaths).not.toContain("mixed");
+    expect(analysis.unsupportedPaths).toContain("mixed");
   });
 
   it("supports nullable types", () => {
@@ -433,35 +427,17 @@ describe("config form renderer", () => {
     expect(analysis.unsupportedPaths).not.toContain("channels");
   });
 
-  it("treats additionalProperties true as editable map fields", () => {
+  it("flags additionalProperties true", () => {
     const schema = {
       type: "object",
       properties: {
-        accounts: {
+        extra: {
           type: "object",
           additionalProperties: true,
         },
       },
     };
     const analysis = analyzeConfigSchema(schema);
-    expect(analysis.unsupportedPaths).not.toContain("accounts");
-
-    const onPatch = vi.fn();
-    const container = document.createElement("div");
-    render(
-      renderConfigForm({
-        schema: analysis.schema,
-        uiHints: {},
-        unsupportedPaths: analysis.unsupportedPaths,
-        value: { accounts: { default: { enabled: true } } },
-        onPatch,
-      }),
-      container,
-    );
-
-    const removeButton = container.querySelector(".cfg-map__item-remove");
-    expect(removeButton).not.toBeNull();
-    removeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(onPatch).toHaveBeenCalledWith(["accounts"], {});
+    expect(analysis.unsupportedPaths).toContain("extra");
   });
 });

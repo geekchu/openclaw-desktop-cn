@@ -1,5 +1,3 @@
-/* @vitest-environment jsdom */
-
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionsListResult } from "../types.ts";
@@ -28,7 +26,6 @@ function createProps(overrides: Partial<ChatProps> = {}): ChatProps {
     fallbackStatus: null,
     messages: [],
     toolMessages: [],
-    streamSegments: [],
     stream: null,
     streamStartedAt: null,
     assistantAvatarUrl: null,
@@ -48,103 +45,11 @@ function createProps(overrides: Partial<ChatProps> = {}): ChatProps {
     onSend: () => undefined,
     onQueueRemove: () => undefined,
     onNewSession: () => undefined,
-    agentsList: null,
-    currentAgentId: "",
-    onAgentChange: () => undefined,
     ...overrides,
   };
 }
 
 describe("chat view", () => {
-  it("uses the assistant avatar URL for the welcome state when the identity avatar is only initials", () => {
-    const container = document.createElement("div");
-    render(
-      renderChat(
-        createProps({
-          assistantName: "Assistant",
-          assistantAvatar: "A",
-          assistantAvatarUrl: "/avatar/main",
-        }),
-      ),
-      container,
-    );
-
-    const welcomeImage = container.querySelector<HTMLImageElement>(".agent-chat__welcome > img");
-    expect(welcomeImage).not.toBeNull();
-    expect(welcomeImage?.getAttribute("src")).toBe("/avatar/main");
-  });
-
-  it("falls back to the bundled logo in the welcome state when the assistant avatar is not a URL", () => {
-    const container = document.createElement("div");
-    render(
-      renderChat(
-        createProps({
-          assistantName: "Assistant",
-          assistantAvatar: "A",
-          assistantAvatarUrl: null,
-        }),
-      ),
-      container,
-    );
-
-    const welcomeImage = container.querySelector<HTMLImageElement>(".agent-chat__welcome > img");
-    const logoImage = container.querySelector<HTMLImageElement>(
-      ".agent-chat__welcome .agent-chat__avatar--logo img",
-    );
-    expect(welcomeImage).toBeNull();
-    expect(logoImage).not.toBeNull();
-    expect(logoImage?.getAttribute("src")).toBe("favicon.svg");
-  });
-
-  it("keeps the welcome logo fallback under the mounted base path", () => {
-    const container = document.createElement("div");
-    render(
-      renderChat(
-        createProps({
-          assistantName: "Assistant",
-          assistantAvatar: "A",
-          assistantAvatarUrl: null,
-          basePath: "/openclaw/",
-        }),
-      ),
-      container,
-    );
-
-    const logoImage = container.querySelector<HTMLImageElement>(
-      ".agent-chat__welcome .agent-chat__avatar--logo img",
-    );
-    expect(logoImage).not.toBeNull();
-    expect(logoImage?.getAttribute("src")).toBe("/openclaw/favicon.svg");
-  });
-
-  it("keeps grouped assistant avatar fallbacks under the mounted base path", () => {
-    const container = document.createElement("div");
-    render(
-      renderChat(
-        createProps({
-          assistantName: "Assistant",
-          assistantAvatar: "A",
-          assistantAvatarUrl: null,
-          basePath: "/openclaw/",
-          messages: [
-            {
-              role: "assistant",
-              content: "hello",
-              timestamp: 1000,
-            },
-          ],
-        }),
-      ),
-      container,
-    );
-
-    const groupedLogo = container.querySelector<HTMLImageElement>(
-      ".chat-group.assistant .chat-avatar--logo",
-    );
-    expect(groupedLogo).not.toBeNull();
-    expect(groupedLogo?.getAttribute("src")).toBe("/openclaw/favicon.svg");
-  });
-
   it("renders compacting indicator as a badge", () => {
     const container = document.createElement("div");
     render(
@@ -162,7 +67,7 @@ describe("chat view", () => {
 
     const indicator = container.querySelector(".compaction-indicator--active");
     expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain("Compacting context...");
+    expect(indicator?.textContent).toContain("正在压缩上下文...");
   });
 
   it("renders completion indicator shortly after compaction", () => {
@@ -183,7 +88,7 @@ describe("chat view", () => {
 
     const indicator = container.querySelector(".compaction-indicator--complete");
     expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain("Context compacted");
+    expect(indicator?.textContent).toContain("上下文已压缩");
     nowSpy.mockRestore();
   });
 
@@ -226,7 +131,7 @@ describe("chat view", () => {
 
     const indicator = container.querySelector(".compaction-indicator--fallback");
     expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain("Fallback active: deepinfra/moonshotai/Kimi-K2.5");
+    expect(indicator?.textContent).toContain("回退活动中: deepinfra/moonshotai/Kimi-K2.5");
     nowSpy.mockRestore();
   });
 
@@ -272,7 +177,7 @@ describe("chat view", () => {
 
     const indicator = container.querySelector(".compaction-indicator--fallback-cleared");
     expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain("Fallback cleared: fireworks/minimax-m2p5");
+    expect(indicator?.textContent).toContain("回退已清除: fireworks/minimax-m2p5");
     nowSpy.mockRestore();
   });
 
@@ -283,18 +188,19 @@ describe("chat view", () => {
       renderChat(
         createProps({
           canAbort: true,
-          sending: true,
           onAbort,
         }),
       ),
       container,
     );
 
-    const stopButton = container.querySelector<HTMLButtonElement>('button[title="Stop"]');
+    const stopButton = Array.from(container.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.trim() === "停止",
+    );
     expect(stopButton).not.toBeUndefined();
     stopButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onAbort).toHaveBeenCalledTimes(1);
-    expect(container.textContent).not.toContain("New session");
+    expect(container.textContent).not.toContain("新会话");
   });
 
   it("shows a new session button when aborting is unavailable", () => {
@@ -310,70 +216,12 @@ describe("chat view", () => {
       container,
     );
 
-    const newSessionButton = container.querySelector<HTMLButtonElement>(
-      'button[title="New session"]',
+    const newSessionButton = Array.from(container.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.trim() === "新会话",
     );
     expect(newSessionButton).not.toBeUndefined();
     newSessionButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onNewSession).toHaveBeenCalledTimes(1);
-    expect(container.textContent).not.toContain("Stop");
-  });
-
-  it("shows sender labels from sanitized gateway messages instead of generic You", () => {
-    const container = document.createElement("div");
-    render(
-      renderChat(
-        createProps({
-          messages: [
-            {
-              role: "user",
-              content: "hello from topic",
-              senderLabel: "Iris",
-              timestamp: 1000,
-            },
-          ],
-        }),
-      ),
-      container,
-    );
-
-    const senderLabels = Array.from(container.querySelectorAll(".chat-sender-name")).map((node) =>
-      node.textContent?.trim(),
-    );
-    expect(senderLabels).toContain("Iris");
-    expect(senderLabels).not.toContain("You");
-  });
-
-  it("keeps consecutive user messages from different senders in separate groups", () => {
-    const container = document.createElement("div");
-    render(
-      renderChat(
-        createProps({
-          messages: [
-            {
-              role: "user",
-              content: "first",
-              senderLabel: "Iris",
-              timestamp: 1000,
-            },
-            {
-              role: "user",
-              content: "second",
-              senderLabel: "Joaquin De Rojas",
-              timestamp: 1001,
-            },
-          ],
-        }),
-      ),
-      container,
-    );
-
-    const groups = container.querySelectorAll(".chat-group.user");
-    expect(groups).toHaveLength(2);
-    const senderLabels = Array.from(container.querySelectorAll(".chat-sender-name")).map((node) =>
-      node.textContent?.trim(),
-    );
-    expect(senderLabels).toContain("Iris");
-    expect(senderLabels).toContain("Joaquin De Rojas");
+    expect(container.textContent).not.toContain("停止");
   });
 });

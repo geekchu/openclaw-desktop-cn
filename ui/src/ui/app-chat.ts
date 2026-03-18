@@ -3,33 +3,27 @@ import { scheduleChatScroll } from "./app-scroll.ts";
 import { setLastActiveSessionKey } from "./app-settings.ts";
 import { resetToolStream } from "./app-tool-stream.ts";
 import type { OpenClawApp } from "./app.ts";
-import { executeSlashCommand } from "./chat/slash-command-executor.ts";
-import { parseSlashCommand } from "./chat/slash-commands.ts";
 import { abortChatRun, loadChatHistory, sendChatMessage } from "./controllers/chat.ts";
 import { loadSessions } from "./controllers/sessions.ts";
-import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
+import type { GatewayHelloOk } from "./gateway.ts";
 import { normalizeBasePath } from "./navigation.ts";
 import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
 import { generateUUID } from "./uuid.ts";
 
 export type ChatHost = {
-  client: GatewayBrowserClient | null;
-  chatMessages: unknown[];
-  chatStream: string | null;
   connected: boolean;
   chatMessage: string;
   chatAttachments: ChatAttachment[];
   chatQueue: ChatQueueItem[];
   chatRunId: string | null;
   chatSending: boolean;
-  lastError?: string | null;
+  chatStream: string | null;
+  chatStreamStartedAt: number | null;
   sessionKey: string;
   basePath: string;
   hello: GatewayHelloOk | null;
   chatAvatarUrl: string | null;
   refreshSessionsAfterChat: Set<string>;
-  /** Callback for slash-command side effects that need app-level access. */
-  onSlashAction?: (action: string) => void;
 };
 
 export const CHAT_SESSIONS_ACTIVE_MINUTES = 120;
@@ -70,10 +64,35 @@ function isChatResetCommand(text: string) {
 
 export async function handleAbortChat(host: ChatHost) {
   if (!host.connected) {
+    // 即使断连也要清除本地状态，避免 UI 卡住
+    host.chatRunId = null;
+    host.chatSending = false;
+    host.chatStream = null;
+    host.chatStreamStartedAt = null;
+    host.chatMessage = "";
     return;
   }
   host.chatMessage = "";
-  await abortChatRun(host as unknown as OpenClawApp);
+  const runIdBefore = host.chatRunId;
+  const ok = await abortChatRun(host as unknown as OpenClawApp);
+  if (!ok) {
+    // abort 请求失败（如大模型已断开），强制清除本地状态
+    host.chatRunId = null;
+    host.chatSending = false;
+    host.chatStream = null;
+    host.chatStreamStartedAt = null;
+  } else if (runIdBefore) {
+    // abort 请求成功，但 gateway 可能不会发回 aborted 事件
+    // 5 秒后如果状态仍未清除，强制清除
+    setTimeout(() => {
+      if (host.chatRunId === runIdBefore) {
+        host.chatRunId = null;
+        host.chatSending = false;
+        host.chatStream = null;
+        host.chatStreamStartedAt = null;
+      }
+    }, 5000);
+  }
 }
 
 function enqueueChatMessage(
@@ -81,7 +100,6 @@ function enqueueChatMessage(
   text: string,
   attachments?: ChatAttachment[],
   refreshSessions?: boolean,
-  localCommand?: { args: string; name: string },
 ) {
   const trimmed = text.trim();
   const hasAttachments = Boolean(attachments && attachments.length > 0);
@@ -96,8 +114,6 @@ function enqueueChatMessage(
       createdAt: Date.now(),
       attachments: hasAttachments ? attachments?.map((att) => ({ ...att })) : undefined,
       refreshSessions,
-      localCommandArgs: localCommand?.args,
-      localCommandName: localCommand?.name,
     },
   ];
 }
@@ -154,25 +170,12 @@ async function flushChatQueue(host: ChatHost) {
     return;
   }
   host.chatQueue = rest;
-  let ok = false;
-  try {
-    if (next.localCommandName) {
-      await dispatchSlashCommand(host, next.localCommandName, next.localCommandArgs ?? "");
-      ok = true;
-    } else {
-      ok = await sendChatMessageNow(host, next.text, {
-        attachments: next.attachments,
-        refreshSessions: next.refreshSessions,
-      });
-    }
-  } catch (err) {
-    host.lastError = String(err);
-  }
+  const ok = await sendChatMessageNow(host, next.text, {
+    attachments: next.attachments,
+    refreshSessions: next.refreshSessions,
+  });
   if (!ok) {
     host.chatQueue = [next, ...host.chatQueue];
-  } else if (host.chatQueue.length > 0) {
-    // Continue draining — local commands don't block on server response
-    void flushChatQueue(host);
   }
 }
 
@@ -194,6 +197,7 @@ export async function handleSendChat(
   const attachmentsToSend = messageOverride == null ? attachments : [];
   const hasAttachments = attachmentsToSend.length > 0;
 
+  // Allow sending with just attachments (no message text required)
   if (!message && !hasAttachments) {
     return;
   }
@@ -203,35 +207,10 @@ export async function handleSendChat(
     return;
   }
 
-  // Intercept local slash commands (/status, /model, /compact, etc.)
-  const parsed = parseSlashCommand(message);
-  if (parsed?.command.executeLocal) {
-    if (isChatBusy(host) && shouldQueueLocalSlashCommand(parsed.command.name)) {
-      if (messageOverride == null) {
-        host.chatMessage = "";
-        host.chatAttachments = [];
-      }
-      enqueueChatMessage(host, message, undefined, isChatResetCommand(message), {
-        args: parsed.args,
-        name: parsed.command.name,
-      });
-      return;
-    }
-    const prevDraft = messageOverride == null ? previousDraft : undefined;
-    if (messageOverride == null) {
-      host.chatMessage = "";
-      host.chatAttachments = [];
-    }
-    await dispatchSlashCommand(host, parsed.command.name, parsed.args, {
-      previousDraft: prevDraft,
-      restoreDraft: Boolean(messageOverride && opts?.restoreDraft),
-    });
-    return;
-  }
-
   const refreshSessions = isChatResetCommand(message);
   if (messageOverride == null) {
     host.chatMessage = "";
+    // Clear attachments when sending
     host.chatAttachments = [];
   }
 
@@ -250,99 +229,11 @@ export async function handleSendChat(
   });
 }
 
-function shouldQueueLocalSlashCommand(name: string): boolean {
-  return !["stop", "focus", "export"].includes(name);
-}
-
-// ── Slash Command Dispatch ──
-
-async function dispatchSlashCommand(
-  host: ChatHost,
-  name: string,
-  args: string,
-  sendOpts?: { previousDraft?: string; restoreDraft?: boolean },
-) {
-  switch (name) {
-    case "stop":
-      await handleAbortChat(host);
-      return;
-    case "new":
-      await sendChatMessageNow(host, "/new", {
-        refreshSessions: true,
-        previousDraft: sendOpts?.previousDraft,
-        restoreDraft: sendOpts?.restoreDraft,
-      });
-      return;
-    case "reset":
-      await sendChatMessageNow(host, "/reset", {
-        refreshSessions: true,
-        previousDraft: sendOpts?.previousDraft,
-        restoreDraft: sendOpts?.restoreDraft,
-      });
-      return;
-    case "clear":
-      await clearChatHistory(host);
-      return;
-    case "focus":
-      host.onSlashAction?.("toggle-focus");
-      return;
-    case "export":
-      host.onSlashAction?.("export");
-      return;
-  }
-
-  if (!host.client) {
-    return;
-  }
-
-  const result = await executeSlashCommand(host.client, host.sessionKey, name, args);
-
-  if (result.content) {
-    injectCommandResult(host, result.content);
-  }
-
-  if (result.action === "refresh") {
-    await refreshChat(host);
-  }
-
-  scheduleChatScroll(host as unknown as Parameters<typeof scheduleChatScroll>[0]);
-}
-
-async function clearChatHistory(host: ChatHost) {
-  if (!host.client || !host.connected) {
-    return;
-  }
-  try {
-    await host.client.request("sessions.reset", { key: host.sessionKey });
-    host.chatMessages = [];
-    host.chatStream = null;
-    host.chatRunId = null;
-    await loadChatHistory(host as unknown as OpenClawApp);
-  } catch (err) {
-    host.lastError = String(err);
-  }
-  scheduleChatScroll(host as unknown as Parameters<typeof scheduleChatScroll>[0]);
-}
-
-function injectCommandResult(host: ChatHost, content: string) {
-  host.chatMessages = [
-    ...host.chatMessages,
-    {
-      role: "system",
-      content,
-      timestamp: Date.now(),
-    },
-  ];
-}
-
 export async function refreshChat(host: ChatHost, opts?: { scheduleScroll?: boolean }) {
   await Promise.all([
     loadChatHistory(host as unknown as OpenClawApp),
     loadSessions(host as unknown as OpenClawApp, {
-      activeMinutes: 0,
-      limit: 0,
-      includeGlobal: false,
-      includeUnknown: false,
+      activeMinutes: CHAT_SESSIONS_ACTIVE_MINUTES,
     }),
     refreshChatAvatar(host),
   ]);
@@ -372,7 +263,7 @@ function resolveAgentIdForSession(host: ChatHost): string | null {
 function buildAvatarMetaUrl(basePath: string, agentId: string): string {
   const base = normalizeBasePath(basePath);
   const encoded = encodeURIComponent(agentId);
-  return base ? `${base}/avatar/${encoded}?meta=1` : `avatar/${encoded}?meta=1`;
+  return base ? `${base}/avatar/${encoded}?meta=1` : `/avatar/${encoded}?meta=1`;
 }
 
 export async function refreshChatAvatar(host: ChatHost) {
