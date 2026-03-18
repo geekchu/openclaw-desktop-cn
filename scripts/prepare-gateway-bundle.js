@@ -133,14 +133,7 @@ function copyIfExists(src, dest) {
 
 // Step 0: 下载 Node.js 运行环境
 console.log("\n[bundle] === Step 0: 准备 Node.js 运行环境 ===");
-// 检测是否在构建 macOS universal binary（需要同时下载 arm64 和 x64）
-const tauriTarget = process.env.TAURI_TARGET_TRIPLE || "";
-if (tauriTarget === "universal-apple-darwin" || process.env.TAURI_UNIVERSAL === "1") {
-  console.log("[bundle] 检测到 universal binary 构建，下载 darwin-arm64 和 darwin-x64");
-  run("node scripts/download-node.js --platform darwin-arm64,darwin-x64");
-} else {
-  run("node scripts/download-node.js");
-}
+run("node scripts/download-node.js");
 
 // Step 0.5: 精简 Node.js 运行环境（只删除文档文件）
 console.log("\n[bundle] === Step 0.5: 精简 Node.js 运行环境 ===");
