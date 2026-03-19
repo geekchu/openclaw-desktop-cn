@@ -188,15 +188,24 @@ export function lookupContextTokens(modelId?: string): number | undefined {
   if (!modelId) {
     return undefined;
   }
+  // Trigger eager warmup on first access
+  triggerEagerWarmupOnce();
   // Best-effort: kick off loading, but don't block.
   void ensureContextWindowCacheLoaded();
   return MODEL_CACHE.get(modelId);
 }
 
-if (!shouldSkipEagerContextWindowWarmup()) {
-  // Keep prior behavior where model limits begin loading during startup.
-  // This avoids a cold-start miss on the first context token lookup.
-  void ensureContextWindowCacheLoaded();
+// Defer eager warmup to avoid module initialization order issues with bundled output.
+// The warmup is triggered on first access to lookupContextTokens or resolveContextTokensForModel.
+let eagerWarmupTriggered = false;
+function triggerEagerWarmupOnce(): void {
+  if (eagerWarmupTriggered) {
+    return;
+  }
+  eagerWarmupTriggered = true;
+  if (!shouldSkipEagerContextWindowWarmup()) {
+    void ensureContextWindowCacheLoaded();
+  }
 }
 
 function resolveConfiguredModelParams(
@@ -314,6 +323,9 @@ export function resolveContextTokensForModel(params: {
   contextTokensOverride?: number;
   fallbackContextTokens?: number;
 }): number | undefined {
+  // Trigger eager warmup on first access
+  triggerEagerWarmupOnce();
+
   if (typeof params.contextTokensOverride === "number" && params.contextTokensOverride > 0) {
     return params.contextTokensOverride;
   }

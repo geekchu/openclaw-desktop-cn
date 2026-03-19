@@ -413,6 +413,7 @@ const bundlePkg = {
   version: rootPkg.version,
   type: "module",
   main: "dist/index.js",
+  exports: rootPkg.exports,
   dependencies: filteredDeps,
 };
 writeFileSync(join(bundleDir, "package.json"), JSON.stringify(bundlePkg, null, 2));

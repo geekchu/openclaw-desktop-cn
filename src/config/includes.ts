@@ -346,18 +346,13 @@ function getDefaultResolver(): IncludeResolver {
 
 /**
  * Resolves all $include directives in a parsed config object.
- *
- * NOTE: This is defined as a const arrow function (not a function declaration) to prevent
- * rolldown/tsdown from hoisting it before the IncludeProcessor class is initialized.
- * Using a function declaration causes "IncludeProcessor is not a constructor" errors
- * because the bundler hoists the function but delays class initialization.
  */
-export const resolveConfigIncludes = (
+export function resolveConfigIncludes(
   obj: unknown,
   configPath: string,
   resolver?: IncludeResolver,
-): unknown => {
+): unknown {
   const actualResolver = resolver ?? getDefaultResolver();
   const processor = new IncludeProcessor(configPath, actualResolver);
   return processor.process(obj);
-};
+}
