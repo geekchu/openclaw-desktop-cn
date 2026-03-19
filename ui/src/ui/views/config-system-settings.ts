@@ -504,12 +504,10 @@ export class SystemSettingsView extends LitElement {
      ─────────────────────────────────────────────── */
   static override styles = css`
     :host {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
+      display: block;
       color: var(--text, #e4e4e7);
       font-family: var(--font-body, "Space Grotesk", system-ui, sans-serif);
-      overflow: hidden;
+      max-width: 800px;
     }
 
     /* ── header (same as channels embed header) ── */
@@ -517,9 +515,7 @@ export class SystemSettingsView extends LitElement {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 16px 24px;
-      border-bottom: 1px solid var(--border, #27272a);
-      flex-shrink: 0;
+      margin-bottom: 20px;
     }
     .header-icon {
       width: 36px;
@@ -546,11 +542,11 @@ export class SystemSettingsView extends LitElement {
       color: var(--muted, #71717a);
     }
 
-    /* ── scrollable content (matches channels p-4) ── */
+    /* ── content wrapper (no longer scrollable, natural flow) ── */
     .content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
     /* ── card (matches channels bg-dark-700 rounded-2xl p-6 border border-dark-500) ── */
@@ -559,10 +555,6 @@ export class SystemSettingsView extends LitElement {
       border: 1px solid var(--border, #27272a);
       border-radius: 12px;
       padding: 24px;
-      margin-bottom: 16px;
-    }
-    .card:last-child {
-      margin-bottom: 0;
     }
 
     /* ── card title (matches channels h3) ── */

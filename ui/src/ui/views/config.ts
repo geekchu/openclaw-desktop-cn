@@ -655,7 +655,7 @@ export function renderConfig(props: ConfigProps) {
         ${
           isVirtualSection
             ? html`
-            <div style="${isOnestop || isChannelsConfig ? "padding: 20px 24px; overflow-y: auto; flex: 1" : "display: flex; flex-direction: column; height: 100%;"}">
+            <div style="padding: 20px 24px; overflow-y: auto; flex: 1">
               ${
                 isOnestop
                   ? renderOnestop(props.onestop)
