@@ -20,6 +20,7 @@ const shared = {
   },
   platform: "node" as const,
   outputOptions: { strictExecutionOrder: true },
+  shims: true, // Enable ESM shims to fix module initialization order issues
 };
 
 export default defineConfig([

@@ -88,7 +88,12 @@ export function deepMerge(target: unknown, source: unknown): unknown {
 // Include Resolver Class
 // ============================================================================
 
-class IncludeProcessor {
+// NOTE: This class MUST be defined before defaultResolver and resolveConfigIncludes
+// to ensure proper initialization order in bundled output (rolldown/tsdown).
+// Moving this class after the Public API section will cause "IncludeProcessor is not a constructor"
+// errors at runtime due to ESM module initialization order issues.
+
+export class IncludeProcessor {
   private visited = new Set<string>();
   private depth = 0;
   private readonly rootDir: string;
@@ -327,20 +332,32 @@ export function readConfigIncludeFileWithGuards(params: IncludeFileReadParams): 
 // Public API
 // ============================================================================
 
-const defaultResolver: IncludeResolver = {
-  readFile: (p) => fs.readFileSync(p, "utf-8"),
-  readFileWithGuards: ({ includePath, resolvedPath, rootRealDir }) =>
-    readConfigIncludeFileWithGuards({ includePath, resolvedPath, rootRealDir }),
-  parseJson: (raw) => JSON5.parse(raw),
-};
+// NOTE: Use a getter function to ensure defaultResolver is accessed after module initialization.
+// This prevents "IncludeProcessor is not a constructor" errors in bundled output where
+// rolldown/tsdown may hoist the resolveConfigIncludes function before the class is initialized.
+function getDefaultResolver(): IncludeResolver {
+  return {
+    readFile: (p) => fs.readFileSync(p, "utf-8"),
+    readFileWithGuards: ({ includePath, resolvedPath, rootRealDir }) =>
+      readConfigIncludeFileWithGuards({ includePath, resolvedPath, rootRealDir }),
+    parseJson: (raw) => JSON5.parse(raw),
+  };
+}
 
 /**
  * Resolves all $include directives in a parsed config object.
+ *
+ * NOTE: This is defined as a const arrow function (not a function declaration) to prevent
+ * rolldown/tsdown from hoisting it before the IncludeProcessor class is initialized.
+ * Using a function declaration causes "IncludeProcessor is not a constructor" errors
+ * because the bundler hoists the function but delays class initialization.
  */
-export function resolveConfigIncludes(
+export const resolveConfigIncludes = (
   obj: unknown,
   configPath: string,
-  resolver: IncludeResolver = defaultResolver,
-): unknown {
-  return new IncludeProcessor(configPath, resolver).process(obj);
-}
+  resolver?: IncludeResolver,
+): unknown => {
+  const actualResolver = resolver ?? getDefaultResolver();
+  const processor = new IncludeProcessor(configPath, actualResolver);
+  return processor.process(obj);
+};
