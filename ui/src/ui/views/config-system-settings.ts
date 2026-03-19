@@ -893,6 +893,18 @@ export class SystemSettingsView extends LitElement {
       margin-top: 16px;
       padding-top: 16px;
       border-top: 1px solid var(--border, #27272a);
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .proxy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .proxy-grid .field {
+      margin-bottom: 0;
     }
     .proxy-optional {
       font-size: 11px;
@@ -900,17 +912,31 @@ export class SystemSettingsView extends LitElement {
       color: var(--muted, #71717a);
       margin-left: 4px;
     }
-    .proxy-notice {
-      display: flex;
+    .proxy-status-badge {
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      background: rgba(59, 130, 246, 0.08);
-      border: 1px solid rgba(59, 130, 246, 0.18);
-      border-radius: 8px;
-      font-size: 12px;
-      color: var(--info, #3b82f6);
-      margin-top: 4px;
+      gap: 5px;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-left: auto;
+    }
+    .proxy-status-badge.on {
+      background: rgba(34, 197, 94, 0.12);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.25);
+    }
+    .proxy-status-badge.off {
+      background: rgba(113, 113, 122, 0.12);
+      color: var(--muted, #71717a);
+      border: 1px solid rgba(113, 113, 122, 0.2);
+    }
+    .proxy-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
     }
 
     /* ── loading ── */
@@ -1378,15 +1404,25 @@ export class SystemSettingsView extends LitElement {
       <div class="card">
         <div class="card-title">
           <div class="card-title-icon blue">${this._proxyIcon}</div>
-          <div>
+          <div style="flex:1">
             <div class="title-text">代理设置</div>
             <div class="title-sub">配置网络代理，所有网络请求将通过代理服务器</div>
           </div>
+          <span class="proxy-status-badge ${this.proxyEnabled ? "on" : "off"}">
+            <span class="proxy-status-dot"></span>
+            ${this.proxyEnabled ? "已启用" : "已禁用"}
+          </span>
         </div>
 
         <div class="toggle-row" style="margin-bottom:0">
           <div class="toggle-row-info">
-            <div class="toggle-row-icon">🌐</div>
+            <div class="toggle-row-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+            </div>
             <div>
               <div class="toggle-text-primary">启用代理</div>
               <div class="toggle-text-secondary">开启后所有网络请求将通过代理服务器（需重启生效）</div>
@@ -1402,21 +1438,23 @@ export class SystemSettingsView extends LitElement {
           this.proxyEnabled
             ? html`
           <div class="proxy-fields">
-            <div class="field">
-              <label class="field-label">HTTP 代理</label>
-              <input class="input-base" type="text" .value=${this.proxyHttp}
-                @input=${(e: Event) => this._handleProxyHttpChange((e.target as HTMLInputElement).value)}
-                placeholder="http://127.0.0.1:7890" />
-              <span class="section-hint">HTTP 请求使用的代理地址</span>
+            <div class="proxy-grid">
+              <div class="field">
+                <label class="field-label">HTTP 代理</label>
+                <input class="input-base" type="text" .value=${this.proxyHttp}
+                  @input=${(e: Event) => this._handleProxyHttpChange((e.target as HTMLInputElement).value)}
+                  placeholder="http://127.0.0.1:7890" />
+                <span class="section-hint">HTTP 请求代理地址</span>
+              </div>
+              <div class="field">
+                <label class="field-label">HTTPS 代理 <span class="proxy-optional">可选</span></label>
+                <input class="input-base" type="text" .value=${this.proxyHttps}
+                  @input=${(e: Event) => this._handleProxyHttpsChange((e.target as HTMLInputElement).value)}
+                  placeholder="留空则回退到 HTTP 代理" />
+                <span class="section-hint">留空时自动使用 HTTP 代理地址</span>
+              </div>
             </div>
-            <div class="field">
-              <label class="field-label">HTTPS 代理 <span class="proxy-optional">可选</span></label>
-              <input class="input-base" type="text" .value=${this.proxyHttps}
-                @input=${(e: Event) => this._handleProxyHttpsChange((e.target as HTMLInputElement).value)}
-                placeholder="留空则回退到 HTTP 代理地址" />
-              <span class="section-hint">HTTPS 请求使用的代理，留空时自动使用 HTTP 代理地址</span>
-            </div>
-            <div class="field">
+            <div class="field" style="margin-bottom:0">
               <label class="field-label">排除地址 <span class="proxy-optional">可选</span></label>
               <input class="input-base" type="text" .value=${this.proxyNoProxy}
                 @input=${(e: Event) => this._handleProxyNoProxyChange((e.target as HTMLInputElement).value)}
@@ -1428,23 +1466,21 @@ export class SystemSettingsView extends LitElement {
               <button class="btn-primary" ?disabled=${this.proxySaving} @click=${() => this._saveProxyConfig()}>
                 ${this.proxySaving ? "保存中…" : "保存"}
               </button>
+              ${
+                this.proxySaveStatus === "success"
+                  ? html`
+                      <span class="save-msg ok">✓ 代理配置已保存</span>
+                    `
+                  : this.proxySaveStatus === "error"
+                    ? html`
+                        <span class="save-msg err">保存失败，请重试</span>
+                      `
+                    : nothing
+              }
             </div>
-
           </div>
         `
             : nothing
-        }
-
-        ${
-          this.proxySaveStatus === "success"
-            ? html`
-                <div class="save-msg ok" style="margin-top: 10px">✓ 代理配置已保存</div>
-              `
-            : this.proxySaveStatus === "error"
-              ? html`
-                  <div class="save-msg err" style="margin-top: 10px">保存失败，请重试</div>
-                `
-              : nothing
         }
       </div>`;
   }
