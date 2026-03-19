@@ -56,7 +56,6 @@ import {
   runLegacyStateMigrations,
 } from "./doctor-state-migrations.js";
 import { maybeRepairUiProtocolFreshness } from "./doctor-ui.js";
-import { maybeOfferUpdateBeforeDoctor } from "./doctor-update.js";
 import { noteWorkspaceStatus } from "./doctor-workspace-status.js";
 import { MEMORY_SYSTEM_PROMPT, shouldSuggestMemorySystem } from "./doctor-workspace.js";
 import { noteOpenAIOAuthTlsPrerequisites } from "./oauth-tls-preflight.js";
@@ -83,17 +82,6 @@ export async function doctorCommand(
     argv1: process.argv[1],
     cwd: process.cwd(),
   });
-
-  const updateResult = await maybeOfferUpdateBeforeDoctor({
-    runtime,
-    options,
-    root,
-    confirm: (p) => prompter.confirm(p),
-    outro,
-  });
-  if (updateResult.handled) {
-    return;
-  }
 
   await maybeRepairUiProtocolFreshness(runtime, prompter);
   noteSourceInstallIssues(root);
