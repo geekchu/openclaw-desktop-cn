@@ -16,6 +16,10 @@ vi.mock("../process/exec.js", () => ({
 
 vi.mock("../infra/net/fetch-guard.js", () => ({
   fetchWithSsrFGuard: vi.fn(),
+  GUARDED_FETCH_MODE: {
+    STRICT: "strict",
+    TRUSTED_ENV_PROXY: "trusted_env_proxy",
+  },
 }));
 
 vi.mock("../security/skill-scanner.js", async (importOriginal) => ({

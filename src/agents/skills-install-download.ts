@@ -7,7 +7,7 @@ import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { isWindowsDrivePath } from "../infra/archive-path.js";
 import { writeFileFromPathWithinRoot } from "../infra/fs-safe.js";
 import { assertCanonicalPathWithinBase } from "../infra/install-safe-path.js";
-import { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "../infra/net/fetch-guard.js";
 import { isWithinDir } from "../infra/path-safety.js";
 import { ensureDir, resolveUserPath } from "../utils.js";
 import { extractArchive } from "./skills-install-extract.js";
@@ -77,6 +77,7 @@ async function downloadFile(params: {
   const { response, release } = await fetchWithSsrFGuard({
     url: params.url,
     timeoutMs: Math.max(1_000, params.timeoutMs),
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
   });
   try {
     if (!response.ok || !response.body) {
