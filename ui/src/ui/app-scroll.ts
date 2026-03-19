@@ -13,6 +13,9 @@ type ScrollHost = {
   logsScrollFrame: number | null;
   logsAtBottom: boolean;
   topbarObserver: ResizeObserver | null;
+  // macOS WebKit scroll position preservation
+  _savedChatScrollTop?: number | null;
+  _savedChatScrollHeight?: number | null;
 };
 
 export function scheduleChatScroll(host: ScrollHost, force = false, smooth = false) {
@@ -145,6 +148,56 @@ export function resetChatScroll(host: ScrollHost) {
   host.chatHasAutoScrolled = false;
   host.chatUserNearBottom = true;
   host.chatNewMessagesBelow = false;
+}
+
+/**
+ * Save the current chat scroll position before a Lit update.
+ * This is used to preserve scroll position on macOS WebKit which lacks overflow-anchor support.
+ */
+export function saveChatScrollPosition(host: ScrollHost) {
+  const container = host.querySelector(".chat-thread") as HTMLElement | null;
+  if (!container) {
+    host._savedChatScrollTop = null;
+    host._savedChatScrollHeight = null;
+    return;
+  }
+  host._savedChatScrollTop = container.scrollTop;
+  host._savedChatScrollHeight = container.scrollHeight;
+}
+
+/**
+ * Restore the chat scroll position after a Lit update if it was unexpectedly changed.
+ * This compensates for macOS WebKit's lack of overflow-anchor support.
+ */
+export function restoreChatScrollPosition(host: ScrollHost) {
+  const savedTop = host._savedChatScrollTop;
+  const savedHeight = host._savedChatScrollHeight;
+  // Clear saved values
+  host._savedChatScrollTop = null;
+  host._savedChatScrollHeight = null;
+
+  if (savedTop == null || savedHeight == null) {
+    return;
+  }
+
+  const container = host.querySelector(".chat-thread") as HTMLElement | null;
+  if (!container) {
+    return;
+  }
+
+  const currentTop = container.scrollTop;
+  const currentHeight = container.scrollHeight;
+
+  // If content height changed (new messages), don't restore - let normal scroll logic handle it
+  if (currentHeight !== savedHeight) {
+    return;
+  }
+
+  // If scroll position changed unexpectedly (WebKit bug), restore it
+  // Allow small tolerance (2px) for rounding differences
+  if (Math.abs(currentTop - savedTop) > 2) {
+    container.scrollTop = savedTop;
+  }
 }
 
 export function exportLogs(lines: string[], label: string) {

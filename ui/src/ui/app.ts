@@ -27,6 +27,7 @@ import {
   handleDisconnected,
   handleFirstUpdated,
   handleUpdated,
+  handleWillUpdate,
 } from "./app-lifecycle.ts";
 import { renderApp } from "./app-render.ts";
 import {
@@ -421,6 +422,10 @@ export class OpenClawApp extends LitElement {
   disconnectedCallback() {
     handleDisconnected(this as unknown as Parameters<typeof handleDisconnected>[0]);
     super.disconnectedCallback();
+  }
+
+  protected willUpdate(changed: Map<PropertyKey, unknown>) {
+    handleWillUpdate(this as unknown as Parameters<typeof handleWillUpdate>[0], changed);
   }
 
   protected updated(changed: Map<PropertyKey, unknown>) {

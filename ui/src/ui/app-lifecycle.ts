@@ -7,7 +7,13 @@ import {
   startDebugPolling,
   stopDebugPolling,
 } from "./app-polling.ts";
-import { observeTopbar, scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
+import {
+  observeTopbar,
+  restoreChatScrollPosition,
+  saveChatScrollPosition,
+  scheduleChatScroll,
+  scheduleLogsScroll,
+} from "./app-scroll.ts";
 import {
   applySettingsFromUrl,
   attachThemeListener,
@@ -104,18 +110,51 @@ export function handleDisconnected(host: LifecycleHost) {
   host.topbarObserver = null;
 }
 
+/** Chat-related properties that should trigger scroll behavior */
+const CHAT_SCROLL_PROPERTIES = new Set([
+  "chatMessages",
+  "chatToolMessages",
+  "chatStream",
+  "chatLoading",
+  "tab",
+]);
+
+/**
+ * Called before Lit update to save chat scroll position.
+ * This is needed to work around macOS WebKit's lack of overflow-anchor support,
+ * which can cause scroll position to jump unexpectedly during re-renders.
+ */
+export function handleWillUpdate(host: LifecycleHost, changed: Map<PropertyKey, unknown>) {
+  // Only save scroll position when on chat tab and the change is NOT chat-related
+  // (chat-related changes have their own scroll handling logic)
+  if (host.tab !== "chat") {
+    return;
+  }
+  const isChatRelatedChange = Array.from(changed.keys()).some((key) =>
+    CHAT_SCROLL_PROPERTIES.has(key as string),
+  );
+  if (!isChatRelatedChange) {
+    saveChatScrollPosition(host as unknown as Parameters<typeof saveChatScrollPosition>[0]);
+  }
+}
+
 export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unknown>) {
+  // Check if this is a chat-related change
+  const isChatRelatedChange = Array.from(changed.keys()).some((key) =>
+    CHAT_SCROLL_PROPERTIES.has(key as string),
+  );
+
+  if (host.tab === "chat" && !isChatRelatedChange) {
+    // Non-chat-related change on chat tab: restore scroll position if it was unexpectedly changed
+    // This compensates for macOS WebKit's lack of overflow-anchor support
+    restoreChatScrollPosition(host as unknown as Parameters<typeof restoreChatScrollPosition>[0]);
+  }
+
   if (host.tab === "chat" && host.chatManualRefreshInFlight) {
     return;
   }
-  if (
-    host.tab === "chat" &&
-    (changed.has("chatMessages") ||
-      changed.has("chatToolMessages") ||
-      changed.has("chatStream") ||
-      changed.has("chatLoading") ||
-      changed.has("tab"))
-  ) {
+
+  if (host.tab === "chat" && isChatRelatedChange) {
     const forcedByTab = changed.has("tab");
     const forcedByLoad =
       changed.has("chatLoading") && changed.get("chatLoading") === true && !host.chatLoading;
@@ -124,6 +163,7 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
       forcedByTab || forcedByLoad || !host.chatHasAutoScrolled,
     );
   }
+
   if (
     host.tab === "logs" &&
     (changed.has("logsEntries") || changed.has("logsAutoFollow") || changed.has("tab"))
