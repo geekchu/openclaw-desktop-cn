@@ -21,7 +21,11 @@ export type { ChannelPlugin } from "../channels/plugins/types.plugin.js";
 export { createReplyPrefixOptions } from "../channels/reply-prefix.js";
 export type { OpenClawConfig } from "../config/config.js";
 export { createDedupeCache } from "../infra/dedupe.js";
-export { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+export {
+  fetchWithSsrFGuard,
+  GUARDED_FETCH_MODE,
+  withTrustedEnvProxyGuardedFetchMode,
+} from "../infra/net/fetch-guard.js";
 export type { LookupFn, SsrFPolicy } from "../infra/net/ssrf.js";
 export { isBlockedHostnameOrIp, SsrFBlockedError } from "../infra/net/ssrf.js";
 export { emptyPluginConfigSchema } from "../plugins/config-schema.js";

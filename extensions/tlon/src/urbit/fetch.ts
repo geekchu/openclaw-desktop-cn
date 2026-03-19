@@ -1,5 +1,5 @@
 import type { LookupFn, SsrFPolicy } from "openclaw/plugin-sdk/tlon";
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/tlon";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/tlon";
 import { validateUrbitBaseUrl } from "./base-url.js";
 import { UrbitUrlError } from "./errors.js";
 
@@ -35,5 +35,6 @@ export async function urbitFetch(params: UrbitFetchOptions) {
     lookupFn: params.lookupFn,
     auditContext: params.auditContext,
     pinDns: params.pinDns,
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
   });
 }

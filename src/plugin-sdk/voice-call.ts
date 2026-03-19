@@ -14,6 +14,10 @@ export {
   readRequestBodyWithLimit,
   requestBodyErrorToText,
 } from "../infra/http-body.js";
-export { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+export {
+  fetchWithSsrFGuard,
+  GUARDED_FETCH_MODE,
+  withTrustedEnvProxyGuardedFetchMode,
+} from "../infra/net/fetch-guard.js";
 export type { OpenClawPluginApi } from "../plugins/types.js";
 export { sleep } from "../utils.js";

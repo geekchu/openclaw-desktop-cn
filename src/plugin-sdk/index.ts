@@ -451,7 +451,11 @@ export type {
   WebhookAnomalyTracker,
 } from "./webhook-memory-guards.js";
 
-export { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+export {
+  fetchWithSsrFGuard,
+  GUARDED_FETCH_MODE,
+  withTrustedEnvProxyGuardedFetchMode,
+} from "../infra/net/fetch-guard.js";
 export {
   SsrFBlockedError,
   isBlockedHostname,

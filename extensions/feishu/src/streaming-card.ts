@@ -3,7 +3,7 @@
  */
 
 import type { Client } from "@larksuiteoapi/node-sdk";
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/feishu";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/feishu";
 import type { FeishuDomain } from "./types.js";
 
 type Credentials = { appId: string; appSecret: string; domain?: FeishuDomain };
@@ -66,6 +66,7 @@ async function getToken(creds: Credentials): Promise<string> {
     },
     policy: { allowedHostnames: resolveAllowedHostnames(creds.domain) },
     auditContext: "feishu.streaming-card.token",
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
   });
   if (!response.ok) {
     await release();
@@ -201,6 +202,7 @@ export class FeishuStreamingSession {
       },
       policy: { allowedHostnames: resolveAllowedHostnames(this.creds.domain) },
       auditContext: "feishu.streaming-card.create",
+      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     });
     if (!createRes.ok) {
       await releaseCreate();
@@ -283,6 +285,7 @@ export class FeishuStreamingSession {
       },
       policy: { allowedHostnames: resolveAllowedHostnames(this.creds.domain) },
       auditContext: "feishu.streaming-card.update",
+      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     })
       .then(async ({ release }) => {
         await release();
@@ -359,6 +362,7 @@ export class FeishuStreamingSession {
       },
       policy: { allowedHostnames: resolveAllowedHostnames(this.creds.domain) },
       auditContext: "feishu.streaming-card.close",
+      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     })
       .then(async ({ release }) => {
         await release();

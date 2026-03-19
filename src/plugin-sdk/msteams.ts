@@ -77,7 +77,11 @@ export {
 } from "../config/types.secrets.js";
 export { MSTeamsConfigSchema } from "../config/zod-schema.providers-core.js";
 export { DEFAULT_WEBHOOK_MAX_BODY_BYTES } from "../infra/http-body.js";
-export { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+export {
+  fetchWithSsrFGuard,
+  GUARDED_FETCH_MODE,
+  withTrustedEnvProxyGuardedFetchMode,
+} from "../infra/net/fetch-guard.js";
 export type { SsrFPolicy } from "../infra/net/ssrf.js";
 export { isPrivateIpAddress } from "../infra/net/ssrf.js";
 export { detectMime, extensionForMime, getFileExtension } from "../media/mime.js";

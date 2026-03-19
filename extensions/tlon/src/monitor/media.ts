@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import * as path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/tlon";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/tlon";
 import { getDefaultSsrFPolicy } from "../urbit/context.js";
 
 // Default to OpenClaw workspace media directory
@@ -71,6 +71,7 @@ export async function downloadMedia(
       init: { method: "GET" },
       policy: getDefaultSsrFPolicy(),
       auditContext: "tlon-media-download",
+      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     });
 
     try {

@@ -1,4 +1,8 @@
-import { fetchWithSsrFGuard, type SsrFPolicy } from "openclaw/plugin-sdk/msteams";
+import {
+  fetchWithSsrFGuard,
+  GUARDED_FETCH_MODE,
+  type SsrFPolicy,
+} from "openclaw/plugin-sdk/msteams";
 import { getMSTeamsRuntime } from "../runtime.js";
 import { downloadMSTeamsAttachments } from "./download.js";
 import { downloadAndStoreMSTeamsRemoteMedia } from "./remote-media.js";
@@ -134,6 +138,7 @@ async function fetchGraphCollection<T>(params: {
     },
     policy: params.ssrfPolicy,
     auditContext: "msteams.graph.collection",
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
   });
   try {
     const status = response.status;
@@ -270,6 +275,7 @@ export async function downloadMSTeamsGraphMedia(params: {
       },
       policy: ssrfPolicy,
       auditContext: "msteams.graph.message",
+      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     });
     try {
       if (msgRes.ok) {

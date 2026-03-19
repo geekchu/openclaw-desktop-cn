@@ -83,7 +83,11 @@ export {
 export { buildSecretInputSchema } from "./secret-input-schema.js";
 export { ToolPolicySchema } from "../config/zod-schema.agent-runtime.js";
 export { MarkdownConfigSchema } from "../config/zod-schema.core.js";
-export { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+export {
+  fetchWithSsrFGuard,
+  GUARDED_FETCH_MODE,
+  withTrustedEnvProxyGuardedFetchMode,
+} from "../infra/net/fetch-guard.js";
 export { issuePairingChallenge } from "../pairing/pairing-challenge.js";
 export { emptyPluginConfigSchema } from "../plugins/config-schema.js";
 export type { PluginRuntime, RuntimeLogger } from "../plugins/runtime/types.js";

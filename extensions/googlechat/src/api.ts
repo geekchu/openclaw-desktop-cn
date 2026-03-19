@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/googlechat";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/googlechat";
 import type { ResolvedGoogleChatAccount } from "./accounts.js";
 import { getGoogleChatAccessToken } from "./auth.js";
 import type { GoogleChatReaction } from "./types.js";
@@ -30,6 +30,7 @@ async function fetchJson<T>(
         "Content-Type": "application/json",
       },
     },
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     auditContext: "googlechat.api.json",
   });
   try {
@@ -58,6 +59,7 @@ async function fetchOk(
         Authorization: `Bearer ${token}`,
       },
     },
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     auditContext: "googlechat.api.ok",
   });
   try {
@@ -86,6 +88,7 @@ async function fetchBuffer(
         Authorization: `Bearer ${token}`,
       },
     },
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     auditContext: "googlechat.api.buffer",
   });
   try {
@@ -220,6 +223,7 @@ export async function uploadGoogleChatAttachment(params: {
       },
       body,
     },
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     auditContext: "googlechat.upload",
   });
   try {

@@ -63,7 +63,11 @@ export {
 export type { DmPolicy, GoogleChatAccountConfig, GoogleChatConfig } from "../config/types.js";
 export { isSecretRef } from "../config/types.secrets.js";
 export { GoogleChatConfigSchema } from "../config/zod-schema.providers-core.js";
-export { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+export {
+  fetchWithSsrFGuard,
+  GUARDED_FETCH_MODE,
+  withTrustedEnvProxyGuardedFetchMode,
+} from "../infra/net/fetch-guard.js";
 export { missingTargetError } from "../infra/outbound/target-errors.js";
 export { emptyPluginConfigSchema } from "../plugins/config-schema.js";
 export type { PluginRuntime } from "../plugins/runtime/types.js";

@@ -1,5 +1,5 @@
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "openclaw/plugin-sdk/account-id";
-import { fetchWithSsrFGuard } from "openclaw/plugin-sdk/matrix";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/matrix";
 import { getMatrixRuntime } from "../../runtime.js";
 import {
   normalizeResolvedSecretInputString,
@@ -198,6 +198,7 @@ export async function resolveMatrixAuth(params?: {
         initial_device_display_name: resolved.deviceName ?? "OpenClaw Gateway",
       }),
     },
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     auditContext: "matrix.login",
   });
   const login = await (async () => {
