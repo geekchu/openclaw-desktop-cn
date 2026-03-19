@@ -133,12 +133,18 @@ export async function installSkill(
   }
   state.skillsBusyKey = skillKey;
   state.skillsError = null;
+  // brew/go 安装可能需要较长时间，设置 5 分钟超时
+  const installTimeoutMs = 300_000;
   try {
-    const result = await state.client.request<{ message?: string }>("skills.install", {
-      name,
-      installId,
-      timeoutMs: 120000,
-    });
+    const result = await state.client.request<{ message?: string }>(
+      "skills.install",
+      {
+        name,
+        installId,
+        timeoutMs: installTimeoutMs,
+      },
+      installTimeoutMs,
+    );
     await loadSkills(state);
     setSkillMessage(state, skillKey, {
       kind: "success",

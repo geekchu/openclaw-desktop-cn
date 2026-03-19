@@ -360,6 +360,24 @@ async function reattachSession(term: any): Promise<boolean> {
     _lastCols = cols;
     _lastRows = rows;
     updateStatusIndicator("connected");
+
+    // 触发 shell 重绘提示符（xterm 是新创建的，需要刷新显示）
+    // macOS/Linux: Ctrl+L 清屏并重绘
+    // Windows PowerShell/cmd: 发送空行让 shell 输出新提示符
+    // 短暂延迟确保事件监听器已就绪
+    const currentSessionId = _sessionId; // 捕获当前会话 ID，防止竞态条件
+    setTimeout(() => {
+      // 如果会话已变更，不发送刷新命令
+      if (_sessionId !== currentSessionId) {
+        return;
+      }
+      const isWindows = navigator.platform.toLowerCase().includes("win");
+      // Windows: 发送回车让 shell 输出新提示符（会执行空命令，无副作用）
+      // Unix: 发送 Ctrl+L 清屏重绘
+      const refreshData = isWindows ? "\r" : "\x0c";
+      invoke("terminal_write", { id: currentSessionId, data: refreshData }).catch(() => {});
+    }, 50);
+
     return true;
   } catch {
     // 会话已不存在，清除过期 ID
@@ -577,10 +595,25 @@ async function createTerminalInstance(container: HTMLElement) {
 // ── 主入口：initTerminal ──
 
 async function initTerminal(container: HTMLElement) {
-  // 如果终端已经挂载在同一个容器上，直接跳过（防止 lit 重渲染导致反复销毁重建）
-  if (_terminal && _currentContainer === container) {
+  // 检查容器是否仍在 DOM 中（防止 tab 切换后使用过期的容器引用）
+  if (!document.body.contains(container)) {
     return;
   }
+
+  // 如果终端已经挂载在同一个容器上，只需要 fit 并聚焦
+  if (_terminal && _currentContainer === container) {
+    try {
+      _fitAddon?.fit();
+      _terminal.focus();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+
+  // 如果容器不同但终端存在，说明是 tab 切换回来，需要重新挂载
+  // 继续执行下方的重新初始化逻辑
+
   if (_initBusy) {
     return;
   }
@@ -664,12 +697,15 @@ export function renderTerminal(props: TerminalProps) {
     return nothing;
   }
 
-  setTimeout(() => {
-    const container = document.getElementById("terminal-container");
-    if (container) {
-      void initTerminal(container);
-    }
-  }, 50);
+  // 使用 requestAnimationFrame 确保 DOM 已经渲染完成
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const container = document.getElementById("terminal-container");
+      if (container) {
+        void initTerminal(container);
+      }
+    });
+  });
 
   return html`
     <div class="terminal-page">

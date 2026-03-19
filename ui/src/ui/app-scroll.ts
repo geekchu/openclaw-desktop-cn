@@ -168,6 +168,9 @@ export function saveChatScrollPosition(host: ScrollHost) {
 /**
  * Restore the chat scroll position after a Lit update if it was unexpectedly changed.
  * This compensates for macOS WebKit's lack of overflow-anchor support.
+ *
+ * When content is added at the bottom (new messages), we adjust scrollTop to maintain
+ * the same visual position (content at top of viewport stays in place).
  */
 export function restoreChatScrollPosition(host: ScrollHost) {
   const savedTop = host._savedChatScrollTop;
@@ -187,13 +190,25 @@ export function restoreChatScrollPosition(host: ScrollHost) {
 
   const currentTop = container.scrollTop;
   const currentHeight = container.scrollHeight;
+  const heightDelta = currentHeight - savedHeight;
 
-  // If content height changed (new messages), don't restore - let normal scroll logic handle it
-  if (currentHeight !== savedHeight) {
+  // If content height increased (new messages at bottom), check if user was NOT at bottom
+  // and adjust scrollTop to maintain visual position
+  if (heightDelta > 0) {
+    const savedDistanceFromBottom = savedHeight - savedTop - container.clientHeight;
+    // If user was scrolled up (not near bottom), maintain their position
+    if (savedDistanceFromBottom >= NEAR_BOTTOM_THRESHOLD) {
+      // Content was added at bottom, keep the same scrollTop to maintain visual position
+      // (user sees the same content at the top of viewport)
+      if (currentTop !== savedTop) {
+        container.scrollTop = savedTop;
+      }
+    }
+    // If user was near bottom, let scheduleChatScroll handle auto-scroll
     return;
   }
 
-  // If scroll position changed unexpectedly (WebKit bug), restore it
+  // If content height unchanged or decreased, restore if position changed unexpectedly (WebKit bug)
   // Allow small tolerance (2px) for rounding differences
   if (Math.abs(currentTop - savedTop) > 2) {
     container.scrollTop = savedTop;
