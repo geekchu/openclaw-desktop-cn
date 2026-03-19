@@ -1201,8 +1201,10 @@ pub async fn clear_channel_config(channel_id: String) -> Result<String, String> 
 
 // ============ 飞书插件管理 ============
 
-/// 确保所有内置渠道插件在配置中已启用
+/// 确保所有内置渠道插件在配置中已启用，并禁用 OpenClaw 内置更新检查
 /// 桌面端内置了所有渠道插件，启动时调用此函数预写 plugins.entries
+/// 同时禁用 OpenClaw 的 update.checkOnStart 和 update.auto.enabled，
+/// 因为桌面版使用 Tauri 自带的更新机制，不需要 OpenClaw 的 npm 更新检查
 pub fn ensure_channel_plugins_enabled() -> Result<(), String> {
     let mut config = load_openclaw_config()?;
 
@@ -1224,6 +1226,31 @@ pub fn ensure_channel_plugins_enabled() -> Result<(), String> {
         if !entries.contains_key(*id) {
             entries.insert(id.to_string(), json!({ "enabled": true }));
             changed = true;
+        }
+    }
+
+    // 禁用 OpenClaw 内置更新检查（桌面版使用 Tauri 更新机制）
+    if config.get("update").is_none() {
+        config["update"] = json!({});
+    }
+    let update_obj = config["update"].as_object_mut().ok_or("update 不是对象")?;
+
+    // 禁用启动时更新检查
+    if update_obj.get("checkOnStart").map(|v| v.as_bool()) != Some(Some(false)) {
+        update_obj.insert("checkOnStart".to_string(), json!(false));
+        changed = true;
+        info!("[配置初始化] 已禁用 OpenClaw 启动时更新检查 (update.checkOnStart=false)");
+    }
+
+    // 禁用自动更新
+    if update_obj.get("auto").is_none() {
+        update_obj.insert("auto".to_string(), json!({}));
+    }
+    if let Some(auto_obj) = update_obj.get_mut("auto").and_then(|v| v.as_object_mut()) {
+        if auto_obj.get("enabled").map(|v| v.as_bool()) != Some(Some(false)) {
+            auto_obj.insert("enabled".to_string(), json!(false));
+            changed = true;
+            info!("[配置初始化] 已禁用 OpenClaw 自动更新 (update.auto.enabled=false)");
         }
     }
 
