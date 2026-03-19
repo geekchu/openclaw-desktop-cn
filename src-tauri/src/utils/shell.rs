@@ -826,6 +826,13 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
     let bind_mode = if lan_access { "lan" } else { "loopback" };
     info!("[Shell] Gateway 绑定模式: {} (lanAccess={})", bind_mode, lan_access);
 
+    // 读取代理配置
+    let proxy_config = get_proxy_config();
+    if proxy_config.enabled {
+        info!("[Shell] 代理已启用: http={:?}, https={:?}, no_proxy={:?}",
+            proxy_config.http, proxy_config.https, proxy_config.no_proxy);
+    }
+
     let user_env_vars = load_openclaw_env_vars();
     info!("[Shell] 已加载 {} 个环境变量", user_env_vars.len());
 
@@ -870,6 +877,9 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
         }
+
+        // 应用代理配置
+        apply_proxy_env(&mut cmd, &proxy_config);
 
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -975,6 +985,9 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
     }
 
+    // 应用代理配置
+    apply_proxy_env(&mut cmd, &proxy_config);
+
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
@@ -1004,10 +1017,10 @@ pub fn command_exists(cmd: &str) -> bool {
         // Windows: 使用 where 命令
         let mut command = Command::new("where");
         command.arg(cmd);
-        
+
         #[cfg(windows)]
         command.creation_flags(CREATE_NO_WINDOW);
-        
+
         command.output()
             .map(|o| o.status.success())
             .unwrap_or(false)
@@ -1018,5 +1031,67 @@ pub fn command_exists(cmd: &str) -> bool {
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false)
+    }
+}
+
+/// 代理配置结构
+#[derive(Debug, Default)]
+pub struct ProxyConfig {
+    pub enabled: bool,
+    pub http: Option<String>,
+    pub https: Option<String>,
+    pub no_proxy: Option<String>,
+}
+
+/// 从 openclaw.json 读取代理配置
+pub fn get_proxy_config() -> ProxyConfig {
+    let config_path = platform::get_config_file_path();
+
+    if let Ok(content) = file::read_file(&config_path) {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(proxy) = json.get("proxy") {
+                let enabled = proxy.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+                if enabled {
+                    return ProxyConfig {
+                        enabled: true,
+                        http: proxy.get("http").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        https: proxy.get("https").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        no_proxy: proxy.get("noProxy").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                    };
+                }
+            }
+        }
+    }
+
+    ProxyConfig::default()
+}
+
+/// 将代理配置应用到 Command 的环境变量
+pub fn apply_proxy_env(cmd: &mut Command, proxy: &ProxyConfig) {
+    if !proxy.enabled {
+        return;
+    }
+
+    // 设置 HTTP_PROXY 和 http_proxy
+    if let Some(ref http) = proxy.http {
+        cmd.env("HTTP_PROXY", http);
+        cmd.env("http_proxy", http);
+        info!("[Shell] 设置代理: HTTP_PROXY={}", http);
+    }
+
+    // 设置 HTTPS_PROXY 和 https_proxy
+    // 如果没有单独设置 https，则使用 http 的值
+    let https_proxy = proxy.https.as_ref().or(proxy.http.as_ref());
+    if let Some(https) = https_proxy {
+        cmd.env("HTTPS_PROXY", https);
+        cmd.env("https_proxy", https);
+        info!("[Shell] 设置代理: HTTPS_PROXY={}", https);
+    }
+
+    // 设置 NO_PROXY 和 no_proxy
+    if let Some(ref no_proxy) = proxy.no_proxy {
+        cmd.env("NO_PROXY", no_proxy);
+        cmd.env("no_proxy", no_proxy);
+        info!("[Shell] 设置代理: NO_PROXY={}", no_proxy);
     }
 }

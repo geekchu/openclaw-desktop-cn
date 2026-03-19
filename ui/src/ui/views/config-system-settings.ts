@@ -11,7 +11,7 @@ import { checkForUpdate, downloadUpdate, installUpdate, closeUpdateResource } fr
 export const CLAW_CONFIG_SYSTEM = "claw-config-system";
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
 function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const t = (window as any).__TAURI__;
+  const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
   if (t?.core?.invoke) {
     return t.core.invoke(cmd, args) as Promise<T>;
   }
@@ -67,6 +67,14 @@ export class SystemSettingsView extends LitElement {
   @state() private lanAccessBusy = false;
   @state() private gatewayToken = "";
 
+  /* ── proxy states ── */
+  @state() private proxyEnabled = false;
+  @state() private proxyHttp = "";
+  @state() private proxyHttps = "";
+  @state() private proxyNoProxy = "";
+  @state() private proxySaving = false;
+  @state() private proxySaveStatus: "idle" | "success" | "error" = "idle";
+
   /* ── update states ── */
   @state() private updateChecking = false;
   @state() private updateAvailable = false;
@@ -84,13 +92,13 @@ export class SystemSettingsView extends LitElement {
   /* ── lifecycle ── */
   override connectedCallback() {
     super.connectedCallback();
-    this._loadConfig();
+    void this._loadConfig();
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
     // 清理更新资源，防止泄漏
-    this._cleanupUpdateResources();
+    void this._cleanupUpdateResources();
   }
 
   private async _cleanupUpdateResources() {
@@ -149,6 +157,23 @@ export class SystemSettingsView extends LitElement {
       const gatewayToken = getNestedValue(cfg, ["gateway", "auth", "token"]);
       if (typeof gatewayToken === "string") {
         this.gatewayToken = gatewayToken;
+      }
+      // 加载代理配置
+      const proxyEnabled = getNestedValue(cfg, ["proxy", "enabled"]);
+      if (typeof proxyEnabled === "boolean") {
+        this.proxyEnabled = proxyEnabled;
+      }
+      const proxyHttp = getNestedValue(cfg, ["proxy", "http"]);
+      if (typeof proxyHttp === "string") {
+        this.proxyHttp = proxyHttp;
+      }
+      const proxyHttps = getNestedValue(cfg, ["proxy", "https"]);
+      if (typeof proxyHttps === "string") {
+        this.proxyHttps = proxyHttps;
+      }
+      const proxyNoProxy = getNestedValue(cfg, ["proxy", "noProxy"]);
+      if (typeof proxyNoProxy === "string") {
+        this.proxyNoProxy = proxyNoProxy;
       }
       try {
         this.autoStart = await invoke<boolean>("autostart_is_enabled");
@@ -383,7 +408,7 @@ export class SystemSettingsView extends LitElement {
       // 提示用户需要重启
       const modeName = newValue ? "局域网访问" : "仅本地访问";
       if (confirm(`已切换到「${modeName}」模式，需要重启应用才能生效。\n\n是否立即重启？`)) {
-        const t = (window as any).__TAURI__;
+        const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
         if (t?.core?.invoke) {
           try {
             await t.core.invoke("stop_gateway");
@@ -401,7 +426,9 @@ export class SystemSettingsView extends LitElement {
   }
 
   private async _copyGatewayToken() {
-    if (!this.gatewayToken) return;
+    if (!this.gatewayToken) {
+      return;
+    }
     try {
       await navigator.clipboard.writeText(this.gatewayToken);
       // 简单的复制成功提示
@@ -423,6 +450,57 @@ export class SystemSettingsView extends LitElement {
       await invoke("open_config_dir");
     } catch (e) {
       console.error("打开目录失败:", e);
+    }
+  }
+
+  /* ── proxy settings ── */
+  private _proxyTimer?: ReturnType<typeof setTimeout>;
+
+  private _handleProxyEnabledChange(enabled: boolean) {
+    this.proxyEnabled = enabled;
+    this._triggerProxySave();
+  }
+
+  private _handleProxyHttpChange(value: string) {
+    this.proxyHttp = value;
+    this._triggerProxySave();
+  }
+
+  private _handleProxyHttpsChange(value: string) {
+    this.proxyHttps = value;
+    this._triggerProxySave();
+  }
+
+  private _handleProxyNoProxyChange(value: string) {
+    this.proxyNoProxy = value;
+    this._triggerProxySave();
+  }
+
+  private _triggerProxySave() {
+    clearTimeout(this._proxyTimer);
+    this._proxyTimer = setTimeout(() => this._saveProxyConfig(), 500);
+  }
+
+  private async _saveProxyConfig() {
+    this.proxySaving = true;
+    this.proxySaveStatus = "idle";
+    try {
+      const proxyConfig: Record<string, unknown> = {
+        enabled: this.proxyEnabled,
+        // Use null for empty fields so deep_merge_config removes stale values.
+        http: this.proxyHttp.trim() || null,
+        https: this.proxyHttps.trim() || null,
+        noProxy: this.proxyNoProxy.trim() || null,
+      };
+      await invoke("save_config", { config: { proxy: proxyConfig } });
+      this.proxySaveStatus = "success";
+      setTimeout(() => (this.proxySaveStatus = "idle"), 2000);
+    } catch (e) {
+      console.error("保存代理配置失败:", e);
+      this.proxySaveStatus = "error";
+      setTimeout(() => (this.proxySaveStatus = "idle"), 3000);
+    } finally {
+      this.proxySaving = false;
     }
   }
 
@@ -808,6 +886,31 @@ export class SystemSettingsView extends LitElement {
       color: #f87171;
     }
 
+    /* ── proxy card specifics ── */
+    .proxy-fields {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border, #27272a);
+    }
+    .proxy-optional {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--muted, #71717a);
+      margin-left: 4px;
+    }
+    .proxy-notice {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.18);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--info, #3b82f6);
+      margin-top: 4px;
+    }
+
     /* ── loading ── */
     .loading {
       display: flex;
@@ -936,6 +1039,7 @@ export class SystemSettingsView extends LitElement {
       ${this._renderHeader()}
       <div class="content">
         ${this._renderSecurityCard()}
+        ${this._renderProxyCard()}
         ${this._renderIdentityCard()}
         ${this._renderAdvancedCard()}
         ${this._renderUpdateCard()}
@@ -1133,7 +1237,7 @@ export class SystemSettingsView extends LitElement {
             <div style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div style="font-size: 12px; color: var(--muted, #71717a); font-weight: 500;">允许访问的额外目录</div>
-                <button class="opt" style="padding: 4px 10px; font-size: 11px; white-space: nowrap; border-radius: 12px;" @click=${this._handleAddAllowedDir}>+ 添加目录</button>
+                <button class="opt" style="padding: 4px 10px; font-size: 11px; white-space: nowrap; border-radius: 12px;" @click=${() => this._handleAddAllowedDir()}>+ 添加目录</button>
               </div>
               ${
                 this.fsAllowedDirs.length === 0
@@ -1204,7 +1308,7 @@ export class SystemSettingsView extends LitElement {
               </div>
             </div>
             <label class="switch">
-              <input type="checkbox" .checked=${this.lanAccess} ?disabled=${this.lanAccessBusy} @change=${this._toggleLanAccess} />
+              <input type="checkbox" .checked=${this.lanAccess} ?disabled=${this.lanAccessBusy} @change=${() => this._toggleLanAccess()} />
               <span class="switch-track"></span>
             </label>
           </div>
@@ -1234,7 +1338,7 @@ export class SystemSettingsView extends LitElement {
                       white-space: nowrap;
                       transition: all 0.15s ease;
                     "
-                    @click=${this._copyGatewayToken}
+                    @click=${() => this._copyGatewayToken()}
                     @mouseover=${(e: Event) => {
                       (e.target as HTMLElement).style.background = "var(--bg-hover, #262a35)";
                       (e.target as HTMLElement).style.borderColor = "var(--border-strong, #3f3f46)";
@@ -1254,6 +1358,93 @@ export class SystemSettingsView extends LitElement {
           }
         </div>
 
+      </div>`;
+  }
+
+  private _proxyIcon = html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="2" y1="12" x2="22" y2="12"></line>
+      <path
+        d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+      ></path>
+    </svg>
+  `;
+
+  private _renderProxyCard() {
+    return html`
+      <div class="card">
+        <div class="card-title">
+          <div class="card-title-icon blue">${this._proxyIcon}</div>
+          <div>
+            <div class="title-text">代理设置</div>
+            <div class="title-sub">配置网络代理，所有网络请求将通过代理服务器</div>
+          </div>
+        </div>
+
+        <div class="toggle-row" style="margin-bottom:0">
+          <div class="toggle-row-info">
+            <div class="toggle-row-icon">🌐</div>
+            <div>
+              <div class="toggle-text-primary">启用代理</div>
+              <div class="toggle-text-secondary">开启后所有网络请求将通过代理服务器（需重启生效）</div>
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" .checked=${this.proxyEnabled} @change=${(e: Event) => this._handleProxyEnabledChange((e.target as HTMLInputElement).checked)} />
+            <span class="switch-track"></span>
+          </label>
+        </div>
+
+        ${
+          this.proxyEnabled
+            ? html`
+          <div class="proxy-fields">
+            <div class="field">
+              <label class="field-label">HTTP 代理</label>
+              <input class="input-base" type="text" .value=${this.proxyHttp}
+                @input=${(e: Event) => this._handleProxyHttpChange((e.target as HTMLInputElement).value)}
+                placeholder="http://127.0.0.1:7890" />
+              <span class="section-hint">HTTP 请求使用的代理地址</span>
+            </div>
+            <div class="field">
+              <label class="field-label">HTTPS 代理 <span class="proxy-optional">可选</span></label>
+              <input class="input-base" type="text" .value=${this.proxyHttps}
+                @input=${(e: Event) => this._handleProxyHttpsChange((e.target as HTMLInputElement).value)}
+                placeholder="留空则回退到 HTTP 代理地址" />
+              <span class="section-hint">HTTPS 请求使用的代理，留空时自动使用 HTTP 代理地址</span>
+            </div>
+            <div class="field">
+              <label class="field-label">排除地址 <span class="proxy-optional">可选</span></label>
+              <input class="input-base" type="text" .value=${this.proxyNoProxy}
+                @input=${(e: Event) => this._handleProxyNoProxyChange((e.target as HTMLInputElement).value)}
+                placeholder="localhost,127.0.0.1,*.local" />
+              <span class="section-hint">不走代理的主机列表，多个地址用英文逗号分隔</span>
+            </div>
+
+            <div class="proxy-notice">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span>修改代理设置后需重启应用才能生效</span>
+            </div>
+
+          </div>
+        `
+            : nothing
+        }
+
+        ${
+          this.proxySaveStatus === "success"
+            ? html`
+                <div class="save-msg ok" style="margin-top: 10px">✓ 代理配置已保存</div>
+              `
+            : this.proxySaveStatus === "error"
+              ? html`
+                  <div class="save-msg err" style="margin-top: 10px">保存失败，请重试</div>
+                `
+              : nothing
+        }
       </div>`;
   }
 
@@ -1295,7 +1486,7 @@ export class SystemSettingsView extends LitElement {
         </div>
 
         <div class="action-bar">
-          <button class="btn-primary" ?disabled=${this.saving} @click=${this._handleSaveIdentity}>
+          <button class="btn-primary" ?disabled=${this.saving} @click=${() => this._handleSaveIdentity()}>
             ${
               this.saving
                 ? html`
@@ -1340,12 +1531,12 @@ export class SystemSettingsView extends LitElement {
             </div>
           </div>
           <label class="switch">
-            <input type="checkbox" .checked=${this.autoStart} ?disabled=${this.autoStartBusy} @change=${this._toggleAutoStart} />
+            <input type="checkbox" .checked=${this.autoStart} ?disabled=${this.autoStartBusy} @change=${() => this._toggleAutoStart()} />
             <span class="switch-track"></span>
           </label>
         </div>
 
-        <button class="click-row" @click=${this._openConfigDir}>
+        <button class="click-row" @click=${() => this._openConfigDir()}>
           <div class="toggle-row-info">
             <div class="toggle-row-icon">📁</div>
             <div>
@@ -1405,14 +1596,14 @@ export class SystemSettingsView extends LitElement {
       // 下载完成，显示重启按钮
       this.updateInstalled = true;
       this.updateDownloading = false;
-    } catch (e: any) {
-      this.updateError = String(e?.message || e);
+    } catch (e: unknown) {
+      this.updateError = String(e instanceof Error ? e.message : e);
       this.updateDownloading = false;
     }
   }
 
   private async _handleRestart() {
-    const t = (window as any).__TAURI__;
+    const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
     if (!t?.core?.invoke) {
       this.updateError = "Tauri API 不可用，请手动重启应用";
       this.updateRestarting = false;
@@ -1444,9 +1635,9 @@ export class SystemSettingsView extends LitElement {
           this.updateRestarting = false;
         }
         return;
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("更新安装失败", e);
-        this.updateError = `更新安装失败: ${e?.message || e}`;
+        this.updateError = `更新安装失败: ${e instanceof Error ? e.message : String(e)}`;
         this.updateRestarting = false;
         return;
       }
@@ -1480,7 +1671,7 @@ export class SystemSettingsView extends LitElement {
               <div class="toggle-text-primary">✅ 更新已下载完成，重启后生效</div>
               ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
             </div>
-            <button class="btn-primary" ?disabled=${this.updateRestarting} @click=${this._handleRestart}>
+            <button class="btn-primary" ?disabled=${this.updateRestarting} @click=${() => this._handleRestart()}>
               ${
                 this.updateRestarting
                   ? html`
@@ -1513,7 +1704,7 @@ export class SystemSettingsView extends LitElement {
               ${this.updateNotes ? html`<div class="toggle-text-secondary">${this.updateNotes}</div>` : nothing}
               ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
             </div>
-            <button class="btn-primary" @click=${this._handleDownloadUpdate}>下载并安装</button>
+            <button class="btn-primary" @click=${() => this._handleDownloadUpdate()}>下载并安装</button>
           </div>
         `
                 : html`
@@ -1530,7 +1721,7 @@ export class SystemSettingsView extends LitElement {
               }
               ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
             </div>
-            <button class="btn-primary" ?disabled=${this.updateChecking} @click=${this._handleCheckUpdate}>
+            <button class="btn-primary" ?disabled=${this.updateChecking} @click=${() => this._handleCheckUpdate()}>
               ${
                 this.updateChecking
                   ? html`

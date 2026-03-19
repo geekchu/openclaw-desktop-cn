@@ -93,8 +93,13 @@ fn deep_merge_config(base: &mut Value, patch: &Value) {
     match (base, patch) {
         (Value::Object(base_map), Value::Object(patch_map)) => {
             for (k, v) in patch_map {
-                let entry = base_map.entry(k.clone()).or_insert(json!(null));
-                deep_merge_config(entry, v);
+                if v.is_null() {
+                    // null patch value = delete the key from base
+                    base_map.remove(k);
+                } else {
+                    let entry = base_map.entry(k.clone()).or_insert(json!(null));
+                    deep_merge_config(entry, v);
+                }
             }
         }
         (base, patch) => {
@@ -117,7 +122,7 @@ pub async fn save_config(config: Value) -> Result<String, String> {
     let known_keys: &[&str] = &[
         "gateway", "agents", "models", "channels", "plugins",
         "meta", "hooks", "security", "notifications", "web", "tools",
-        "auth", "commands", "messages", "wizard",
+        "auth", "commands", "messages", "wizard", "proxy",
     ];
     if let Some(obj) = config.as_object() {
         for key in obj.keys() {

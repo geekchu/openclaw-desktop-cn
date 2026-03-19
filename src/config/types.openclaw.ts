@@ -63,6 +63,17 @@ export type OpenClawConfig = {
   diagnostics?: DiagnosticsConfig;
   logging?: LoggingConfig;
   cli?: CliConfig;
+  /** Proxy configuration for all network requests. */
+  proxy?: {
+    /** Enable proxy for all network requests. */
+    enabled?: boolean;
+    /** HTTP proxy URL (e.g., http://127.0.0.1:7890). Used for HTTP requests. */
+    http?: string;
+    /** HTTPS proxy URL (e.g., http://127.0.0.1:7890). Used for HTTPS requests. Falls back to http if not set. */
+    https?: string;
+    /** Comma-separated list of hosts to bypass proxy (e.g., localhost,127.0.0.1,*.local). */
+    noProxy?: string;
+  };
   update?: {
     /** Update channel for git + npm installs ("stable", "beta", or "dev"). */
     channel?: "stable" | "beta" | "dev";
