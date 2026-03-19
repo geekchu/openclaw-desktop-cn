@@ -32,7 +32,7 @@ describe("web_search redirect resolution hardening", () => {
     fetchWithSsrFGuardMock.mockReset();
   });
 
-  it("resolves redirects via SSRF-guarded HEAD requests", async () => {
+  it("resolves redirects via SSRF-guarded HEAD requests with proxy", async () => {
     const release = vi.fn(async () => {});
     fetchWithSsrFGuardMock.mockResolvedValue({
       response: new Response(null, { status: 200 }),
@@ -47,10 +47,9 @@ describe("web_search redirect resolution hardening", () => {
         url: "https://example.com/start",
         timeoutMs: 5000,
         init: { method: "HEAD" },
+        mode: "trusted_env_proxy",
       }),
     );
-    expect(fetchWithSsrFGuardMock.mock.calls[0]?.[0]?.proxy).toBeUndefined();
-    expect(fetchWithSsrFGuardMock.mock.calls[0]?.[0]?.policy).toBeUndefined();
     expect(release).toHaveBeenCalledTimes(1);
   });
 

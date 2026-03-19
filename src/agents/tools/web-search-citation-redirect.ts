@@ -1,4 +1,4 @@
-import { withStrictWebToolsEndpoint } from "./web-guarded-fetch.js";
+import { fetchWithWebToolsNetworkGuard } from "./web-guarded-fetch.js";
 
 const REDIRECT_TIMEOUT_MS = 5000;
 
@@ -8,14 +8,14 @@ const REDIRECT_TIMEOUT_MS = 5000;
  */
 export async function resolveCitationRedirectUrl(url: string): Promise<string> {
   try {
-    return await withStrictWebToolsEndpoint(
-      {
-        url,
-        init: { method: "HEAD" },
-        timeoutMs: REDIRECT_TIMEOUT_MS,
-      },
-      async ({ finalUrl }) => finalUrl || url,
-    );
+    const { finalUrl, release } = await fetchWithWebToolsNetworkGuard({
+      url,
+      init: { method: "HEAD" },
+      timeoutMs: REDIRECT_TIMEOUT_MS,
+      useEnvProxy: true,
+    });
+    await release();
+    return finalUrl || url;
   } catch {
     return url;
   }
