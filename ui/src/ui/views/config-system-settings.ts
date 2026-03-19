@@ -67,6 +67,8 @@ export class SystemSettingsView extends LitElement {
   @state() private lanAccessBusy = false;
   @state() private gatewayToken = "";
 
+  @state() private lanNeedsRestart = false;
+
   /* ── proxy states ── */
   @state() private proxyEnabled = false;
   @state() private proxyHttp = "";
@@ -74,6 +76,7 @@ export class SystemSettingsView extends LitElement {
   @state() private proxyNoProxy = "";
   @state() private proxySaving = false;
   @state() private proxySaveStatus: "idle" | "success" | "error" = "idle";
+  @state() private proxyNeedsRestart = false;
 
   /* ── update states ── */
   @state() private updateChecking = false;
@@ -405,19 +408,7 @@ export class SystemSettingsView extends LitElement {
         throw configErr;
       }
       this.lanAccess = newValue;
-      // 提示用户需要重启
-      const modeName = newValue ? "局域网访问" : "仅本地访问";
-      if (confirm(`已切换到「${modeName}」模式，需要重启应用才能生效。\n\n是否立即重启？`)) {
-        const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
-        if (t?.core?.invoke) {
-          try {
-            await t.core.invoke("stop_gateway");
-          } catch {
-            /* best-effort */
-          }
-          t.core.invoke("plugin:process|restart");
-        }
-      }
+      this.lanNeedsRestart = true;
     } catch (e) {
       console.error("切换局域网访问失败:", e);
     } finally {
@@ -453,6 +444,19 @@ export class SystemSettingsView extends LitElement {
     }
   }
 
+  /* ── restart helper ── */
+  private async _doRestart() {
+    const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
+    if (t?.core?.invoke) {
+      try {
+        await (t.core.invoke as (cmd: string) => Promise<void>)("stop_gateway");
+      } catch {
+        /* best-effort */
+      }
+      void (t.core.invoke as (cmd: string) => Promise<void>)("plugin:process|restart");
+    }
+  }
+
   /* ── proxy settings ── */
   private _handleProxyEnabledChange(enabled: boolean) {
     this.proxyEnabled = enabled;
@@ -485,18 +489,7 @@ export class SystemSettingsView extends LitElement {
       await invoke("save_config", { config: { proxy: proxyConfig } });
       this.proxySaveStatus = "success";
       setTimeout(() => (this.proxySaveStatus = "idle"), 2000);
-      // 保存成功后询问是否重启
-      if (confirm("代理设置已保存。需要重启应用才能生效。\n\n是否立即重启？")) {
-        const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
-        if (t?.core?.invoke) {
-          try {
-            await (t.core.invoke as (cmd: string) => Promise<void>)("stop_gateway");
-          } catch {
-            /* best-effort */
-          }
-          void (t.core.invoke as (cmd: string) => Promise<void>)("plugin:process|restart");
-        }
-      }
+      this.proxyNeedsRestart = true;
     } catch (e) {
       console.error("保存代理配置失败:", e);
       this.proxySaveStatus = "error";
@@ -937,6 +930,38 @@ export class SystemSettingsView extends LitElement {
       height: 6px;
       border-radius: 50%;
       background: currentColor;
+    }
+
+    /* ── restart banner ── */
+    .restart-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 10px;
+    }
+    .restart-banner-text {
+      flex: 1;
+      font-size: 13px;
+      color: #fbbf24;
+    }
+    .restart-banner-dismiss {
+      background: none;
+      border: 1px solid rgba(113, 113, 122, 0.3);
+      border-radius: 8px;
+      color: var(--muted, #71717a);
+      font-size: 12px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+    .restart-banner-dismiss:hover {
+      background: var(--bg-hover, #262a35);
+      color: var(--text, #e4e4e7);
     }
 
     /* ── loading ── */
@@ -1384,6 +1409,25 @@ export class SystemSettingsView extends LitElement {
           `
               : nothing
           }
+
+          ${
+            this.lanNeedsRestart
+              ? html`
+            <div class="restart-banner">
+              <span class="restart-banner-text">设置已保存，重启后生效</span>
+              <button class="btn-primary" style="padding:6px 14px;font-size:13px" @click=${() => {
+                this.lanNeedsRestart = false;
+                void this._doRestart();
+              }}>
+                立即重启
+              </button>
+              <button class="restart-banner-dismiss" @click=${() => {
+                this.lanNeedsRestart = false;
+              }}>稍后</button>
+            </div>
+          `
+              : nothing
+          }
         </div>
 
       </div>`;
@@ -1478,6 +1522,25 @@ export class SystemSettingsView extends LitElement {
                     : nothing
               }
             </div>
+          </div>
+        `
+            : nothing
+        }
+
+        ${
+          this.proxyNeedsRestart
+            ? html`
+          <div class="restart-banner">
+            <span class="restart-banner-text">代理设置已保存，重启后生效</span>
+            <button class="btn-primary" style="padding:6px 14px;font-size:13px" @click=${() => {
+              this.proxyNeedsRestart = false;
+              void this._doRestart();
+            }}>
+              立即重启
+            </button>
+            <button class="restart-banner-dismiss" @click=${() => {
+              this.proxyNeedsRestart = false;
+            }}>稍后</button>
           </div>
         `
             : nothing
