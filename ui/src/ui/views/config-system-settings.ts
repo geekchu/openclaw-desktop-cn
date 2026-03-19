@@ -445,14 +445,14 @@ export class SystemSettingsView extends LitElement {
   }
 
   /* ── restart helper ── */
-  private async _doRestart() {
+  private _doRestart() {
+    // Do NOT call stop_gateway before restarting: stop_gateway sets suppress_restart=true
+    // and never resets it. If the user cancels or restart fails, the health-check loop
+    // would be permanently suppressed and gateway would never auto-recover.
+    // plugin:process|restart triggers a clean Tauri exit which calls gm.stop() via
+    // RunEvent::Exit, so gateway is properly cleaned up without touching suppress_restart.
     const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
     if (t?.core?.invoke) {
-      try {
-        await (t.core.invoke as (cmd: string) => Promise<void>)("stop_gateway");
-      } catch {
-        /* best-effort */
-      }
       void (t.core.invoke as (cmd: string) => Promise<void>)("plugin:process|restart");
     }
   }
@@ -1417,7 +1417,7 @@ export class SystemSettingsView extends LitElement {
               <span class="restart-banner-text">设置已保存，重启后生效</span>
               <button class="btn-primary" style="padding:6px 14px;font-size:13px" @click=${() => {
                 this.lanNeedsRestart = false;
-                void this._doRestart();
+                this._doRestart();
               }}>
                 立即重启
               </button>
@@ -1534,7 +1534,7 @@ export class SystemSettingsView extends LitElement {
             <span class="restart-banner-text">代理设置已保存，重启后生效</span>
             <button class="btn-primary" style="padding:6px 14px;font-size:13px" @click=${() => {
               this.proxyNeedsRestart = false;
-              void this._doRestart();
+              this._doRestart();
             }}>
               立即重启
             </button>
