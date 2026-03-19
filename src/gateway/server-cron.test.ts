@@ -28,6 +28,10 @@ vi.mock("../config/config.js", async () => {
 
 vi.mock("../infra/net/fetch-guard.js", () => ({
   fetchWithSsrFGuard: (...args: unknown[]) => fetchWithSsrFGuardMock(...args),
+  GUARDED_FETCH_MODE: {
+    STRICT: "strict",
+    TRUSTED_ENV_PROXY: "trusted_env_proxy",
+  },
 }));
 
 import { buildGatewayCronService } from "./server-cron.js";
@@ -134,6 +138,7 @@ describe("buildGatewayCronService", () => {
           body: expect.stringContaining('"action":"finished"'),
           signal: expect.any(AbortSignal),
         },
+        mode: "trusted_env_proxy",
       });
     } finally {
       state.cron.stop();

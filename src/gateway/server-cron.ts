@@ -22,7 +22,7 @@ import { normalizeHttpWebhookUrl } from "../cron/webhook-url.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { runHeartbeatOnce } from "../infra/heartbeat-runner.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
-import { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "../infra/net/fetch-guard.js";
 import { SsrFBlockedError } from "../infra/net/ssrf.js";
 import { deliverOutboundPayloads } from "../infra/outbound/deliver.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
@@ -114,6 +114,7 @@ async function postCronWebhook(params: {
         body: JSON.stringify(params.payload),
         signal: abortController.signal,
       },
+      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     });
     await result.release();
   } catch (err) {

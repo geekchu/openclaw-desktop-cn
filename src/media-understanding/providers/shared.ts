@@ -1,5 +1,5 @@
 import type { GuardedFetchResult } from "../../infra/net/fetch-guard.js";
-import { fetchWithSsrFGuard } from "../../infra/net/fetch-guard.js";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "../../infra/net/fetch-guard.js";
 import type { LookupFn, SsrFPolicy } from "../../infra/net/ssrf.js";
 export { fetchWithTimeout } from "../../utils/fetch-timeout.js";
 
@@ -29,6 +29,7 @@ export async function fetchWithTimeoutGuarded(
     policy: options?.ssrfPolicy,
     lookupFn: options?.lookupFn,
     pinDns: options?.pinDns,
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
   });
 }
 

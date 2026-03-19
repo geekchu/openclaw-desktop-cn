@@ -1,5 +1,8 @@
 import path from "node:path";
-import { fetchWithSsrFGuard, withStrictGuardedFetchMode } from "../infra/net/fetch-guard.js";
+import {
+  fetchWithSsrFGuard,
+  withTrustedEnvProxyGuardedFetchMode,
+} from "../infra/net/fetch-guard.js";
 import type { LookupFn, SsrFPolicy } from "../infra/net/ssrf.js";
 import { detectMime, extensionForMime } from "./mime.js";
 import { readResponseWithLimit } from "./read-response-with-limit.js";
@@ -99,7 +102,7 @@ export async function fetchRemoteMedia(options: FetchMediaOptions): Promise<Fetc
   let release: (() => Promise<void>) | null = null;
   try {
     const result = await fetchWithSsrFGuard(
-      withStrictGuardedFetchMode({
+      withTrustedEnvProxyGuardedFetchMode({
         url,
         fetchImpl,
         init: requestInit,

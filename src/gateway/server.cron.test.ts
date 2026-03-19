@@ -33,6 +33,10 @@ vi.mock("../infra/net/fetch-guard.js", () => ({
         release: () => Promise<void>;
       }>
     )(...args),
+  GUARDED_FETCH_MODE: {
+    STRICT: "strict",
+    TRUSTED_ENV_PROXY: "trusted_env_proxy",
+  },
 }));
 
 installGatewayTestHooks({ scope: "suite" });

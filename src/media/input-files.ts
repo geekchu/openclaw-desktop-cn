@@ -1,4 +1,4 @@
-import { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "../infra/net/fetch-guard.js";
 import type { SsrFPolicy } from "../infra/net/ssrf.js";
 import { logWarn } from "../logger.js";
 import { canonicalizeBase64, estimateBase64DecodedBytes } from "./base64.js";
@@ -187,6 +187,7 @@ export async function fetchWithGuard(params: {
     policy: params.policy,
     auditContext: params.auditContext,
     init: { headers: { "User-Agent": "OpenClaw-Gateway/1.0" } },
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
   });
 
   try {
