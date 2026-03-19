@@ -302,9 +302,9 @@ export const OpenClawSchema = z
         /** Enable proxy for all network requests. */
         enabled: z.boolean().optional(),
         /** HTTP proxy URL (e.g., http://127.0.0.1:7890). Used for HTTP requests. */
-        http: z.string().url().optional(),
+        http: z.string().optional(),
         /** HTTPS proxy URL (e.g., http://127.0.0.1:7890). Used for HTTPS requests. Falls back to http if not set. */
-        https: z.string().url().optional(),
+        https: z.string().optional(),
         /** Comma-separated list of hosts to bypass proxy (e.g., localhost,127.0.0.1,*.local). */
         noProxy: z.string().optional(),
       })
