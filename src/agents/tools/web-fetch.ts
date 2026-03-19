@@ -16,7 +16,7 @@ import {
   truncateText,
   type ExtractMode,
 } from "./web-fetch-utils.js";
-import { fetchWithWebToolsNetworkGuard } from "./web-guarded-fetch.js";
+import { fetchWithWebToolsNetworkGuard, withTrustedWebToolsEndpoint } from "./web-guarded-fetch.js";
 import {
   CacheEntry,
   DEFAULT_CACHE_TTL_MINUTES,
@@ -26,7 +26,6 @@ import {
   readResponseText,
   resolveCacheTtlMs,
   resolveTimeoutSeconds,
-  withTimeout,
   writeCache,
 } from "./web-shared.js";
 
@@ -382,15 +381,21 @@ export async function fetchFirecrawlContent(params: {
     storeInCache: params.storeInCache,
   };
 
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${params.apiKey}`,
-      "Content-Type": "application/json",
+  const res = await withTrustedWebToolsEndpoint(
+    {
+      url: endpoint,
+      timeoutSeconds: params.timeoutSeconds,
+      init: {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${params.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
     },
-    body: JSON.stringify(body),
-    signal: withTimeout(undefined, params.timeoutSeconds * 1000),
-  });
+    async ({ response }) => response,
+  );
 
   const payload = (await res.json()) as {
     success?: boolean;
@@ -533,6 +538,7 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
       url: params.url,
       maxRedirects: params.maxRedirects,
       timeoutSeconds: params.timeoutSeconds,
+      useEnvProxy: true,
       init: {
         headers: {
           Accept: "text/markdown, text/html;q=0.9, */*;q=0.1",
