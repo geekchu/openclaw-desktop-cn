@@ -454,31 +454,21 @@ export class SystemSettingsView extends LitElement {
   }
 
   /* ── proxy settings ── */
-  private _proxyTimer?: ReturnType<typeof setTimeout>;
-
   private _handleProxyEnabledChange(enabled: boolean) {
     this.proxyEnabled = enabled;
-    this._triggerProxySave();
+    void this._saveProxyConfig();
   }
 
   private _handleProxyHttpChange(value: string) {
     this.proxyHttp = value;
-    this._triggerProxySave();
   }
 
   private _handleProxyHttpsChange(value: string) {
     this.proxyHttps = value;
-    this._triggerProxySave();
   }
 
   private _handleProxyNoProxyChange(value: string) {
     this.proxyNoProxy = value;
-    this._triggerProxySave();
-  }
-
-  private _triggerProxySave() {
-    clearTimeout(this._proxyTimer);
-    this._proxyTimer = setTimeout(() => this._saveProxyConfig(), 500);
   }
 
   private async _saveProxyConfig() {
@@ -495,6 +485,18 @@ export class SystemSettingsView extends LitElement {
       await invoke("save_config", { config: { proxy: proxyConfig } });
       this.proxySaveStatus = "success";
       setTimeout(() => (this.proxySaveStatus = "idle"), 2000);
+      // 保存成功后询问是否重启
+      if (confirm("代理设置已保存。需要重启应用才能生效。\n\n是否立即重启？")) {
+        const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
+        if (t?.core?.invoke) {
+          try {
+            await (t.core.invoke as (cmd: string) => Promise<void>)("stop_gateway");
+          } catch {
+            /* best-effort */
+          }
+          void (t.core.invoke as (cmd: string) => Promise<void>)("plugin:process|restart");
+        }
+      }
     } catch (e) {
       console.error("保存代理配置失败:", e);
       this.proxySaveStatus = "error";
@@ -1422,11 +1424,10 @@ export class SystemSettingsView extends LitElement {
               <span class="section-hint">不走代理的主机列表，多个地址用英文逗号分隔</span>
             </div>
 
-            <div class="proxy-notice">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              <span>修改代理设置后需重启应用才能生效</span>
+            <div class="action-bar">
+              <button class="btn-primary" ?disabled=${this.proxySaving} @click=${() => this._saveProxyConfig()}>
+                ${this.proxySaving ? "保存中…" : "保存"}
+              </button>
             </div>
 
           </div>
