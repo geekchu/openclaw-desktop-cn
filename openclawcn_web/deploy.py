@@ -119,6 +119,8 @@ def main():
             sed(r'下载 macOS 版 - Intel (v[0-9.]*)', f'下载 macOS 版 - Intel (v{ver})')
             verify(f'OpenClaw桌面版_{ver}_aarch64.dmg')
             verify(f'OpenClaw桌面版_{ver}_x64.dmg')
+            verify(f'下载 macOS 版 - Apple Silicon (v{ver})')
+            verify(f'下载 macOS 版 - Intel (v{ver})')
             print(f"Updated macOS download links to v{ver}")
 
     elif action == "nginx":
