@@ -477,56 +477,24 @@ EOF
 
 ### 步骤 6：更新官网下载链接
 
-> ⚠️ **修改前必须先同步最新代码**，否则本地旧版 `page.tsx` 部署后会覆盖线上其他平台的下载链接：
->
-> ```bash
-> git pull
-> ```
+使用 `deploy.py update-links` 直接原地替换服务器上的下载链接，**不会重新部署整个网站**，不会影响其他平台的链接。
 
-修改 `openclawcn_web/src/app/page.tsx` 中的版本号和文件名。**只更新本次发版平台对应的链接，不要修改其他平台的下载按钮。**
-
-#### Windows 发版时（只改 Windows 链接）
-
-```tsx
-// 找到 Windows 下载按钮，更新 href 和按钮文字中的版本号
-href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64-setup.exe"
-下载 Windows 版 (v0.3.0)
-```
-
-> ⚠️ Windows 独立发版时，**不要**修改 macOS 下载按钮。
-> ⚠️ 部署前务必确认本地 `page.tsx` 中**未发版平台**的下载链接与线上一致（`git diff` 检查），否则 `deploy.py upload` 会用本地版本覆盖线上，导致其他平台链接丢失。
-
-#### macOS 发版时（只改 macOS 链接）
-
-需要提供两个版本（Apple Silicon 和 Intel）：
-
-```tsx
-// macOS Apple Silicon (M1/M2/M3)
-<a
-  href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_aarch64.dmg"
-  className="...（复制 Windows 按钮的 className）"
->
-  下载 macOS 版 - Apple Silicon (v0.3.0)
-</a>
-
-// macOS Intel
-<a
-  href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64.dmg"
-  className="...（复制 Windows 按钮的 className）"
->
-  下载 macOS 版 - Intel (v0.3.0)
-</a>
-```
-
-> ⚠️ macOS 独立发版时，**不要**修改 Windows 下载按钮。
-
-然后部署官网（静态导出，无需 PM2）：
+#### Windows 发版时
 
 ```bash
 cd openclawcn_web
-npm run build
-python deploy.py upload
+DEPLOY_SSH_PASSWORD=xxx python deploy.py update-links --platform windows --version 0.3.0
 ```
+
+#### macOS 发版时
+
+```bash
+cd openclawcn_web
+DEPLOY_SSH_PASSWORD=xxx python deploy.py update-links --platform macos --version 0.3.0
+```
+
+> ⚠️ `update-links` 直接修改服务器上的 `index.html`，无需本地构建，两个平台完全独立互不影响。
+> ⚠️ **不要**再使用 `python deploy.py upload` 单独更新下载链接，那会覆盖整个网站（包括另一个平台的链接）。`deploy.py upload` 只在需要更新网站结构/样式时使用，且使用前需确保本地 `page.tsx` 已包含所有平台最新链接。
 
 最后提交官网改动：
 

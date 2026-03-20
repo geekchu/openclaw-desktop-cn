@@ -84,6 +84,43 @@ def main():
         # Stop PM2 process if running (no longer needed for static site)
         ssh_exec(ssh, "pm2 delete openclawcn-web 2>/dev/null || true", check=False)
 
+    elif action == "update-links":
+        # Update only download links in the live index.html without redeploying the whole site.
+        # Usage: python deploy.py update-links --platform windows --version 0.3.0
+        #        python deploy.py update-links --platform macos --version 0.3.0
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument("_action")
+        parser.add_argument("--platform", required=True, choices=["windows", "macos"])
+        parser.add_argument("--version", required=True)
+        args = parser.parse_args()
+        ver = args.version
+        html_path = f"{REMOTE_DIR}/index.html"
+        if args.platform == "windows":
+            # Replace Windows NSIS installer URL and button text
+            exe_old = r'OpenClaw桌面版_[0-9.]*_x64-setup\.exe'
+            exe_new = f'OpenClaw桌面版_{ver}_x64-setup.exe'
+            label_old = r'下载 Windows 版 (v[0-9.]*)'
+            label_new = f'下载 Windows 版 (v{ver})'
+            ssh_exec(ssh, f"sed -i 's|{exe_old}|{exe_new}|g' {html_path}")
+            ssh_exec(ssh, f"sed -i 's|{label_old}|{label_new}|g' {html_path}")
+            print(f"Updated Windows download links to v{ver}")
+        elif args.platform == "macos":
+            # Replace macOS DMG URLs and button texts
+            arm_old = r'OpenClaw桌面版_[0-9.]*_aarch64\.dmg'
+            arm_new = f'OpenClaw桌面版_{ver}_aarch64.dmg'
+            intel_old = r'OpenClaw桌面版_[0-9.]*_x64\.dmg'
+            intel_new = f'OpenClaw桌面版_{ver}_x64.dmg'
+            label_arm_old = r'下载 macOS 版 - Apple Silicon (v[0-9.]*)'
+            label_arm_new = f'下载 macOS 版 - Apple Silicon (v{ver})'
+            label_intel_old = r'下载 macOS 版 - Intel (v[0-9.]*)'
+            label_intel_new = f'下载 macOS 版 - Intel (v{ver})'
+            ssh_exec(ssh, f"sed -i 's|{arm_old}|{arm_new}|g' {html_path}")
+            ssh_exec(ssh, f"sed -i 's|{intel_old}|{intel_new}|g' {html_path}")
+            ssh_exec(ssh, f"sed -i 's|{label_arm_old}|{label_arm_new}|g' {html_path}")
+            ssh_exec(ssh, f"sed -i 's|{label_intel_old}|{label_intel_new}|g' {html_path}")
+            print(f"Updated macOS download links to v{ver}")
+
     elif action == "nginx":
         # Static site: serve directly from Nginx, no proxy needed
         nginx_config = """server {
