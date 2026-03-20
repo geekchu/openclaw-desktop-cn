@@ -496,14 +496,17 @@ DEPLOY_SSH_PASSWORD=xxx python deploy.py update-links --platform macos --version
 > ⚠️ `update-links` 直接修改服务器上的 `index.html`，无需本地构建，两个平台完全独立互不影响。
 > ⚠️ **不要**再使用 `python deploy.py upload` 单独更新下载链接，那会覆盖整个网站（包括另一个平台的链接）。`deploy.py upload` 只在需要更新网站结构/样式时使用，且使用前需确保本地 `page.tsx` 已包含所有平台最新链接。
 
-最后提交官网改动：
+同步本地 `page.tsx` 版本号并提交（保持源码与线上一致）：
 
 ```bash
+# 在 page.tsx 中手动将本平台的版本号改为新版本，然后：
 cd ..
 git add openclawcn_web/src/app/page.tsx
 git commit -m "chore: update website download link to v0.3.0"
 git push
 ```
+
+> 注意：`page.tsx` 的版本号更新只是保持源码同步，真正生效的是 `update-links` 对服务器的直接修改。
 
 ### 步骤 7：验证
 
