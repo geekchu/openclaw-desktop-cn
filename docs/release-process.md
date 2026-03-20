@@ -848,6 +848,7 @@ export NOTARYTOOL_PROFILE="openclaw-notary"
 - `SIGN_IDENTITY`: 指定签名证书；正式发版时应显式设为 `Developer ID Application: ...`
 - `CODESIGN_TIMESTAMP`: 时间戳模式，`auto`（默认）/`on`/`off`
 - `DISABLE_LIBRARY_VALIDATION`: 设为 `1` 可跳过库验证，仅开发调试用
+- `ALLOW_ADHOC_SIGNING`: 设为 `1` 可跳过证书检查，仅开发/CI 无证书环境调试用；正式发版不使用
 
 **notarize-mac-artifact.sh 环境变量：**
 
