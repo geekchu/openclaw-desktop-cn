@@ -367,6 +367,23 @@ async function ensureGoInstalled(params: {
   });
 }
 
+function getProxyEnv(): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    [
+      "HTTP_PROXY",
+      "HTTPS_PROXY",
+      "http_proxy",
+      "https_proxy",
+      "NO_PROXY",
+      "no_proxy",
+      "ALL_PROXY",
+      "all_proxy",
+    ]
+      .filter((k) => process.env[k] !== undefined)
+      .map((k) => [k, process.env[k]]),
+  ) as NodeJS.ProcessEnv;
+}
+
 async function executeInstallCommand(params: {
   argv: string[] | null;
   timeoutMs: number;
@@ -462,15 +479,24 @@ export async function installSkill(params: SkillInstallRequest): Promise<SkillIn
     argv[0] = brewExe;
   }
 
-  let env: NodeJS.ProcessEnv | undefined;
-  if (spec.kind === "go" && brewExe) {
-    const brewBin = await resolveBrewBinDir(timeoutMs, brewExe);
-    if (brewBin) {
-      env = { GOBIN: brewBin };
+  const proxyEnv = getProxyEnv();
+  let env: NodeJS.ProcessEnv = { ...proxyEnv };
+  if (spec.kind === "go") {
+    // Use CN Go module proxy by default to improve reliability in China
+    env.GOPROXY = process.env.GOPROXY ?? "https://goproxy.cn,direct";
+    if (brewExe) {
+      const brewBin = await resolveBrewBinDir(timeoutMs, brewExe);
+      if (brewBin) {
+        env.GOBIN = brewBin;
+      }
     }
   }
 
-  const result = await executeInstallCommand({ argv, timeoutMs, env });
+  const result = await executeInstallCommand({
+    argv,
+    timeoutMs,
+    env: Object.keys(env).length > 0 ? env : undefined,
+  });
   if (result.ok) {
     clearHasBinaryCache();
   }
