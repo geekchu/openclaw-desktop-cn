@@ -101,8 +101,9 @@ def main():
             ssh_exec(ssh, f"LC_ALL=C.UTF-8 sed -i 's|{pattern}|{replacement}|g' {html_path}")
 
         def verify(expected):
-            out, _, _ = ssh_exec(ssh, f"grep -c '{expected}' {html_path}", check=False)
-            if out.strip() == "0":
+            out, _, code = ssh_exec(ssh, f"grep -c '{expected}' {html_path}", check=False)
+            # code=1 means no match, code=2 means file not found; both are failures
+            if code != 0 or out.strip() == "0":
                 raise RuntimeError(f"update-links verification failed: '{expected}' not found in {html_path}")
 
         if args.platform == "windows":
