@@ -110,6 +110,7 @@ def main():
             sed(r'OpenClaw桌面版_[0-9.]*_x64-setup\.exe', f'OpenClaw桌面版_{ver}_x64-setup.exe')
             sed(r'下载 Windows 版 (v[0-9.]*)', f'下载 Windows 版 (v{ver})')
             verify(f'OpenClaw桌面版_{ver}_x64-setup.exe')
+            verify(f'下载 Windows 版 (v{ver})')
             print(f"Updated Windows download links to v{ver}")
         elif args.platform == "macos":
             sed(r'OpenClaw桌面版_[0-9.]*_aarch64\.dmg', f'OpenClaw桌面版_{ver}_aarch64.dmg')
