@@ -195,15 +195,25 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="text-base md:text-lg font-bold text-[#1a1a2e]">macOS 版</h3>
-                <p className="text-[#bbb] text-xs md:text-sm">当前维护中，暂时关闭下载</p>
+                <p className="text-[#bbb] text-xs md:text-sm">
+                  支持 Apple Silicon (M1/M2/M3) 和 Intel
+                </p>
               </div>
             </div>
-            <button
-              disabled
-              className="w-full bg-gray-50 text-[#ccc] py-3 rounded-xl cursor-not-allowed text-sm font-medium border border-gray-100"
-            >
-              macOS 版维护中
-            </button>
+            <div className="flex flex-col gap-2">
+              <a
+                href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.8_aarch64.dmg"
+                className="w-full block text-center bg-gradient-to-r from-[#555] to-[#333] text-white py-3 rounded-xl text-sm font-medium shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
+              >
+                下载 macOS 版 - Apple Silicon (v0.2.8)
+              </a>
+              <a
+                href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.8_x64.dmg"
+                className="w-full block text-center bg-gradient-to-r from-[#555] to-[#333] text-white py-2.5 rounded-xl text-sm font-medium shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-200"
+              >
+                下载 macOS 版 - Intel (v0.2.8)
+              </a>
+            </div>
           </div>
         </div>
       </section>
