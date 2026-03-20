@@ -196,23 +196,28 @@ export function restoreChatScrollPosition(host: ScrollHost) {
   // and adjust scrollTop to maintain visual position
   if (heightDelta > 0) {
     const savedDistanceFromBottom = savedHeight - savedTop - container.clientHeight;
+    const currentDistanceFromBottom = currentHeight - currentTop - container.clientHeight;
+
     // If user was scrolled up (not near bottom), maintain their position
     if (savedDistanceFromBottom >= NEAR_BOTTOM_THRESHOLD) {
+      // But if user has scrolled closer to bottom since willUpdate, respect that
+      // (user actively scrolled down during the render cycle)
+      if (currentDistanceFromBottom < savedDistanceFromBottom) {
+        // User scrolled toward bottom, don't restore - let scheduleChatScroll handle it
+        return;
+      }
       // Content was added at bottom, keep the same scrollTop to maintain visual position
       // (user sees the same content at the top of viewport)
       if (currentTop !== savedTop) {
         container.scrollTop = savedTop;
       }
+      // Mark user as NOT near bottom to prevent scheduleChatScroll retry from overriding
+      host.chatUserNearBottom = false;
     }
     // If user was near bottom, let scheduleChatScroll handle auto-scroll
-    return;
   }
-
-  // If content height unchanged or decreased, restore if position changed unexpectedly (WebKit bug)
-  // Allow small tolerance (2px) for rounding differences
-  if (Math.abs(currentTop - savedTop) > 2) {
-    container.scrollTop = savedTop;
-  }
+  // For heightDelta <= 0 (no new content or content removed), do NOT restore scrollTop.
+  // Any scrollTop change is likely user-initiated scrolling, not a WebKit bug.
 }
 
 export function exportLogs(lines: string[], label: string) {

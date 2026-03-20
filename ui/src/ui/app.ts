@@ -389,7 +389,7 @@ export class OpenClawApp extends LitElement {
   private chatScrollFrame: number | null = null;
   private chatScrollTimeout: number | null = null;
   private chatHasAutoScrolled = false;
-  private chatUserNearBottom = true;
+  private chatUserNearBottom = false;
   @state() chatNewMessagesBelow = false;
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
