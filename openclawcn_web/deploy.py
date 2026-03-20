@@ -96,29 +96,27 @@ def main():
         args = parser.parse_args()
         ver = args.version
         html_path = f"{REMOTE_DIR}/index.html"
+        # LC_ALL=C.UTF-8 ensures sed handles multibyte (Chinese) characters correctly
+        def sed(pattern, replacement):
+            ssh_exec(ssh, f"LC_ALL=C.UTF-8 sed -i 's|{pattern}|{replacement}|g' {html_path}")
+
+        def verify(expected):
+            out, _, _ = ssh_exec(ssh, f"grep -c '{expected}' {html_path}", check=False)
+            if out.strip() == "0":
+                raise RuntimeError(f"update-links verification failed: '{expected}' not found in {html_path}")
+
         if args.platform == "windows":
-            # Replace Windows NSIS installer URL and button text
-            exe_old = r'OpenClaw桌面版_[0-9.]*_x64-setup\.exe'
-            exe_new = f'OpenClaw桌面版_{ver}_x64-setup.exe'
-            label_old = r'下载 Windows 版 (v[0-9.]*)'
-            label_new = f'下载 Windows 版 (v{ver})'
-            ssh_exec(ssh, f"sed -i 's|{exe_old}|{exe_new}|g' {html_path}")
-            ssh_exec(ssh, f"sed -i 's|{label_old}|{label_new}|g' {html_path}")
+            sed(r'OpenClaw桌面版_[0-9.]*_x64-setup\.exe', f'OpenClaw桌面版_{ver}_x64-setup.exe')
+            sed(r'下载 Windows 版 (v[0-9.]*)', f'下载 Windows 版 (v{ver})')
+            verify(f'OpenClaw桌面版_{ver}_x64-setup.exe')
             print(f"Updated Windows download links to v{ver}")
         elif args.platform == "macos":
-            # Replace macOS DMG URLs and button texts
-            arm_old = r'OpenClaw桌面版_[0-9.]*_aarch64\.dmg'
-            arm_new = f'OpenClaw桌面版_{ver}_aarch64.dmg'
-            intel_old = r'OpenClaw桌面版_[0-9.]*_x64\.dmg'
-            intel_new = f'OpenClaw桌面版_{ver}_x64.dmg'
-            label_arm_old = r'下载 macOS 版 - Apple Silicon (v[0-9.]*)'
-            label_arm_new = f'下载 macOS 版 - Apple Silicon (v{ver})'
-            label_intel_old = r'下载 macOS 版 - Intel (v[0-9.]*)'
-            label_intel_new = f'下载 macOS 版 - Intel (v{ver})'
-            ssh_exec(ssh, f"sed -i 's|{arm_old}|{arm_new}|g' {html_path}")
-            ssh_exec(ssh, f"sed -i 's|{intel_old}|{intel_new}|g' {html_path}")
-            ssh_exec(ssh, f"sed -i 's|{label_arm_old}|{label_arm_new}|g' {html_path}")
-            ssh_exec(ssh, f"sed -i 's|{label_intel_old}|{label_intel_new}|g' {html_path}")
+            sed(r'OpenClaw桌面版_[0-9.]*_aarch64\.dmg', f'OpenClaw桌面版_{ver}_aarch64.dmg')
+            sed(r'OpenClaw桌面版_[0-9.]*_x64\.dmg', f'OpenClaw桌面版_{ver}_x64.dmg')
+            sed(r'下载 macOS 版 - Apple Silicon (v[0-9.]*)', f'下载 macOS 版 - Apple Silicon (v{ver})')
+            sed(r'下载 macOS 版 - Intel (v[0-9.]*)', f'下载 macOS 版 - Intel (v{ver})')
+            verify(f'OpenClaw桌面版_{ver}_aarch64.dmg')
+            verify(f'OpenClaw桌面版_{ver}_x64.dmg')
             print(f"Updated macOS download links to v{ver}")
 
     elif action == "nginx":
