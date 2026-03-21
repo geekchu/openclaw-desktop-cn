@@ -202,16 +202,16 @@ export default function Home() {
             </div>
             <div className="flex flex-col gap-2">
               <a
-                href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.8_aarch64.dmg"
+                href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.9_aarch64.dmg"
                 className="w-full block text-center bg-gradient-to-r from-[#555] to-[#333] text-white py-3 rounded-xl text-sm font-medium shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
               >
-                下载 macOS 版 - Apple Silicon (v0.2.8)
+                下载 macOS 版 - Apple Silicon (v0.2.9)
               </a>
               <a
-                href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.8_x64.dmg"
+                href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.9_x64.dmg"
                 className="w-full block text-center bg-gradient-to-r from-[#555] to-[#333] text-white py-2.5 rounded-xl text-sm font-medium shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-200"
               >
-                下载 macOS 版 - Intel (v0.2.8)
+                下载 macOS 版 - Intel (v0.2.9)
               </a>
             </div>
           </div>
