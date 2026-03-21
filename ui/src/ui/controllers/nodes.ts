@@ -40,9 +40,16 @@ export function loadNodes(state: NodesState, opts?: { quiet?: boolean }): Promis
 
     try {
       const res = await client.request<{ nodes?: Record<string, unknown> }>("node.list", {});
-      state.nodes = Array.isArray(res.nodes) ? res.nodes : [];
+      const newNodes = Array.isArray(res.nodes) ? res.nodes : [];
+      // Only trigger Lit update if content actually changed — avoids unnecessary
+      // re-renders that cause scroll position jumps on both platforms.
+      if (JSON.stringify(newNodes) !== JSON.stringify(state.nodes)) {
+        state.nodes = newNodes;
+      }
       // 即使在静默模式下，如果请求成功了，也应该清除之前可能残留的错误状态
-      state.lastError = null;
+      if (state.lastError !== null) {
+        state.lastError = null;
+      }
     } catch (err) {
       if (!opts?.quiet) {
         state.lastError = String(err);
