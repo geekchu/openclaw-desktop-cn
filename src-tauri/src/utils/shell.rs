@@ -804,7 +804,7 @@ pub fn find_available_port(start_port: u16, min_port: u16) -> Option<u16> {
             return Some(port);
         }
         info!("[Shell] 端口 {} 已被占用，尝试下一个", port);
-        if port <= min_port {
+        if port == min_port {
             break;
         }
         port -= 1;
