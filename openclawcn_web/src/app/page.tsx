@@ -175,10 +175,10 @@ export default function Home() {
               </div>
             </div>
             <a
-              href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.8_x64-setup.exe"
+              href="https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.2.9_x64-setup.exe"
               className="w-full block text-center bg-gradient-to-r from-[#0078d4] to-[#005a9e] text-white py-3 rounded-xl text-sm font-medium shadow-md hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
             >
-              下载 Windows 版 (v0.2.8)
+              下载 Windows 版 (v0.2.9)
             </a>
           </div>
 
