@@ -1239,14 +1239,18 @@ describe("applyAuthChoice", () => {
 
 describe("resolvePreferredProviderForAuthChoice", () => {
   it("maps github-copilot to the provider", () => {
-    expect(resolvePreferredProviderForAuthChoice("github-copilot")).toBe("github-copilot");
+    expect(resolvePreferredProviderForAuthChoice({ choice: "github-copilot" })).toBe(
+      "github-copilot",
+    );
   });
 
   it("maps qwen-portal to the provider", () => {
-    expect(resolvePreferredProviderForAuthChoice("qwen-portal")).toBe("qwen-portal");
+    expect(resolvePreferredProviderForAuthChoice({ choice: "qwen-portal" })).toBe("qwen-portal");
   });
 
   it("returns undefined for unknown choices", () => {
-    expect(resolvePreferredProviderForAuthChoice("unknown" as AuthChoice)).toBeUndefined();
+    expect(
+      resolvePreferredProviderForAuthChoice({ choice: "unknown" as AuthChoice }),
+    ).toBeUndefined();
   });
 });

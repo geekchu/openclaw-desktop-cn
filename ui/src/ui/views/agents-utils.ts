@@ -1,14 +1,15 @@
 import { html } from "lit";
 import {
-  listCoreToolSections,
-  PROFILE_OPTIONS as TOOL_PROFILE_OPTIONS,
-} from "../../../../src/agents/tool-catalog.js";
-import {
   expandToolGroups,
   normalizeToolName,
   resolveToolProfilePolicy,
 } from "../../../../src/agents/tool-policy-shared.js";
 import type { AgentIdentityResult, AgentsFilesListResult, AgentsListResult } from "../types.ts";
+
+export function agentLogoUrl(basePath: string): string {
+  const base = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+  return `${base}/favicon.ico`;
+}
 
 export const TOOL_SECTIONS = [
   {

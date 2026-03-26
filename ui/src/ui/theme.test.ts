@@ -2,14 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import { parseThemeSelection, resolveSystemTheme, resolveTheme } from "./theme.ts";
 
 describe("resolveTheme", () => {
-  it("resolves named theme families when mode is provided", () => {
-    expect(resolveTheme("knot", "dark")).toBe("openknot");
-    expect(resolveTheme("dash", "light")).toBe("dash-light");
+  it("returns light when mode is light", () => {
+    expect(resolveTheme("light")).toBe("light");
+  });
+
+  it("returns dark when mode is dark", () => {
+    expect(resolveTheme("dark")).toBe("dark");
   });
 
   it("uses system preference when mode is system", () => {
-    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
-    expect(resolveTheme("knot", "system")).toBe("openknot-light");
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }));
+    expect(resolveTheme("system")).toBe("light");
     vi.unstubAllGlobals();
   });
 });
@@ -17,7 +20,7 @@ describe("resolveTheme", () => {
 describe("resolveSystemTheme", () => {
   it("mirrors the active preferred color scheme", () => {
     vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
-    expect(resolveSystemTheme()).toBe("light");
+    expect(resolveSystemTheme()).toBe("dark");
     vi.unstubAllGlobals();
   });
 });

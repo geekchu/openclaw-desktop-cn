@@ -437,6 +437,8 @@ export type GatewaySessionRow = {
   model?: string;
   modelProvider?: string;
   contextTokens?: number;
+  spawnedBy?: string | null;
+  fastMode?: boolean | null;
 };
 
 export type SessionsListResult = SessionsListResultBase<GatewaySessionsDefaults, GatewaySessionRow>;
@@ -632,9 +634,45 @@ export type SkillStatusReport = {
   skills: SkillStatusEntry[];
 };
 
+export type AttentionItem = {
+  id: string;
+  severity: "error" | "warning" | "info";
+  icon?: string;
+  title: string;
+  description?: string;
+  href?: string;
+  external?: boolean;
+};
+
 export type StatusSummary = Record<string, unknown>;
 
 export type HealthSnapshot = Record<string, unknown>;
+
+export type HealthSummary = {
+  ok: boolean;
+  ts: number;
+  durationMs: number;
+  channels: Record<string, unknown>;
+  channelOrder: string[];
+  channelLabels: Record<string, string>;
+  heartbeatSeconds: number;
+  defaultAgentId: string;
+  agents: unknown[];
+  sessions: {
+    path: string;
+    count: number;
+    recent: Array<{ key: string; updatedAt: number | null; age: number | null }>;
+  };
+};
+
+export type ModelCatalogEntry = {
+  id: string;
+  name: string;
+  provider: string;
+  contextWindow?: number;
+  reasoning?: boolean;
+  input?: string[];
+};
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 

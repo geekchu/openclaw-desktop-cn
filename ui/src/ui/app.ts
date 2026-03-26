@@ -217,6 +217,8 @@ export class OpenClawApp extends LitElement {
   @state() whatsappLoginQrDataUrl: string | null = null;
   @state() whatsappLoginConnected: boolean | null = null;
   @state() whatsappBusy = false;
+  @state() loginShowGatewayToken = false;
+  @state() loginShowGatewayPassword = false;
   @state() nostrProfileFormState: NostrProfileFormState | null = null;
   @state() nostrProfileAccountId: string | null = null;
 

@@ -9,17 +9,18 @@ import { customElement, state } from "lit/decorators.js";
 
 // ─── Tauri invoke helper ────────────────────────────────────
 
-function getTauri(): any {
-  const w = window as any;
-  return w.__TAURI__ ?? null;
-}
-
-async function invoke<T = any>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const tauri = getTauri();
-  if (tauri?.core?.invoke) {
-    return tauri.core.invoke(cmd, args);
+function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const t = (
+    window as unknown as {
+      __TAURI__?: {
+        core?: { invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
+      };
+    }
+  ).__TAURI__;
+  if (t?.core?.invoke) {
+    return t.core.invoke(cmd, args) as Promise<T>;
   }
-  throw new Error("Tauri invoke not available");
+  return Promise.reject(new Error("Tauri invoke not available"));
 }
 
 // ─── 类型定义 ────────────────────────────────────────────────
@@ -218,34 +219,49 @@ export class CustomProvidersView extends LitElement {
   @state() deleteConfirmProvider: string | null = null;
   @state() deleting = false;
 
+  private _loadAbort: AbortController | null = null;
+
   @state() expandedProviders = new Set<string>();
 
   connectedCallback() {
     super.connectedCallback();
     if (!this.aiConfig && !this.loading) {
-      this.loadData();
+      void this.loadData();
     }
   }
 
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._loadAbort?.abort();
+    this._loadAbort = null;
+  }
+
   async loadData() {
+    this._loadAbort?.abort();
+    this._loadAbort = new AbortController();
+    const signal = this._loadAbort.signal;
+
     this.loading = true;
+    if (signal.aborted) {
+      this.loading = false;
+      return;
+    }
+
     this.error = null;
     this.loadingStatus = "初始化中...";
-    // this.addLog("开始加载数据...");
 
     try {
-      const officialPromise = invoke<OfficialProvider[]>("get_official_providers");
-      const timeout1 = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000),
-      );
+      this.officialProviders = await invoke<OfficialProvider[]>("get_official_providers");
+      if (signal.aborted) {
+        this.loading = false;
+        return;
+      }
 
-      this.officialProviders = await Promise.race([officialPromise, timeout1]);
-
-      const configPromise = invoke<AIConfigOverview>("get_ai_config");
-      const timeout2 = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("请求超时 (5000ms)")), 5000),
-      );
-      this.aiConfig = await Promise.race([configPromise, timeout2]);
+      this.aiConfig = await invoke<AIConfigOverview>("get_ai_config");
+      if (signal.aborted) {
+        this.loading = false;
+        return;
+      }
 
       // 过滤掉一站式接入的 provider，避免在自定义接入页面显示
       if (this.aiConfig?.configured_providers) {
@@ -255,7 +271,7 @@ export class CustomProvidersView extends LitElement {
       }
 
       // this.addLog("配置加载完成");
-    } catch (e: any) {
+    } catch (e) {
       console.error("Load Data Error:", e);
       const errMsg = e?.message || String(e);
       this.error = errMsg;
@@ -816,7 +832,7 @@ export class CustomProvidersView extends LitElement {
                           ?disabled=${model.is_primary}
                           @click=${(e: Event) => {
                             e.stopPropagation();
-                            this.handleSwitchModel(model.full_id);
+                            void this.handleSwitchModel(model.full_id);
                           }}
                         >${model.is_primary ? "✓ 当前" : "切换"}</button>
                       </div>
@@ -891,7 +907,7 @@ export class CustomProvidersView extends LitElement {
               this.aiConfig = null;
               this.error = null;
 
-              this.loadData();
+              void this.loadData();
             }}>强制刷新</button>
           </div>
           <div class="onestop-custom-loading">

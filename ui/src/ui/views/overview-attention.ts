@@ -37,7 +37,7 @@ export function renderOverviewAttention(props: OverviewAttentionProps) {
         ${props.items.map(
           (item) => html`
             <div class="ov-attention-item ${severityClass(item.severity)}">
-              <span class="ov-attention-icon">${attentionIcon(item.icon)}</span>
+              <span class="ov-attention-icon">${attentionIcon(item.icon ?? "")}</span>
               <div class="ov-attention-body">
                 <div class="ov-attention-title">${item.title}</div>
                 <div class="muted">${item.description}</div>

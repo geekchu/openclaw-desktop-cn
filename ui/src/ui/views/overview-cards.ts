@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { t } from "../../i18n/index.ts";
-import { formatCost, formatTokens, formatRelativeTimestamp } from "../format.ts";
+import { formatRelativeTimestamp } from "../format.ts";
 import { formatNextRun } from "../presenter.ts";
 import type {
   SessionsUsageResult,
@@ -70,10 +70,6 @@ export function renderOverviewCards(props: OverviewCardsProps) {
     return renderSkeletonCards();
   }
 
-  const totals = props.usageResult?.totals;
-  const totalCost = formatCost(totals?.totalCost);
-  const totalTokens = formatTokens(totals?.totalTokens);
-  const totalMessages = totals ? String(props.usageResult?.aggregates?.messages?.total ?? 0) : "0";
   const sessionCount = props.sessionsResult?.count ?? null;
 
   const skills = props.skillsReport?.skills ?? [];
@@ -105,8 +101,8 @@ export function renderOverviewCards(props: OverviewCardsProps) {
       kind: "cost",
       tab: "usage",
       label: t("overview.cards.cost"),
-      value: totalCost,
-      hint: `${totalTokens} tokens · ${totalMessages} msgs`,
+      value: "—",
+      hint: "— tokens · — msgs",
     },
     {
       kind: "sessions",

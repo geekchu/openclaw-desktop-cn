@@ -124,6 +124,8 @@ export type AppViewState = {
   whatsappLoginQrDataUrl: string | null;
   whatsappLoginConnected: boolean | null;
   whatsappBusy: boolean;
+  loginShowGatewayToken: boolean;
+  loginShowGatewayPassword: boolean;
   nostrProfileFormState: NostrProfileFormState | null;
   nostrProfileAccountId: string | null;
   configFormDirty: boolean;

@@ -9,6 +9,9 @@ const HEALTH_FALLBACK: HealthSummary = {
   heartbeatSeconds: 0,
   defaultAgentId: "",
   agents: [],
+  channels: {},
+  channelOrder: [],
+  channelLabels: {},
   sessions: { path: "", count: 0, recent: [] },
 };
 

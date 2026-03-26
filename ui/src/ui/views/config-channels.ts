@@ -1362,14 +1362,23 @@ export class OpenClawConfigChannels extends LitElement {
   private _whatsappPollTimer: ReturnType<typeof setInterval> | null = null;
   private _whatsappTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private _pairingPollTimer: ReturnType<typeof setInterval> | null = null;
+  // AbortController：每次 connectedCallback 创建新实例，disconnectedCallback 时取消，
+  // 防止组件离开 DOM 后旧的 init() 异步完成时污染状态（导致偶发的"一直加载中"竞态）。
+  private _loadAbort: AbortController | null = null;
 
-  override async connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback();
-    await this.init();
+    // 取消上一次可能仍在飞行中的 init()，再创建新的控制器
+    this._loadAbort?.abort();
+    this._loadAbort = new AbortController();
+    void this.init(this._loadAbort.signal);
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
+    // 中止当前 init()，防止离开后旧回调继续修改状态
+    this._loadAbort?.abort();
+    this._loadAbort = null;
     if (this._whatsappPollTimer) {
       clearInterval(this._whatsappPollTimer);
       this._whatsappPollTimer = null;
@@ -1390,9 +1399,9 @@ export class OpenClawConfigChannels extends LitElement {
 
   private _startPairingPoll(channelId: string) {
     this._stopPairingPoll();
-    this._fetchPairingRequests(channelId);
+    void this._fetchPairingRequests(channelId);
     this._pairingPollTimer = setInterval(() => {
-      this._fetchPairingRequests(channelId);
+      void this._fetchPairingRequests(channelId);
     }, 30000);
   }
 
@@ -1434,7 +1443,7 @@ export class OpenClawConfigChannels extends LitElement {
       this.approveResult = result;
       if (result.success) {
         this.approveCode = "";
-        this._fetchPairingRequests(channelId);
+        void this._fetchPairingRequests(channelId);
       }
     } catch (e) {
       this.approveResult = { success: false, message: String(e) };
@@ -1466,10 +1475,18 @@ export class OpenClawConfigChannels extends LitElement {
     }
   }
 
-  private async init() {
+  private async init(signal: AbortSignal) {
     this.loading = true;
+    if (signal.aborted) {
+      this.loading = false;
+      return;
+    }
     try {
       const result = await this.fetchChannels();
+      // 如果在 invoke 等待期间组件已离开 DOM，放弃结果，不修改任何状态
+      if (signal.aborted) {
+        return;
+      }
       const configured = result.find((c) => c.enabled);
       if (configured) {
         this.handleChannelSelect(configured.id, result);
@@ -1515,7 +1532,7 @@ export class OpenClawConfigChannels extends LitElement {
     const requiredFields = info?.fields.filter((field) => field.required) ?? [];
     for (const field of requiredFields) {
       const value = config[field.key];
-      if (value === undefined || value === null || String(value).trim() === "") {
+      if (value == null || typeof value !== "string" || value.trim() === "") {
         return `${field.label} is required`;
       }
     }
@@ -1538,14 +1555,26 @@ export class OpenClawConfigChannels extends LitElement {
     if (channel.channel_type === "slack") {
       const mode =
         typeof config.mode === "string" && config.mode.trim() ? config.mode.trim() : "socket";
-      if (!config.botToken || String(config.botToken).trim() === "") {
+      if (
+        !config.botToken ||
+        typeof config.botToken !== "string" ||
+        config.botToken.trim() === ""
+      ) {
         return "Bot Token 为必填项";
       }
       if (mode === "http") {
-        if (!config.signingSecret || String(config.signingSecret).trim() === "") {
+        if (
+          !config.signingSecret ||
+          typeof config.signingSecret !== "string" ||
+          config.signingSecret.trim() === ""
+        ) {
           return "HTTP 模式需要配置 Signing Secret";
         }
-      } else if (!config.appToken || String(config.appToken).trim() === "") {
+      } else if (
+        !config.appToken ||
+        typeof config.appToken !== "string" ||
+        config.appToken.trim() === ""
+      ) {
         return "Socket 模式需要配置 App Token";
       }
     }
@@ -1820,7 +1849,7 @@ export class OpenClawConfigChannels extends LitElement {
 
     if (channel.channel_type === "telegram") {
       const botToken = channel.config.botToken;
-      return botToken !== undefined && botToken !== null && String(botToken).trim() !== "";
+      return typeof botToken === "string" && botToken.trim() !== "";
     }
     if (channel.channel_type === "slack") {
       const botToken = channel.config.botToken;
@@ -1828,19 +1857,14 @@ export class OpenClawConfigChannels extends LitElement {
       const mode = typeof modeRaw === "string" && modeRaw.trim() ? modeRaw.trim() : "socket";
       const appToken = channel.config.appToken;
       const signingSecret = channel.config.signingSecret;
-      const hasBotToken =
-        botToken !== undefined && botToken !== null && String(botToken).trim() !== "";
+      const hasBotToken = typeof botToken === "string" && botToken.trim() !== "";
       if (!hasBotToken) {
         return false;
       }
       if (mode === "http") {
-        return (
-          signingSecret !== undefined &&
-          signingSecret !== null &&
-          String(signingSecret).trim() !== ""
-        );
+        return typeof signingSecret === "string" && signingSecret.trim() !== "";
       }
-      return appToken !== undefined && appToken !== null && String(appToken).trim() !== "";
+      return typeof appToken === "string" && appToken.trim() !== "";
     }
 
     const requiredFields = info.fields.filter((field) => field.required);
@@ -1849,7 +1873,7 @@ export class OpenClawConfigChannels extends LitElement {
     }
     return requiredFields.every((field) => {
       const value = channel.config[field.key];
-      return value !== undefined && value !== null && String(value).trim() !== "";
+      return typeof value === "string" && value.trim() !== "";
     });
   }
 
@@ -2037,7 +2061,7 @@ export class OpenClawConfigChannels extends LitElement {
                     <div class="notice-title">WhatsApp 扫码登录</div>
                     <div class="notice-desc">登录时会弹出控制台二维码。连接终端或者运行 CLI \`openclaw channels login --channel whatsapp\`</div>
                     <div class="btn-group" style="margin-top: 12px; display: flex; gap: 8px;">
-                      <button class="btn btn-secondary btn-sm" @click=${this.handleWhatsAppLogin} ?disabled=${this.loginLoading}>
+                      <button class="btn btn-secondary btn-sm" @click=${() => void this.handleWhatsAppLogin()} ?disabled=${this.loginLoading}>
                         ${this.loginLoading ? iconLoader2 : iconQrCode} 启动扫码
                       </button>
                     </div>
@@ -2055,7 +2079,7 @@ export class OpenClawConfigChannels extends LitElement {
                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
                     ${iconUserCheck}
                     <span style="font-size: 15px; font-weight: 600; color: var(--text-strong, #fafafa);">配对请求</span>
-                    <button class="btn btn-secondary btn-sm" style="margin-left: auto;" @click=${() => this._fetchPairingRequests(currentChannel.id)} ?disabled=${this.pairingLoading}>
+                    <button class="btn btn-secondary btn-sm" style="margin-left: auto;" @click=${() => void this._fetchPairingRequests(currentChannel.id)} ?disabled=${this.pairingLoading}>
                       ${this.pairingLoading ? iconLoader2 : iconRefresh} 刷新
                     </button>
                   </div>
@@ -2096,11 +2120,11 @@ export class OpenClawConfigChannels extends LitElement {
                       }}
                       @keydown=${(e: KeyboardEvent) => {
                         if (e.key === "Enter") {
-                          this._handleApproveCode(currentChannel.id, this.approveCode);
+                          void this._handleApproveCode(currentChannel.id, this.approveCode);
                         }
                       }}
                     />
-                    <button class="btn btn-primary btn-sm" @click=${() => this._handleApproveCode(currentChannel.id, this.approveCode)} ?disabled=${this.approveLoading || !this.approveCode.trim()}>
+                    <button class="btn btn-primary btn-sm" @click=${() => void this._handleApproveCode(currentChannel.id, this.approveCode)} ?disabled=${this.approveLoading || !this.approveCode.trim()}>
                       ${this.approveLoading ? iconLoader2 : iconCheck} 通过
                     </button>
                   </div>
@@ -2126,7 +2150,7 @@ export class OpenClawConfigChannels extends LitElement {
               <div class="actions-bar">
                 <button
                   class="btn btn-primary"
-                  @click=${this.handleSave}
+                  @click=${() => void this.handleSave()}
                   ?disabled=${this.saving}
                 >
                   ${this.saving ? iconLoader2 : iconCheck}
@@ -2135,7 +2159,7 @@ export class OpenClawConfigChannels extends LitElement {
                 
                 <button
                   class="btn btn-secondary"
-                  @click=${this.handleQuickTest}
+                  @click=${() => void this.handleQuickTest()}
                   ?disabled=${this.testing}
                 >
                   ${this.testing ? iconLoader2 : iconPlay}
@@ -2149,7 +2173,7 @@ export class OpenClawConfigChannels extends LitElement {
                     ? html`
                   <button
                     class="btn btn-danger"
-                    @click=${this.handleShowClearConfirm}
+                    @click=${() => this.handleShowClearConfirm()}
                     ?disabled=${this.clearing}
                   >
                     ${this.clearing ? iconLoader2 : iconTrash2} 清空配置
@@ -2158,7 +2182,7 @@ export class OpenClawConfigChannels extends LitElement {
                     : html`
                   <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
                     <span style="color: var(--accent, #ff5c5c);">确定清空？</span>
-                    <button class="btn btn-danger btn-sm" style="background: rgba(255, 92, 92, 0.2);" @click=${this.handleClearConfig}>确定</button>
+                    <button class="btn btn-danger btn-sm" style="background: rgba(255, 92, 92, 0.2);" @click=${() => void this.handleClearConfig()}>确定</button>
                     <button class="btn btn-secondary btn-sm" @click=${() => (this.showClearConfirm = false)}>取消</button>
                   </div>
                 `

@@ -11,7 +11,13 @@ import { checkForUpdate, downloadUpdate, installUpdate, closeUpdateResource } fr
 export const CLAW_CONFIG_SYSTEM = "claw-config-system";
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
 function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
+  const t = (
+    window as unknown as {
+      __TAURI__?: {
+        core?: { invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
+      };
+    }
+  ).__TAURI__;
   if (t?.core?.invoke) {
     return t.core.invoke(cmd, args) as Promise<T>;
   }
@@ -45,6 +51,8 @@ export class SystemSettingsView extends LitElement {
   @state() private loading = true;
   @state() private saving = false;
   @state() private saveStatus: "idle" | "success" | "error" = "idle";
+
+  private _loadAbort: AbortController | null = null;
 
   @state() private execSecurity: "allowlist" | "deny" | "full" = "allowlist";
   @state() private execAsk: "off" | "on-miss" | "always" = "on-miss";
@@ -95,12 +103,15 @@ export class SystemSettingsView extends LitElement {
   /* ── lifecycle ── */
   override connectedCallback() {
     super.connectedCallback();
+    this._loadAbort?.abort();
+    this._loadAbort = new AbortController();
     void this._loadConfig();
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
-    // 清理更新资源，防止泄漏
+    this._loadAbort?.abort();
+    this._loadAbort = null;
     void this._cleanupUpdateResources();
   }
 
@@ -113,9 +124,24 @@ export class SystemSettingsView extends LitElement {
   }
 
   private async _loadConfig() {
+    const signal = this._loadAbort?.signal;
+    if (!signal) {
+      // _loadAbort 为 null 时不应该被调用，但防御性地重置 loading
+      this.loading = false;
+      return;
+    }
+
     this.loading = true;
+    if (signal.aborted) {
+      this.loading = false;
+      return;
+    }
     try {
       const cfg = (await invoke<Record<string, unknown>>("get_config")) ?? {};
+      if (signal.aborted) {
+        this.loading = false;
+        return;
+      }
       const secMode = getNestedValue(cfg, ["tools", "exec", "security"]);
       if (secMode === "deny" || secMode === "allowlist" || secMode === "full") {
         this.execSecurity = secMode;
@@ -178,36 +204,44 @@ export class SystemSettingsView extends LitElement {
       if (typeof proxyNoProxy === "string") {
         this.proxyNoProxy = proxyNoProxy;
       }
-      try {
-        this.autoStart = await invoke<boolean>("autostart_is_enabled");
-      } catch {
-        /* ignore */
-      }
-      try {
-        const approvals = (await invoke<Record<string, unknown>>("get_exec_approvals")) ?? {};
-        this._execApprovalsData = approvals;
-        const agents = (approvals.agents ?? {}) as Record<string, Record<string, unknown>>;
-        const mainAgent = agents.main ?? {};
-        const allowlist = Array.isArray(mainAgent.allowlist) ? mainAgent.allowlist : [];
-        this.allowlistEntries = allowlist
-          .filter(
-            (e: unknown): e is Record<string, unknown> =>
-              !!e &&
-              typeof e === "object" &&
-              typeof (e as Record<string, unknown>).pattern === "string",
-          )
-          .map((e: Record<string, unknown>) => ({
-            id: e.id as string | undefined,
-            pattern: e.pattern as string,
-            lastUsedCommand: e.lastUsedCommand as string | undefined,
-          }));
-      } catch {
-        /* ignore */
-      }
     } catch (e) {
       console.error("加载配置失败:", e);
     } finally {
+      // 核心配置（文件读取）完成后立即解除 loading，避免注册表/慢查询阻塞 UI 渲染
       this.loading = false;
+    }
+    // autostart（读注册表，偶发慢）和 approvals 在后台加载，不阻塞 loading
+    if (signal.aborted) {
+      return;
+    }
+    try {
+      this.autoStart = await invoke<boolean>("autostart_is_enabled");
+    } catch {
+      /* ignore */
+    }
+    if (signal.aborted) {
+      return;
+    }
+    try {
+      const approvals = (await invoke<Record<string, unknown>>("get_exec_approvals")) ?? {};
+      this._execApprovalsData = approvals;
+      const agents = (approvals.agents ?? {}) as Record<string, Record<string, unknown>>;
+      const mainAgent = agents.main ?? {};
+      const allowlist = Array.isArray(mainAgent.allowlist) ? mainAgent.allowlist : [];
+      this.allowlistEntries = allowlist
+        .filter(
+          (e: unknown): e is Record<string, unknown> =>
+            !!e &&
+            typeof e === "object" &&
+            typeof (e as Record<string, unknown>).pattern === "string",
+        )
+        .map((e: Record<string, unknown>) => ({
+          id: e.id as string | undefined,
+          pattern: e.pattern as string,
+          lastUsedCommand: e.lastUsedCommand as string | undefined,
+        }));
+    } catch {
+      /* ignore */
     }
   }
 
@@ -1695,7 +1729,13 @@ export class SystemSettingsView extends LitElement {
   }
 
   private async _handleRestart() {
-    const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
+    const t = (
+      window as unknown as {
+        __TAURI__?: {
+          core?: { invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
+        };
+      }
+    ).__TAURI__;
     if (!t?.core?.invoke) {
       this.updateError = "Tauri API 不可用，请手动重启应用";
       this.updateRestarting = false;

@@ -50,6 +50,26 @@ export function resolveGatewayErrorDetailCode(
   return readConnectErrorDetailCode(error?.details);
 }
 
+const NON_RECOVERABLE_AUTH_CODES = new Set([
+  "AUTH_TOKEN_MISSING",
+  "AUTH_BOOTSTRAP_TOKEN_INVALID",
+  "AUTH_PASSWORD_MISSING",
+  "AUTH_PASSWORD_MISMATCH",
+  "AUTH_RATE_LIMITED",
+  "PAIRING_REQUIRED",
+]);
+
+export function isNonRecoverableAuthError(error: GatewayErrorInfo | null | undefined): boolean {
+  if (!error) {
+    return false;
+  }
+  const detailCode = readConnectErrorDetailCode(error.details);
+  if (!detailCode) {
+    return false;
+  }
+  return NON_RECOVERABLE_AUTH_CODES.has(detailCode);
+}
+
 export type GatewayHelloOk = {
   type: "hello-ok";
   protocol: number;
