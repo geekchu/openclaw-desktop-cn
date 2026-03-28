@@ -88,6 +88,7 @@ def main():
         # Update only download links in the live index.html without redeploying the whole site.
         # Usage: python deploy.py update-links --platform windows --version 0.3.0
         #        python deploy.py update-links --platform macos --version 0.3.0
+        #        python deploy.py update-links --platform linux --version 0.3.0
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument("_action")

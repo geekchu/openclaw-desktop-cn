@@ -626,6 +626,9 @@ Linux 版本以 AppImage 格式发布，流程与 Windows / macOS 平行，无�
 {
   "$schema": "https://schema.tauri.app/config/2",
   "version": "0.3.0",
+  "bundle": {
+    "targets": ["appimage"]
+  },
   "plugins": {
     "updater": {
       "endpoints": ["https://openclawcn.net/update/latest-linux.json"]
@@ -633,6 +636,8 @@ Linux 版本以 AppImage 格式发布，流程与 Windows / macOS 平行，无�
   }
 }
 ```
+
+> `bundle.targets` 必须保留 `["appimage"]`；基础配置 `tauri.conf.json` 的 `targets` 是 `["app", "dmg", "nsis"]`，Linux 构建会继承它，但 Tauri 在 Linux 上不会产出这些格式。缺少此字段将导致构建无产物。
 
 ### 步骤 2：提交并打 Tag
 
