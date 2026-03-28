@@ -124,7 +124,7 @@ def main():
             print(f"Updated macOS download links to v{ver}")
         elif args.platform == "linux":
             sed(r'OpenClaw桌面版_[0-9.]*_amd64\.AppImage', f'OpenClaw桌面版_{ver}_amd64.AppImage')
-            sed(r'下载 Linux 版 \(v[0-9.]*\)', f'下载 Linux 版 (v{ver})')
+            sed(r'下载 Linux 版 (v[0-9.]*)', f'下载 Linux 版 (v{ver})')
             verify(f'OpenClaw桌面版_{ver}_amd64.AppImage')
             verify(f'下载 Linux 版 (v{ver})')
             print(f"Updated Linux download links to v{ver}")
