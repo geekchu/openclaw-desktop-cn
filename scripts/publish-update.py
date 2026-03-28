@@ -7,11 +7,13 @@ OpenClaw 更新发布脚本 (Python + paramiko)
 用法:
   python scripts/publish-update.py <版本号> --platform macos
   python scripts/publish-update.py <版本号> --platform windows
+  python scripts/publish-update.py <版本号> --platform linux
   python scripts/publish-update.py <版本号> --platform all
 
 示例:
   python scripts/publish-update.py 0.3.0 --platform macos
   python scripts/publish-update.py 0.3.0 --platform windows
+  python scripts/publish-update.py 0.3.0 --platform linux
   python scripts/publish-update.py 0.3.0 --platform all  # 旧版 Windows 客户端兼容 latest.json
 
 前提条件:
