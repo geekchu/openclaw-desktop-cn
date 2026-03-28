@@ -91,7 +91,7 @@ def main():
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument("_action")
-        parser.add_argument("--platform", required=True, choices=["windows", "macos"])
+        parser.add_argument("--platform", required=True, choices=["windows", "macos", "linux"])
         parser.add_argument("--version", required=True)
         args = parser.parse_args()
         ver = args.version
@@ -122,6 +122,12 @@ def main():
             verify(f'下载 macOS 版 - Apple Silicon (v{ver})')
             verify(f'下载 macOS 版 - Intel (v{ver})')
             print(f"Updated macOS download links to v{ver}")
+        elif args.platform == "linux":
+            sed(r'OpenClaw桌面版_[0-9.]*_amd64\.AppImage', f'OpenClaw桌面版_{ver}_amd64.AppImage')
+            sed(r'下载 Linux 版 \(v[0-9.]*\)', f'下载 Linux 版 (v{ver})')
+            verify(f'OpenClaw桌面版_{ver}_amd64.AppImage')
+            verify(f'下载 Linux 版 (v{ver})')
+            print(f"Updated Linux download links to v{ver}")
 
     elif action == "nginx":
         # Static site: serve directly from Nginx, no proxy needed

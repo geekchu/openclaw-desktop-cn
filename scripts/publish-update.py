@@ -60,6 +60,11 @@ UPDATE_METADATA = {
         "url": "https://openclawcn.net/update/latest-windows.json",
         "platforms": {"windows-x86_64"},
     },
+    "linux": {
+        "path": "latest-linux.json",
+        "url": "https://openclawcn.net/update/latest-linux.json",
+        "platforms": {"linux-x86_64"},
+    },
 }
 
 # 项目根目录（脚本在 scripts/ 下）
@@ -73,7 +78,7 @@ def parse_args():
     parser.add_argument("version", help="要发布的安装包版本号")
     parser.add_argument(
         "--platform",
-        choices=("all", "macos", "windows"),
+        choices=("all", "macos", "windows", "linux"),
         required=True,
         help="发布目标平台；all 表示额外写入旧版 Windows 客户端读取的 latest.json",
     )

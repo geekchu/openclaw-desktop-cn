@@ -13,6 +13,7 @@ summary: "OpenClaw 桌面版的构建、签名、公证、发布和回归检查�
 - [架构概览](#架构概览)
 - [环境准备（一次性）](#环境准备一次性)
 - [每次发版流程](#每次发版流程)
+- [Linux 发版流程](#linux-发版流程)
 - [自动更新机制](#自动更新机制)
 - [updater 元数据格式参考](#updater-元数据格式参考)
 - [服务器维护](#服务器维护)
@@ -34,6 +35,7 @@ summary: "OpenClaw 桌面版的构建、签名、公证、发布和回归检查�
 │                  │  ← 下载安装包       │    ├── latest.json                 │
 │                  │                    │    ├── latest-macos.json           │
 │                  │                    │    ├── latest-windows.json         │
+│                  │                    │    ├── latest-linux.json           │
 │                  │                    │    └── artifacts/                  │
 │                  │                    │        ├── *-setup.exe             │
 └──────────────────┘                    │        ├── *.app.tar.gz            │
@@ -51,7 +53,7 @@ summary: "OpenClaw 桌面版的构建、签名、公证、发布和回归检查�
                                                     cdn.openclawcn.net/update/artifacts/
 ```
 
-**关键配置文件：** `src-tauri/tauri.conf.json`、`src-tauri/tauri.macos.conf.json`、`src-tauri/tauri.windows.conf.json`
+**关键配置文件：** `src-tauri/tauri.conf.json`、`src-tauri/tauri.macos.conf.json`、`src-tauri/tauri.windows.conf.json`、`src-tauri/tauri.linux.conf.json`
 
 - `version`：当前平台版本号；客户端用它判断是否需要更新
 - `plugins.updater.endpoints`：macOS / Windows 各自的 `latest-*.json`；新版本客户端使用的平台独立更新端点
@@ -59,7 +61,7 @@ summary: "OpenClaw 桌面版的构建、签名、公证、发布和回归检查�
 - `bundle.createUpdaterArtifacts`：`true`；构建时自动生成 `.sig` 签名文件
 
 > `src-tauri/tauri.conf.json` 中的 `latest.json` 仅保留给**旧版 Windows 客户端**兼容使用。
-> 新版本客户端只使用 `latest-macos.json` / `latest-windows.json`。
+> 新版本客户端只使用 `latest-macos.json` / `latest-windows.json` / `latest-linux.json`。
 >
 > 当前桌面自动更新只支持**按平台拆分**，不支持 stable / beta / dev 这类**按发布渠道拆分**。
 > 如果后续需要分渠道更新，必须继续拆分 updater endpoint 和元数据文件，例如 `latest-macos-beta.json`、`latest-windows-beta.json`。
@@ -71,6 +73,7 @@ summary: "OpenClaw 桌面版的构建、签名、公证、发布和回归检查�
 - `latest.json`：仅旧版 Windows 客户端兼容使用，只允许出现 `windows-x86_64`
 - `latest-windows.json`：仅新版本 Windows 客户端使用，只允许出现 `windows-x86_64`
 - `latest-macos.json`：仅 macOS 客户端使用，允许出现 `darwin-aarch64` 和/或 `darwin-x86_64`
+- `latest-linux.json`：仅 Linux 客户端使用，只允许出现 `linux-x86_64`
 
 必须按下面的规则执行：
 
@@ -185,6 +188,12 @@ ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 "version": "0.3.0"
 ```
 
+**Linux：`src-tauri/tauri.linux.conf.json`**
+
+```json
+"version": "0.3.0"
+```
+
 > 新版本号必须严格大于该平台当前已发布版本，否则客户端不会触发更新。
 > `src-tauri/tauri.conf.json` 是跨平台兜底配置；桌面端正式发版以平台配置文件为准。
 
@@ -194,6 +203,7 @@ ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 
 - macOS：`v<version>-macos`
 - Windows：`v<version>-windows`
+- Linux：`v<version>-linux`
 
 例如只发 macOS：
 
@@ -210,6 +220,15 @@ git push && git push --tags
 git add src-tauri/tauri.windows.conf.json
 git commit -m "release: Windows v0.3.0"
 git tag v0.3.0-windows
+git push && git push --tags
+```
+
+例如只发 Linux：
+
+```bash
+git add src-tauri/tauri.linux.conf.json
+git commit -m "release: Linux v0.3.0"
+git tag v0.3.0-linux
 git push && git push --tags
 ```
 
@@ -276,6 +295,7 @@ pnpm installer:build:mac-intel
 | 平台          | 原始路径                                                      | 产物文件                          |
 | ------------- | ------------------------------------------------------------- | --------------------------------- |
 | Windows       | `src-tauri/target/release/bundle/nsis/`                       | `*_x64-setup.exe` + `.sig`        |
+| Linux         | `src-tauri/target/release/bundle/appimage/`                   | `*_amd64.AppImage` + `.sig`       |
 | macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/macos/` | `*.app` + `*.app.tar.gz` + `.sig` |
 | macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/`   | `*_aarch64.dmg`                   |
 | macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/macos/`  | `*.app` + `*.app.tar.gz` + `.sig` |
@@ -397,6 +417,13 @@ python scripts/publish-update.py 0.3.0 --platform all
 python scripts/publish-update.py 0.3.0 --platform macos
 ```
 
+**Linux 发版 checklist：**
+
+```bash
+# 发布 Linux AppImage
+python scripts/publish-update.py 0.3.0 --platform linux
+```
+
 也可通过环境变量传入密码（CI 场景）：
 
 ```bash
@@ -415,6 +442,7 @@ DEPLOY_SSH_PASSWORD=xxx python scripts/publish-update.py 0.3.0 --platform window
 > **执行结论：**
 > Windows 发版 = `--platform windows` + `--platform all`
 > macOS 发版 = `--platform macos`
+> Linux 发版 = `--platform linux`
 > `latest.json` 永远只给旧版 Windows 客户端使用。
 
 #### 方式 B：手动操作
@@ -493,6 +521,13 @@ cd openclawcn_web
 DEPLOY_SSH_PASSWORD=xxx python deploy.py update-links --platform macos --version 0.3.0
 ```
 
+#### Linux 发版时
+
+```bash
+cd openclawcn_web
+DEPLOY_SSH_PASSWORD=xxx python deploy.py update-links --platform linux --version 0.3.0
+```
+
 > ⚠️ `update-links` 直接修改服务器上的 `index.html`，无需本地构建，两个平台完全独立互不影响。
 > ⚠️ **不要**再使用 `python deploy.py upload` 单独更新下载链接，那会覆盖整个网站（包括另一个平台的链接）。`deploy.py upload` 只在需要更新网站结构/样式时使用，且使用前需确保本地 `page.tsx` 已包含所有平台最新链接。
 
@@ -530,7 +565,6 @@ curl https://openclawcn.net/update/latest.json
 **macOS 发版后验证：**
 
 ```bash
-
 # macOS 发版时：检查 macOS updater 元数据
 curl https://openclawcn.net/update/latest-macos.json
 ```
@@ -539,6 +573,19 @@ curl https://openclawcn.net/update/latest-macos.json
 
 - `latest-macos.json` 的 `version` 为本次 macOS 发布版本
 - `platforms` 中只包含 `darwin-aarch64` 和/或 `darwin-x86_64`
+- `signature` 不为空
+
+**Linux 发版后验证：**
+
+```bash
+# Linux 发版时：检查 Linux updater 元数据
+curl https://openclawcn.net/update/latest-linux.json
+```
+
+确认：
+
+- `latest-linux.json` 的 `version` 为本次 Linux 发布版本
+- `platforms` 中只包含 `linux-x86_64`
 - `signature` 不为空
 
 **安装包下载验证：**
@@ -557,6 +604,102 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 2. 启动应用，等待 15 秒后应出现更新横幅；或进入「系统设置 → 软件更新」手动检查
 3. 点击"立即更新"，确认下载进度条正常
 4. 下载完成后点击"立即重启"，确认更新后版本号正确
+
+---
+
+## Linux 发版流程
+
+Linux 版本以 AppImage 格式发布，流程与 Windows / macOS 平行，无需 root 权限或包管理器。
+
+### 前置条件
+
+- 在 Linux 机器（Ubuntu 22.04 / Debian 12 推荐）上操作
+- 已安装 Rust stable、Node.js 22+、pnpm、cargo-tauri 2.x
+- minisign 私钥已复制到 `~/.tauri/openclaw.key`
+- `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 已设置
+
+### 步骤 1：更新版本号
+
+修改 `src-tauri/tauri.linux.conf.json`：
+
+```json
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "version": "0.3.0",
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://openclawcn.net/update/latest-linux.json"]
+    }
+  }
+}
+```
+
+### 步骤 2：提交并打 Tag
+
+```bash
+git add src-tauri/tauri.linux.conf.json
+git commit -m "release: Linux v0.3.0"
+git tag v0.3.0-linux
+git push && git push --tags
+```
+
+### 步骤 3：构建签名 AppImage
+
+```bash
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/openclaw.key)"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<你的 minisign 私钥密码>"
+
+pnpm installer:build
+```
+
+产物路径：`src-tauri/target/release/bundle/appimage/`
+
+- `OpenClaw桌面版_0.3.0_amd64.AppImage`
+- `OpenClaw桌面版_0.3.0_amd64.AppImage.sig`
+
+### 步骤 4：上传 updater 元数据
+
+```bash
+python scripts/publish-update.py 0.3.0 --platform linux
+```
+
+### 步骤 5：更新官网下载链接
+
+```bash
+cd openclawcn_web
+DEPLOY_SSH_PASSWORD=xxx python deploy.py update-links --platform linux --version 0.3.0
+```
+
+同步本地 `page.tsx` 版本号并提交：
+
+```bash
+cd ..
+git add openclawcn_web/src/app/page.tsx
+git commit -m "chore: update website Linux download link to v0.3.0"
+git push
+```
+
+### 步骤 6：验证
+
+```bash
+# 检查 updater 元数据
+curl https://openclawcn.net/update/latest-linux.json
+
+# 检查安装包可下载
+curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_amd64.AppImage"
+```
+
+确认：
+
+- `latest-linux.json` 的 `version` 为本次发布版本
+- `platforms` 中只包含 `linux-x86_64`
+- `signature` 不为空，安装包 URL 返回 200
+
+### 步骤 7：端到端测试
+
+1. 安装旧版 Linux AppImage
+2. 替换 `latest-linux.json` 后启动，进入「系统设置 → 软件更新」手动检查
+3. 确认出现新版本提示，下载、更新后版本号正确
 
 ---
 
@@ -655,6 +798,7 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 - `latest-windows.json`：只包含 `windows-x86_64`
 - `latest.json`：仅旧版 Windows 客户端兼容使用，也只包含 `windows-x86_64`
 - `latest-macos.json`：包含 `darwin-aarch64` 和/或 `darwin-x86_64`
+- `latest-linux.json`：只包含 `linux-x86_64`
 
 **字段说明：**
 
@@ -725,6 +869,13 @@ location = /update/latest-macos.json {
 
 location = /update/latest-windows.json {
     alias /var/www/openclaw-update/latest-windows.json;
+    add_header Access-Control-Allow-Origin "*" always;
+    add_header Cache-Control "no-cache" always;
+    default_type application/json;
+}
+
+location = /update/latest-linux.json {
+    alias /var/www/openclaw-update/latest-linux.json;
     add_header Access-Control-Allow-Origin "*" always;
     add_header Cache-Control "no-cache" always;
     default_type application/json;
@@ -937,6 +1088,7 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 - `src-tauri/tauri.conf.json`：跨平台兜底配置、签名公钥、CSP、安全策略
 - `src-tauri/tauri.macos.conf.json`：macOS 版本号、macOS updater endpoint
 - `src-tauri/tauri.windows.conf.json`：Windows 版本号、Windows updater endpoint
+- `src-tauri/tauri.linux.conf.json`：Linux 版本号、Linux updater endpoint
 - `src-tauri/Cargo.toml`：Rust crate 元数据
 - `src-tauri/capabilities/default.json`：Tauri 权限配置（含 `updater:default`）
 

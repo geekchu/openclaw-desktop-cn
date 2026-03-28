@@ -55,6 +55,17 @@ if ! grep -q 'location = /update/latest-windows.json' "$CONF" 2>/dev/null; then
 BLOCK
 fi
 
+if ! grep -q 'location = /update/latest-linux.json' "$CONF" 2>/dev/null; then
+  cat >> "$TMPF" << 'BLOCK'
+    location = /update/latest-linux.json {
+        alias /var/www/openclaw-update/latest-linux.json;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "no-cache" always;
+        default_type application/json;
+    }
+BLOCK
+fi
+
 if [ -s "$TMPF" ]; then
   # Insert before the first "location / {" in the SSL server block
   # Find the line number of the LAST "location / {" (the SSL server block one)
@@ -76,7 +87,7 @@ fi
 
 # Create update directory and placeholder
 mkdir -p /var/www/openclaw-update/artifacts
-for latest_file in latest.json latest-macos.json latest-windows.json; do
+for latest_file in latest.json latest-macos.json latest-windows.json latest-linux.json; do
   if [ ! -f "/var/www/openclaw-update/${latest_file}" ]; then
     echo '{"version":"0.0.0","notes":"暂无更新","pub_date":"2026-01-01T00:00:00Z","platforms":{}}' > "/var/www/openclaw-update/${latest_file}"
     echo "OK: Created placeholder ${latest_file}"

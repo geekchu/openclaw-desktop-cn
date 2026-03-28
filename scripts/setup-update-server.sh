@@ -17,7 +17,7 @@ mkdir -p "$WEBROOT/artifacts"
 echo "  ✅ 创建目录: $WEBROOT"
 
 # 创建占位 updater 元数据
-for latest_file in latest.json latest-macos.json latest-windows.json; do
+for latest_file in latest.json latest-macos.json latest-windows.json latest-linux.json; do
   if [ -f "$WEBROOT/$latest_file" ]; then
     echo "  ℹ $latest_file 已存在，跳过"
     continue
