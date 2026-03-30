@@ -2,10 +2,10 @@
 summary: 关于 OpenClaw 安装、配置和使用的常见问题
 title: 常见问题
 x-i18n:
-  generated_at: "2026-02-01T21:32:04Z"
+  generated_at: "2026-03-16T06:52:18Z"
   model: claude-opus-4-5
   provider: pi
-  source_hash: 5a611f2fda3325b1c7a9ec518616d87c78be41e2bfbe86244ae4f48af3815a26
+  source_hash: 94f7c6ea1024d5606379ce80d65a006b3acc12a963d57ca2333fcee3e5a31872
   source_path: help/faq.md
   workflow: 15
 ---
@@ -39,7 +39,7 @@ x-i18n:
   - [如何在 VPS 上安装 OpenClaw？](#how-do-i-install-openclaw-on-a-vps)
   - [云/VPS 安装指南在哪里？](#where-are-the-cloudvps-install-guides)
   - [可以让 OpenClaw 自行更新吗？](#can-i-ask-openclaw-to-update-itself)
-  - [新手引导向导具体做了什么？](#what-does-the-onboarding-wizard-actually-do)
+  - [新手引导具体做了什么？](#新手引导具体做了什么)
   - [运行 OpenClaw 需要 Claude 或 OpenAI 订阅吗？](#do-i-need-a-claude-or-openai-subscription-to-run-this)
   - [能否使用 Claude Max 订阅而不需要 API 密钥？](#can-i-use-claude-max-subscription-without-an-api-key)
   - [Anthropic "setup-token" 认证如何工作？](#how-does-anthropic-setuptoken-auth-work)
@@ -310,14 +310,14 @@ openclaw doctor
 
 ### 安装和设置 OpenClaw 的推荐方式是什么
 
-仓库推荐从源码运行并使用新手引导向导：
+仓库推荐从源码运行并使用新手引导：
 
 ```bash
 curl -fsSL https://openclaw.ai/install.sh | bash
 openclaw onboard --install-daemon
 ```
 
-向导还可以自动构建 UI 资源。新手引导后，通常在端口 **28789** 上运行 Gateway 网关。
+新手引导还可以自动构建 UI 资源。新手引导后，通常在端口 **28789** 上运行 Gateway 网关。
 
 从源码安装（贡献者/开发者）：
 
@@ -334,7 +334,7 @@ openclaw onboard
 
 ### 新手引导后如何打开仪表板
 
-向导现在会在新手引导完成后立即使用带令牌的仪表板 URL 打开浏览器，并在摘要中打印完整链接（带令牌）。保持该标签页打开；如果没有自动启动，请在同一台机器上复制/粘贴打印的 URL。令牌保持在本地主机上——不会从浏览器获取任何内容。
+新手引导现在会在完成后立即使用带令牌的仪表板 URL 打开浏览器，并在摘要中打印完整链接（带令牌）。保持该标签页打开；如果没有自动启动，请在同一台机器上复制/粘贴打印的 URL。令牌保持在本地主机上，不会从浏览器获取任何内容。
 
 ### 如何在本地和远程环境中验证仪表板令牌
 
@@ -406,7 +406,7 @@ openclaw doctor
 可以。复制**状态目录**和**工作区**，然后运行一次 Doctor。只要你同时复制**两个**位置，就能保持你的机器人“完全一样”（记忆、会话历史、认证和渠道状态）：
 
 1. 在新机器上安装 OpenClaw。
-2. 从旧机器复制 `$OPENCLAW_STATE_DIR`（默认：`~/.openclawcn`）。
+2. 从旧机器复制 `$OPENCLAW_STATE_DIR`（默认：`~/.openclaw`）。
 3. 复制你的工作区（默认：`~/.openclawcn/workspace`）。
 4. 运行 `openclaw doctor` 并重启 Gateway 网关服务。
 
@@ -427,7 +427,7 @@ https://github.com/openclaw/openclaw/blob/main/CHANGELOG.md
 
 ### 无法访问 docs.openclaw.ai（SSL 错误），怎么办
 
-一些 Comcast/Xfinity 连接通过 Xfinity Advanced Security 错误地拦截了 `docs.openclaw.ai`。禁用该功能或将 `docs.openclaw.ai` 加入白名单，然后重试。更多详情：[故障排除](/help/troubleshooting#docsopenclawai-shows-an-ssl-error-comcastxfinity)。
+一些 Comcast/Xfinity 连接通过 Xfinity Advanced Security 错误地拦截了 `docs.openclaw.ai`。禁用该功能或将 `docs.openclaw.ai` 加入白名单，然后重试。
 请帮助我们在此处报告以解除封锁：https://spa.xfinity.com/check_url_status。
 
 如果仍然无法访问该网站，文档在 GitHub 上有镜像：
@@ -562,7 +562,7 @@ curl -fsSL https://openclaw.ai/install.sh | bash -s -- --install-method git
 
 ### 如何在 Linux 上安装 OpenClaw
 
-简短回答：按照 Linux 指南操作，然后运行新手引导向导。
+简短回答：按照 Linux 指南操作，然后运行新手引导。
 
 - Linux 快速路径 + 服务安装：[Linux](/platforms/linux)。
 - 完整指南：[入门](/start/getting-started)。
@@ -614,7 +614,7 @@ openclaw gateway restart
 
 文档：[更新](/cli/update)、[更新指南](/install/updating)。
 
-### 新手引导向导具体做了什么
+### 新手引导具体做了什么
 
 `openclaw onboard` 是推荐的设置路径。在**本地模式**下，它引导你完成：
 
@@ -642,7 +642,7 @@ Claude Pro/Max 订阅**不包含 API 密钥**，因此这是订阅账户的正�
 
 ### Anthropic setup-token 认证如何工作
 
-`claude setup-token` 通过 Claude Code CLI 生成一个**令牌字符串**（在 Web 控制台中不可用）。你可以在**任何机器**上运行它。在向导中选择 **Anthropic token (paste setup-token)** 或使用 `openclaw models auth paste-token --provider anthropic` 粘贴。令牌作为 **anthropic** 提供商的认证配置文件存储，像 API 密钥一样使用（无自动刷新）。更多详情：[OAuth](/concepts/oauth)。
+`claude setup-token` 通过 Claude Code CLI 生成一个**令牌字符串**（在 Web 控制台中不可用）。你可以在**任何机器**上运行它。在新手引导中选择 **Anthropic token (paste setup-token)** 或使用 `openclaw models auth paste-token --provider anthropic` 粘贴。令牌作为 **anthropic** 提供商的认证配置文件存储，像 API 密钥一样使用（无自动刷新）。更多详情：[OAuth](/concepts/oauth)。
 
 ### 在哪里获取 Anthropic setup-token
 
@@ -652,7 +652,7 @@ Claude Pro/Max 订阅**不包含 API 密钥**，因此这是订阅账户的正�
 claude setup-token
 ```
 
-复制它打印的令牌，然后在向导中选择 **Anthropic token (paste setup-token)**。如果你想在 Gateway 网关主机上运行，使用 `openclaw models auth setup-token --provider anthropic`。如果你在其他地方运行了 `claude setup-token`，在 Gateway 网关主机上使用 `openclaw models auth paste-token --provider anthropic` 粘贴。参阅 [Anthropic](/providers/anthropic)。
+复制它打印的令牌，然后在新手引导中选择 **Anthropic token (paste setup-token)**。如果你想在 Gateway 网关主机上运行，使用 `openclaw models auth setup-token --provider anthropic`。如果你在其他地方运行了 `claude setup-token`，在 Gateway 网关主机上使用 `openclaw models auth paste-token --provider anthropic` 粘贴。参阅 [Anthropic](/providers/anthropic)。
 
 ### 是否支持 Claude 订阅认证（Claude Pro/Max）
 
@@ -673,13 +673,13 @@ claude setup-token
 
 ### Codex 认证如何工作
 
-OpenClaw 通过 OAuth（ChatGPT 登录）支持 **OpenAI Code (Codex)**。向导可以运行 OAuth 流程，并在适当时将默认模型设置为 `openai-codex/gpt-5.2`。参阅[模型提供商](/concepts/model-providers)和[向导](/start/wizard)。
+OpenClaw 通过 OAuth（ChatGPT 登录）支持 **OpenAI Code (Codex)**。新手引导可以运行 OAuth 流程，并在适当时将默认模型设置为 `openai-codex/gpt-5.2`。参阅[模型提供商](/concepts/model-providers)和[CLI 新手引导](/start/wizard)。
 
 ### 是否支持 OpenAI 订阅认证（Codex OAuth）
 
-是的。OpenClaw 完全支持 **OpenAI Code (Codex) 订阅 OAuth**。新手引导向导可以为你运行 OAuth 流程。
+是的。OpenClaw 完全支持 **OpenAI Code (Codex) 订阅 OAuth**。新手引导可以为你运行 OAuth 流程。
 
-参阅 [OAuth](/concepts/oauth)、[模型提供商](/concepts/model-providers)和[向导](/start/wizard)。
+参阅 [OAuth](/concepts/oauth)、[模型提供商](/concepts/model-providers)和[CLI 新手引导](/start/wizard)。
 
 ### 如何设置 Gemini CLI OAuth
 
@@ -687,7 +687,7 @@ Gemini CLI 使用**插件认证流程**，而不是 `openclaw.json` 中的 clien
 
 步骤：
 
-1. 启用插件：`openclaw plugins enable google-gemini-cli-auth`
+1. 启用插件：`openclaw plugins enable google`
 2. 登录：`openclaw models auth login --provider google-gemini-cli --set-default`
 
 这会在 Gateway 网关主机上将 OAuth 令牌存储为认证配置文件。详情：[模型提供商](/concepts/model-providers)。
@@ -790,7 +790,7 @@ brew install <formula>
 
 可以。安装另一种方式，然后运行 Doctor 使 Gateway 网关服务指向新的入口点。
 这**不会删除你的数据**——它只改变 OpenClaw 代码的安装位置。你的状态
-（`~/.openclawcn`）和工作区（`~/.openclawcn/workspace`）保持不变。
+（`~/.openclaw`）和工作区（`~/.openclawcn/workspace`）保持不变。
 
 从 npm → git：
 
@@ -1139,7 +1139,7 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 
 不是——**OpenClaw 的状态是本地的**，但**外部服务仍然会看到你发送给它们的内容**。
 
-- **默认本地：** 会话、记忆文件、配置和工作区位于 Gateway 网关主机上（`~/.openclawcn` + 你的工作区目录）。
+- **默认本地：** 会话、记忆文件、配置和工作区位于 Gateway 网关主机上（`~/.openclaw` + 你的工作区目录）。
 - **必然远程：** 你发送给模型提供商（Anthropic/OpenAI/等）的消息会发送到它们的 API，聊天平台（WhatsApp/Telegram/Slack/等）在它们的服务器上存储消息数据。
 - **你控制范围：** 使用本地模型可以将提示保留在你的机器上，但渠道流量仍然通过渠道的服务器。
 
@@ -1147,7 +1147,7 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 
 ### OpenClaw 将数据存储在哪里
 
-所有内容位于 `$OPENCLAW_STATE_DIR`（默认：`~/.openclawcn`）下：
+所有内容位于 `$OPENCLAW_STATE_DIR`（默认：`~/.openclaw`）下：
 
 | 路径                                                            | 用途                                                 |
 | --------------------------------------------------------------- | ---------------------------------------------------- |
@@ -1166,11 +1166,11 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 
 ### AGENTS.md / SOUL.md / USER.md / MEMORY.md 应该放在哪里
 
-这些文件位于**智能体工作区**中，而不是 `~/.openclawcn`。
+这些文件位于**智能体工作区**中，而不是 `~/.openclaw`。
 
 - **工作区（按智能体）**：`AGENTS.md`、`SOUL.md`、`IDENTITY.md`、`USER.md`、
   `MEMORY.md`（或 `memory.md`）、`memory/YYYY-MM-DD.md`、可选的 `HEARTBEAT.md`。
-- **状态目录（`~/.openclawcn`）**：配置、凭据、认证配置文件、会话、日志和共享 Skills（`~/.openclawcn/skills`）。
+- **状态目录（`~/.openclaw`）**：配置、凭据、认证配置文件、会话、日志和共享 Skills（`~/.openclawcn/skills`）。
 
 默认工作区是 `~/.openclawcn/workspace`，可通过以下方式配置：
 
@@ -1190,7 +1190,7 @@ OpenClaw 还会运行**静默的预压缩记忆刷新**，以提醒模型在自�
 
 将你的**智能体工作区**放入一个**私有** git 仓库，并备份到某个私有位置（例如 GitHub 私有仓库）。这会捕获记忆 + AGENTS/SOUL/USER 文件，让你以后可以恢复助手的“思维”。
 
-**不要**提交 `~/.openclawcn` 下的任何内容（凭据、会话、令牌）。如果你需要完整恢复，将工作区和状态目录分别备份（参阅上面的迁移问题）。
+**不要**提交 `~/.openclaw` 下的任何内容（凭据、会话、令牌）。如果你需要完整恢复，将工作区和状态目录分别备份（参阅上面的迁移问题）。
 
 文档：[智能体工作区](/concepts/agent-workspace)。
 
@@ -1266,15 +1266,26 @@ Gateway 网关监视配置文件并支持热重载：
 
 ### 如何启用网络搜索（和网页抓取）
 
-`web_fetch` 无需 API 密钥即可工作。`web_search` 需要 Brave Search API 密钥。**推荐：** 运行 `openclaw configure --section web` 将其存储在 `tools.web.search.apiKey` 中。环境变量替代方案：为 Gateway 网关进程设置 `BRAVE_API_KEY`。
+`web_fetch` 无需 API 密钥即可工作。`web_search` 需要所选提供商的 API 密钥。**推荐：** 运行 `openclaw configure --section web`。新的提供商专属配置会存储在 `plugins.entries.<plugin>.config.webSearch.*` 下。环境变量替代方案：为 Gateway 网关进程设置相应的提供商环境变量。
 
 ```json5
 {
+  plugins: {
+    entries: {
+      brave: {
+        config: {
+          webSearch: {
+            apiKey: "BRAVE_API_KEY_HERE",
+          },
+        },
+      },
+    },
+  },
   tools: {
     web: {
       search: {
         enabled: true,
-        apiKey: "BRAVE_API_KEY_HERE",
+        provider: "brave",
         maxResults: 5,
       },
       fetch: {
@@ -1290,6 +1301,7 @@ Gateway 网关监视配置文件并支持热重载：
 - 如果你使用允许列表，添加 `web_search`/`web_fetch` 或 `group:web`。
 - `web_fetch` 默认启用（除非明确禁用）。
 - 守护进程从 `~/.openclawcn/.env`（或服务环境）读取环境变量。
+- 旧的 `tools.web.search.*` 提供商路径仍通过兼容层继续生效，但不应再用于新配置。
 
 文档：[Web 工具](/tools/web)。
 
@@ -1632,7 +1644,7 @@ openclaw onboard --install-daemon
 
 注意：
 
-- 新手引导向导在看到现有配置时也提供**重置**选项。参阅[向导](/start/wizard)。
+- 新手引导在看到现有配置时也提供**重置**选项。参阅[CLI 新手引导](/start/wizard)。
 - 如果你使用了配置文件（`--profile` / `OPENCLAW_PROFILE`），重置每个状态目录（默认为 `~/.openclaw-<profile>`）。
 - 开发重置：`openclaw gateway --dev --reset`（仅限开发；清除开发配置 + 凭据 + 会话 + 工作区）。
 

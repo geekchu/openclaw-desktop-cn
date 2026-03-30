@@ -1,106 +1,158 @@
-import { html } from "lit";
+import { html, nothing } from "lit";
 import {
   expandToolGroups,
   normalizeToolName,
   resolveToolProfilePolicy,
 } from "../../../../src/agents/tool-policy-shared.js";
-import type { AgentIdentityResult, AgentsFilesListResult, AgentsListResult } from "../types.ts";
+import type {
+  AgentIdentityResult,
+  AgentsFilesListResult,
+  AgentsListResult,
+  ModelCatalogEntry,
+  ToolCatalogProfile,
+  ToolsCatalogResult,
+} from "../types.ts";
 
-export function agentLogoUrl(basePath: string): string {
-  const base = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
-  return `${base}/favicon.ico`;
-}
+export type AgentToolEntry = {
+  id: string;
+  label: string;
+  description: string;
+  source?: "core" | "plugin";
+  pluginId?: string;
+  optional?: boolean;
+  defaultProfiles?: string[];
+};
 
-export const TOOL_SECTIONS = [
+export type AgentToolSection = {
+  id: string;
+  label: string;
+  source?: "core" | "plugin";
+  pluginId?: string;
+  tools: AgentToolEntry[];
+};
+
+export const FALLBACK_TOOL_SECTIONS: AgentToolSection[] = [
   {
     id: "fs",
-    label: "文件",
+    label: "Files",
     tools: [
-      { id: "read", label: "read", description: "读取文件内容" },
-      { id: "write", label: "write", description: "创建或覆盖文件" },
-      { id: "edit", label: "edit", description: "精确编辑" },
-      { id: "apply_patch", label: "apply_patch", description: "补丁文件 (OpenAI)" },
+      { id: "read", label: "read", description: "Read file contents" },
+      { id: "write", label: "write", description: "Create or overwrite files" },
+      { id: "edit", label: "edit", description: "Make precise edits" },
+      { id: "apply_patch", label: "apply_patch", description: "Patch files (OpenAI)" },
     ],
   },
   {
     id: "runtime",
-    label: "运行时",
+    label: "Runtime",
     tools: [
-      { id: "exec", label: "exec", description: "执行 Shell 命令" },
-      { id: "process", label: "process", description: "管理后台进程" },
+      { id: "exec", label: "exec", description: "Run shell commands" },
+      { id: "process", label: "process", description: "Manage background processes" },
     ],
   },
   {
     id: "web",
-    label: "网络",
+    label: "Web",
     tools: [
-      { id: "web_search", label: "web_search", description: "搜索网页" },
-      { id: "web_fetch", label: "web_fetch", description: "获取网页内容" },
+      { id: "web_search", label: "web_search", description: "Search the web" },
+      { id: "web_fetch", label: "web_fetch", description: "Fetch web content" },
     ],
   },
   {
     id: "memory",
-    label: "记忆",
+    label: "Memory",
     tools: [
-      { id: "memory_search", label: "memory_search", description: "语义搜索" },
-      { id: "memory_get", label: "memory_get", description: "读取记忆文件" },
+      { id: "memory_search", label: "memory_search", description: "Semantic search" },
+      { id: "memory_get", label: "memory_get", description: "Read memory files" },
     ],
   },
   {
     id: "sessions",
-    label: "会话",
+    label: "Sessions",
     tools: [
-      { id: "sessions_list", label: "sessions_list", description: "列出会话" },
-      { id: "sessions_history", label: "sessions_history", description: "会话历史" },
-      { id: "sessions_send", label: "sessions_send", description: "发送到会话" },
-      { id: "sessions_spawn", label: "sessions_spawn", description: "生成子代理" },
-      { id: "session_status", label: "session_status", description: "会话状态" },
+      { id: "sessions_list", label: "sessions_list", description: "List sessions" },
+      { id: "sessions_history", label: "sessions_history", description: "Session history" },
+      { id: "sessions_send", label: "sessions_send", description: "Send to session" },
+      { id: "sessions_spawn", label: "sessions_spawn", description: "Spawn sub-agent" },
+      { id: "session_status", label: "session_status", description: "Session status" },
     ],
   },
   {
     id: "ui",
-    label: "界面",
+    label: "UI",
     tools: [
-      { id: "browser", label: "browser", description: "控制浏览器" },
-      { id: "canvas", label: "canvas", description: "控制画布" },
+      { id: "browser", label: "browser", description: "Control web browser" },
+      { id: "canvas", label: "canvas", description: "Control canvases" },
     ],
   },
   {
     id: "messaging",
-    label: "消息",
-    tools: [{ id: "message", label: "message", description: "发送消息" }],
+    label: "Messaging",
+    tools: [{ id: "message", label: "message", description: "Send messages" }],
   },
   {
     id: "automation",
-    label: "自动化",
+    label: "Automation",
     tools: [
-      { id: "cron", label: "cron", description: "计划任务" },
-      { id: "gateway", label: "gateway", description: "网关控制" },
+      { id: "cron", label: "cron", description: "Schedule tasks" },
+      { id: "gateway", label: "gateway", description: "Gateway control" },
     ],
   },
   {
     id: "nodes",
-    label: "节点",
-    tools: [{ id: "nodes", label: "nodes", description: "节点和设备" }],
+    label: "Nodes",
+    tools: [{ id: "nodes", label: "nodes", description: "Nodes + devices" }],
   },
   {
     id: "agents",
-    label: "代理",
-    tools: [{ id: "agents_list", label: "agents_list", description: "列出代理" }],
+    label: "Agents",
+    tools: [{ id: "agents_list", label: "agents_list", description: "List agents" }],
   },
   {
     id: "media",
-    label: "媒体",
-    tools: [{ id: "image", label: "image", description: "图像理解" }],
+    label: "Media",
+    tools: [{ id: "image", label: "image", description: "Image understanding" }],
   },
 ];
 
 export const PROFILE_OPTIONS = [
-  { id: "minimal", label: "最小" },
-  { id: "coding", label: "编程" },
-  { id: "messaging", label: "消息" },
-  { id: "full", label: "完整" },
+  { id: "minimal", label: "Minimal" },
+  { id: "coding", label: "Coding" },
+  { id: "messaging", label: "Messaging" },
+  { id: "full", label: "Full" },
 ] as const;
+
+export function resolveToolSections(
+  toolsCatalogResult: ToolsCatalogResult | null,
+): AgentToolSection[] {
+  if (toolsCatalogResult?.groups?.length) {
+    return toolsCatalogResult.groups.map((group) => ({
+      id: group.id,
+      label: group.label,
+      source: group.source,
+      pluginId: group.pluginId,
+      tools: group.tools.map((tool) => ({
+        id: tool.id,
+        label: tool.label,
+        description: tool.description,
+        source: tool.source,
+        pluginId: tool.pluginId,
+        optional: tool.optional,
+        defaultProfiles: [...tool.defaultProfiles],
+      })),
+    }));
+  }
+  return FALLBACK_TOOL_SECTIONS;
+}
+
+export function resolveToolProfileOptions(
+  toolsCatalogResult: ToolsCatalogResult | null,
+): readonly ToolCatalogProfile[] | typeof PROFILE_OPTIONS {
+  if (toolsCatalogResult?.profiles?.length) {
+    return toolsCatalogResult.profiles;
+  }
+  return PROFILE_OPTIONS;
+}
 
 type ToolPolicy = {
   allow?: string[];
@@ -141,6 +193,33 @@ export function normalizeAgentLabel(agent: {
   identity?: { name?: string };
 }) {
   return agent.name?.trim() || agent.identity?.name?.trim() || agent.id;
+}
+
+const AVATAR_URL_RE = /^(https?:\/\/|data:image\/|\/)/i;
+
+export function resolveAgentAvatarUrl(
+  agent: { identity?: { avatar?: string; avatarUrl?: string } },
+  agentIdentity?: AgentIdentityResult | null,
+): string | null {
+  const candidates = [
+    agentIdentity?.avatar?.trim(),
+    agent.identity?.avatarUrl?.trim(),
+    agent.identity?.avatar?.trim(),
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    if (AVATAR_URL_RE.test(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+export function agentLogoUrl(basePath: string): string {
+  const base = basePath?.trim() ? basePath.replace(/\/$/, "") : "";
+  return base ? `${base}/favicon.svg` : "favicon.svg";
 }
 
 function isLikelyEmoji(value: string) {
@@ -191,7 +270,15 @@ export function resolveAgentEmoji(
 }
 
 export function agentBadgeText(agentId: string, defaultId: string | null) {
-  return defaultId && agentId === defaultId ? "默认" : null;
+  return defaultId && agentId === defaultId ? "default" : null;
+}
+
+export function agentAvatarHue(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  }
+  return ((hash % 360) + 360) % 360;
 }
 
 export function formatBytes(bytes?: number) {
@@ -226,7 +313,7 @@ export type AgentContext = {
   workspace: string;
   model: string;
   identityName: string;
-  identityEmoji: string;
+  identityAvatar: string;
   skillsLabel: string;
   isDefault: boolean;
 };
@@ -252,15 +339,15 @@ export function buildAgentContext(
     agent.name?.trim() ||
     config.entry?.name ||
     agent.id;
-  const identityEmoji = resolveAgentEmoji(agent, agentIdentity) || "-";
+  const identityAvatar = resolveAgentAvatarUrl(agent, agentIdentity) ? "custom" : "—";
   const skillFilter = Array.isArray(config.entry?.skills) ? config.entry?.skills : null;
   const skillCount = skillFilter?.length ?? null;
   return {
     workspace,
     model: modelLabel,
     identityName,
-    identityEmoji,
-    skillsLabel: skillFilter ? `已选 ${skillCount} 个` : "全部技能",
+    identityAvatar,
+    skillsLabel: skillFilter ? `${skillCount} selected` : "all skills",
     isDefault: Boolean(defaultId && agent.id === defaultId),
   };
 }
@@ -277,7 +364,7 @@ export function resolveModelLabel(model?: unknown): string {
     const primary = record.primary?.trim();
     if (primary) {
       const fallbackCount = Array.isArray(record.fallbacks) ? record.fallbacks.length : 0;
-      return fallbackCount > 0 ? `${primary} (+${fallbackCount} 备选)` : primary;
+      return fallbackCount > 0 ? `${primary} (+${fallbackCount} fallback)` : primary;
     }
   }
   return "-";
@@ -488,16 +575,38 @@ function resolveConfiguredModels(
 export function buildModelOptions(
   configForm: Record<string, unknown> | null,
   current?: string | null,
+  catalog?: ModelCatalogEntry[],
 ) {
-  const options = resolveConfiguredModels(configForm);
-  const hasCurrent = current ? options.some((option) => option.value === current) : false;
-  if (current && !hasCurrent) {
-    options.unshift({ value: current, label: `当前 (${current})` });
+  const seen = new Set<string>();
+  const options: ConfiguredModelOption[] = [];
+  const addOption = (value: string, label: string) => {
+    const key = value.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    options.push({ value, label });
+  };
+
+  for (const opt of resolveConfiguredModels(configForm)) {
+    addOption(opt.value, opt.label);
   }
+
+  if (catalog) {
+    for (const entry of catalog) {
+      const provider = entry.provider?.trim();
+      const value = provider ? `${provider}/${entry.id}` : entry.id;
+      const label = provider ? `${entry.id} · ${provider}` : entry.id;
+      addOption(value, label);
+    }
+  }
+
+  if (current && !seen.has(current.toLowerCase())) {
+    options.unshift({ value: current, label: `Current (${current})` });
+  }
+
   if (options.length === 0) {
-    return html`
-      <option value="" disabled>无已配置模型</option>
-    `;
+    return nothing;
   }
   return options.map((option) => html`<option value=${option.value}>${option.label}</option>`);
 }

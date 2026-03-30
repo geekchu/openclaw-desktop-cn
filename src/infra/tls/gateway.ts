@@ -6,6 +6,7 @@ import tls from "node:tls";
 import { promisify } from "node:util";
 import type { GatewayTlsConfig } from "../../config/types.gateway.js";
 import { CONFIG_DIR, ensureDir, resolveUserPath, shortenHomeInString } from "../../utils.js";
+import { resolveSystemBin } from "../resolve-system-bin.js";
 import { normalizeFingerprint } from "./fingerprint.js";
 
 const execFileAsync = promisify(execFile);
@@ -41,26 +42,28 @@ async function generateSelfSignedCert(params: {
   if (keyDir !== certDir) {
     await ensureDir(keyDir);
   }
-  await execFileAsync(
-    "openssl",
-    [
-      "req",
-      "-x509",
-      "-newkey",
-      "rsa:2048",
-      "-sha256",
-      "-days",
-      "3650",
-      "-nodes",
-      "-keyout",
-      params.keyPath,
-      "-out",
-      params.certPath,
-      "-subj",
-      "/CN=openclaw-gateway",
-    ],
-    { windowsHide: true },
-  );
+  const opensslBin = resolveSystemBin("openssl");
+  if (!opensslBin) {
+    throw new Error(
+      "openssl not found in trusted system directories. Install it in an OS-managed location.",
+    );
+  }
+  await execFileAsync(opensslBin, [
+    "req",
+    "-x509",
+    "-newkey",
+    "rsa:2048",
+    "-sha256",
+    "-days",
+    "3650",
+    "-nodes",
+    "-keyout",
+    params.keyPath,
+    "-out",
+    params.certPath,
+    "-subj",
+    "/CN=openclaw-gateway",
+  ]);
   await fs.chmod(params.keyPath, 0o600).catch(() => {});
   await fs.chmod(params.certPath, 0o600).catch(() => {});
   params.log?.info?.(

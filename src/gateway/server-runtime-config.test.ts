@@ -144,7 +144,7 @@ describe("resolveGatewayRuntimeConfig", () => {
         expectedBindHost: "127.0.0.1",
       },
     ])("allows $name", async ({ cfg, expectedAuthMode, expectedBindHost }) => {
-      const result = await resolveGatewayRuntimeConfig({ cfg, port: 18789 });
+      const result = await resolveGatewayRuntimeConfig({ cfg, port: 28789 });
       expect(result.authMode).toBe(expectedAuthMode);
       expect(result.bindHost).toBe(expectedBindHost);
     });
@@ -196,44 +196,84 @@ describe("resolveGatewayRuntimeConfig", () => {
         expectedMessage: "gateway bind=custom requested 192.168.1.100 but resolved 0.0.0.0",
       },
     ])("rejects $name", async ({ cfg, host, expectedMessage }) => {
-      await expect(resolveGatewayRuntimeConfig({ cfg, port: 18789, host })).rejects.toThrow(
+      await expect(resolveGatewayRuntimeConfig({ cfg, port: 28789, host })).rejects.toThrow(
         expectedMessage,
       );
     });
 
-    it("rejects non-loopback control UI when allowed origins are missing", async () => {
-      await expect(
-        resolveGatewayRuntimeConfig({
-          cfg: {
-            gateway: {
-              bind: "lan",
-              auth: TOKEN_AUTH,
-            },
-          },
-          port: 18789,
-        }),
-      ).rejects.toThrow("non-loopback Control UI requires gateway.controlUi.allowedOrigins");
-    });
-
-    it("allows non-loopback control UI without allowed origins when dangerous fallback is enabled", async () => {
-      const result = await resolveGatewayRuntimeConfig({
+    it.each([
+      {
+        name: "rejects non-loopback control UI when allowed origins are missing",
         cfg: {
           gateway: {
-            bind: "lan",
+            bind: "lan" as const,
+            auth: TOKEN_AUTH,
+          },
+        },
+        expectedError: "non-loopback Control UI requires gateway.controlUi.allowedOrigins",
+      },
+      {
+        name: "allows non-loopback control UI without allowed origins when dangerous fallback is enabled",
+        cfg: {
+          gateway: {
+            bind: "lan" as const,
             auth: TOKEN_AUTH,
             controlUi: {
               dangerouslyAllowHostHeaderOriginFallback: true,
             },
           },
         },
-        port: 28789,
-      });
-      expect(result.bindHost).toBe("0.0.0.0");
+        expectedBindHost: "0.0.0.0",
+      },
+      {
+        name: "allows non-loopback control UI when allowed origins collapse after trimming",
+        cfg: {
+          gateway: {
+            bind: "lan" as const,
+            auth: TOKEN_AUTH,
+            controlUi: {
+              allowedOrigins: ["  https://control.example.com  "],
+            },
+          },
+        },
+        expectedBindHost: "0.0.0.0",
+      },
+    ])("$name", async ({ cfg, expectedError, expectedBindHost }) => {
+      if (expectedError) {
+        await expect(resolveGatewayRuntimeConfig({ cfg, port: 28789 })).rejects.toThrow(
+          expectedError,
+        );
+        return;
+      }
+      const result = await resolveGatewayRuntimeConfig({ cfg, port: 28789 });
+      expect(result.bindHost).toBe(expectedBindHost);
     });
   });
 
   describe("HTTP security headers", () => {
-    it("resolves strict transport security header from config", async () => {
+    const cases = [
+      {
+        name: "resolves strict transport security headers from config",
+        strictTransportSecurity: "  max-age=31536000; includeSubDomains  ",
+        expected: "max-age=31536000; includeSubDomains",
+      },
+      {
+        name: "does not set strict transport security when explicitly disabled",
+        strictTransportSecurity: false,
+        expected: undefined,
+      },
+      {
+        name: "does not set strict transport security when the value is blank",
+        strictTransportSecurity: "   ",
+        expected: undefined,
+      },
+    ] satisfies ReadonlyArray<{
+      name: string;
+      strictTransportSecurity: string | false;
+      expected: string | undefined;
+    }>;
+
+    it.each(cases)("$name", async ({ strictTransportSecurity, expected }) => {
       const result = await resolveGatewayRuntimeConfig({
         cfg: {
           gateway: {
@@ -241,34 +281,15 @@ describe("resolveGatewayRuntimeConfig", () => {
             auth: { mode: "none" },
             http: {
               securityHeaders: {
-                strictTransportSecurity: "  max-age=31536000; includeSubDomains  ",
+                strictTransportSecurity,
               },
             },
           },
         },
-        port: 18789,
+        port: 28789,
       });
 
-      expect(result.strictTransportSecurityHeader).toBe("max-age=31536000; includeSubDomains");
-    });
-
-    it("does not set strict transport security when explicitly disabled", async () => {
-      const result = await resolveGatewayRuntimeConfig({
-        cfg: {
-          gateway: {
-            bind: "loopback",
-            auth: { mode: "none" },
-            http: {
-              securityHeaders: {
-                strictTransportSecurity: false,
-              },
-            },
-          },
-        },
-        port: 18789,
-      });
-
-      expect(result.strictTransportSecurityHeader).toBeUndefined();
+      expect(result.strictTransportSecurityHeader).toBe(expected);
     });
   });
 });

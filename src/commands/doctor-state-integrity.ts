@@ -21,11 +21,21 @@ import { note } from "../terminal/note.js";
 import { shortenHomePath } from "../utils.js";
 
 type DoctorPrompterLike = {
-  confirmSkipInNonInteractive: (params: {
-    message: string;
-    initialValue?: boolean;
-  }) => Promise<boolean>;
+  confirmRuntimeRepair: (params: { message: string; initialValue?: boolean }) => Promise<boolean>;
 };
+
+function countLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function formatFilePreview(paths: string[], limit = 3): string {
+  const names = paths.slice(0, limit).map((filePath) => path.basename(filePath));
+  const remaining = paths.length - names.length;
+  if (remaining > 0) {
+    return `${names.join(", ")}, and ${remaining} more`;
+  }
+  return names.join(", ");
+}
 
 function existsDir(dir: string): boolean {
   try {
@@ -519,7 +529,7 @@ export async function noteStateIntegrity(
         "- Gateway is in remote mode; run doctor on the remote host where the gateway runs.",
       );
     }
-    const create = await prompter.confirmSkipInNonInteractive({
+    const create = await prompter.confirmRuntimeRepair({
       message: `Create ${displayStateDir} now?`,
       initialValue: false,
     });
@@ -540,7 +550,7 @@ export async function noteStateIntegrity(
     if (hint) {
       warnings.push(`  ${hint}`);
     }
-    const repair = await prompter.confirmSkipInNonInteractive({
+    const repair = await prompter.confirmRuntimeRepair({
       message: `Repair permissions on ${displayStateDir}?`,
       initialValue: true,
     });
@@ -569,7 +579,7 @@ export async function noteStateIntegrity(
         warnings.push(
           `- State directory permissions are too open (${displayStateDir}). Recommend chmod 700.`,
         );
-        const tighten = await prompter.confirmSkipInNonInteractive({
+        const tighten = await prompter.confirmRuntimeRepair({
           message: `Tighten permissions on ${displayStateDir} to 700?`,
           initialValue: true,
         });
@@ -596,7 +606,7 @@ export async function noteStateIntegrity(
         warnings.push(
           `- Config file is group/world readable (${displayConfigPath ?? configPath}). Recommend chmod 600.`,
         );
-        const tighten = await prompter.confirmSkipInNonInteractive({
+        const tighten = await prompter.confirmRuntimeRepair({
           message: `Tighten permissions on ${displayConfigPath ?? configPath} to 600?`,
           initialValue: true,
         });
@@ -640,7 +650,7 @@ export async function noteStateIntegrity(
       const displayDir = displayDirFor(dir);
       if (!existsDir(dir)) {
         warnings.push(`- CRITICAL: ${label} missing (${displayDir}).`);
-        const create = await prompter.confirmSkipInNonInteractive({
+        const create = await prompter.confirmRuntimeRepair({
           message: `Create ${label} at ${displayDir}?`,
           initialValue: true,
         });
@@ -660,7 +670,7 @@ export async function noteStateIntegrity(
         if (hint) {
           warnings.push(`  ${hint}`);
         }
-        const repair = await prompter.confirmSkipInNonInteractive({
+        const repair = await prompter.confirmRuntimeRepair({
           message: `Repair permissions on ${label}?`,
           initialValue: true,
         });
@@ -772,11 +782,18 @@ export async function noteStateIntegrity(
       .map((entry) => path.resolve(path.join(sessionsDir, entry.name)))
       .filter((filePath) => !referencedTranscriptPaths.has(filePath));
     if (orphanTranscriptPaths.length > 0) {
+      const orphanCount = countLabel(orphanTranscriptPaths.length, "orphan transcript file");
+      const orphanPreview = formatFilePreview(orphanTranscriptPaths);
       warnings.push(
-        `- Found ${orphanTranscriptPaths.length} orphan transcript file(s) in ${displaySessionsDir}. They are not referenced by sessions.json and can consume disk over time.`,
+        [
+          `- Found ${orphanCount} in ${displaySessionsDir}.`,
+          "  These .jsonl files are no longer referenced by sessions.json, so they are not part of any active session history.",
+          "  Doctor can archive them safely by renaming each file to *.deleted.<timestamp>.",
+          `  Examples: ${orphanPreview}`,
+        ].join("\n"),
       );
-      const archiveOrphans = await prompter.confirmSkipInNonInteractive({
-        message: `Archive ${orphanTranscriptPaths.length} orphan transcript file(s) in ${displaySessionsDir}?`,
+      const archiveOrphans = await prompter.confirmRuntimeRepair({
+        message: `Archive ${orphanCount} in ${displaySessionsDir}? This only renames them to *.deleted.<timestamp>.`,
         initialValue: false,
       });
       if (archiveOrphans) {
@@ -794,7 +811,9 @@ export async function noteStateIntegrity(
           }
         }
         if (archived > 0) {
-          changes.push(`- Archived ${archived} orphan transcript file(s) in ${displaySessionsDir}`);
+          changes.push(
+            `- Archived ${countLabel(archived, "orphan transcript file")} in ${displaySessionsDir} as .deleted timestamped backups.`,
+          );
         }
       }
     }

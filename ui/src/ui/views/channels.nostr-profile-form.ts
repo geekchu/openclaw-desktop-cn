@@ -101,15 +101,23 @@ export function renderNostrProfileForm(params: {
             placeholder=${placeholder ?? ""}
             maxlength=${maxLength ?? 2000}
             rows="3"
-            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: vertical; font-family: inherit;"
+            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); resize: vertical; font-family: inherit;"
             @input=${(e: InputEvent) => {
               const target = e.target as HTMLTextAreaElement;
               callbacks.onFieldChange(field, target.value);
             }}
             ?disabled=${state.saving}
           ></textarea>
-          ${help ? html`<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${help}</div>` : nothing}
-          ${error ? html`<div style="font-size: 12px; color: var(--danger-color); margin-top: 2px;">${error}</div>` : nothing}
+          ${help
+            ? html`<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                ${help}
+              </div>`
+            : nothing}
+          ${error
+            ? html`<div style="font-size: 12px; color: var(--danger-color); margin-top: 2px;">
+                ${error}
+              </div>`
+            : nothing}
         </div>
       `;
     }
@@ -125,15 +133,23 @@ export function renderNostrProfileForm(params: {
           .value=${value}
           placeholder=${placeholder ?? ""}
           maxlength=${maxLength ?? 256}
-          style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;"
+          style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);"
           @input=${(e: InputEvent) => {
             const target = e.target as HTMLInputElement;
             callbacks.onFieldChange(field, target.value);
           }}
           ?disabled=${state.saving}
         />
-        ${help ? html`<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${help}</div>` : nothing}
-        ${error ? html`<div style="font-size: 12px; color: var(--danger-color); margin-top: 2px;">${error}</div>` : nothing}
+        ${help
+          ? html`<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              ${help}
+            </div>`
+          : nothing}
+        ${error
+          ? html`<div style="font-size: 12px; color: var(--danger-color); margin-top: 2px;">
+              ${error}
+            </div>`
+          : nothing}
       </div>
     `;
   };
@@ -148,7 +164,7 @@ export function renderNostrProfileForm(params: {
       <div style="margin-bottom: 12px;">
         <img
           src=${picture}
-          alt="头像预览"
+          alt="Profile picture preview"
           style="max-width: 80px; max-height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color);"
           @error=${(e: Event) => {
             const img = e.target as HTMLImageElement;
@@ -164,82 +180,75 @@ export function renderNostrProfileForm(params: {
   };
 
   return html`
-    <div class="nostr-profile-form" style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; margin-top: 12px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <div style="font-weight: 600; font-size: 16px;">编辑资料</div>
-        <div style="font-size: 12px; color: var(--text-muted);">账户: ${accountId}</div>
+    <div
+      class="nostr-profile-form"
+      style="padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-md); margin-top: 12px;"
+    >
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;"
+      >
+        <div style="font-weight: 600; font-size: 16px;">Edit Profile</div>
+        <div style="font-size: 12px; color: var(--text-muted);">Account: ${accountId}</div>
       </div>
 
-      ${
-        state.error
-          ? html`<div class="callout danger" style="margin-bottom: 12px;">${state.error}</div>`
-          : nothing
-      }
-
-      ${
-        state.success
-          ? html`<div class="callout success" style="margin-bottom: 12px;">${state.success}</div>`
-          : nothing
-      }
-
+      ${state.error
+        ? html`<div class="callout danger" style="margin-bottom: 12px;">${state.error}</div>`
+        : nothing}
+      ${state.success
+        ? html`<div class="callout success" style="margin-bottom: 12px;">${state.success}</div>`
+        : nothing}
       ${renderPicturePreview()}
-
-      ${renderField("name", "用户名", {
+      ${renderField("name", "Username", {
         placeholder: "satoshi",
         maxLength: 256,
-        help: "简短用户名 (例如 satoshi)",
+        help: "Short username (e.g., satoshi)",
       })}
-
-      ${renderField("displayName", "显示名称", {
-        placeholder: "中本聪",
+      ${renderField("displayName", "Display Name", {
+        placeholder: "Satoshi Nakamoto",
         maxLength: 256,
-        help: "您的完整显示名称",
+        help: "Your full display name",
       })}
-
-      ${renderField("about", "简介", {
+      ${renderField("about", "Bio", {
         type: "textarea",
-        placeholder: "介绍一下自己...",
+        placeholder: "Tell people about yourself...",
         maxLength: 2000,
-        help: "简短的个人介绍",
+        help: "A brief bio or description",
       })}
-
-      ${renderField("picture", "头像 URL", {
+      ${renderField("picture", "Avatar URL", {
         type: "url",
         placeholder: "https://example.com/avatar.jpg",
-        help: "您的头像图片的 HTTPS URL",
+        help: "HTTPS URL to your profile picture",
       })}
+      ${state.showAdvanced
+        ? html`
+            <div
+              style="border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 12px;"
+            >
+              <div style="font-weight: 500; margin-bottom: 12px; color: var(--text-muted);">
+                Advanced
+              </div>
 
-      ${
-        state.showAdvanced
-          ? html`
-            <div style="border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 12px;">
-              <div style="font-weight: 500; margin-bottom: 12px; color: var(--text-muted);">高级选项</div>
-
-              ${renderField("banner", "横幅 URL", {
+              ${renderField("banner", "Banner URL", {
                 type: "url",
                 placeholder: "https://example.com/banner.jpg",
-                help: "横幅图片的 HTTPS URL",
+                help: "HTTPS URL to a banner image",
               })}
-
-              ${renderField("website", "网站", {
+              ${renderField("website", "Website", {
                 type: "url",
                 placeholder: "https://example.com",
-                help: "您的个人网站",
+                help: "Your personal website",
               })}
-
-              ${renderField("nip05", "NIP-05 标识符", {
+              ${renderField("nip05", "NIP-05 Identifier", {
                 placeholder: "you@example.com",
-                help: "可验证标识符 (例如 you@domain.com)",
+                help: "Verifiable identifier (e.g., you@domain.com)",
               })}
-
-              ${renderField("lud16", "闪电网络地址", {
+              ${renderField("lud16", "Lightning Address", {
                 placeholder: "you@getalby.com",
-                help: "用于打赏的闪电网络地址 (LUD-16)",
+                help: "Lightning address for tips (LUD-16)",
               })}
             </div>
           `
-          : nothing
-      }
+        : nothing}
 
       <div style="display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
         <button
@@ -247,7 +256,7 @@ export function renderNostrProfileForm(params: {
           @click=${callbacks.onSave}
           ?disabled=${state.saving || !isDirty}
         >
-          ${state.saving ? "保存中..." : "保存并发布"}
+          ${state.saving ? "Saving..." : "Save & Publish"}
         </button>
 
         <button
@@ -255,32 +264,23 @@ export function renderNostrProfileForm(params: {
           @click=${callbacks.onImport}
           ?disabled=${state.importing || state.saving}
         >
-          ${state.importing ? "导入中..." : "从中继导入"}
+          ${state.importing ? "Importing..." : "Import from Relays"}
         </button>
 
-        <button
-          class="btn"
-          @click=${callbacks.onToggleAdvanced}
-        >
-          ${state.showAdvanced ? "隐藏高级选项" : "显示高级选项"}
+        <button class="btn" @click=${callbacks.onToggleAdvanced}>
+          ${state.showAdvanced ? "Hide Advanced" : "Show Advanced"}
         </button>
 
-        <button
-          class="btn"
-          @click=${callbacks.onCancel}
-          ?disabled=${state.saving}
-        >
-          取消
-        </button>
+        <button class="btn" @click=${callbacks.onCancel} ?disabled=${state.saving}>Cancel</button>
       </div>
 
-      ${
-        isDirty
-          ? html`
-              <div style="font-size: 12px; color: var(--warning-color); margin-top: 8px">您有未保存的更改</div>
-            `
-          : nothing
-      }
+      ${isDirty
+        ? html`
+            <div style="font-size: 12px; color: var(--warning-color); margin-top: 8px">
+              You have unsaved changes
+            </div>
+          `
+        : nothing}
     </div>
   `;
 }

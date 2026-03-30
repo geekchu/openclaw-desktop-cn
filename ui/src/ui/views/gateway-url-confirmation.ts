@@ -12,27 +12,19 @@ export function renderGatewayUrlConfirmation(state: AppViewState) {
       <div class="exec-approval-card">
         <div class="exec-approval-header">
           <div>
-            <div class="exec-approval-title">更改网关地址</div>
-            <div class="exec-approval-sub">这将重新连接到不同的网关服务器</div>
+            <div class="exec-approval-title">Change Gateway URL</div>
+            <div class="exec-approval-sub">This will reconnect to a different gateway server</div>
           </div>
         </div>
         <div class="exec-approval-command mono">${pendingGatewayUrl}</div>
         <div class="callout danger" style="margin-top: 12px;">
-          仅在您信任此地址时才确认。恶意地址可能会危害您的系统。
+          Only confirm if you trust this URL. Malicious URLs can compromise your system.
         </div>
         <div class="exec-approval-actions">
-          <button
-            class="btn primary"
-            @click=${() => state.handleGatewayUrlConfirm()}
-          >
-            确认
+          <button class="btn primary" @click=${() => state.handleGatewayUrlConfirm()}>
+            Confirm
           </button>
-          <button
-            class="btn"
-            @click=${() => state.handleGatewayUrlCancel()}
-          >
-            取消
-          </button>
+          <button class="btn" @click=${() => state.handleGatewayUrlCancel()}>Cancel</button>
         </div>
       </div>
     </div>

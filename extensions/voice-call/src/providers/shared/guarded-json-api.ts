@@ -1,4 +1,4 @@
-import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/voice-call";
+import { fetchWithSsrFGuard } from "../../../api.js";
 
 type GuardedJsonApiRequestParams = {
   url: string;
@@ -23,7 +23,6 @@ export async function guardedJsonApiRequest<T = unknown>(
     },
     policy: { allowedHostnames: params.allowedHostnames },
     auditContext: params.auditContext,
-    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
   });
 
   try {

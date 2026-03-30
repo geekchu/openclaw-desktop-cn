@@ -82,7 +82,7 @@ export async function updateSkillEnabled(state: SkillsState, skillKey: string, e
     await loadSkills(state);
     setSkillMessage(state, skillKey, {
       kind: "success",
-      message: enabled ? "技能已启用" : "技能已禁用",
+      message: enabled ? "Skill enabled" : "Skill disabled",
     });
   } catch (err) {
     const message = getErrorMessage(err);
@@ -108,7 +108,7 @@ export async function saveSkillApiKey(state: SkillsState, skillKey: string) {
     await loadSkills(state);
     setSkillMessage(state, skillKey, {
       kind: "success",
-      message: "API 密钥已保存",
+      message: `API key saved — stored in openclaw.json (skills.entries.${skillKey})`,
     });
   } catch (err) {
     const message = getErrorMessage(err);
@@ -133,22 +133,16 @@ export async function installSkill(
   }
   state.skillsBusyKey = skillKey;
   state.skillsError = null;
-  // brew/go 安装可能需要较长时间，设置 5 分钟超时
-  const installTimeoutMs = 300_000;
   try {
-    const result = await state.client.request<{ message?: string }>(
-      "skills.install",
-      {
-        name,
-        installId,
-        timeoutMs: installTimeoutMs,
-      },
-      installTimeoutMs,
-    );
+    const result = await state.client.request<{ message?: string }>("skills.install", {
+      name,
+      installId,
+      timeoutMs: 120000,
+    });
     await loadSkills(state);
     setSkillMessage(state, skillKey, {
       kind: "success",
-      message: result?.message ?? "已安装",
+      message: result?.message ?? "Installed",
     });
   } catch (err) {
     const message = getErrorMessage(err);

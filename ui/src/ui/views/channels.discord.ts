@@ -1,7 +1,12 @@
 import { html, nothing } from "lit";
-import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+import { formatRelativeTimestamp } from "../format.ts";
 import type { DiscordStatus } from "../types.ts";
 import { renderChannelConfigSection } from "./channels.config.ts";
+import {
+  formatNullableBoolean,
+  renderSingleAccountChannelCard,
+  resolveChannelConfigured,
+} from "./channels.shared.ts";
 import type { ChannelsProps } from "./channels.types.ts";
 
 export function renderDiscordCard(params: {
@@ -10,56 +15,34 @@ export function renderDiscordCard(params: {
   accountCountLabel: unknown;
 }) {
   const { props, discord, accountCountLabel } = params;
+  const configured = resolveChannelConfigured("discord", props);
 
-  return html`
-    <div class="card">
-      <div class="card-title">Discord</div>
-      <div class="card-sub">机器人状态和频道配置。</div>
-      ${accountCountLabel}
-
-      <div class="status-list" style="margin-top: 16px;">
-        <div>
-          <span class="label">已配置</span>
-          <span>${discord?.configured ? "是" : "否"}</span>
-        </div>
-        <div>
-          <span class="label">运行中</span>
-          <span>${discord?.running ? "是" : "否"}</span>
-        </div>
-        <div>
-          <span class="label">上次启动</span>
-          <span>${discord?.lastStartAt ? formatAgo(discord.lastStartAt) : "无"}</span>
-        </div>
-        <div>
-          <span class="label">上次探测</span>
-          <span>${discord?.lastProbeAt ? formatAgo(discord.lastProbeAt) : "无"}</span>
-        </div>
-      </div>
-
-      ${
-        discord?.lastError
-          ? html`<div class="callout danger" style="margin-top: 12px;">
-            ${discord.lastError}
-          </div>`
-          : nothing
-      }
-
-      ${
-        discord?.probe
-          ? html`<div class="callout" style="margin-top: 12px;">
-            探测 ${discord.probe.ok ? "成功" : "失败"} ·
-            ${discord.probe.status ?? ""} ${discord.probe.error ?? ""}
-          </div>`
-          : nothing
-      }
-
-      ${renderChannelConfigSection({ channelId: "discord", props })}
-
-      <div class="row" style="margin-top: 12px;">
-        <button class="btn" @click=${() => props.onRefresh(true)}>
-          探测
-        </button>
-      </div>
-    </div>
-  `;
+  return renderSingleAccountChannelCard({
+    title: "Discord",
+    subtitle: "Bot status and channel configuration.",
+    accountCountLabel,
+    statusRows: [
+      { label: "Configured", value: formatNullableBoolean(configured) },
+      { label: "Running", value: discord?.running ? "Yes" : "No" },
+      {
+        label: "Last start",
+        value: discord?.lastStartAt ? formatRelativeTimestamp(discord.lastStartAt) : "n/a",
+      },
+      {
+        label: "Last probe",
+        value: discord?.lastProbeAt ? formatRelativeTimestamp(discord.lastProbeAt) : "n/a",
+      },
+    ],
+    lastError: discord?.lastError,
+    secondaryCallout: discord?.probe
+      ? html`<div class="callout" style="margin-top: 12px;">
+          Probe ${discord.probe.ok ? "ok" : "failed"} · ${discord.probe.status ?? ""}
+          ${discord.probe.error ?? ""}
+        </div>`
+      : nothing,
+    configSection: renderChannelConfigSection({ channelId: "discord", props }),
+    footer: html`<div class="row" style="margin-top: 12px;">
+      <button class="btn" @click=${() => props.onRefresh(true)}>Probe</button>
+    </div>`,
+  });
 }

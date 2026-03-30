@@ -42,7 +42,7 @@ describe("message-normalizer", () => {
         timestamp: 2000,
       });
 
-      expect(result.role).toBe("assistant");
+      expect(result.role).toBe("toolResult");
       expect(result.content).toHaveLength(2);
       expect(result.content[0]).toEqual({
         type: "text",
@@ -87,6 +87,21 @@ describe("message-normalizer", () => {
       expect(result.role).toBe("toolResult");
     });
 
+    it("detects tool messages by toolcall content blocks", () => {
+      const result = normalizeMessage({
+        role: "assistant",
+        content: [{ type: "toolcall", name: "Bash", arguments: { command: "pwd" } }],
+      });
+
+      expect(result.role).toBe("toolResult");
+      expect(result.content[0]).toEqual({
+        type: "toolcall",
+        text: undefined,
+        name: "Bash",
+        args: { command: "pwd" },
+      });
+    });
+
     it("handles missing role", () => {
       const result = normalizeMessage({ content: "No role" });
       expect(result.role).toBe("unknown");
@@ -109,6 +124,15 @@ describe("message-normalizer", () => {
       });
 
       expect(result.content[0].args).toEqual({ foo: "bar" });
+    });
+
+    it("handles input field for anthropic tool_use blocks", () => {
+      const result = normalizeMessage({
+        role: "assistant",
+        content: [{ type: "tool_use", name: "Bash", input: { command: "pwd" } }],
+      });
+
+      expect(result.content[0].args).toEqual({ command: "pwd" });
     });
   });
 

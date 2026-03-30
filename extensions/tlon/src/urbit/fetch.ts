@@ -1,5 +1,4 @@
-import type { LookupFn, SsrFPolicy } from "openclaw/plugin-sdk/tlon";
-import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/tlon";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE, type LookupFn, type SsrFPolicy } from "../../runtime-api.js";
 import { validateUrbitBaseUrl } from "./base-url.js";
 import { UrbitUrlError } from "./errors.js";
 

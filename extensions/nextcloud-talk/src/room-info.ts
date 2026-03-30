@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
-import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/nextcloud-talk";
-import type { RuntimeEnv } from "openclaw/plugin-sdk/nextcloud-talk";
+import { fetchWithSsrFGuard, type RuntimeEnv } from "../runtime-api.js";
 import type { ResolvedNextcloudTalkAccount } from "./accounts.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 
@@ -105,8 +104,8 @@ export async function resolveNextcloudTalkRoomKind(params: {
           Accept: "application/json",
         },
       },
-      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
       auditContext: "nextcloud-talk.room-info",
+      policy: account.config?.allowPrivateNetwork ? { allowPrivateNetwork: true } : undefined,
     });
     try {
       if (!response.ok) {

@@ -1,8 +1,8 @@
 /**
  * Upload an image from a URL to Tlon storage.
  */
-import { uploadFile } from "@tloncorp/api";
-import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/tlon";
+import { fetchWithSsrFGuard } from "../../runtime-api.js";
+import { uploadFile } from "../tlon-api.js";
 import { getDefaultSsrFPolicy } from "./context.js";
 
 /**
@@ -27,7 +27,6 @@ export async function uploadImageFromUrl(imageUrl: string): Promise<string> {
       init: { method: "GET" },
       policy: getDefaultSsrFPolicy(),
       auditContext: "tlon-upload-image",
-      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
     });
 
     try {

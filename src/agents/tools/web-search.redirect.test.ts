@@ -1,62 +1,48 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fetchWithSsrFGuardMock } = vi.hoisted(() => ({
-  fetchWithSsrFGuardMock: vi.fn(),
+const { withStrictWebToolsEndpointMock } = vi.hoisted(() => ({
+  withStrictWebToolsEndpointMock: vi.fn(),
 }));
 
-vi.mock("../../infra/net/fetch-guard.js", () => {
-  const GUARDED_FETCH_MODE = {
-    STRICT: "strict",
-    TRUSTED_ENV_PROXY: "trusted_env_proxy",
-  } as const;
-  return {
-    GUARDED_FETCH_MODE,
-    fetchWithSsrFGuard: fetchWithSsrFGuardMock,
-    withStrictGuardedFetchMode: (params: Record<string, unknown>) => ({
-      ...params,
-      mode: GUARDED_FETCH_MODE.STRICT,
-    }),
-    withTrustedEnvProxyGuardedFetchMode: (params: Record<string, unknown>) => ({
-      ...params,
-      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
-    }),
-  };
-});
-
-import { __testing } from "./web-search.js";
+vi.mock("./web-guarded-fetch.js", () => ({
+  withStrictWebToolsEndpoint: withStrictWebToolsEndpointMock,
+}));
 
 describe("web_search redirect resolution hardening", () => {
-  const { resolveRedirectUrl } = __testing;
+  async function resolveRedirectUrl() {
+    const module = await import("./web-search-citation-redirect.js");
+    return module.resolveCitationRedirectUrl;
+  }
 
   beforeEach(() => {
-    fetchWithSsrFGuardMock.mockReset();
+    vi.resetModules();
+    withStrictWebToolsEndpointMock.mockReset();
   });
 
-  it("resolves redirects via SSRF-guarded HEAD requests with proxy", async () => {
-    const release = vi.fn(async () => {});
-    fetchWithSsrFGuardMock.mockResolvedValue({
-      response: new Response(null, { status: 200 }),
-      finalUrl: "https://example.com/final",
-      release,
+  it("resolves redirects via SSRF-guarded HEAD requests", async () => {
+    const resolve = await resolveRedirectUrl();
+    withStrictWebToolsEndpointMock.mockImplementation(async (_params, run) => {
+      return await run({
+        response: new Response(null, { status: 200 }),
+        finalUrl: "https://example.com/final",
+      });
     });
 
-    const resolved = await resolveRedirectUrl("https://example.com/start");
+    const resolved = await resolve("https://example.com/start");
     expect(resolved).toBe("https://example.com/final");
-    expect(fetchWithSsrFGuardMock).toHaveBeenCalledWith(
+    expect(withStrictWebToolsEndpointMock).toHaveBeenCalledWith(
       expect.objectContaining({
         url: "https://example.com/start",
         timeoutMs: 5000,
         init: { method: "HEAD" },
-        mode: "trusted_env_proxy",
       }),
+      expect.any(Function),
     );
-    expect(release).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to the original URL when guarded resolution fails", async () => {
-    fetchWithSsrFGuardMock.mockRejectedValue(new Error("blocked"));
-    await expect(resolveRedirectUrl("https://example.com/start")).resolves.toBe(
-      "https://example.com/start",
-    );
+    const resolve = await resolveRedirectUrl();
+    withStrictWebToolsEndpointMock.mockRejectedValue(new Error("blocked"));
+    await expect(resolve("https://example.com/start")).resolves.toBe("https://example.com/start");
   });
 });

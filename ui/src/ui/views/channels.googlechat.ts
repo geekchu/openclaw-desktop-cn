@@ -1,7 +1,12 @@
 import { html, nothing } from "lit";
-import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+import { formatRelativeTimestamp } from "../format.ts";
 import type { GoogleChatStatus } from "../types.ts";
 import { renderChannelConfigSection } from "./channels.config.ts";
+import {
+  formatNullableBoolean,
+  renderSingleAccountChannelCard,
+  resolveChannelConfigured,
+} from "./channels.shared.ts";
 import type { ChannelsProps } from "./channels.types.ts";
 
 export function renderGoogleChatCard(params: {
@@ -10,70 +15,44 @@ export function renderGoogleChatCard(params: {
   accountCountLabel: unknown;
 }) {
   const { props, googleChat, accountCountLabel } = params;
+  const configured = resolveChannelConfigured("googlechat", props);
 
-  return html`
-    <div class="card">
-      <div class="card-title">Google Chat</div>
-      <div class="card-sub">Chat API webhook 状态和频道配置。</div>
-      ${accountCountLabel}
-
-      <div class="status-list" style="margin-top: 16px;">
-        <div>
-          <span class="label">已配置</span>
-          <span>${googleChat ? (googleChat.configured ? "是" : "否") : "无"}</span>
-        </div>
-        <div>
-          <span class="label">运行中</span>
-          <span>${googleChat ? (googleChat.running ? "是" : "否") : "无"}</span>
-        </div>
-        <div>
-          <span class="label">凭证</span>
-          <span>${googleChat?.credentialSource ?? "无"}</span>
-        </div>
-        <div>
-          <span class="label">受众</span>
-          <span>
-            ${
-              googleChat?.audienceType
-                ? `${googleChat.audienceType}${googleChat.audience ? ` · ${googleChat.audience}` : ""}`
-                : "无"
-            }
-          </span>
-        </div>
-        <div>
-          <span class="label">上次启动</span>
-          <span>${googleChat?.lastStartAt ? formatAgo(googleChat.lastStartAt) : "无"}</span>
-        </div>
-        <div>
-          <span class="label">上次探测</span>
-          <span>${googleChat?.lastProbeAt ? formatAgo(googleChat.lastProbeAt) : "无"}</span>
-        </div>
-      </div>
-
-      ${
-        googleChat?.lastError
-          ? html`<div class="callout danger" style="margin-top: 12px;">
-            ${googleChat.lastError}
-          </div>`
-          : nothing
-      }
-
-      ${
-        googleChat?.probe
-          ? html`<div class="callout" style="margin-top: 12px;">
-            探测 ${googleChat.probe.ok ? "成功" : "失败"} ·
-            ${googleChat.probe.status ?? ""} ${googleChat.probe.error ?? ""}
-          </div>`
-          : nothing
-      }
-
-      ${renderChannelConfigSection({ channelId: "googlechat", props })}
-
-      <div class="row" style="margin-top: 12px;">
-        <button class="btn" @click=${() => props.onRefresh(true)}>
-          探测
-        </button>
-      </div>
-    </div>
-  `;
+  return renderSingleAccountChannelCard({
+    title: "Google Chat",
+    subtitle: "Chat API webhook status and channel configuration.",
+    accountCountLabel,
+    statusRows: [
+      { label: "Configured", value: formatNullableBoolean(configured) },
+      {
+        label: "Running",
+        value: googleChat ? (googleChat.running ? "Yes" : "No") : "n/a",
+      },
+      { label: "Credential", value: googleChat?.credentialSource ?? "n/a" },
+      {
+        label: "Audience",
+        value: googleChat?.audienceType
+          ? `${googleChat.audienceType}${googleChat.audience ? ` · ${googleChat.audience}` : ""}`
+          : "n/a",
+      },
+      {
+        label: "Last start",
+        value: googleChat?.lastStartAt ? formatRelativeTimestamp(googleChat.lastStartAt) : "n/a",
+      },
+      {
+        label: "Last probe",
+        value: googleChat?.lastProbeAt ? formatRelativeTimestamp(googleChat.lastProbeAt) : "n/a",
+      },
+    ],
+    lastError: googleChat?.lastError,
+    secondaryCallout: googleChat?.probe
+      ? html`<div class="callout" style="margin-top: 12px;">
+          Probe ${googleChat.probe.ok ? "ok" : "failed"} · ${googleChat.probe.status ?? ""}
+          ${googleChat.probe.error ?? ""}
+        </div>`
+      : nothing,
+    configSection: renderChannelConfigSection({ channelId: "googlechat", props }),
+    footer: html`<div class="row" style="margin-top: 12px;">
+      <button class="btn" @click=${() => props.onRefresh(true)}>Probe</button>
+    </div>`,
+  });
 }

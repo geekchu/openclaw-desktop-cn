@@ -1,7 +1,12 @@
 import { html, nothing } from "lit";
-import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+import { formatRelativeTimestamp } from "../format.ts";
 import type { SignalStatus } from "../types.ts";
 import { renderChannelConfigSection } from "./channels.config.ts";
+import {
+  formatNullableBoolean,
+  renderSingleAccountChannelCard,
+  resolveChannelConfigured,
+} from "./channels.shared.ts";
 import type { ChannelsProps } from "./channels.types.ts";
 
 export function renderSignalCard(params: {
@@ -10,60 +15,35 @@ export function renderSignalCard(params: {
   accountCountLabel: unknown;
 }) {
   const { props, signal, accountCountLabel } = params;
+  const configured = resolveChannelConfigured("signal", props);
 
-  return html`
-    <div class="card">
-      <div class="card-title">Signal</div>
-      <div class="card-sub">signal-cli 状态和频道配置。</div>
-      ${accountCountLabel}
-
-      <div class="status-list" style="margin-top: 16px;">
-        <div>
-          <span class="label">已配置</span>
-          <span>${signal?.configured ? "是" : "否"}</span>
-        </div>
-        <div>
-          <span class="label">运行中</span>
-          <span>${signal?.running ? "是" : "否"}</span>
-        </div>
-        <div>
-          <span class="label">基础 URL</span>
-          <span>${signal?.baseUrl ?? "无"}</span>
-        </div>
-        <div>
-          <span class="label">上次启动</span>
-          <span>${signal?.lastStartAt ? formatAgo(signal.lastStartAt) : "无"}</span>
-        </div>
-        <div>
-          <span class="label">上次探测</span>
-          <span>${signal?.lastProbeAt ? formatAgo(signal.lastProbeAt) : "无"}</span>
-        </div>
-      </div>
-
-      ${
-        signal?.lastError
-          ? html`<div class="callout danger" style="margin-top: 12px;">
-            ${signal.lastError}
-          </div>`
-          : nothing
-      }
-
-      ${
-        signal?.probe
-          ? html`<div class="callout" style="margin-top: 12px;">
-            探测 ${signal.probe.ok ? "成功" : "失败"} ·
-            ${signal.probe.status ?? ""} ${signal.probe.error ?? ""}
-          </div>`
-          : nothing
-      }
-
-      ${renderChannelConfigSection({ channelId: "signal", props })}
-
-      <div class="row" style="margin-top: 12px;">
-        <button class="btn" @click=${() => props.onRefresh(true)}>
-          探测
-        </button>
-      </div>
-    </div>
-  `;
+  return renderSingleAccountChannelCard({
+    title: "Signal",
+    subtitle: "signal-cli status and channel configuration.",
+    accountCountLabel,
+    statusRows: [
+      { label: "Configured", value: formatNullableBoolean(configured) },
+      { label: "Running", value: signal?.running ? "Yes" : "No" },
+      { label: "Base URL", value: signal?.baseUrl ?? "n/a" },
+      {
+        label: "Last start",
+        value: signal?.lastStartAt ? formatRelativeTimestamp(signal.lastStartAt) : "n/a",
+      },
+      {
+        label: "Last probe",
+        value: signal?.lastProbeAt ? formatRelativeTimestamp(signal.lastProbeAt) : "n/a",
+      },
+    ],
+    lastError: signal?.lastError,
+    secondaryCallout: signal?.probe
+      ? html`<div class="callout" style="margin-top: 12px;">
+          Probe ${signal.probe.ok ? "ok" : "failed"} · ${signal.probe.status ?? ""}
+          ${signal.probe.error ?? ""}
+        </div>`
+      : nothing,
+    configSection: renderChannelConfigSection({ channelId: "signal", props }),
+    footer: html`<div class="row" style="margin-top: 12px;">
+      <button class="btn" @click=${() => props.onRefresh(true)}>Probe</button>
+    </div>`,
+  });
 }

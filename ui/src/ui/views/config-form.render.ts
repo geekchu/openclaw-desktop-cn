@@ -1,15 +1,8 @@
-﻿import { html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { icons } from "../icons.ts";
 import type { ConfigUiHints } from "../types.ts";
 import { matchesNodeSearch, parseConfigSearchQuery, renderNode } from "./config-form.node.ts";
-import {
-  hintForPath,
-  humanize,
-  resolveHelp,
-  resolveLabel,
-  schemaType,
-  type JsonSchema,
-} from "./config-form.shared.ts";
+import { hintForPath, humanize, schemaType, type JsonSchema } from "./config-form.shared.ts";
 
 export type ConfigFormProps = {
   schema: JsonSchema | null;
@@ -20,6 +13,9 @@ export type ConfigFormProps = {
   searchQuery?: string;
   activeSection?: string | null;
   activeSubsection?: string | null;
+  revealSensitive?: boolean;
+  isSensitivePathRevealed?: (path: Array<string | number>) => boolean;
+  onToggleSensitivePath?: (path: Array<string | number>) => void;
   onPatch: (path: Array<string | number>, value: unknown) => void;
 };
 
@@ -53,11 +49,6 @@ const sectionIcons = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
       <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-    </svg>
-  `,
-  security: html`
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
     </svg>
   `,
   channels: html`
@@ -240,6 +231,40 @@ const sectionIcons = {
       <path d="m19.07 10.93-4.24 4.24"></path>
     </svg>
   `,
+  diagnostics: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+    </svg>
+  `,
+  cli: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <polyline points="4 17 10 11 4 5"></polyline>
+      <line x1="12" y1="19" x2="20" y2="19"></line>
+    </svg>
+  `,
+  secrets: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path
+        d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"
+      ></path>
+    </svg>
+  `,
+  acp: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </svg>
+  `,
+  mcp: html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+      <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+      <line x1="6" y1="6" x2="6.01" y2="6"></line>
+      <line x1="6" y1="18" x2="6.01" y2="18"></line>
+    </svg>
+  `,
   default: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -250,250 +275,51 @@ const sectionIcons = {
 
 // Section metadata
 export const SECTION_META: Record<string, { label: string; description: string }> = {
-  onestop: {
-    label: "AI大模型接入",
-    description: "一站式接入全球AI大模型，支持自定义配置",
-  },
   env: {
-    label: "环境变量",
-    description: "传递给网关进程的环境变量",
+    label: "Environment Variables",
+    description: "Environment variables passed to the gateway process",
   },
-  update: { label: "更新", description: "自动更新设置和发布渠道" },
-  agents: { label: "代理", description: "代理配置、模型和身份" },
-  auth: { label: "认证", description: "API 密钥和认证配置" },
+  update: { label: "Updates", description: "Auto-update settings and release channel" },
+  agents: { label: "Agents", description: "Agent configurations, models, and identities" },
+  auth: { label: "Authentication", description: "API keys and authentication profiles" },
   channels: {
-    label: "频道",
-    description: "消息频道 (Telegram、Discord、Slack 等)",
+    label: "Channels",
+    description: "Messaging channels (Telegram, Discord, Slack, etc.)",
   },
-  messages: { label: "消息", description: "消息处理和路由设置" },
-  commands: { label: "命令", description: "自定义斜杠命令" },
-  hooks: { label: "钩子", description: "Webhook 和事件钩子" },
-  skills: { label: "技能", description: "技能包和功能" },
-  tools: { label: "工具", description: "工具配置 (浏览器、搜索等)" },
-  gateway: { label: "网关", description: "网关服务器设置 (端口、认证、绑定)" },
-  wizard: { label: "设置向导", description: "设置向导状态和历史" },
+  messages: { label: "Messages", description: "Message handling and routing settings" },
+  commands: { label: "Commands", description: "Custom slash commands" },
+  hooks: { label: "Hooks", description: "Webhooks and event hooks" },
+  skills: { label: "Skills", description: "Skill packs and capabilities" },
+  tools: { label: "Tools", description: "Tool configurations (browser, search, etc.)" },
+  gateway: { label: "Gateway", description: "Gateway server settings (port, auth, binding)" },
+  wizard: { label: "Setup Wizard", description: "Setup wizard state and history" },
   // Additional sections
-  meta: { label: "元数据", description: "网关元数据和版本信息" },
-  logging: { label: "日志", description: "日志级别和输出配置" },
-  browser: { label: "浏览器", description: "浏览器自动化设置" },
-  ui: { label: "界面", description: "用户界面偏好设置" },
-  models: { label: "自定义配置接入", description: "手动配置 AI 模型提供商和密钥（高级用户）" },
-  bindings: { label: "绑定", description: "快捷键绑定" },
-  broadcast: { label: "广播", description: "广播和通知设置" },
-  audio: { label: "音频", description: "音频输入/输出设置" },
-  session: { label: "会话", description: "会话管理和持久化" },
-  cron: { label: "定时任务", description: "计划任务和自动化" },
-  web: { label: "Web", description: "Web 服务器和 API 设置" },
-  discovery: { label: "发现", description: "服务发现和网络" },
-  canvasHost: { label: "画布主机", description: "画布渲染和显示" },
-  talk: { label: "语音", description: "语音和语音设置" },
-  plugins: { label: "插件", description: "插件管理和扩展" },
-  // More potential sections
-  routing: { label: "路由", description: "消息路由配置" },
-  allowlist: { label: "白名单", description: "允许列表配置" },
-  pairing: { label: "配对", description: "设备配对设置" },
-  presence: { label: "在线状态", description: "在线状态和活动设置" },
-  memory: { label: "记忆", description: "长期记忆和上下文" },
-  mcp: { label: "MCP", description: "模型上下文协议设置" },
-  diagnostics: { label: "诊断", description: "诊断和调试设置" },
-  telemetry: { label: "遥测", description: "遥测和分析设置" },
-  security: { label: "安全", description: "安全和权限设置" },
-  network: { label: "网络", description: "网络和连接设置" },
-  storage: { label: "存储", description: "数据存储设置" },
-  cache: { label: "缓存", description: "缓存配置" },
-  limits: { label: "限制", description: "速率限制和配额" },
-  notifications: { label: "通知", description: "通知设置" },
-  integrations: { label: "集成", description: "第三方集成" },
-  experimental: { label: "实验性", description: "实验性功能" },
-  advanced: { label: "高级", description: "高级设置" },
-  developer: { label: "开发者", description: "开发者选项" },
-  debug: { label: "调试", description: "调试设置" },
-  performance: { label: "性能", description: "性能优化设置" },
-  backup: { label: "备份", description: "备份和恢复设置" },
-  sync: { label: "同步", description: "数据同步设置" },
-  export: { label: "导出", description: "数据导出设置" },
-  import: { label: "导入", description: "数据导入设置" },
-  theme: { label: "主题", description: "主题和外观设置" },
-  language: { label: "语言", description: "语言和本地化" },
-  accessibility: { label: "无障碍", description: "无障碍功能设置" },
-  privacy: { label: "隐私", description: "隐私设置" },
-  account: { label: "账户", description: "账户设置" },
-  profile: { label: "个人资料", description: "个人资料设置" },
-  preferences: { label: "偏好", description: "用户偏好设置" },
-  defaults: { label: "默认值", description: "默认配置" },
-  templates: { label: "模板", description: "消息模板" },
-  shortcuts: { label: "快捷方式", description: "快捷方式设置" },
-  automation: { label: "自动化", description: "自动化规则" },
-  workflows: { label: "工作流", description: "工作流配置" },
-  scripts: { label: "脚本", description: "自定义脚本" },
-  extensions: { label: "扩展", description: "扩展管理" },
-  api: { label: "API", description: "API 配置" },
-  webhooks: { label: "Webhooks", description: "Webhook 配置" },
-  events: { label: "事件", description: "事件处理" },
-  triggers: { label: "触发器", description: "触发器配置" },
-  actions: { label: "动作", description: "动作配置" },
-  filters: { label: "过滤器", description: "过滤器设置" },
-  rules: { label: "规则", description: "规则配置" },
-  policies: { label: "策略", description: "策略设置" },
-  permissions: { label: "权限", description: "权限管理" },
-  roles: { label: "角色", description: "角色管理" },
-  users: { label: "用户", description: "用户管理" },
-  groups: { label: "群组", description: "群组管理" },
-  teams: { label: "团队", description: "团队设置" },
-  organizations: { label: "组织", description: "组织设置" },
-  billing: { label: "计费", description: "计费设置" },
-  subscription: { label: "订阅", description: "订阅管理" },
-  usage: { label: "使用量", description: "使用量统计" },
-  analytics: { label: "分析", description: "数据分析" },
-  reports: { label: "报告", description: "报告设置" },
-  logs: { label: "日志", description: "日志查看" },
-  history: { label: "历史", description: "历史记录" },
-  activity: { label: "活动", description: "活动日志" },
-  audit: { label: "审计", description: "审计日志" },
-  monitoring: { label: "监控", description: "系统监控" },
-  alerts: { label: "警报", description: "警报设置" },
-  health: { label: "健康", description: "健康检查" },
-  status: { label: "状态", description: "系统状态" },
-  info: { label: "信息", description: "系统信息" },
-  about: { label: "关于", description: "关于信息" },
-  help: { label: "帮助", description: "帮助文档" },
-  support: { label: "支持", description: "技术支持" },
-  feedback: { label: "反馈", description: "用户反馈" },
-  controlUi: { label: "控制界面", description: "控制界面设置" },
-  server: { label: "服务器", description: "服务器设置" },
-  client: { label: "客户端", description: "客户端设置" },
-  connection: { label: "连接", description: "连接设置" },
-  timeout: { label: "超时", description: "超时设置" },
-  retry: { label: "重试", description: "重试策略" },
-  fallback: { label: "回退", description: "回退设置" },
-  proxy: { label: "代理服务器", description: "代理服务器设置" },
-  ssl: { label: "SSL", description: "SSL/TLS 设置" },
-  cors: { label: "CORS", description: "跨域设置" },
-  headers: { label: "请求头", description: "HTTP 请求头" },
-  cookies: { label: "Cookies", description: "Cookie 设置" },
-  tokens: { label: "令牌", description: "令牌管理" },
-  keys: { label: "密钥", description: "密钥管理" },
-  secrets: { label: "密钥", description: "密钥存储" },
-  credentials: { label: "凭证", description: "凭证管理" },
-  certificates: { label: "证书", description: "证书管理" },
-  encryption: { label: "加密", description: "加密设置" },
-  hashing: { label: "哈希", description: "哈希算法" },
-  signing: { label: "签名", description: "签名设置" },
-  verification: { label: "验证", description: "验证设置" },
-  validation: { label: "校验", description: "数据校验" },
-  sanitization: { label: "清理", description: "数据清理" },
-  formatting: { label: "格式化", description: "格式化设置" },
-  parsing: { label: "解析", description: "解析设置" },
-  encoding: { label: "编码", description: "编码设置" },
-  decoding: { label: "解码", description: "解码设置" },
-  compression: { label: "压缩", description: "压缩设置" },
-  decompression: { label: "解压", description: "解压设置" },
-  serialization: { label: "序列化", description: "序列化设置" },
-  deserialization: { label: "反序列化", description: "反序列化设置" },
-  // 额外的配置节
-  nodeHost: { label: "节点主机", description: "节点主机设置" },
-  media: { label: "媒体", description: "媒体处理设置" },
-  approvals: { label: "审批", description: "执行审批设置" },
-  exec: { label: "执行", description: "命令执行设置" },
-  image: { label: "图片", description: "图片处理设置" },
-  video: { label: "视频", description: "视频处理设置" },
-  links: { label: "链接", description: "链接处理设置" },
-  fetch: { label: "抓取", description: "网页抓取设置" },
-  search: { label: "搜索", description: "搜索设置" },
-  voicewake: { label: "语音唤醒", description: "语音唤醒设置" },
-  crossContext: { label: "跨上下文", description: "跨上下文消息设置" },
-  marker: { label: "标记", description: "消息标记设置" },
-  dm: { label: "私信", description: "私信设置" },
-  thread: { label: "线程", description: "线程设置" },
-  intents: { label: "意图", description: "Discord 意图设置" },
-  pluralkit: { label: "PluralKit", description: "PluralKit 集成" },
-  draftChunk: { label: "草稿分块", description: "草稿分块设置" },
-  remote: { label: "远程", description: "远程连接设置" },
-  reload: { label: "重载", description: "配置重载设置" },
-  nodes: { label: "节点", description: "节点设置" },
-  browserProxy: { label: "浏览器代理", description: "浏览器代理设置" },
-  otel: { label: "OpenTelemetry", description: "OpenTelemetry 设置" },
-  cacheTrace: { label: "缓存追踪", description: "缓存追踪设置" },
-  applyPatch: { label: "应用补丁", description: "apply_patch 设置" },
-  message: { label: "消息", description: "消息设置" },
-  cooldowns: { label: "冷却", description: "冷却时间设置" },
-  memorySearch: { label: "记忆搜索", description: "记忆搜索设置" },
-  chunking: { label: "分块", description: "分块设置" },
-  query: { label: "查询", description: "查询设置" },
-  hybrid: { label: "混合", description: "混合搜索设置" },
-  batch: { label: "批处理", description: "批处理设置" },
-  local: { label: "本地", description: "本地设置" },
-  store: { label: "存储", description: "存储设置" },
-  vector: { label: "向量", description: "向量设置" },
-  contextPruning: { label: "上下文裁剪", description: "上下文裁剪设置" },
-  softTrim: { label: "软裁剪", description: "软裁剪设置" },
-  hardClear: { label: "硬清除", description: "硬清除设置" },
-  compaction: { label: "压缩", description: "上下文压缩设置" },
-  memoryFlush: { label: "记忆刷新", description: "记忆刷新设置" },
-  humanDelay: { label: "人类延迟", description: "人类延迟设置" },
-  heartbeat: { label: "心跳", description: "心跳设置" },
-  subagents: { label: "子代理", description: "子代理设置" },
-  identity: { label: "身份", description: "身份设置" },
-  model: { label: "模型", description: "模型设置" },
-  imageModel: { label: "图像模型", description: "图像模型设置" },
-  firecrawl: { label: "Firecrawl", description: "Firecrawl 设置" },
-  perplexity: { label: "Perplexity", description: "Perplexity 设置" },
-  snapshotDefaults: { label: "快照默认值", description: "快照默认值设置" },
-  agentToAgent: { label: "代理间通信", description: "代理间通信设置" },
-  inbound: { label: "入站", description: "入站消息设置" },
-  tailscale: { label: "Tailscale", description: "Tailscale 设置" },
-  http: { label: "HTTP", description: "HTTP 设置" },
-  endpoints: { label: "端点", description: "端点设置" },
-  chatCompletions: { label: "聊天补全", description: "聊天补全端点" },
-  load: { label: "加载", description: "加载设置" },
-  slots: { label: "槽位", description: "插件槽位" },
-  entries: { label: "条目", description: "插件条目" },
-  installs: { label: "安装", description: "插件安装记录" },
-  mdns: { label: "mDNS", description: "mDNS 发现设置" },
-  capabilities: { label: "功能", description: "功能设置" },
-  customCommands: { label: "自定义命令", description: "自定义命令设置" },
-  // 更多配置节
-  list: { label: "列表", description: "列表设置" },
-  profiles: { label: "配置文件", description: "配置文件管理" },
-  providers: { label: "提供商", description: "提供商设置" },
-  sessions: { label: "会话", description: "会话设置" },
-  blockStreaming: { label: "块流", description: "块流设置" },
-  blockStreamingChunk: { label: "块流分块", description: "块流分块设置" },
-  blockStreamingCoalesce: { label: "块流合并", description: "块流合并设置" },
-  typing: { label: "输入指示", description: "输入指示设置" },
-  envelope: { label: "信封", description: "消息信封设置" },
-  assistant: { label: "助手", description: "助手设置" },
-  funnel: { label: "Funnel", description: "Tailscale Funnel 设置" },
-  trustedProxies: { label: "受信任代理", description: "受信任代理设置" },
-  allowedOrigins: { label: "允许的来源", description: "允许的来源设置" },
-  // 浏览器和代理
-  cdp: { label: "CDP", description: "Chrome DevTools 协议设置" },
-  container: { label: "容器", description: "容器设置" },
-  docker: { label: "Docker", description: "Docker 设置" },
-  // 安全相关
-  apparmor: { label: "AppArmor", description: "AppArmor 安全配置" },
-  seccomp: { label: "Seccomp", description: "Seccomp 安全配置" },
-  sandbox: { label: "沙箱", description: "沙箱设置" },
-  // 时间和调度
-  schedule: { label: "调度", description: "调度设置" },
-  timer: { label: "定时器", description: "定时器设置" },
-  // 限制
-  quota: { label: "配额", description: "配额设置" },
-  rateLimit: { label: "速率限制", description: "速率限制设置" },
-  // 其他
-  ack: { label: "确认", description: "消息确认设置" },
-  override: { label: "覆盖", description: "覆盖设置" },
-  custom: { label: "自定义", description: "自定义设置" },
-  // 功能模块
-  filter: { label: "过滤", description: "过滤设置" },
-  sort: { label: "排序", description: "排序设置" },
-  pagination: { label: "分页", description: "分页设置" },
-  // 数据处理
-  transform: { label: "转换", description: "数据转换设置" },
-  // 监控
-  metrics: { label: "指标", description: "指标设置" },
-  tracing: { label: "追踪", description: "追踪设置" },
-  healthCheck: { label: "健康检查", description: "健康检查设置" },
+  meta: { label: "Metadata", description: "Gateway metadata and version information" },
+  logging: { label: "Logging", description: "Log levels and output configuration" },
+  browser: { label: "Browser", description: "Browser automation settings" },
+  ui: { label: "UI", description: "User interface preferences" },
+  models: { label: "Models", description: "AI model configurations and providers" },
+  bindings: { label: "Bindings", description: "Key bindings and shortcuts" },
+  broadcast: { label: "Broadcast", description: "Broadcast and notification settings" },
+  audio: { label: "Audio", description: "Audio input/output settings" },
+  session: { label: "Session", description: "Session management and persistence" },
+  cron: { label: "Cron", description: "Scheduled tasks and automation" },
+  web: { label: "Web", description: "Web server and API settings" },
+  discovery: { label: "Discovery", description: "Service discovery and networking" },
+  canvasHost: { label: "Canvas Host", description: "Canvas rendering and display" },
+  talk: { label: "Talk", description: "Voice and speech settings" },
+  plugins: { label: "Plugins", description: "Plugin management and extensions" },
+  diagnostics: {
+    label: "Diagnostics",
+    description: "Instrumentation, OpenTelemetry, and cache-trace settings",
+  },
+  cli: { label: "CLI", description: "CLI banner and startup behavior" },
+  secrets: { label: "Secrets", description: "Secret provider configuration" },
+  acp: {
+    label: "ACP",
+    description: "Agent Communication Protocol runtime and streaming settings",
+  },
+  mcp: { label: "MCP", description: "Model Context Protocol server definitions" },
 };
 
 function getSectionIcon(key: string) {
@@ -513,20 +339,14 @@ function matchesSearch(params: {
   const criteria = parseConfigSearchQuery(params.query);
   const q = criteria.text;
   const meta = SECTION_META[params.key];
+  const sectionMetaMatches =
+    q &&
+    (params.key.toLowerCase().includes(q) ||
+      (meta?.label ? meta.label.toLowerCase().includes(q) : false) ||
+      (meta?.description ? meta.description.toLowerCase().includes(q) : false));
 
-  // Check key name
-  if (q && params.key.toLowerCase().includes(q)) {
+  if (sectionMetaMatches && criteria.tags.length === 0) {
     return true;
-  }
-
-  // Check label and description
-  if (q && meta) {
-    if (meta.label.toLowerCase().includes(q)) {
-      return true;
-    }
-    if (meta.description.toLowerCase().includes(q)) {
-      return true;
-    }
   }
 
   return matchesNodeSearch({
@@ -540,16 +360,12 @@ function matchesSearch(params: {
 
 export function renderConfigForm(props: ConfigFormProps) {
   if (!props.schema) {
-    return html`
-      <div class="muted">架构不可用。</div>
-    `;
+    return html` <div class="muted">Schema unavailable.</div> `;
   }
   const schema = props.schema;
   const value = props.value ?? {};
   if (schemaType(schema) !== "object" || !schema.properties) {
-    return html`
-      <div class="callout danger">不支持的架构。请使用原始模式。</div>
-    `;
+    return html` <div class="callout danger">Unsupported schema. Use Raw.</div> `;
   }
   const unsupported = new Set(props.unsupportedPaths ?? []);
   const properties = schema.properties;
@@ -609,92 +425,89 @@ export function renderConfigForm(props: ConfigFormProps) {
       <div class="config-empty">
         <div class="config-empty__icon">${icons.search}</div>
         <div class="config-empty__text">
-          ${searchQuery ? `没有匹配 "${searchQuery}" 的设置` : "此部分没有设置"}
+          ${searchQuery ? `No settings match "${searchQuery}"` : "No settings in this section"}
         </div>
       </div>
     `;
   }
 
+  const renderSectionCard = (params: {
+    id: string;
+    sectionKey: string;
+    label: string;
+    description: string;
+    node: JsonSchema;
+    nodeValue: unknown;
+    path: Array<string | number>;
+  }) => html`
+    <section class="config-section-card" id=${params.id}>
+      <div class="config-section-card__header">
+        <span class="config-section-card__icon">${getSectionIcon(params.sectionKey)}</span>
+        <div class="config-section-card__titles">
+          <h3 class="config-section-card__title">${params.label}</h3>
+          ${params.description
+            ? html`<p class="config-section-card__desc">${params.description}</p>`
+            : nothing}
+        </div>
+      </div>
+      <div class="config-section-card__content">
+        ${renderNode({
+          schema: params.node,
+          value: params.nodeValue,
+          path: params.path,
+          hints: props.uiHints,
+          unsupported,
+          disabled: props.disabled ?? false,
+          showLabel: false,
+          searchCriteria,
+          revealSensitive: props.revealSensitive ?? false,
+          isSensitivePathRevealed: props.isSensitivePathRevealed,
+          onToggleSensitivePath: props.onToggleSensitivePath,
+          onPatch: props.onPatch,
+        })}
+      </div>
+    </section>
+  `;
+
   return html`
     <div class="config-form config-form--modern">
-      ${
-        subsectionContext
-          ? (() => {
-              const { sectionKey, subsectionKey, schema: node } = subsectionContext;
-              const hint = hintForPath([sectionKey, subsectionKey], props.uiHints);
-              const label = resolveLabel(subsectionKey, node.title, hint?.label);
-              const description = resolveHelp(hint?.help, node.description) ?? "";
-              const sectionValue = value[sectionKey];
-              const scopedValue =
-                sectionValue && typeof sectionValue === "object"
-                  ? (sectionValue as Record<string, unknown>)[subsectionKey]
-                  : undefined;
-              const id = `config-section-${sectionKey}-${subsectionKey}`;
-              return html`
-              <section class="config-section-card" id=${id}>
-                <div class="config-section-card__header">
-                  <span class="config-section-card__icon">${getSectionIcon(sectionKey)}</span>
-                  <div class="config-section-card__titles">
-                    <h3 class="config-section-card__title">${label}</h3>
-                    ${
-                      description
-                        ? html`<p class="config-section-card__desc">${description}</p>`
-                        : nothing
-                    }
-                  </div>
-                </div>
-                <div class="config-section-card__content">
-                  ${renderNode({
-                    schema: node,
-                    value: scopedValue,
-                    path: [sectionKey, subsectionKey],
-                    hints: props.uiHints,
-                    unsupported,
-                    disabled: props.disabled ?? false,
-                    showLabel: false,
-                    searchCriteria,
-                    onPatch: props.onPatch,
-                  })}
-                </div>
-              </section>
-            `;
-            })()
-          : filteredEntries.map(([key, node]) => {
-              const meta = SECTION_META[key] ?? {
-                label: humanize(key),
-                description: resolveHelp(undefined, node.description) ?? "",
-              };
+      ${subsectionContext
+        ? (() => {
+            const { sectionKey, subsectionKey, schema: node } = subsectionContext;
+            const hint = hintForPath([sectionKey, subsectionKey], props.uiHints);
+            const label = hint?.label ?? node.title ?? humanize(subsectionKey);
+            const description = hint?.help ?? node.description ?? "";
+            const sectionValue = value[sectionKey];
+            const scopedValue =
+              sectionValue && typeof sectionValue === "object"
+                ? (sectionValue as Record<string, unknown>)[subsectionKey]
+                : undefined;
+            return renderSectionCard({
+              id: `config-section-${sectionKey}-${subsectionKey}`,
+              sectionKey,
+              label,
+              description,
+              node,
+              nodeValue: scopedValue,
+              path: [sectionKey, subsectionKey],
+            });
+          })()
+        : filteredEntries.map(([key, node]) => {
+            const meta = SECTION_META[key] ?? {
+              label: key.charAt(0).toUpperCase() + key.slice(1),
+              description: node.description ?? "",
+            };
 
-              return html`
-              <section class="config-section-card" id="config-section-${key}">
-                <div class="config-section-card__header">
-                  <span class="config-section-card__icon">${getSectionIcon(key)}</span>
-                  <div class="config-section-card__titles">
-                    <h3 class="config-section-card__title">${meta.label}</h3>
-                    ${
-                      meta.description
-                        ? html`<p class="config-section-card__desc">${meta.description}</p>`
-                        : nothing
-                    }
-                  </div>
-                </div>
-                <div class="config-section-card__content">
-                  ${renderNode({
-                    schema: node,
-                    value: value[key],
-                    path: [key],
-                    hints: props.uiHints,
-                    unsupported,
-                    disabled: props.disabled ?? false,
-                    showLabel: false,
-                    searchCriteria,
-                    onPatch: props.onPatch,
-                  })}
-                </div>
-              </section>
-            `;
-            })
-      }
+            return renderSectionCard({
+              id: `config-section-${key}`,
+              sectionKey: key,
+              label: meta.label,
+              description: meta.description,
+              node,
+              nodeValue: value[key],
+              path: [key],
+            });
+          })}
     </div>
   `;
 }

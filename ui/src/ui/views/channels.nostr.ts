@@ -1,5 +1,5 @@
 import { html, nothing } from "lit";
-import { formatAgo, formatRelativeTimestamp } from "../format.ts";
+import { formatRelativeTimestamp } from "../format.ts";
 import type { ChannelAccountSnapshot, NostrStatus } from "../types.ts";
 import { renderChannelConfigSection } from "./channels.config.ts";
 import {
@@ -14,7 +14,7 @@ import type { ChannelsProps } from "./channels.types.ts";
  */
 function truncatePubkey(pubkey: string | null | undefined): string {
   if (!pubkey) {
-    return "无";
+    return "n/a";
   }
   if (pubkey.length <= 20) {
     return pubkey;
@@ -66,28 +66,28 @@ export function renderNostrCard(params: {
         </div>
         <div class="status-list account-card-status">
           <div>
-            <span class="label">运行中</span>
-            <span>${account.running ? "是" : "否"}</span>
+            <span class="label">Running</span>
+            <span>${account.running ? "Yes" : "No"}</span>
           </div>
           <div>
-            <span class="label">已配置</span>
-            <span>${account.configured ? "是" : "否"}</span>
+            <span class="label">Configured</span>
+            <span>${account.configured ? "Yes" : "No"}</span>
           </div>
           <div>
-            <span class="label">公钥</span>
+            <span class="label">Public Key</span>
             <span class="monospace" title="${publicKey ?? ""}">${truncatePubkey(publicKey)}</span>
           </div>
           <div>
-            <span class="label">上次入站</span>
-            <span>${account.lastInboundAt ? formatAgo(account.lastInboundAt) : "无"}</span>
+            <span class="label">Last inbound</span>
+            <span
+              >${account.lastInboundAt
+                ? formatRelativeTimestamp(account.lastInboundAt)
+                : "n/a"}</span
+            >
           </div>
-          ${
-            account.lastError
-              ? html`
-                <div class="account-card-error">${account.lastError}</div>
-              `
-              : nothing
-          }
+          ${account.lastError
+            ? html` <div class="account-card-error">${account.lastError}</div> `
+            : nothing}
         </div>
       </div>
     `;
@@ -121,34 +121,34 @@ export function renderNostrCard(params: {
     const hasAnyProfileData = name || displayName || about || picture || nip05;
 
     return html`
-      <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <div style="font-weight: 500;">个人资料</div>
-          ${
-            summaryConfigured
-              ? html`
+      <div
+        style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-md);"
+      >
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+        >
+          <div style="font-weight: 500;">Profile</div>
+          ${summaryConfigured
+            ? html`
                 <button
-                  class="btn btn-sm"
+                  class="btn btn--sm"
                   @click=${onEditProfile}
                   style="font-size: 12px; padding: 4px 8px;"
                 >
-                  编辑资料
+                  Edit Profile
                 </button>
               `
-              : nothing
-          }
+            : nothing}
         </div>
-        ${
-          hasAnyProfileData
-            ? html`
+        ${hasAnyProfileData
+          ? html`
               <div class="status-list">
-                ${
-                  picture
-                    ? html`
+                ${picture
+                  ? html`
                       <div style="margin-bottom: 8px;">
                         <img
                           src=${picture}
-                          alt="头像"
+                          alt="Profile picture"
                           style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color);"
                           @error=${(e: Event) => {
                             (e.target as HTMLImageElement).style.display = "none";
@@ -156,28 +156,33 @@ export function renderNostrCard(params: {
                         />
                       </div>
                     `
-                    : nothing
-                }
-                ${name ? html`<div><span class="label">名称</span><span>${name}</span></div>` : nothing}
-                ${
-                  displayName
-                    ? html`<div><span class="label">显示名称</span><span>${displayName}</span></div>`
-                    : nothing
-                }
-                ${
-                  about
-                    ? html`<div><span class="label">简介</span><span style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${about}</span></div>`
-                    : nothing
-                }
-                ${nip05 ? html`<div><span class="label">NIP-05</span><span>${nip05}</span></div>` : nothing}
+                  : nothing}
+                ${name
+                  ? html`<div><span class="label">Name</span><span>${name}</span></div>`
+                  : nothing}
+                ${displayName
+                  ? html`<div>
+                      <span class="label">Display Name</span><span>${displayName}</span>
+                    </div>`
+                  : nothing}
+                ${about
+                  ? html`<div>
+                      <span class="label">About</span
+                      ><span style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;"
+                        >${about}</span
+                      >
+                    </div>`
+                  : nothing}
+                ${nip05
+                  ? html`<div><span class="label">NIP-05</span><span>${nip05}</span></div>`
+                  : nothing}
               </div>
             `
-            : html`
-                <div style="color: var(--text-muted); font-size: 13px">
-                  未设置个人资料。点击"编辑资料"添加您的名称、简介和头像。
-                </div>
-              `
-        }
+          : html`
+              <div style="color: var(--text-muted); font-size: 13px">
+                No profile set. Click "Edit Profile" to add your name, bio, and avatar.
+              </div>
+            `}
       </div>
     `;
   };
@@ -185,52 +190,45 @@ export function renderNostrCard(params: {
   return html`
     <div class="card">
       <div class="card-title">Nostr</div>
-      <div class="card-sub">通过 Nostr 中继的去中心化私信 (NIP-04)。</div>
+      <div class="card-sub">Decentralized DMs via Nostr relays (NIP-04).</div>
       ${accountCountLabel}
-
-      ${
-        hasMultipleAccounts
-          ? html`
+      ${hasMultipleAccounts
+        ? html`
             <div class="account-card-list">
               ${nostrAccounts.map((account) => renderAccountCard(account))}
             </div>
           `
-          : html`
+        : html`
             <div class="status-list" style="margin-top: 16px;">
               <div>
-                <span class="label">已配置</span>
-                <span>${summaryConfigured ? "是" : "否"}</span>
+                <span class="label">Configured</span>
+                <span>${summaryConfigured ? "Yes" : "No"}</span>
               </div>
               <div>
-                <span class="label">运行中</span>
-                <span>${summaryRunning ? "是" : "否"}</span>
+                <span class="label">Running</span>
+                <span>${summaryRunning ? "Yes" : "No"}</span>
               </div>
               <div>
-                <span class="label">公钥</span>
+                <span class="label">Public Key</span>
                 <span class="monospace" title="${summaryPublicKey ?? ""}"
                   >${truncatePubkey(summaryPublicKey)}</span
                 >
               </div>
               <div>
-                <span class="label">上次启动</span>
-                <span>${summaryLastStartAt ? formatAgo(summaryLastStartAt) : "无"}</span>
+                <span class="label">Last start</span>
+                <span
+                  >${summaryLastStartAt ? formatRelativeTimestamp(summaryLastStartAt) : "n/a"}</span
+                >
               </div>
             </div>
-          `
-      }
-
-      ${
-        summaryLastError
-          ? html`<div class="callout danger" style="margin-top: 12px;">${summaryLastError}</div>`
-          : nothing
-      }
-
-      ${renderProfileSection()}
-
-      ${renderChannelConfigSection({ channelId: "nostr", props })}
+          `}
+      ${summaryLastError
+        ? html`<div class="callout danger" style="margin-top: 12px;">${summaryLastError}</div>`
+        : nothing}
+      ${renderProfileSection()} ${renderChannelConfigSection({ channelId: "nostr", props })}
 
       <div class="row" style="margin-top: 12px;">
-        <button class="btn" @click=${() => props.onRefresh(false)}>刷新</button>
+        <button class="btn" @click=${() => props.onRefresh(false)}>Refresh</button>
       </div>
     </div>
   `;

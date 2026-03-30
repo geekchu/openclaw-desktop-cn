@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import * as path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "openclaw/plugin-sdk/tlon";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "../../runtime-api.js";
 import { getDefaultSsrFPolicy } from "../urbit/context.js";
 
 // Default to OpenClaw workspace media directory
