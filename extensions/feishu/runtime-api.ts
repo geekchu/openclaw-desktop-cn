@@ -25,3 +25,4 @@ export {
   readRequestBodyWithLimit,
   requestBodyErrorToText,
 } from "openclaw/plugin-sdk/webhook-ingress";
+export { GUARDED_FETCH_MODE } from "../../src/infra/net/fetch-guard.js";
