@@ -613,10 +613,51 @@ Linux 版本以 AppImage 格式发布，流程与 Windows / macOS 平行，无�
 
 ### 前置条件
 
-- 在 Linux 机器（Ubuntu 22.04 / Debian 12 推荐）上操作
-- 已安装 Rust stable、Node.js 22+、pnpm、cargo-tauri 2.x
+- 在原生 Linux 机器或 WSL2（Ubuntu 22.04 / 24.04）上操作
+- 已安装 Rust stable、Node.js 24+、pnpm（全局）、cargo-tauri 2.x
+- 已安装系统依赖：`libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf build-essential`
 - minisign 私钥已复制到 `~/.tauri/openclaw.key`
 - `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 已设置
+
+#### WSL2 一次性环境初始化（首次构建前执行）
+
+> **重要：** 以 root 身份执行以避免 sudo 交互问题。
+
+```bash
+# 1. 安装 Node.js 24
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# 2. 安装系统构建依赖（unset proxy 避免代理干扰）
+sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf build-essential
+
+# 3. 安装 pnpm（全局）
+npm install -g pnpm
+
+# 4. 设置 npm 缓存到 Linux 本地路径（避免 NTFS 缓存报 Unknown system error）
+npm config set cache ~/.npm-cache
+
+# 5. 安装 Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+source ~/.cargo/env
+
+# 6. 安装 cargo-tauri
+cargo install tauri-cli --version "^2"
+
+# 7. 复制签名私钥（从 Windows 主机）
+mkdir -p ~/.tauri
+cp /mnt/c/Users/<你的用户名>/.tauri/openclaw.key ~/.tauri/
+```
+
+#### WSL2 `.wslconfig` 注意事项
+
+`~/.wslconfig` 中 **不能** 启用 `sparseVhd=true`，否则 ext4 镜像在写入压力下会被重挂载为只读，导致构建失败：
+
+```ini
+[experimental]
+sparseVhd=false  # 必须为 false，true 会导致 ext4 remount-ro 崩溃
+```
 
 ### 步骤 1：更新版本号
 
@@ -650,11 +691,51 @@ git push && git push --tags
 
 ### 步骤 3：构建签名 AppImage
 
+> **WSL2 关键：** pnpm 必须在 WSL2 内使用 Linux 本地 store 安装依赖，否则会安装 Windows 平台原生绑定（win32-x64-msvc），导致 Linux 构建失败。必须在构建前执行 Step 3a。
+
+#### Step 3a：安装 Linux 平台依赖（WSL2 每次构建前）
+
+> **原因：** WSL2 的 PATH 默认包含 Windows 路径，若 Windows 也安装了 pnpm，WSL2 会优先使用 Windows 版 pnpm（位于 `/mnt/c/...`），导致安装的是 win32 平台原生绑定，Linux 构建时报 `Cannot find module '@rolldown/binding-win32-x64-msvc'`。
+>
+> 必须先确认 WSL2 内使用的是 Linux 版 pnpm（`/usr/bin/pnpm`），然后重新安装 node_modules。
+
 ```bash
+# 在 WSL2 内执行，从项目根目录
+
+# 确认使用 Linux pnpm（首次或重置后需要执行一次）
+npm install -g pnpm
+
+# 先修正 PATH，确保 /usr/bin 优先于 Windows 路径
+export PATH=/usr/bin:/usr/local/bin:$PATH
+# 验证：which pnpm 应输出 /usr/bin/pnpm，而非 /mnt/c/...
+which pnpm
+
+# 删除 Windows 平台的 node_modules，用 Linux pnpm 重新安装
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+rm -rf node_modules
+pnpm install --no-frozen-lockfile
+
+# 验证安装的是 Linux 平台包（应看到 linux-x64，而非 win32-x64-msvc）
+ls node_modules/.pnpm/ | grep rolldown
+
+# 注意：pnpm install 会修改 pnpm-lock.yaml（跨平台 optional deps），构建完成后还原：
+# git checkout -- pnpm-lock.yaml
+```
+
+#### Step 3b：构建
+
+> **注意：** 必须在执行 Step 3a 的**同一个 shell** 中接续执行，以继承已修正的 PATH。若开了新 shell，请先重新执行 `export PATH=/usr/bin:/usr/local/bin:$PATH`。
+
+```bash
+# 确保 PATH 正确（若新开 shell 则必须执行）
+export PATH=/usr/bin:/usr/local/bin:$PATH
+source ~/.cargo/env
 export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/openclaw.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<你的 minisign 私钥密码>"
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
-pnpm installer:build
+# --skip-deps 跳过重复的 pnpm install（已在 3a 中执行）
+node scripts/build-installer.js --skip-deps
 ```
 
 产物路径：`src-tauri/target/release/bundle/appimage/`

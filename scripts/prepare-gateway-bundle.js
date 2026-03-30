@@ -24,7 +24,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -221,7 +221,11 @@ function copyIfExists(src, dest) {
         }
       }
     } else {
-      cpSync(src, dest, { recursive: true });
+      // On Linux, skip node_modules (pnpm symlinks from Windows are unresolvable)
+      cpSync(src, dest, {
+        recursive: true,
+        filter: (src) => !src.includes("/node_modules/") && !src.endsWith("/node_modules"),
+      });
     }
     return true;
   }
@@ -274,7 +278,7 @@ console.log("\n[bundle] === Step 1.5: 编译 extensions ===");
         console.log(`[bundle] 编译 extension: ${name}`);
         try {
           run("pnpm build", { cwd: extPath });
-        } catch (err) {
+        } catch {
           console.log(`[bundle] 警告: extension ${name} 编译失败，继续...`);
         }
       }
