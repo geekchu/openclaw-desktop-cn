@@ -32,10 +32,10 @@ try {
 
     Set-Location -Path $ScriptRoot
 
-    Write-Host "[OpenClaw Build] Starting pnpm installer:build..." -ForegroundColor Cyan
+    Write-Host "[OpenClaw Build] Starting build..." -ForegroundColor Cyan
 
     $env:BUILD_CONFIG = "release"
-    pnpm installer:build
+    node scripts/build-installer.js
 
     if ($LASTEXITCODE -ne 0) {
         $ExitCode = $LASTEXITCODE
