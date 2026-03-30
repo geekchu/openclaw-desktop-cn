@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { fetchWithSsrFGuard } from "../runtime-api.js";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "../runtime-api.js";
 import type { ResolvedGoogleChatAccount } from "./accounts.js";
 import { getGoogleChatAccessToken } from "./auth.js";
 import type { GoogleChatReaction } from "./types.js";
@@ -41,6 +41,7 @@ async function withGoogleChatResponse<T>(params: {
       },
     },
     auditContext,
+    mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
   });
   try {
     if (!response.ok) {

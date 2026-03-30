@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { fetchWithSsrFGuard, type RuntimeEnv } from "../runtime-api.js";
+import { fetchWithSsrFGuard, GUARDED_FETCH_MODE, type RuntimeEnv } from "../runtime-api.js";
 import type { ResolvedNextcloudTalkAccount } from "./accounts.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 
@@ -105,6 +105,7 @@ export async function resolveNextcloudTalkRoomKind(params: {
         },
       },
       auditContext: "nextcloud-talk.room-info",
+      mode: GUARDED_FETCH_MODE.TRUSTED_ENV_PROXY,
       policy: account.config?.allowPrivateNetwork ? { allowPrivateNetwork: true } : undefined,
     });
     try {
