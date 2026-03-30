@@ -259,7 +259,13 @@ console.log("\n[bundle] === Step 0.5: 精简 Node.js 运行环境 ===");
 
 // Step 1: 编译 TypeScript
 console.log("\n[bundle] === Step 1: 编译 TypeScript ===");
-run("pnpm build");
+// Windows: 跳过 canvas:a2ui:bundle (bash脚本在Windows下失败)，使用已有bundle
+if (process.platform === "win32") {
+  console.log("[bundle] Windows: 跳过 canvas:a2ui:bundle，使用已有bundle");
+  run("node scripts/tsdown-build.mjs && node scripts/runtime-postbuild.mjs && node scripts/build-stamp.mjs && pnpm build:plugin-sdk:dts && node --import tsx scripts/write-plugin-sdk-entry-dts.ts && node --import tsx scripts/canvas-a2ui-copy.ts && node --import tsx scripts/copy-hook-metadata.ts && node --import tsx scripts/copy-export-html-templates.ts && node --import tsx scripts/write-build-info.ts && node --import tsx scripts/write-cli-startup-metadata.ts && node --import tsx scripts/write-cli-compat.ts");
+} else {
+  run("pnpm build");
+}
 
 // Step 1.5: 编译 extensions（部分 extension 需要 tsc 编译）
 console.log("\n[bundle] === Step 1.5: 编译 extensions ===");
