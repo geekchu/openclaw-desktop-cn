@@ -3,7 +3,7 @@
  *
  * 提供 openclaw onboard 命令的交互式配置支持
  */
-import type { ChannelOnboardingAdapter, OpenClawConfig } from "openclaw/plugin-sdk";
+import type { ChannelOnboardingAdapter, OpenClawConfig } from "../runtime-api.js";
 import { DEFAULT_ACCOUNT_ID, listQQBotAccountIds, resolveQQBotAccount } from "./config.js";
 
 // 内部类型（用于类型安全）

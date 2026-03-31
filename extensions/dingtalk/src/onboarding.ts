@@ -1,5 +1,5 @@
 import type { OpenClawConfig, ChannelOnboardingAdapter, WizardPrompter } from "openclaw/plugin-sdk";
-import { DEFAULT_ACCOUNT_ID, normalizeAccountId, formatDocsLink } from "openclaw/plugin-sdk";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId, formatDocsLink } from "../runtime-api.js";
 import type { DingTalkConfig, DingTalkChannelConfig } from "./types.js";
 import { listDingTalkAccountIds, resolveDingTalkAccount } from "./types.js";
 

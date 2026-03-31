@@ -4,7 +4,7 @@ import {
   applyAccountNameToChannelSection,
   deleteAccountFromConfigSection,
   setAccountEnabledInConfigSection,
-} from "openclaw/plugin-sdk";
+} from "../runtime-api.js";
 import {
   DEFAULT_ACCOUNT_ID,
   listQQBotAccountIds,

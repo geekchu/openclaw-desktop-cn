@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DWClient, TOPIC_ROBOT } from "dingtalk-stream";
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
-import { buildChannelConfigSchema } from "openclaw/plugin-sdk";
+import type { OpenClawConfig } from "../runtime-api.js";
+import { buildChannelConfigSchema } from "../runtime-api.js";
 import { getAccessToken } from "./auth.js";
 import { createAICard, streamAICard, finishAICard } from "./card-service.js";
 import { DingTalkConfigSchema } from "./config-schema.js";
