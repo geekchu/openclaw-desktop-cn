@@ -71,7 +71,7 @@ export function resolvePreferredOpenClawTmpDir(
     return path.join(base, suffix);
   };
 
-  if (os.platform() === "win32") {
+  if (process.platform === "win32") {
     return fallback();
   }
 

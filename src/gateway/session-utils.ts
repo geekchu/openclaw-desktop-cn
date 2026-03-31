@@ -49,7 +49,6 @@ import {
 import { normalizeSessionDeliveryFields } from "../utils/delivery-context.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../utils/usage-format.js";
 import {
-  readLatestSessionUsageFromTranscript,
   readSessionTitleFieldsFromTranscript,
 } from "./session-utils.fs.js";
 import type {
@@ -62,11 +61,9 @@ import type {
 export {
   archiveFileOnDisk,
   archiveSessionTranscripts,
-  attachOpenClawTranscriptMeta,
   capArrayByJsonBytes,
   readFirstUserMessageFromTranscript,
   readLastMessagePreviewFromTranscript,
-  readLatestSessionUsageFromTranscript,
   readSessionTitleFieldsFromTranscript,
   readSessionPreviewItemsFromTranscript,
   readSessionMessages,
