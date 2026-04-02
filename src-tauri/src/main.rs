@@ -11,10 +11,10 @@ mod utils;
 
 use commands::{config, diagnostics, installer, process, service, terminal};
 use std::path::PathBuf;
-use tauri::Emitter;
-use tauri::Manager;
 use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::Emitter;
+use tauri::Manager;
 
 /// 托盘菜单项引用，用于动态更新状态
 pub struct TrayState {
@@ -35,7 +35,10 @@ fn resolve_gateway_bundle_dir(app: &tauri::App) -> PathBuf {
     {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let project_root = PathBuf::from(manifest_dir).parent().unwrap().to_path_buf();
-        log::info!("[Main] 开发模式 - gateway 目录（项目根）: {}", project_root.display());
+        log::info!(
+            "[Main] 开发模式 - gateway 目录（项目根）: {}",
+            project_root.display()
+        );
         project_root
     }
 
@@ -45,7 +48,10 @@ fn resolve_gateway_bundle_dir(app: &tauri::App) -> PathBuf {
         if let Ok(resource_dir) = app.path().resource_dir() {
             let bundle_dir = resource_dir.join("gateway-bundle");
             if bundle_dir.exists() {
-                log::info!("[Main] 生产模式 - gateway bundle 目录: {}", bundle_dir.display());
+                log::info!(
+                    "[Main] 生产模式 - gateway bundle 目录: {}",
+                    bundle_dir.display()
+                );
                 return bundle_dir;
             }
             log::warn!("[Main] gateway-bundle 目录不存在: {}", bundle_dir.display());
@@ -56,7 +62,10 @@ fn resolve_gateway_bundle_dir(app: &tauri::App) -> PathBuf {
             if let Some(exe_dir) = exe_path.parent() {
                 let bundle_dir = exe_dir.join("gateway-bundle");
                 if bundle_dir.exists() {
-                    log::info!("[Main] 回退 - gateway bundle 目录: {}", bundle_dir.display());
+                    log::info!(
+                        "[Main] 回退 - gateway bundle 目录: {}",
+                        bundle_dir.display()
+                    );
                     return bundle_dir;
                 }
             }
@@ -64,7 +73,10 @@ fn resolve_gateway_bundle_dir(app: &tauri::App) -> PathBuf {
 
         // 最终回退：当前目录
         let cwd = std::env::current_dir().unwrap_or_default();
-        log::warn!("[Main] 未找到 gateway bundle，使用当前目录: {}", cwd.display());
+        log::warn!(
+            "[Main] 未找到 gateway bundle，使用当前目录: {}",
+            cwd.display()
+        );
         cwd
     }
 }
@@ -92,9 +104,7 @@ fn show_main_window(app: &tauri::AppHandle) {
 
 fn main() {
     // 初始化日志 - 默认显示 info 级别日志
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info")
-    ).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     log::info!("OpenClaw桌面版 启动");
 
@@ -132,7 +142,8 @@ fn main() {
         )
         .setup(|app| {
             // 自动更新插件
-            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
 
             // 解析并设置 gateway bundle 目录
             let gateway_dir = resolve_gateway_bundle_dir(app);
@@ -140,7 +151,9 @@ fn main() {
             // Node.js 无法正确解析此前缀（会导致 EISDIR: lstat 'C:' 错误），需要去掉
             let gateway_dir_str = gateway_dir.to_str().unwrap_or(".");
             #[cfg(windows)]
-            let gateway_dir_str = gateway_dir_str.strip_prefix("\\\\?\\").unwrap_or(gateway_dir_str);
+            let gateway_dir_str = gateway_dir_str
+                .strip_prefix("\\\\?\\")
+                .unwrap_or(gateway_dir_str);
             std::env::set_var("OPENCLAW_GATEWAY_BUNDLE_DIR", gateway_dir_str);
             log::info!("[Main] OPENCLAW_GATEWAY_BUNDLE_DIR = {}", gateway_dir_str);
 
@@ -152,24 +165,14 @@ fn main() {
             app.manage(terminal::TerminalState::new());
 
             // ── 系统托盘 ──
-            let status_item = MenuItem::with_id(
-                app, "status", "Gateway: 检测中...", false, None::<&str>,
-            )?;
-            let start_item = MenuItem::with_id(
-                app, "start", "启动 Gateway", false, None::<&str>,
-            )?;
-            let stop_item = MenuItem::with_id(
-                app, "stop", "停止 Gateway", false, None::<&str>,
-            )?;
-            let restart_item = MenuItem::with_id(
-                app, "restart", "重启 Gateway", false, None::<&str>,
-            )?;
-            let open_item = MenuItem::with_id(
-                app, "open", "打开面板", true, None::<&str>,
-            )?;
-            let quit_item = MenuItem::with_id(
-                app, "quit", "退出", true, None::<&str>,
-            )?;
+            let status_item =
+                MenuItem::with_id(app, "status", "Gateway: 检测中...", false, None::<&str>)?;
+            let start_item = MenuItem::with_id(app, "start", "启动 Gateway", false, None::<&str>)?;
+            let stop_item = MenuItem::with_id(app, "stop", "停止 Gateway", false, None::<&str>)?;
+            let restart_item =
+                MenuItem::with_id(app, "restart", "重启 Gateway", false, None::<&str>)?;
+            let open_item = MenuItem::with_id(app, "open", "打开面板", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
 
             let sep1 = PredefinedMenuItem::separator(app)?;
             let sep2 = PredefinedMenuItem::separator(app)?;
@@ -191,59 +194,57 @@ fn main() {
                 .icon(app.default_window_icon().cloned().expect("应用图标缺失"))
                 .menu(&menu)
                 .tooltip("OpenClaw桌面版")
-                .on_menu_event(|app, event| {
-                    match event.id().as_ref() {
-                        "open" => {
-                            show_main_window(app);
-                        }
-                        "start" => {
-                            let handle = app.clone();
-                            std::thread::spawn(move || {
-                                let gm = handle.state::<gateway::GatewayManager>();
-                                match gm.start() {
-                                    Ok(port) => {
-                                        if gm.wait_for_ready(60) {
-                                            crate::gateway::navigate_webview_to_gateway(&handle, port);
-                                        }
-                                    }
-                                    Err(e) => {
-                                        log::error!("[Tray] 启动 Gateway 失败: {}", e);
-                                    }
-                                }
-                            });
-                        }
-                        "stop" => {
-                            let handle = app.clone();
-                            std::thread::spawn(move || {
-                                let gm = handle.state::<gateway::GatewayManager>();
-                                gm.stop();
-                            });
-                        }
-                        "restart" => {
-                            let handle = app.clone();
-                            std::thread::spawn(move || {
-                                let gm = handle.state::<gateway::GatewayManager>();
-                                gm.stop();
-                                std::thread::sleep(std::time::Duration::from_secs(1));
-                                match gm.start() {
-                                    Ok(port) => {
-                                        if gm.wait_for_ready(60) {
-                                            crate::gateway::navigate_webview_to_gateway(&handle, port);
-                                        }
-                                    }
-                                    Err(e) => {
-                                        log::error!("[Tray] 重启 Gateway 失败: {}", e);
-                                    }
-                                }
-                            });
-                        }
-                        "quit" => {
-                            let gm = app.state::<gateway::GatewayManager>();
-                            gm.stop();
-                            app.exit(0);
-                        }
-                        _ => {}
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "open" => {
+                        show_main_window(app);
                     }
+                    "start" => {
+                        let handle = app.clone();
+                        std::thread::spawn(move || {
+                            let gm = handle.state::<gateway::GatewayManager>();
+                            match gm.start() {
+                                Ok(port) => {
+                                    if gm.wait_for_ready(60) {
+                                        crate::gateway::navigate_webview_to_gateway(&handle, port);
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("[Tray] 启动 Gateway 失败: {}", e);
+                                }
+                            }
+                        });
+                    }
+                    "stop" => {
+                        let handle = app.clone();
+                        std::thread::spawn(move || {
+                            let gm = handle.state::<gateway::GatewayManager>();
+                            gm.stop();
+                        });
+                    }
+                    "restart" => {
+                        let handle = app.clone();
+                        std::thread::spawn(move || {
+                            let gm = handle.state::<gateway::GatewayManager>();
+                            gm.stop();
+                            std::thread::sleep(std::time::Duration::from_secs(1));
+                            match gm.start() {
+                                Ok(port) => {
+                                    if gm.wait_for_ready(60) {
+                                        crate::gateway::navigate_webview_to_gateway(&handle, port);
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("[Tray] 重启 Gateway 失败: {}", e);
+                                }
+                            }
+                        });
+                    }
+                    "quit" => {
+                        let gm = app.state::<gateway::GatewayManager>();
+                        gm.stop();
+                        app.exit(0);
+                    }
+                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     // 左键点击托盘图标 → 显示主窗口

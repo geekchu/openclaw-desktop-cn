@@ -5,7 +5,6 @@ import {
   resolveAgentIdFromSessionKey,
 } from "../../../src/routing/session-key.js";
 import { t } from "../i18n/index.ts";
-import { getSafeLocalStorage } from "../local-storage.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
 import { renderUsageTab } from "./app-render-usage-tab.ts";
 import {
@@ -37,7 +36,6 @@ import {
   findAgentConfigEntryIndex,
   loadConfig,
   openConfigFile,
-  runUpdate,
   saveConfig,
   updateConfigFormValue,
   removeConfigFormValue,
@@ -101,6 +99,8 @@ import {
 import { renderChat } from "./views/chat.ts";
 import { renderCommandPalette } from "./views/command-palette.ts";
 import { renderConfig } from "./views/config.ts";
+import { renderOnestop, saveOnestopConfig } from "./views/config-onestop.ts";
+import "./views/config-system-settings.js";
 import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderLoginGate } from "./views/login-gate.ts";
@@ -136,7 +136,9 @@ const lazyDebug = createLazy(() => import("./views/debug.ts"));
 const lazyInstances = createLazy(() => import("./views/instances.ts"));
 const lazyLogs = createLazy(() => import("./views/logs.ts"));
 const lazyNodes = createLazy(() => import("./views/nodes.ts"));
+const lazyConfigChannels = createLazy(() => import("./views/config-channels.ts"));
 const lazySessions = createLazy(() => import("./views/sessions.ts"));
+const lazyTerminal = createLazy(() => import("./views/terminal.ts"));
 const lazySkills = createLazy(() => import("./views/skills.ts"));
 
 function lazyRender<M>(getter: () => M | null, render: (mod: M) => unknown) {
@@ -144,7 +146,6 @@ function lazyRender<M>(getter: () => M | null, render: (mod: M) => unknown) {
   return mod ? render(mod) : nothing;
 }
 
-const UPDATE_BANNER_DISMISS_KEY = "openclaw:control-ui:update-banner-dismissed:v1";
 const CRON_THINKING_SUGGESTIONS = ["off", "minimal", "low", "medium", "high"];
 const CRON_TIMEZONE_SUGGESTIONS = [
   "UTC",
@@ -183,62 +184,15 @@ function uniquePreserveOrder(values: string[]): string[] {
   return output;
 }
 
-type DismissedUpdateBanner = {
-  latestVersion: string;
-  channel: string | null;
-  dismissedAtMs: number;
-};
-
-function loadDismissedUpdateBanner(): DismissedUpdateBanner | null {
-  try {
-    const raw = getSafeLocalStorage()?.getItem(UPDATE_BANNER_DISMISS_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<DismissedUpdateBanner>;
-    if (!parsed || typeof parsed.latestVersion !== "string") {
-      return null;
-    }
-    return {
-      latestVersion: parsed.latestVersion,
-      channel: typeof parsed.channel === "string" ? parsed.channel : null,
-      dismissedAtMs: typeof parsed.dismissedAtMs === "number" ? parsed.dismissedAtMs : Date.now(),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function isUpdateBannerDismissed(updateAvailable: unknown): boolean {
-  const dismissed = loadDismissedUpdateBanner();
-  if (!dismissed) {
+function isDesktopMessageSettingsRuntime(): boolean {
+  if (typeof window === "undefined") {
     return false;
   }
-  const info = updateAvailable as { latestVersion?: unknown; channel?: unknown };
-  const latestVersion = info && typeof info.latestVersion === "string" ? info.latestVersion : null;
-  const channel = info && typeof info.channel === "string" ? info.channel : null;
-  return Boolean(
-    latestVersion && dismissed.latestVersion === latestVersion && dismissed.channel === channel,
-  );
-}
-
-function dismissUpdateBanner(updateAvailable: unknown) {
-  const info = updateAvailable as { latestVersion?: unknown; channel?: unknown };
-  const latestVersion = info && typeof info.latestVersion === "string" ? info.latestVersion : null;
-  if (!latestVersion) {
-    return;
-  }
-  const channel = info && typeof info.channel === "string" ? info.channel : null;
-  const payload: DismissedUpdateBanner = {
-    latestVersion,
-    channel,
-    dismissedAtMs: Date.now(),
+  const host = window as typeof window & {
+    __TAURI__?: unknown;
+    __TAURI_INTERNALS__?: unknown;
   };
-  try {
-    getSafeLocalStorage()?.setItem(UPDATE_BANNER_DISMISS_KEY, JSON.stringify(payload));
-  } catch {
-    // ignore
-  }
+  return Boolean(host.__TAURI__) || Boolean(host.__TAURI_INTERNALS__);
 }
 
 const AVATAR_DATA_RE = /^data:/i;
@@ -295,6 +249,12 @@ function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
 }
 
 export function renderApp(state: AppViewState) {
+  const onestopState = state as AppViewState & {
+    onestopApiKey?: string;
+    onestopShowApiKey?: boolean;
+    onestopActiveCategory?: string;
+    onestopSaving?: boolean;
+  };
   const updatableState = state as AppViewState & { requestUpdate?: () => void };
   const requestHostUpdate =
     typeof updatableState.requestUpdate === "function"
@@ -579,33 +539,6 @@ export function renderApp(state: AppViewState) {
         </aside>
       </div>
       <main class="content ${isChat ? "content--chat" : ""}">
-        ${state.updateAvailable &&
-        state.updateAvailable.latestVersion !== state.updateAvailable.currentVersion &&
-        !isUpdateBannerDismissed(state.updateAvailable)
-          ? html`<div class="update-banner callout danger" role="alert">
-              <strong>Update available:</strong> v${state.updateAvailable.latestVersion} (running
-              v${state.updateAvailable.currentVersion}).
-              <button
-                class="btn btn--sm update-banner__btn"
-                ?disabled=${state.updateRunning || !state.connected}
-                @click=${() => runUpdate(state)}
-              >
-                ${state.updateRunning ? "Updating…" : "Update now"}
-              </button>
-              <button
-                class="update-banner__close"
-                type="button"
-                title="Dismiss"
-                aria-label="Dismiss update banner"
-                @click=${() => {
-                  dismissUpdateBanner(state.updateAvailable);
-                  state.updateAvailable = null;
-                }}
-              >
-                ${icons.x}
-              </button>
-            </div>`
-          : nothing}
         ${state.tab === "config"
           ? nothing
           : html`<section class="content-header">
@@ -1531,7 +1464,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1590,7 +1522,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1613,69 +1544,75 @@ export function renderApp(state: AppViewState) {
               includeVirtualSections: false,
             })
           : nothing}
-        ${state.tab === "communications"
-          ? renderConfig({
-              raw: state.configRaw,
-              originalRaw: state.configRawOriginal,
-              valid: state.configValid,
-              issues: state.configIssues,
-              loading: state.configLoading,
-              saving: state.configSaving,
-              applying: state.configApplying,
-              updating: state.updateRunning,
-              connected: state.connected,
-              schema: state.configSchema,
-              schemaLoading: state.configSchemaLoading,
-              uiHints: state.configUiHints,
-              formMode: state.communicationsFormMode,
-              formValue: state.configForm,
-              originalValue: state.configFormOriginal,
-              searchQuery: state.communicationsSearchQuery,
-              activeSection:
-                state.communicationsActiveSection &&
-                !COMMUNICATION_SECTION_KEYS.includes(
-                  state.communicationsActiveSection as CommunicationSectionKey,
-                )
-                  ? null
-                  : state.communicationsActiveSection,
-              activeSubsection:
-                state.communicationsActiveSection &&
-                !COMMUNICATION_SECTION_KEYS.includes(
-                  state.communicationsActiveSection as CommunicationSectionKey,
-                )
-                  ? null
-                  : state.communicationsActiveSubsection,
-              onRawChange: (next) => {
-                state.configRaw = next;
-              },
-              onRequestUpdate: requestHostUpdate,
-              onFormModeChange: (mode) => (state.communicationsFormMode = mode),
-              onFormPatch: (path, value) => updateConfigFormValue(state, path, value),
-              onSearchChange: (query) => (state.communicationsSearchQuery = query),
-              onSectionChange: (section) => {
-                state.communicationsActiveSection = section;
-                state.communicationsActiveSubsection = null;
-              },
-              onSubsectionChange: (section) => (state.communicationsActiveSubsection = section),
-              onReload: () => loadConfig(state),
-              onSave: () => saveConfig(state),
-              onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
-              onOpenFile: () => openConfigFile(state),
-              version: state.hello?.server?.version ?? "",
-              theme: state.theme,
-              themeMode: state.themeMode,
-              setTheme: (t, ctx) => state.setTheme(t, ctx),
-              setThemeMode: (m, ctx) => state.setThemeMode(m, ctx),
-              borderRadius: state.settings.borderRadius,
-              setBorderRadius: (v) => state.setBorderRadius(v),
-              gatewayUrl: state.settings.gatewayUrl,
-              assistantName: state.assistantName,
-              configPath: state.configSnapshot?.path ?? null,
-              navRootLabel: "Communication",
-              includeSections: [...COMMUNICATION_SECTION_KEYS],
-              includeVirtualSections: false,
-            })
+        ${state.tab === "communications" || state.tab === "messages"
+          ? isDesktopMessageSettingsRuntime()
+            ? lazyConfigChannels()
+              ? html`
+                  <div style="padding: 20px 24px; overflow-y: auto; flex: 1">
+                    <openclaw-config-channels></openclaw-config-channels>
+                  </div>
+                `
+              : nothing
+            : renderConfig({
+                raw: state.configRaw,
+                originalRaw: state.configRawOriginal,
+                valid: state.configValid,
+                issues: state.configIssues,
+                loading: state.configLoading,
+                saving: state.configSaving,
+                applying: state.configApplying,
+                connected: state.connected,
+                schema: state.configSchema,
+                schemaLoading: state.configSchemaLoading,
+                uiHints: state.configUiHints,
+                formMode: state.communicationsFormMode,
+                formValue: state.configForm,
+                originalValue: state.configFormOriginal,
+                searchQuery: state.communicationsSearchQuery,
+                activeSection:
+                  state.communicationsActiveSection &&
+                  !COMMUNICATION_SECTION_KEYS.includes(
+                    state.communicationsActiveSection as CommunicationSectionKey,
+                  )
+                    ? null
+                    : state.communicationsActiveSection,
+                activeSubsection:
+                  state.communicationsActiveSection &&
+                  !COMMUNICATION_SECTION_KEYS.includes(
+                    state.communicationsActiveSection as CommunicationSectionKey,
+                  )
+                    ? null
+                    : state.communicationsActiveSubsection,
+                onRawChange: (next) => {
+                  state.configRaw = next;
+                },
+                onRequestUpdate: requestHostUpdate,
+                onFormModeChange: (mode) => (state.communicationsFormMode = mode),
+                onFormPatch: (path, value) => updateConfigFormValue(state, path, value),
+                onSearchChange: (query) => (state.communicationsSearchQuery = query),
+                onSectionChange: (section) => {
+                  state.communicationsActiveSection = section;
+                  state.communicationsActiveSubsection = null;
+                },
+                onSubsectionChange: (section) => (state.communicationsActiveSubsection = section),
+                onReload: () => loadConfig(state),
+                onSave: () => saveConfig(state),
+                onApply: () => applyConfig(state),
+                onOpenFile: () => openConfigFile(state),
+                version: state.hello?.server?.version ?? "",
+                theme: state.theme,
+                themeMode: state.themeMode,
+                setTheme: (t, ctx) => state.setTheme(t, ctx),
+                setThemeMode: (m, ctx) => state.setThemeMode(m, ctx),
+                borderRadius: state.settings.borderRadius,
+                setBorderRadius: (v) => state.setBorderRadius(v),
+                gatewayUrl: state.settings.gatewayUrl,
+                assistantName: state.assistantName,
+                configPath: state.configSnapshot?.path ?? null,
+                navRootLabel: "Communication",
+                includeSections: [...COMMUNICATION_SECTION_KEYS],
+                includeVirtualSections: false,
+              })
           : nothing}
         ${state.tab === "appearance"
           ? renderConfig({
@@ -1686,7 +1623,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1724,7 +1660,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1750,7 +1685,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1788,7 +1722,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1814,7 +1747,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1852,7 +1784,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1878,7 +1809,6 @@ export function renderApp(state: AppViewState) {
               loading: state.configLoading,
               saving: state.configSaving,
               applying: state.configApplying,
-              updating: state.updateRunning,
               connected: state.connected,
               schema: state.configSchema,
               schemaLoading: state.configSchemaLoading,
@@ -1912,7 +1842,6 @@ export function renderApp(state: AppViewState) {
               onReload: () => loadConfig(state),
               onSave: () => saveConfig(state),
               onApply: () => applyConfig(state),
-              onUpdate: () => runUpdate(state),
               onOpenFile: () => openConfigFile(state),
               version: state.hello?.server?.version ?? "",
               theme: state.theme,
@@ -1969,6 +1898,57 @@ export function renderApp(state: AppViewState) {
                 onRefresh: () => loadLogs(state, { reset: true }),
                 onExport: (lines, label) => state.exportLogs(lines, label),
                 onScroll: (event) => state.handleLogsScroll(event),
+              }),
+            )
+          : nothing}
+        ${state.tab === "onestop"
+          ? renderOnestop({
+              apiKey: onestopState.onestopApiKey ?? "",
+              selectedModel: state.onestopSelectedModel,
+              showApiKey: onestopState.onestopShowApiKey ?? false,
+              activeCategory: onestopState.onestopActiveCategory ?? "all",
+              saving: onestopState.onestopSaving ?? false,
+              onApiKeyChange: (value) => {
+                onestopState.onestopApiKey = value;
+              },
+              onModelSelect: (modelId) => {
+                state.onestopSelectedModel = modelId;
+                void loadConfig(state);
+              },
+              onToggleShowApiKey: () => {
+                onestopState.onestopShowApiKey = !(onestopState.onestopShowApiKey ?? false);
+              },
+              onCategoryChange: (category) => {
+                onestopState.onestopActiveCategory = category;
+              },
+              onSave: async () => {
+                onestopState.onestopSaving = true;
+                try {
+                  await saveOnestopConfig(
+                    onestopState.onestopApiKey ?? "",
+                    state.onestopSelectedModel,
+                  );
+                  void loadConfig(state);
+                } catch (error) {
+                  console.error("一站式保存失败:", error);
+                } finally {
+                  onestopState.onestopSaving = false;
+                }
+              },
+              onNavigateToCustom: () => {
+                // The custom provider flow lives inside the one-stop page tabs.
+              },
+              requestUpdate: requestHostUpdate ?? (() => {}),
+            })
+          : nothing}
+        ${state.tab === "systemSettings"
+          ? html`<openclaw-system-settings></openclaw-system-settings>`
+          : nothing}
+        ${state.tab === "terminal"
+          ? lazyRender(lazyTerminal, (m) =>
+              m.renderTerminal({
+                active: state.tab === "terminal",
+                gatewayUrl: state.settings.gatewayUrl,
               }),
             )
           : nothing}

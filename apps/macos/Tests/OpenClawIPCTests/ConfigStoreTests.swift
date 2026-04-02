@@ -65,4 +65,29 @@ struct ConfigStoreTests {
         #expect(localHit)
         #expect(!remoteHit)
     }
+
+    @Test func `local fallback restores redacted sensitive values before saving`() {
+        let restored = restoreLocalRedactedSentinels(
+            in: [
+                "channels": [
+                    "telegram": [
+                        "botToken": "__OPENCLAW_REDACTED__",
+                        "mode": "polling",
+                    ]
+                ]
+            ],
+            original: [
+                "channels": [
+                    "telegram": [
+                        "botToken": "secret-token",
+                        "mode": "webhook",
+                    ]
+                ]
+            ])
+
+        let channels = restored["channels"] as? [String: Any]
+        let telegram = channels?["telegram"] as? [String: Any]
+        #expect(telegram?["botToken"] as? String == "secret-token")
+        #expect(telegram?["mode"] as? String == "polling")
+    }
 }

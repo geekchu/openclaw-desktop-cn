@@ -6,6 +6,8 @@
 @import "./styles/config.css";
 @import "@xterm/xterm/css/xterm.css";
 @import "./styles/usage.css";
+@import "./styles/onestop.css";
+@import "./styles/terminal.css";
 @import "@create-markdown/preview/themes/system.css";
 
 .cm-preview {

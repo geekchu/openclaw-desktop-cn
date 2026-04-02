@@ -1,5 +1,6 @@
 import { render } from "lit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "../../i18n/index.ts";
 import type { ThemeMode, ThemeName } from "../theme.ts";
 import { renderConfig, type ConfigProps } from "./config.ts";
 
@@ -12,7 +13,6 @@ describe("config view", () => {
     loading: false,
     saving: false,
     applying: false,
-    updating: false,
     connected: true,
     schema: {
       type: "object",
@@ -35,7 +35,6 @@ describe("config view", () => {
     onReload: vi.fn(),
     onSave: vi.fn(),
     onApply: vi.fn(),
-    onUpdate: vi.fn(),
     onSubsectionChange: vi.fn(),
     version: "2026.3.11",
     theme: "claw" as ThemeName,
@@ -100,6 +99,41 @@ describe("config view", () => {
 
   beforeEach(() => {
     resetRawRevealState();
+  });
+
+  it("updates translated section labels after a locale switch", async () => {
+    const container = document.createElement("div");
+    await i18n.setLocale("en");
+    render(
+      renderConfig({
+        ...baseProps(),
+        schema: {
+          type: "object",
+          properties: {
+            env: { type: "object", properties: {} },
+          },
+        },
+      }),
+      container,
+    );
+    expect(normalizedText(container)).toContain("Environment");
+
+    await i18n.setLocale("zh-CN");
+    render(
+      renderConfig({
+        ...baseProps(),
+        schema: {
+          type: "object",
+          properties: {
+            env: { type: "object", properties: {} },
+          },
+        },
+      }),
+      container,
+    );
+    expect(normalizedText(container)).toContain("环境");
+
+    await i18n.setLocale("en");
   });
 
   it("allows save when form is unsafe", () => {

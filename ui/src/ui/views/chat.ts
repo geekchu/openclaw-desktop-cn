@@ -1437,7 +1437,7 @@ function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
         kind: "group",
         key: `group:${role}:${item.key}`,
         role,
-        senderLabel,
+        senderLabel: senderLabel ?? undefined,
         messages: [{ message: item.message, key: item.key }],
         timestamp,
         isStreaming: false,

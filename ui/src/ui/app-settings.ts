@@ -43,6 +43,7 @@ type SettingsHost = {
   theme: ThemeName;
   themeMode: ThemeMode;
   themeResolved: ResolvedTheme;
+  themeMedia?: MediaQueryList | null;
   applySessionKey: string;
   sessionKey: string;
   tab: Tab;
@@ -60,6 +61,17 @@ type SettingsHost = {
   pendingGatewayToken?: string | null;
 };
 
+function isDesktopMessageSettingsRuntime(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const host = window as typeof window & {
+    __TAURI__?: unknown;
+    __TAURI_INTERNALS__?: unknown;
+  };
+  return Boolean(host.__TAURI__) || Boolean(host.__TAURI_INTERNALS__);
+}
+
 export function applySettings(host: SettingsHost, next: UiSettings) {
   const normalized = {
     ...next,
@@ -70,7 +82,7 @@ export function applySettings(host: SettingsHost, next: UiSettings) {
   if (next.theme !== host.theme || next.themeMode !== host.themeMode) {
     host.theme = next.theme;
     host.themeMode = next.themeMode;
-    applyResolvedTheme(host, resolveTheme(next.theme, next.themeMode));
+    applyResolvedTheme(host, resolveTheme(next.themeMode));
   }
   applyBorderRadius(next.borderRadius);
   host.applySessionKey = host.settings.lastActiveSessionKey;
@@ -182,7 +194,7 @@ export function setTab(host: SettingsHost, next: Tab) {
 }
 
 export function setTheme(host: SettingsHost, next: ThemeName, context?: ThemeTransitionContext) {
-  const resolved = resolveTheme(next, host.themeMode);
+  const resolved = resolveTheme(host.themeMode);
   const applyTheme = () => {
     applySettings(host, { ...host.settings, theme: next });
   };
@@ -200,7 +212,7 @@ export function setThemeMode(
   next: ThemeMode,
   context?: ThemeTransitionContext,
 ) {
-  const resolved = resolveTheme(host.theme, next);
+  const resolved = resolveTheme(next);
   const applyMode = () => {
     applySettings(host, { ...host.settings, themeMode: next });
   };
@@ -270,15 +282,25 @@ export async function refreshActiveTab(host: SettingsHost) {
       !host.chatHasAutoScrolled,
     );
   }
+  const useLegacyDesktopMessageSettings =
+    isDesktopMessageSettingsRuntime() &&
+    (host.tab === "messages" || host.tab === "communications");
+
   if (
     host.tab === "config" ||
-    host.tab === "communications" ||
+    (!useLegacyDesktopMessageSettings &&
+      (host.tab === "messages" || host.tab === "communications")) ||
     host.tab === "appearance" ||
     host.tab === "automation" ||
     host.tab === "infrastructure" ||
     host.tab === "aiAgents"
   ) {
     await loadConfigSchema(host as unknown as OpenClawApp);
+    await loadConfig(host as unknown as OpenClawApp);
+  }
+  if (host.tab === "onestop") {
+    // The one-stop page restores its selected model from the config snapshot.
+    // Load config on direct navigation so deep-linked /onestop renders the current state.
     await loadConfig(host as unknown as OpenClawApp);
   }
   if (host.tab === "debug") {
@@ -306,7 +328,7 @@ export function inferBasePath() {
 export function syncThemeWithSettings(host: SettingsHost) {
   host.theme = host.settings.theme ?? "claw";
   host.themeMode = host.settings.themeMode ?? "system";
-  applyResolvedTheme(host, resolveTheme(host.theme, host.themeMode));
+  applyResolvedTheme(host, resolveTheme(host.themeMode));
   applyBorderRadius(host.settings.borderRadius ?? 50);
   syncSystemThemeListener(host);
 }
@@ -370,7 +392,7 @@ function syncSystemThemeListener(host: SettingsHost) {
     if (host.themeMode !== "system") {
       return;
     }
-    applyResolvedTheme(host, resolveTheme(host.theme, "system"));
+    applyResolvedTheme(host, resolveTheme("system"));
   };
   if (typeof mql.addEventListener === "function") {
     mql.addEventListener("change", onChange);

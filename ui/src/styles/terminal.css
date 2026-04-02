@@ -1,0 +1,132 @@
+/* 终端页面样式 */
+
+.terminal-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+
+.terminal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  gap: var(--space-3);
+}
+
+.terminal-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.terminal-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.terminal-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  transition: background 0.3s;
+}
+
+.terminal-status__dot--ok {
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+}
+
+.terminal-status__label {
+  font-size: var(--text-sm);
+  color: var(--fg);
+  font-family: var(--mono);
+}
+
+.terminal-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.terminal-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-3);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.terminal-toolbar__btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.terminal-toolbar__btn svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}
+
+.terminal-toolbar__btn--restart {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.terminal-toolbar__btn--restart:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.terminal-container {
+  flex: 1;
+  padding: var(--space-2);
+  background: #000;
+  overflow: hidden;
+}
+
+/* xterm.js 容器样式调整 */
+.terminal-container .xterm {
+  height: 100%;
+  padding: var(--space-2);
+}
+
+.terminal-container .xterm-viewport {
+  background: transparent !important;
+}
+
+.terminal-container .xterm-screen {
+  background: transparent !important;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .terminal-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .terminal-toolbar__left {
+    justify-content: space-between;
+  }
+
+  .terminal-toolbar__actions {
+    justify-content: flex-end;
+  }
+
+  .terminal-toolbar__btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

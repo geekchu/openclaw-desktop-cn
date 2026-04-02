@@ -17,13 +17,23 @@ describe("TAB_GROUPS", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not expose unfinished settings slices in the sidebar", () => {
+  it("exposes the published settings tabs in the sidebar", () => {
     const settings = navigation.TAB_GROUPS.find((group) => group.label === "settings");
-    expect(settings?.tabs).toEqual(["config", "debug", "logs"]);
+    expect(settings?.tabs).toEqual([
+      "config",
+      "onestop",
+      "messages",
+      "systemSettings",
+      "debug",
+      "logs",
+    ]);
   });
 
   it("routes every published settings slice", () => {
     expect(navigation.tabFromPath("/config")).toBe("config");
+    expect(navigation.tabFromPath("/onestop")).toBe("onestop");
+    expect(navigation.tabFromPath("/messages")).toBe("messages");
+    expect(navigation.tabFromPath("/system-settings")).toBe("systemSettings");
     expect(navigation.tabFromPath("/debug")).toBe("debug");
     expect(navigation.tabFromPath("/logs")).toBe("logs");
   });

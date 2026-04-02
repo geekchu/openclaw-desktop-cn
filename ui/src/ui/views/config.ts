@@ -14,6 +14,7 @@ import {
   type JsonSchema,
 } from "./config-form.shared.ts";
 import { analyzeConfigSchema, renderConfigForm, SECTION_META } from "./config-form.ts";
+import { t } from "../../i18n/index.ts";
 
 const BORDER_RADIUS_LABELS: Record<BorderRadiusStop, string> = {
   0: "None",
@@ -31,7 +32,6 @@ export type ConfigProps = {
   loading: boolean;
   saving: boolean;
   applying: boolean;
-  updating: boolean;
   connected: boolean;
   schema: unknown;
   schemaLoading: boolean;
@@ -52,7 +52,6 @@ export type ConfigProps = {
   onReload: () => void;
   onSave: () => void;
   onApply: () => void;
-  onUpdate: () => void;
   onOpenFile?: () => void;
   version: string;
   theme: ThemeName;
@@ -353,84 +352,101 @@ type SectionCategory = {
   sections: Array<{ key: string; label: string }>;
 };
 
-const SECTION_CATEGORIES: SectionCategory[] = [
+type SectionCategoryDef = {
+  id: string;
+  labelKey: string;
+  sections: Array<{ key: string; labelKey: string }>;
+};
+
+const SECTION_CATEGORY_DEFS: SectionCategoryDef[] = [
   {
     id: "core",
-    label: "Core",
+    labelKey: "configSections.core",
     sections: [
-      { key: "env", label: "Environment" },
-      { key: "auth", label: "Authentication" },
-      { key: "update", label: "Updates" },
-      { key: "meta", label: "Meta" },
-      { key: "logging", label: "Logging" },
-      { key: "diagnostics", label: "Diagnostics" },
-      { key: "cli", label: "Cli" },
-      { key: "secrets", label: "Secrets" },
+      { key: "env", labelKey: "configSections.environment" },
+      { key: "auth", labelKey: "configSections.authentication" },
+      { key: "update", labelKey: "configSections.updates" },
+      { key: "meta", labelKey: "configSections.meta" },
+      { key: "logging", labelKey: "configSections.logging" },
+      { key: "diagnostics", labelKey: "configSections.diagnostics" },
+      { key: "cli", labelKey: "configSections.cli" },
+      { key: "secrets", labelKey: "configSections.secrets" },
     ],
   },
   {
     id: "ai",
-    label: "AI & Agents",
+    labelKey: "configSections.aiAgents",
     sections: [
-      { key: "agents", label: "Agents" },
-      { key: "models", label: "Models" },
-      { key: "skills", label: "Skills" },
-      { key: "tools", label: "Tools" },
-      { key: "memory", label: "Memory" },
-      { key: "session", label: "Session" },
+      { key: "agents", labelKey: "configSections.agents" },
+      { key: "models", labelKey: "configSections.models" },
+      { key: "skills", labelKey: "configSections.skills" },
+      { key: "tools", labelKey: "configSections.tools" },
+      { key: "memory", labelKey: "configSections.memory" },
+      { key: "session", labelKey: "configSections.session" },
     ],
   },
   {
     id: "communication",
-    label: "Communication",
+    labelKey: "configSections.communication",
     sections: [
-      { key: "channels", label: "Channels" },
-      { key: "messages", label: "Messages" },
-      { key: "broadcast", label: "Broadcast" },
-      { key: "talk", label: "Talk" },
-      { key: "audio", label: "Audio" },
+      { key: "channels", labelKey: "configSections.channels" },
+      { key: "messages", labelKey: "configSections.messages" },
+      { key: "broadcast", labelKey: "configSections.broadcast" },
+      { key: "talk", labelKey: "configSections.talk" },
+      { key: "audio", labelKey: "configSections.audio" },
     ],
   },
   {
     id: "automation",
-    label: "Automation",
+    labelKey: "configSections.automation",
     sections: [
-      { key: "commands", label: "Commands" },
-      { key: "hooks", label: "Hooks" },
-      { key: "bindings", label: "Bindings" },
-      { key: "cron", label: "Cron" },
-      { key: "approvals", label: "Approvals" },
-      { key: "plugins", label: "Plugins" },
+      { key: "commands", labelKey: "configSections.commands" },
+      { key: "hooks", labelKey: "configSections.hooks" },
+      { key: "bindings", labelKey: "configSections.bindings" },
+      { key: "cron", labelKey: "configSections.cron" },
+      { key: "approvals", labelKey: "configSections.approvals" },
+      { key: "plugins", labelKey: "configSections.plugins" },
     ],
   },
   {
     id: "infrastructure",
-    label: "Infrastructure",
+    labelKey: "configSections.infrastructure",
     sections: [
-      { key: "gateway", label: "Gateway" },
-      { key: "web", label: "Web" },
-      { key: "browser", label: "Browser" },
-      { key: "nodeHost", label: "NodeHost" },
-      { key: "canvasHost", label: "CanvasHost" },
-      { key: "discovery", label: "Discovery" },
-      { key: "media", label: "Media" },
-      { key: "acp", label: "Acp" },
-      { key: "mcp", label: "Mcp" },
+      { key: "gateway", labelKey: "configSections.gateway" },
+      { key: "web", labelKey: "configSections.web" },
+      { key: "browser", labelKey: "configSections.browser" },
+      { key: "nodeHost", labelKey: "configSections.nodeHost" },
+      { key: "canvasHost", labelKey: "configSections.canvasHost" },
+      { key: "discovery", labelKey: "configSections.discovery" },
+      { key: "media", labelKey: "configSections.media" },
+      { key: "acp", labelKey: "configSections.acp" },
+      { key: "mcp", labelKey: "configSections.mcp" },
     ],
   },
   {
     id: "appearance",
-    label: "Appearance",
+    labelKey: "configSections.appearance",
     sections: [
-      { key: "__appearance__", label: "Theme" },
-      { key: "ui", label: "UI" },
-      { key: "wizard", label: "Setup Wizard" },
+      { key: "__appearance__", labelKey: "configSections.theme" },
+      { key: "ui", labelKey: "configSections.ui" },
+      { key: "wizard", labelKey: "configSections.setupWizard" },
     ],
   },
 ];
 
 // Flat lookup: all categorised keys
-const CATEGORISED_KEYS = new Set(SECTION_CATEGORIES.flatMap((c) => c.sections.map((s) => s.key)));
+const CATEGORISED_KEYS = new Set(SECTION_CATEGORY_DEFS.flatMap((c) => c.sections.map((s) => s.key)));
+
+function buildSectionCategories(): SectionCategory[] {
+  return SECTION_CATEGORY_DEFS.map((category) => ({
+    id: category.id,
+    label: t(category.labelKey),
+    sections: category.sections.map((section) => ({
+      key: section.key,
+      label: t(section.labelKey),
+    })),
+  }));
+}
 
 function getSectionIcon(key: string) {
   return sidebarIcons[key as keyof typeof sidebarIcons] ?? sidebarIcons.default;
@@ -712,12 +728,13 @@ export function renderConfig(props: ConfigProps) {
   const formMode = showModeToggle ? props.formMode : "form";
   const envSensitiveVisible = cvs.envRevealed;
   const requestUpdate = props.onRequestUpdate ?? (() => props.onRawChange(props.raw));
+  const sectionCategories = buildSectionCategories();
 
   // Build categorised nav from schema - only include sections that exist in the schema
   const schemaProps = analysis.schema?.properties ?? {};
 
   const VIRTUAL_SECTIONS = new Set(["__appearance__"]);
-  const visibleCategories = SECTION_CATEGORIES.map((cat) => ({
+  const visibleCategories = sectionCategories.map((cat) => ({
     ...cat,
     sections: cat.sections.filter(
       (s) => (includeVirtualSections && VIRTUAL_SECTIONS.has(s.key)) || s.key in schemaProps,
@@ -730,7 +747,7 @@ export function renderConfig(props: ConfigProps) {
     .map((k) => ({ key: k, label: k.charAt(0).toUpperCase() + k.slice(1) }));
 
   const otherCategory: SectionCategory | null =
-    extraSections.length > 0 ? { id: "other", label: "Other", sections: extraSections } : null;
+    extraSections.length > 0 ? { id: "other", label: t("configSections.other"), sections: extraSections } : null;
 
   const isVirtualSection =
     includeVirtualSections &&
@@ -770,10 +787,8 @@ export function renderConfig(props: ConfigProps) {
   const canApply =
     props.connected &&
     !props.applying &&
-    !props.updating &&
     hasChanges &&
     (formMode === "raw" ? true : canSaveForm);
-  const canUpdate = props.connected && !props.applying && !props.updating;
 
   const showAppearanceOnRoot =
     includeVirtualSections &&
@@ -836,9 +851,6 @@ export function renderConfig(props: ConfigProps) {
             </button>
             <button class="btn btn--sm" ?disabled=${!canApply} @click=${props.onApply}>
               ${props.applying ? "Applying…" : "Apply"}
-            </button>
-            <button class="btn btn--sm" ?disabled=${!canUpdate} @click=${props.onUpdate}>
-              ${props.updating ? "Updating…" : "Update"}
             </button>
           </div>
         </div>

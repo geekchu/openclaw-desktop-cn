@@ -87,6 +87,83 @@ export function hintForPath(path: Array<string | number>, hints: ConfigUiHints) 
   return undefined;
 }
 
+// Placeholder for redacted sensitive values
+export const REDACTED_PLACEHOLDER = "[REDACTED]";
+
+// List of sensitive field name patterns
+const SENSITIVE_PATTERNS = [
+  "password",
+  "token",
+  "secret",
+  "apikey",
+  "api_key",
+  "accesstoken",
+  "access_token",
+  "refreshtoken",
+  "refresh_token",
+  "privatekey",
+  "private_key",
+  "credential",
+  "auth",
+];
+
+// Check if a config path contains sensitive data
+export function isSensitiveConfigPath(path: string | Array<string | number>): boolean {
+  const pathStr = Array.isArray(path) ? pathKey(path) : path;
+  const lower = pathStr.toLowerCase();
+  return SENSITIVE_PATTERNS.some((pattern) => lower.includes(pattern));
+}
+
+// Check if a value at a path is sensitive
+export function hasSensitiveConfigData(
+  value: unknown,
+  path: Array<string | number>,
+  hints: ConfigUiHints,
+): boolean {
+  // Check if the path itself is sensitive
+  if (isSensitiveConfigPath(path)) {
+    return true;
+  }
+
+  // Check if hints mark this as sensitive
+  const hint = hintForPath(path, hints);
+  if (hint?.sensitive) {
+    return true;
+  }
+
+  return false;
+}
+
+// Count sensitive values in a config object
+export function countSensitiveConfigValues(
+  obj: unknown,
+  basePath: Array<string | number>,
+  hints: ConfigUiHints,
+): number {
+  if (obj == null || typeof obj !== "object") {
+    return 0;
+  }
+
+  let count = 0;
+
+  for (const [key, value] of Object.entries(obj)) {
+    const path = [...basePath, key];
+
+    if (hasSensitiveConfigData(value, path, hints)) {
+      if (value != null && String(value).trim() !== "") {
+        count += 1;
+      }
+    }
+
+    // Recursively count in nested objects
+    if (value != null && typeof value === "object" && !Array.isArray(value)) {
+      count += countSensitiveConfigValues(value, path, hints);
+    }
+  }
+
+  return count;
+}
+
 // 常用配置字段的中文翻译
 const FIELD_TRANSLATIONS: Record<string, string> = {
   // 通用字段

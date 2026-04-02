@@ -1,5 +1,21 @@
 import SwiftUI
 
+let redactedConfigSentinel = "__OPENCLAW_REDACTED__"
+
+func visibleSensitiveStringValue(_ value: Any?, defaultValue: String?, sensitive: Bool) -> String {
+    let resolved: String?
+    if let text = value as? String {
+        resolved = text
+    } else {
+        resolved = defaultValue
+    }
+    guard let resolved else { return "" }
+    if sensitive, resolved == redactedConfigSentinel {
+        return ""
+    }
+    return resolved
+}
+
 struct ConfigSchemaForm: View {
     @Bindable var store: ChannelsStore
     let schema: ConfigSchemaNode
@@ -11,18 +27,15 @@ struct ConfigSchemaForm: View {
 
     private func renderNode(_ schema: ConfigSchemaNode, path: ConfigPath) -> AnyView {
         let storedValue = self.store.configValue(at: path)
-        let value = storedValue ?? schema.explicitDefault
-        let label = hintForPath(path, hints: store.configUiHints)?.label ?? schema.title
-        let help = hintForPath(path, hints: store.configUiHints)?.help ?? schema.description
-        let variants = schema.anyOf.isEmpty ? schema.oneOf : schema.anyOf
+        let effectiveSchema = schema.resolvedFormNode(preferredValue: storedValue ?? schema.explicitDefault)
+        let value = storedValue ?? effectiveSchema.explicitDefault ?? schema.explicitDefault
+        let label = hintForPath(path, hints: store.configUiHints)?.label ?? schema.title ?? effectiveSchema.title
+        let help = hintForPath(path, hints: store.configUiHints)?.help ?? schema.description ?? effectiveSchema.description
+        let variants = effectiveSchema.variants
 
         if !variants.isEmpty {
-            let nonNull = variants.filter { !$0.isNullSchema }
-            if nonNull.count == 1, let only = nonNull.first {
-                return self.renderNode(only, path: path)
-            }
-            let literals = nonNull.compactMap(\.literalValue)
-            if !literals.isEmpty, literals.count == nonNull.count {
+            let literals = variants.compactMap(\.literalValue)
+            if !literals.isEmpty, literals.count == variants.count {
                 return AnyView(
                     VStack(alignment: .leading, spacing: 6) {
                         if let label { Text(label).font(.callout.weight(.semibold)) }
@@ -36,10 +49,10 @@ struct ConfigSchemaForm: View {
                             selection: self.enumBinding(
                                 path,
                                 options: literals,
-                                defaultValue: schema.explicitDefault))
+                                defaultValue: effectiveSchema.explicitDefault))
                         {
                             Text("Select…").tag(-1)
-                            ForEach(literals.indices, id: \ .self) { index in
+                            ForEach(literals.indices, id: \.self) { index in
                                 Text(String(describing: literals[index])).tag(index)
                             }
                         }
@@ -48,7 +61,7 @@ struct ConfigSchemaForm: View {
             }
         }
 
-        switch schema.schemaType {
+        switch effectiveSchema.schemaType {
         case "object":
             return AnyView(
                 VStack(alignment: .leading, spacing: 12) {
@@ -61,34 +74,34 @@ struct ConfigSchemaForm: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    let properties = schema.properties
+                    let properties = effectiveSchema.properties
                     let sortedKeys = properties.keys.sorted { lhs, rhs in
                         let orderA = hintForPath(path + [.key(lhs)], hints: store.configUiHints)?.order ?? 0
                         let orderB = hintForPath(path + [.key(rhs)], hints: store.configUiHints)?.order ?? 0
                         if orderA != orderB { return orderA < orderB }
                         return lhs < rhs
                     }
-                    ForEach(sortedKeys, id: \ .self) { key in
+                    ForEach(sortedKeys, id: \.self) { key in
                         if let child = properties[key] {
                             self.renderNode(child, path: path + [.key(key)])
                         }
                     }
-                    if schema.allowsAdditionalProperties {
-                        self.renderAdditionalProperties(schema, path: path, value: value)
+                    if effectiveSchema.allowsAdditionalProperties {
+                        self.renderAdditionalProperties(effectiveSchema, path: path, value: value)
                     }
                 })
         case "array":
-            return AnyView(self.renderArray(schema, path: path, value: value, label: label, help: help))
+            return AnyView(self.renderArray(effectiveSchema, path: path, value: value, label: label, help: help))
         case "boolean":
             return AnyView(
-                Toggle(isOn: self.boolBinding(path, defaultValue: schema.explicitDefault as? Bool)) {
+                Toggle(isOn: self.boolBinding(path, defaultValue: effectiveSchema.explicitDefault as? Bool)) {
                     if let label { Text(label) } else { Text("Enabled") }
                 }
                 .help(help ?? ""))
         case "number", "integer":
-            return AnyView(self.renderNumberField(schema, path: path, label: label, help: help))
+            return AnyView(self.renderNumberField(effectiveSchema, path: path, label: label, help: help))
         case "string":
-            return AnyView(self.renderStringField(schema, path: path, label: label, help: help))
+            return AnyView(self.renderStringField(effectiveSchema, path: path, label: label, help: help))
         default:
             return AnyView(
                 VStack(alignment: .leading, spacing: 6) {
@@ -121,7 +134,7 @@ struct ConfigSchemaForm: View {
             if let options = schema.enumValues {
                 Picker("", selection: self.enumBinding(path, options: options, defaultValue: schema.explicitDefault)) {
                     Text("Select…").tag(-1)
-                    ForEach(options.indices, id: \ .self) { index in
+                    ForEach(options.indices, id: \.self) { index in
                         Text(String(describing: options[index])).tag(index)
                     }
                 }
@@ -179,7 +192,7 @@ struct ConfigSchemaForm: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            ForEach(items.indices, id: \ .self) { index in
+            ForEach(items.indices, id: \.self) { index in
                 HStack(alignment: .top, spacing: 8) {
                     if let itemSchema {
                         self.renderNode(itemSchema, path: path + [.index(index)])
@@ -228,7 +241,7 @@ struct ConfigSchemaForm: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(extras, id: \ .self) { key in
+                    ForEach(extras, id: \.self) { key in
                         let itemPath: ConfigPath = path + [.key(key)]
                         HStack(alignment: .top, spacing: 8) {
                             TextField("Key", text: self.mapKeyBinding(path: path, key: key))
@@ -265,8 +278,12 @@ struct ConfigSchemaForm: View {
     private func stringBinding(_ path: ConfigPath, defaultValue: String?) -> Binding<String> {
         Binding(
             get: {
-                if let value = store.configValue(at: path) as? String { return value }
-                return defaultValue ?? ""
+                let hint = hintForPath(path, hints: store.configUiHints)
+                let sensitive = hint?.sensitive ?? isSensitivePath(path)
+                return visibleSensitiveStringValue(
+                    store.configValue(at: path),
+                    defaultValue: defaultValue,
+                    sensitive: sensitive)
             },
             set: { newValue in
                 let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)

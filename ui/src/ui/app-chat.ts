@@ -18,6 +18,7 @@ export type ChatHost = {
   client: GatewayBrowserClient | null;
   chatMessages: unknown[];
   chatStream: string | null;
+  chatStreamStartedAt?: number | null;
   connected: boolean;
   chatMessage: string;
   chatAttachments: ChatAttachment[];

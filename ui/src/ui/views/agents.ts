@@ -19,6 +19,7 @@ import {
 } from "./agents-panels-status-files.ts";
 import { renderAgentTools, renderAgentSkills } from "./agents-panels-tools-skills.ts";
 import { agentBadgeText, buildAgentContext, normalizeAgentLabel } from "./agents-utils.ts";
+import { t } from "../../i18n/index.ts";
 
 export type AgentsPanel = "overview" | "files" | "tools" | "skills" | "channels" | "cron";
 
@@ -347,12 +348,12 @@ function renderAgentTabs(
   counts: Record<string, number | null>,
 ) {
   const tabs: Array<{ id: AgentsPanel; label: string }> = [
-    { id: "overview", label: "Overview" },
-    { id: "files", label: "Files" },
-    { id: "tools", label: "Tools" },
-    { id: "skills", label: "Skills" },
-    { id: "channels", label: "Channels" },
-    { id: "cron", label: "Cron Jobs" },
+    { id: "overview", label: t("tabs.overview") },
+    { id: "files", label: t("tabs.files") },
+    { id: "tools", label: t("tabs.tools") },
+    { id: "skills", label: t("tabs.skills") },
+    { id: "channels", label: t("tabs.channels") },
+    { id: "cron", label: t("tabs.cron") },
   ];
   return html`
     <div class="agent-tabs">

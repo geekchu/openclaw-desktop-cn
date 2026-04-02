@@ -12,6 +12,17 @@ const uiDir = path.join(repoRoot, "ui");
 const WINDOWS_SHELL_EXTENSIONS = new Set([".cmd", ".bat", ".com"]);
 const WINDOWS_UNSAFE_SHELL_ARG_PATTERN = /[\r\n"&|<>^%!]/;
 
+function quoteWindowsCmdArg(value) {
+  if (value.length === 0) {
+    return '""';
+  }
+  const escaped = value.replace(/"/g, '\\"').replace(/%/g, "%%").replace(/!/g, "^!");
+  if (!/[ \t"&|<>^()%!]/u.test(value)) {
+    return escaped;
+  }
+  return `"${escaped}"`;
+}
+
 function usage() {
   // keep this tiny; it's invoked from npm scripts too
   process.stderr.write("Usage: node scripts/ui.js <install|dev|build|test> [...args]\n");
@@ -77,22 +88,41 @@ export function assertSafeWindowsShellArgs(args, platform = process.platform) {
 }
 
 function createSpawnOptions(cmd, args, envOverride) {
-  const useShell = shouldUseShellForCommand(cmd);
-  if (useShell) {
+  if (shouldUseShellForCommand(cmd)) {
     assertSafeWindowsShellArgs(args);
   }
   return {
     cwd: uiDir,
     stdio: "inherit",
     env: envOverride ?? process.env,
-    ...(useShell ? { shell: true } : {}),
+  };
+}
+
+function resolveSpawnInvocation(cmd, args, envOverride) {
+  const options = createSpawnOptions(cmd, args, envOverride);
+  if (!shouldUseShellForCommand(cmd)) {
+    return { command: cmd, args, options };
+  }
+  const quotedCommand = quoteWindowsCmdArg(cmd);
+  const commandLineInner = [quotedCommand, ...args.map(quoteWindowsCmdArg)].join(" ");
+  const commandLine = quotedCommand.startsWith('"')
+    ? `"${commandLineInner}"`
+    : commandLineInner;
+  return {
+    command: process.env.ComSpec ?? "cmd.exe",
+    args: ["/d", "/s", "/c", commandLine],
+    options: {
+      ...options,
+      windowsVerbatimArguments: true,
+    },
   };
 }
 
 function run(cmd, args) {
   let child;
   try {
-    child = spawn(cmd, args, createSpawnOptions(cmd, args));
+    const invocation = resolveSpawnInvocation(cmd, args);
+    child = spawn(invocation.command, invocation.args, invocation.options);
   } catch (err) {
     console.error(`Failed to launch ${cmd}:`, err);
     process.exit(1);
@@ -113,7 +143,8 @@ function run(cmd, args) {
 function runSync(cmd, args, envOverride) {
   let result;
   try {
-    result = spawnSync(cmd, args, createSpawnOptions(cmd, args, envOverride));
+    const invocation = resolveSpawnInvocation(cmd, args, envOverride);
+    result = spawnSync(invocation.command, invocation.args, invocation.options);
   } catch (err) {
     console.error(`Failed to launch ${cmd}:`, err);
     process.exit(1);

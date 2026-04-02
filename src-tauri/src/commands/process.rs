@@ -1,6 +1,6 @@
 use crate::utils::shell;
+use log::{debug, info};
 use tauri::{command, Manager};
-use log::{info, debug};
 
 /// 检查 OpenClaw 是否已安装
 /// 生产模式：仅检查 bundle 模式（内置 Node.js + openclaw.mjs）
@@ -12,7 +12,10 @@ pub async fn check_openclaw_installed() -> Result<bool, String> {
     let bundle_ok = std::env::var("OPENCLAW_GATEWAY_BUNDLE_DIR")
         .map(|dir| {
             std::path::Path::new(&dir).join("openclaw.mjs").exists()
-            || std::path::Path::new(&dir).join("dist").join("entry.js").exists()
+                || std::path::Path::new(&dir)
+                    .join("dist")
+                    .join("entry.js")
+                    .exists()
         })
         .unwrap_or(false);
     let node_ok = shell::get_node_path().is_some();
@@ -24,13 +27,19 @@ pub async fn check_openclaw_installed() -> Result<bool, String> {
 
     // 生产模式：不回退到全局 openclaw，打包应用必须自包含
     if !cfg!(debug_assertions) {
-        info!("[进程检查] 生产模式下 bundle 不可用 (bundle_ok={}, node_ok={})", bundle_ok, node_ok);
+        info!(
+            "[进程检查] 生产模式下 bundle 不可用 (bundle_ok={}, node_ok={})",
+            bundle_ok, node_ok
+        );
         return Ok(false);
     }
 
     // 开发模式：回退到全局 openclaw 检查
     let installed = shell::get_openclaw_path().is_some();
-    info!("[进程检查] [开发模式] OpenClaw 安装状态: {}", if installed { "已安装" } else { "未安装" });
+    info!(
+        "[进程检查] [开发模式] OpenClaw 安装状态: {}",
+        if installed { "已安装" } else { "未安装" }
+    );
     Ok(installed)
 }
 
@@ -44,11 +53,11 @@ pub async fn get_openclaw_version() -> Result<Option<String>, String> {
             let v = version.trim().to_string();
             info!("[进程检查] OpenClaw 版本: {}", v);
             Ok(Some(v))
-        },
+        }
         Err(e) => {
             debug!("[进程检查] 获取版本失败: {}", e);
             Ok(None)
-        },
+        }
     }
 }
 
@@ -56,35 +65,42 @@ pub async fn get_openclaw_version() -> Result<Option<String>, String> {
 #[command]
 pub async fn check_port_in_use(app: tauri::AppHandle, port: u16) -> Result<bool, String> {
     info!("[进程检查] 检查端口 {} 是否被占用...", port);
-    
+
     // 使用 openclaw health 检查 gateway 是否在运行
     let gm = app.state::<crate::gateway::GatewayManager>();
     let current_gateway_port = gm.get_port();
 
     // 如果 port 是当前 gateway 的 port，直接使用 openclaw health
     if port == current_gateway_port {
-        debug!("[进程检查] 使用 openclaw health 检查当前网关端口 {}...", port);
+        debug!(
+            "[进程检查] 使用 openclaw health 检查当前网关端口 {}...",
+            port
+        );
         let result = shell::run_openclaw(&["health", "--timeout", "2000"]);
         // 如果 health 命令成功，说明端口被 gateway 占用
         let in_use = result.is_ok();
-        info!("[进程检查] 当前网关端口 {} 状态: {}", port, if in_use { "被占用" } else { "空闲" });
+        info!(
+            "[进程检查] 当前网关端口 {} 状态: {}",
+            port,
+            if in_use { "被占用" } else { "空闲" }
+        );
         return Ok(in_use);
     }
-    
+
     // 对于非默认端口，尝试使用 TCP 连接检查
     debug!("[进程检查] 使用 TCP 连接检查端口 {}...", port);
     use std::net::TcpStream;
     use std::time::Duration;
-    
+
     let addr = format!("127.0.0.1:{}", port);
     match TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_millis(500)) {
         Ok(_) => {
             info!("[进程检查] 端口 {} 被占用", port);
             Ok(true)
-        },
+        }
         Err(_) => {
             info!("[进程检查] 端口 {} 空闲", port);
             Ok(false)
-        },
+        }
     }
 }

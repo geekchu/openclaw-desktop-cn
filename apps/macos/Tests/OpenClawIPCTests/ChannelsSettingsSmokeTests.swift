@@ -156,4 +156,172 @@ struct ChannelsSettingsSmokeTests {
         let view = ChannelsSettings(store: store)
         _ = view.body
     }
+
+    @Test func `messages settings keeps the legacy nine-channel order`() {
+        let store = makeChannelsStore(channels: [:])
+        let view = ChannelsSettings(
+            store: store,
+            allowedChannelIds: MessagesSettings.supportedChannelIds,
+            desktopActionsEnabled: true)
+
+        #expect(view.orderedChannels.map(\.id) == MessagesSettings.supportedChannelIds)
+    }
+
+    @Test func `messages settings keeps fixed order even when some channels are configured`() {
+        let store = ChannelsStore(isPreview: true)
+        store.snapshot = ChannelsStatusSnapshot(
+            ts: 1_700_000_000_000,
+            channelOrder: ["whatsapp", "slack", "telegram", "discord"],
+            channelLabels: [
+                "telegram": "Telegram",
+                "discord": "Discord",
+                "slack": "Slack",
+                "whatsapp": "WhatsApp",
+            ],
+            channelDetailLabels: nil,
+            channelSystemImages: nil,
+            channelMeta: nil,
+            channels: [
+                "whatsapp": SnapshotAnyCodable([
+                    "configured": false,
+                    "linked": false,
+                    "running": false,
+                    "connected": false,
+                    "reconnectAttempts": 0,
+                ]),
+                "telegram": SnapshotAnyCodable([
+                    "configured": true,
+                    "running": true,
+                ]),
+                "discord": SnapshotAnyCodable([
+                    "configured": false,
+                    "running": false,
+                ]),
+                "slack": SnapshotAnyCodable([
+                    "configured": false,
+                    "running": false,
+                ]),
+            ],
+            channelAccounts: [:],
+            channelDefaultAccountId: ["telegram": "default"])
+
+        let view = ChannelsSettings(
+            store: store,
+            allowedChannelIds: MessagesSettings.supportedChannelIds,
+            desktopActionsEnabled: true)
+
+        #expect(view.orderedChannels.map(\.id) == MessagesSettings.supportedChannelIds)
+    }
+
+    @Test func `generic message channels surface probe failures as errors`() {
+        let store = ChannelsStore(isPreview: true)
+        store.snapshot = ChannelsStatusSnapshot(
+            ts: 1_700_000_000_000,
+            channelOrder: ["feishu"],
+            channelLabels: ["feishu": "Feishu"],
+            channelDetailLabels: nil,
+            channelSystemImages: nil,
+            channelMeta: nil,
+            channels: [
+                "feishu": SnapshotAnyCodable([
+                    "configured": true,
+                    "running": true,
+                    "probe": [
+                        "ok": false,
+                        "status": 401,
+                        "error": "token expired",
+                    ],
+                    "lastProbeAt": 1_700_000_050_000,
+                ])
+            ],
+            channelAccounts: [:],
+            channelDefaultAccountId: ["feishu": "default"])
+
+        let view = ChannelsSettings(store: store, allowedChannelIds: ["feishu"])
+        let channel = try #require(view.orderedChannels.first)
+
+        #expect(view.channelHasError(channel))
+        #expect(view.channelTint(channel) == .orange)
+        #expect(view.channelSummary(channel) == "Error")
+        #expect(view.channelDetails(channel)?.contains("token expired") == true)
+    }
+
+    @Test func `wecom configured state stays healthy in messages ui`() {
+        let store = ChannelsStore(isPreview: true)
+        store.snapshot = ChannelsStatusSnapshot(
+            ts: 1_700_000_000_000,
+            channelOrder: ["wecom"],
+            channelLabels: ["wecom": "WeCom"],
+            channelDetailLabels: nil,
+            channelSystemImages: nil,
+            channelMeta: nil,
+            channels: [
+                "wecom": SnapshotAnyCodable([
+                    "configured": true,
+                ])
+            ],
+            channelAccounts: [:],
+            channelDefaultAccountId: [:])
+
+        let view = ChannelsSettings(store: store, allowedChannelIds: ["wecom"], desktopActionsEnabled: true)
+        let channel = try #require(view.orderedChannels.first)
+
+        #expect(view.channelTint(channel) == .green)
+        #expect(!view.channelHasError(channel))
+        #expect(view.channelSummary(channel) == "Configured")
+    }
+
+    @Test func `imessage healthy probe shows ready state in messages ui`() {
+        let store = ChannelsStore(isPreview: true)
+        store.snapshot = ChannelsStatusSnapshot(
+            ts: 1_700_000_000_000,
+            channelOrder: ["imessage"],
+            channelLabels: ["imessage": "iMessage"],
+            channelDetailLabels: nil,
+            channelSystemImages: nil,
+            channelMeta: nil,
+            channels: [
+                "imessage": SnapshotAnyCodable([
+                    "configured": true,
+                    "running": false,
+                    "probe": ["ok": true],
+                ])
+            ],
+            channelAccounts: [:],
+            channelDefaultAccountId: [:])
+
+        let view = ChannelsSettings(store: store, allowedChannelIds: ["imessage"], desktopActionsEnabled: true)
+        let channel = try #require(view.orderedChannels.first)
+
+        #expect(view.channelTint(channel) == .green)
+        #expect(!view.channelHasError(channel))
+    }
+
+    @Test func `whatsapp linked state stays healthy in messages ui`() {
+        let store = ChannelsStore(isPreview: true)
+        store.snapshot = ChannelsStatusSnapshot(
+            ts: 1_700_000_000_000,
+            channelOrder: ["whatsapp"],
+            channelLabels: ["whatsapp": "WhatsApp"],
+            channelDetailLabels: nil,
+            channelSystemImages: nil,
+            channelMeta: nil,
+            channels: [
+                "whatsapp": SnapshotAnyCodable([
+                    "configured": true,
+                    "linked": true,
+                    "running": false,
+                    "connected": false,
+                    "reconnectAttempts": 0,
+                ])
+            ],
+            channelAccounts: [:],
+            channelDefaultAccountId: [:])
+
+        let view = ChannelsSettings(store: store, allowedChannelIds: ["whatsapp"], desktopActionsEnabled: true)
+        let channel = try #require(view.orderedChannels.first)
+
+        #expect(view.channelTint(channel) == .green)
+        #expect(view.channelSummary(channel) == "Linked")
+    }
 }

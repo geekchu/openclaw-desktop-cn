@@ -21,6 +21,8 @@ async function loadChatHelpers(): Promise<void> {
 
 function makeHost(overrides?: Partial<ChatHost>): ChatHost {
   return {
+    client: null,
+    chatMessages: [],
     chatStream: null,
     chatStreamStartedAt: null,
     connected: true,

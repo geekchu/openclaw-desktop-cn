@@ -63,7 +63,8 @@ enum ConfigStore {
                 do {
                     try await self.saveToGateway(root)
                 } catch {
-                    OpenClawConfigFile.saveDict(root)
+                    let original = OpenClawConfigFile.loadDict()
+                    OpenClawConfigFile.saveDict(restoreLocalRedactedSentinels(in: root, original: original))
                 }
             }
         }
@@ -114,4 +115,33 @@ enum ConfigStore {
         await self.overrideStore.setOverride(.init())
     }
     #endif
+}
+
+func restoreLocalRedactedSentinels(in incoming: Any, original: Any) -> [String: Any] {
+    restoreLocalRedactedSentinelsValue(incoming: incoming, original: original) as? [String: Any] ?? [:]
+}
+
+func restoreLocalRedactedSentinelsValue(incoming: Any, original: Any?) -> Any {
+    if let text = incoming as? String, text == redactedConfigSentinel {
+        return original ?? incoming
+    }
+
+    if let incomingDict = incoming as? [String: Any] {
+        let originalDict = original as? [String: Any]
+        return incomingDict.reduce(into: [String: Any]()) { result, entry in
+            result[entry.key] = restoreLocalRedactedSentinelsValue(
+                incoming: entry.value,
+                original: originalDict?[entry.key])
+        }
+    }
+
+    if let incomingArray = incoming as? [Any] {
+        let originalArray = original as? [Any] ?? []
+        return incomingArray.enumerated().map { index, value in
+            let originalValue: Any? = index < originalArray.count ? originalArray[index] : nil
+            return restoreLocalRedactedSentinelsValue(incoming: value, original: originalValue)
+        }
+    }
+
+    return incoming
 }

@@ -275,6 +275,27 @@ export type MSTeamsStatus = {
   lastProbeAt?: number | null;
 };
 
+export type FeishuProbe = {
+  ok: boolean;
+  status?: number | null;
+  error?: string | null;
+  appId?: string | null;
+  botName?: string | null;
+  botOpenId?: string | null;
+};
+
+export type FeishuStatus = {
+  configured: boolean;
+  running: boolean;
+  domain?: string | null;
+  appId?: string | null;
+  lastStartAt?: number | null;
+  lastStopAt?: number | null;
+  lastError?: string | null;
+  probe?: FeishuProbe | null;
+  lastProbeAt?: number | null;
+};
+
 export type ConfigSnapshotIssue = {
   path: string;
   message: string;
@@ -627,6 +648,9 @@ export type HealthSummary = {
   heartbeatSeconds: number;
   defaultAgentId: string;
   agents: Array<{ id: string; name?: string }>;
+  channels: Record<string, unknown>;
+  channelOrder: string[];
+  channelLabels: Record<string, string>;
   sessions: {
     path: string;
     count: number;

@@ -13,6 +13,14 @@ OUTPUT_FILE="$ROOT_DIR/src/canvas-host/a2ui/a2ui.bundle.js"
 A2UI_RENDERER_DIR="$ROOT_DIR/vendor/a2ui/renderers/lit"
 A2UI_APP_DIR="$ROOT_DIR/apps/shared/OpenClawKit/Tools/CanvasA2UI"
 
+# Windows: skip rebuild if bundle exists (pnpm exec fails in git-bash)
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+  if [[ -f "$OUTPUT_FILE" ]]; then
+    echo "A2UI bundle exists; skipping rebuild on Windows."
+    exit 0
+  fi
+fi
+
 # Docker builds exclude vendor/apps via .dockerignore.
 # In that environment we can keep a prebuilt bundle only if it exists.
 if [[ ! -d "$A2UI_RENDERER_DIR" || ! -d "$A2UI_APP_DIR" ]]; then

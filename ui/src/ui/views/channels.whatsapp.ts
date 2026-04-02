@@ -9,6 +9,15 @@ import {
 } from "./channels.shared.ts";
 import type { ChannelsProps } from "./channels.types.ts";
 
+export function shouldShowWhatsAppLogout(props: ChannelsProps): boolean {
+  const whatsappAccounts = props.snapshot?.channelAccounts?.whatsapp ?? [];
+  return whatsappAccounts.length < 2;
+}
+
+function shouldShowWhatsAppAuthActions(props: ChannelsProps): boolean {
+  return shouldShowWhatsAppLogout(props);
+}
+
 export function renderWhatsAppCard(params: {
   props: ChannelsProps;
   whatsapp?: WhatsAppStatus;
@@ -16,6 +25,8 @@ export function renderWhatsAppCard(params: {
 }) {
   const { props, whatsapp, accountCountLabel } = params;
   const configured = resolveChannelConfigured("whatsapp", props);
+  const showAuthActions = shouldShowWhatsAppAuthActions(props);
+  const showLogout = shouldShowWhatsAppLogout(props);
 
   return renderSingleAccountChannelCard({
     title: "WhatsApp",
@@ -43,6 +54,12 @@ export function renderWhatsAppCard(params: {
     ],
     lastError: whatsapp?.lastError,
     extraContent: html`
+      ${!showAuthActions
+        ? html`<div class="callout" style="margin-top: 12px;">
+            Multi-account WhatsApp linking is not available in this view. Use the CLI with
+            <code>--account</code> to manage a specific account.
+          </div>`
+        : nothing}
       ${props.whatsappMessage
         ? html`<div class="callout" style="margin-top: 12px;">${props.whatsappMessage}</div>`
         : nothing}
@@ -54,30 +71,42 @@ export function renderWhatsAppCard(params: {
     `,
     configSection: renderChannelConfigSection({ channelId: "whatsapp", props }),
     footer: html`<div class="row" style="margin-top: 14px; flex-wrap: wrap;">
-      <button
-        class="btn primary"
-        ?disabled=${props.whatsappBusy}
-        @click=${() => props.onWhatsAppStart(false)}
-      >
-        ${props.whatsappBusy ? "Working…" : "Show QR"}
-      </button>
-      <button
-        class="btn"
-        ?disabled=${props.whatsappBusy}
-        @click=${() => props.onWhatsAppStart(true)}
-      >
-        Relink
-      </button>
-      <button class="btn" ?disabled=${props.whatsappBusy} @click=${() => props.onWhatsAppWait()}>
-        Wait for scan
-      </button>
-      <button
-        class="btn danger"
-        ?disabled=${props.whatsappBusy}
-        @click=${() => props.onWhatsAppLogout()}
-      >
-        Logout
-      </button>
+      ${showAuthActions
+        ? html`
+            <button
+              class="btn primary"
+              ?disabled=${props.whatsappBusy}
+              @click=${() => props.onWhatsAppStart(false)}
+            >
+              ${props.whatsappBusy ? "Working…" : "Show QR"}
+            </button>
+            <button
+              class="btn"
+              ?disabled=${props.whatsappBusy}
+              @click=${() => props.onWhatsAppStart(true)}
+            >
+              Relink
+            </button>
+            <button
+              class="btn"
+              ?disabled=${props.whatsappBusy}
+              @click=${() => props.onWhatsAppWait()}
+            >
+              Wait for scan
+            </button>
+          `
+        : nothing}
+      ${showLogout
+        ? html`
+            <button
+              class="btn danger"
+              ?disabled=${props.whatsappBusy}
+              @click=${() => props.onWhatsAppLogout()}
+            >
+              Logout
+            </button>
+          `
+        : nothing}
       <button class="btn" @click=${() => props.onRefresh(true)}>Refresh</button>
     </div>`,
   });

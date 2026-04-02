@@ -1,6 +1,6 @@
 use crate::models::{
-    AIConfigOverview, ChannelConfig, ConfiguredModel, ConfiguredProvider,
-    ModelConfig, OfficialProvider, SuggestedModel,
+    AIConfigOverview, ChannelConfig, ConfiguredModel, ConfiguredProvider, ModelConfig,
+    OfficialProvider, SuggestedModel,
 };
 use crate::utils::{file, platform, shell};
 use log::{debug, error, info, warn};
@@ -24,9 +24,28 @@ fn desktop_supported_channel_types() -> Vec<(&'static str, &'static str, Vec<&'s
 
 fn builtin_channel_plugin_ids() -> Vec<&'static str> {
     vec![
-        "telegram", "discord", "slack", "feishu", "dingtalk", "wecom", "qqbot", "whatsapp",
-        "imessage", "signal", "line", "matrix", "msteams", "googlechat", "mattermost",
-        "irc", "nostr", "zalo", "zalouser", "tlon", "twitch", "bluebubbles",
+        "telegram",
+        "discord",
+        "slack",
+        "feishu",
+        "dingtalk",
+        "wecom",
+        "qqbot",
+        "whatsapp",
+        "imessage",
+        "signal",
+        "line",
+        "matrix",
+        "msteams",
+        "googlechat",
+        "mattermost",
+        "irc",
+        "nostr",
+        "zalo",
+        "zalouser",
+        "tlon",
+        "twitch",
+        "bluebubbles",
         "nextcloud-talk",
     ]
 }
@@ -43,7 +62,9 @@ fn has_meaningful_channel_value(value: &Value) -> bool {
         Value::String(text) => !text.trim().is_empty(),
         Value::Array(items) => items.iter().any(has_meaningful_channel_value),
         Value::Object(map) => map.iter().any(|(key, item)| {
-            key != "enabled" && !is_test_only_channel_field(key) && has_meaningful_channel_value(item)
+            key != "enabled"
+                && !is_test_only_channel_field(key)
+                && has_meaningful_channel_value(item)
         }),
     }
 }
@@ -55,24 +76,23 @@ fn channel_has_persisted_config(channel_config: Option<&Value>) -> bool {
 /// 获取 openclaw.json 配置
 fn load_openclaw_config() -> Result<Value, String> {
     let config_path = platform::get_config_file_path();
-    
+
     if !file::file_exists(&config_path) {
         return Ok(json!({}));
     }
-    
-    let content =
-        file::read_file(&config_path).map_err(|e| format!("读取配置文件失败: {}", e))?;
-    
+
+    let content = file::read_file(&config_path).map_err(|e| format!("读取配置文件失败: {}", e))?;
+
     serde_json::from_str(&content).map_err(|e| format!("解析配置文件失败: {}", e))
 }
 
 /// 保存 openclaw.json 配置
 fn save_openclaw_config(config: &Value) -> Result<(), String> {
     let config_path = platform::get_config_file_path();
-    
+
     let content =
         serde_json::to_string_pretty(config).map_err(|e| format!("序列化配置失败: {}", e))?;
-    
+
     file::write_file(&config_path, &content).map_err(|e| format!("写入配置文件失败: {}", e))
 }
 
@@ -120,9 +140,22 @@ pub async fn save_config(config: Value) -> Result<String, String> {
 
     // 已知顶级 key (未知 key 仅 warn，不拒绝，保持扩展性)
     let known_keys: &[&str] = &[
-        "gateway", "agents", "models", "channels", "plugins",
-        "meta", "hooks", "security", "notifications", "web", "tools",
-        "auth", "commands", "messages", "wizard", "proxy",
+        "gateway",
+        "agents",
+        "models",
+        "channels",
+        "plugins",
+        "meta",
+        "hooks",
+        "security",
+        "notifications",
+        "web",
+        "tools",
+        "auth",
+        "commands",
+        "messages",
+        "wizard",
+        "proxy",
     ];
     if let Some(obj) = config.as_object() {
         for key in obj.keys() {
@@ -169,9 +202,9 @@ pub async fn get_exec_approvals() -> Result<Value, String> {
 #[command]
 pub async fn save_exec_approvals(data: Value) -> Result<String, String> {
     let path = platform::get_exec_approvals_path();
-    let content =
-        serde_json::to_string_pretty(&data).map_err(|e| format!("序列化失败: {}", e))?;
-    file::write_file(&path, &content).map_err(|e| format!("写入 exec-approvals.json 失败: {}", e))?;
+    let content = serde_json::to_string_pretty(&data).map_err(|e| format!("序列化失败: {}", e))?;
+    file::write_file(&path, &content)
+        .map_err(|e| format!("写入 exec-approvals.json 失败: {}", e))?;
     Ok("exec-approvals.json 已保存".to_string())
 }
 
@@ -198,14 +231,23 @@ pub async fn save_env_value(key: String, value: String) -> Result<String, String
     info!("[保存环境变量] 保存环境变量: {}", key);
 
     // key 验证：只允许大写字母开头，字母数字下划线
-    if !key.chars().next().map(|c| c.is_ascii_uppercase()).unwrap_or(false)
-        || !key.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+    if !key
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_uppercase())
+        .unwrap_or(false)
+        || !key
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
     {
         return Err("环境变量名无效：必须以大写字母开头，仅允许大写字母、数字和下划线".to_string());
     }
 
     // value 验证：拒绝换行符和控制字符
-    if value.chars().any(|c| c == '\n' || c == '\r' || (c.is_control() && c != '\t')) {
+    if value
+        .chars()
+        .any(|c| c == '\n' || c == '\r' || (c.is_control() && c != '\t'))
+    {
         return Err("环境变量值无效：不允许包含换行符或控制字符".to_string());
     }
 
@@ -237,9 +279,9 @@ fn generate_token() -> String {
 #[command]
 pub async fn get_or_create_gateway_token() -> Result<String, String> {
     info!("[Gateway Token] 获取或创建 Gateway Token...");
-    
+
     let mut config = load_openclaw_config()?;
-    
+
     // 检查是否已有 token
     if let Some(token) = config
         .pointer("/gateway/auth/token")
@@ -250,11 +292,11 @@ pub async fn get_or_create_gateway_token() -> Result<String, String> {
             return Ok(token.to_string());
         }
     }
-    
+
     // 生成新 token
     let new_token = generate_token();
     info!("[Gateway Token] 生成新 Token: {}...", &new_token[..8]);
-    
+
     // 确保路径存在
     if config.get("gateway").is_none() {
         config["gateway"] = json!({});
@@ -262,14 +304,14 @@ pub async fn get_or_create_gateway_token() -> Result<String, String> {
     if config["gateway"].get("auth").is_none() {
         config["gateway"]["auth"] = json!({});
     }
-    
+
     // 设置 token
     config["gateway"]["auth"]["token"] = json!(new_token);
     config["gateway"]["mode"] = json!("local");
-    
+
     // 保存配置
     save_openclaw_config(&config)?;
-    
+
     info!("[Gateway Token] ✓ Token 已保存到配置");
     Ok(new_token)
 }
@@ -439,16 +481,14 @@ pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
             api_type: "openai-completions".to_string(),
             requires_api_key: true,
             docs_url: Some("https://docs.openclaw.ai/providers/glm".to_string()),
-            suggested_models: vec![
-                SuggestedModel {
-                    id: "glm-4".to_string(),
-                    name: "GLM-4".to_string(),
-                    description: Some("最新旗舰模型".to_string()),
-                    context_window: Some(128000),
-                    max_tokens: Some(8192),
-                    recommended: true,
-                },
-            ],
+            suggested_models: vec![SuggestedModel {
+                id: "glm-4".to_string(),
+                name: "GLM-4".to_string(),
+                description: Some("最新旗舰模型".to_string()),
+                context_window: Some(128000),
+                max_tokens: Some(8192),
+                recommended: true,
+            }],
         },
         OfficialProvider {
             id: "minimax".to_string(),
@@ -458,16 +498,14 @@ pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
             api_type: "anthropic-messages".to_string(),
             requires_api_key: true,
             docs_url: Some("https://docs.openclaw.ai/providers/minimax".to_string()),
-            suggested_models: vec![
-                SuggestedModel {
-                    id: "minimax-m2.1".to_string(),
-                    name: "MiniMax M2.1".to_string(),
-                    description: Some("最新模型".to_string()),
-                    context_window: Some(200000),
-                    max_tokens: Some(8192),
-                    recommended: true,
-                },
-            ],
+            suggested_models: vec![SuggestedModel {
+                id: "minimax-m2.1".to_string(),
+                name: "MiniMax M2.1".to_string(),
+                description: Some("最新模型".to_string()),
+                context_window: Some(200000),
+                max_tokens: Some(8192),
+                recommended: true,
+            }],
         },
         OfficialProvider {
             id: "venice".to_string(),
@@ -477,16 +515,14 @@ pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
             api_type: "openai-completions".to_string(),
             requires_api_key: true,
             docs_url: Some("https://docs.openclaw.ai/providers/venice".to_string()),
-            suggested_models: vec![
-                SuggestedModel {
-                    id: "llama-3.3-70b".to_string(),
-                    name: "Llama 3.3 70B".to_string(),
-                    description: Some("隐私优先推理".to_string()),
-                    context_window: Some(128000),
-                    max_tokens: Some(8192),
-                    recommended: true,
-                },
-            ],
+            suggested_models: vec![SuggestedModel {
+                id: "llama-3.3-70b".to_string(),
+                name: "Llama 3.3 70B".to_string(),
+                description: Some("隐私优先推理".to_string()),
+                context_window: Some(128000),
+                max_tokens: Some(8192),
+                recommended: true,
+            }],
         },
         OfficialProvider {
             id: "openrouter".to_string(),
@@ -496,16 +532,14 @@ pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
             api_type: "openai-completions".to_string(),
             requires_api_key: true,
             docs_url: Some("https://docs.openclaw.ai/providers/openrouter".to_string()),
-            suggested_models: vec![
-                SuggestedModel {
-                    id: "anthropic/claude-opus-4-5".to_string(),
-                    name: "Claude Opus 4.5".to_string(),
-                    description: Some("通过 OpenRouter 访问".to_string()),
-                    context_window: Some(200000),
-                    max_tokens: Some(8192),
-                    recommended: true,
-                },
-            ],
+            suggested_models: vec![SuggestedModel {
+                id: "anthropic/claude-opus-4-5".to_string(),
+                name: "Claude Opus 4.5".to_string(),
+                description: Some("通过 OpenRouter 访问".to_string()),
+                context_window: Some(200000),
+                max_tokens: Some(8192),
+                recommended: true,
+            }],
         },
         OfficialProvider {
             id: "ollama".to_string(),
@@ -515,16 +549,14 @@ pub async fn get_official_providers() -> Result<Vec<OfficialProvider>, String> {
             api_type: "openai-completions".to_string(),
             requires_api_key: false,
             docs_url: Some("https://docs.openclaw.ai/providers/ollama".to_string()),
-            suggested_models: vec![
-                SuggestedModel {
-                    id: "llama3".to_string(),
-                    name: "Llama 3".to_string(),
-                    description: Some("本地运行".to_string()),
-                    context_window: Some(8192),
-                    max_tokens: Some(4096),
-                    recommended: true,
-                },
-            ],
+            suggested_models: vec![SuggestedModel {
+                id: "llama3".to_string(),
+                name: "Llama 3".to_string(),
+                description: Some("本地运行".to_string()),
+                context_window: Some(8192),
+                max_tokens: Some(4096),
+                recommended: true,
+            }],
         },
     ];
 
@@ -544,7 +576,10 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
     info!("[AI 配置] 配置文件路径: {}", config_path);
 
     let config = load_openclaw_config()?;
-    debug!("[AI 配置] 配置内容: {}", serde_json::to_string_pretty(&config).unwrap_or_default());
+    debug!(
+        "[AI 配置] 配置内容: {}",
+        serde_json::to_string_pretty(&config).unwrap_or_default()
+    );
 
     // 解析主模型
     let primary_model = config
@@ -565,14 +600,17 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
     let mut configured_providers: Vec<ConfiguredProvider> = Vec::new();
 
     let providers_value = config.pointer("/models/providers");
-    info!("[AI 配置] providers 节点存在: {}", providers_value.is_some());
+    info!(
+        "[AI 配置] providers 节点存在: {}",
+        providers_value.is_some()
+    );
 
     if let Some(providers) = providers_value.and_then(|v| v.as_object()) {
         info!("[AI 配置] 找到 {} 个 Provider", providers.len());
-        
+
         for (provider_name, provider_config) in providers {
             info!("[AI 配置] 解析 Provider: {}", provider_name);
-            
+
             let base_url = provider_config
                 .get("baseUrl")
                 .and_then(|v| v.as_str())
@@ -594,8 +632,12 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
 
             // 解析模型列表
             let models_array = provider_config.get("models").and_then(|v| v.as_array());
-            info!("[AI 配置] Provider {} 的 models 数组: {:?}", provider_name, models_array.map(|a| a.len()));
-            
+            info!(
+                "[AI 配置] Provider {} 的 models 数组: {:?}",
+                provider_name,
+                models_array.map(|a| a.len())
+            );
+
             let models: Vec<ConfiguredModel> = models_array
                 .map(|arr| {
                     arr.iter()
@@ -609,13 +651,19 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
                             let full_id = format!("{}/{}", provider_name, id);
                             let is_primary = primary_model.as_ref() == Some(&full_id);
 
-                            info!("[AI 配置] 解析模型: {} (is_primary: {})", full_id, is_primary);
+                            info!(
+                                "[AI 配置] 解析模型: {} (is_primary: {})",
+                                full_id, is_primary
+                            );
 
                             Some(ConfiguredModel {
                                 full_id,
                                 id,
                                 name,
-                                api_type: m.get("api").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                                api_type: m
+                                    .get("api")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string()),
                                 context_window: m
                                     .get("contextWindow")
                                     .and_then(|v| v.as_u64())
@@ -631,7 +679,11 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
                 })
                 .unwrap_or_default();
 
-            info!("[AI 配置] Provider {} 解析完成: {} 个模型", provider_name, models.len());
+            info!(
+                "[AI 配置] Provider {} 解析完成: {} 个模型",
+                provider_name,
+                models.len()
+            );
 
             configured_providers.push(ConfiguredProvider {
                 name: provider_name.clone(),
@@ -925,7 +977,6 @@ pub async fn add_available_model(model_id: String) -> Result<String, String> {
     Ok(format!("模型 {} 已添加", model_id))
 }
 
-
 // ============ 旧版兼容 ============
 
 /// 获取所有支持的 AI Provider（旧版兼容）
@@ -964,21 +1015,21 @@ pub async fn get_ai_providers() -> Result<Vec<crate::models::AIProviderOption>, 
 #[command]
 pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
     info!("[渠道配置] 获取渠道配置列表...");
-    
+
     let config = load_openclaw_config()?;
     let channels_obj = config.get("channels").cloned().unwrap_or(json!({}));
     let env_path = platform::get_env_file_path();
     debug!("[渠道配置] 环境文件路径: {}", env_path);
-    
+
     let mut channels = Vec::new();
-    
+
     let channel_types = desktop_supported_channel_types();
-    
+
     let array_fields = ["allowFrom", "groupAllowFrom"];
-    
+
     for (channel_id, channel_type, test_fields) in channel_types {
         let channel_config = channels_obj.get(channel_id);
-        
+
         // 将渠道配置转换为 HashMap
         let mut config_map: HashMap<String, Value> = if let Some(cfg) = channel_config {
             if let Some(obj) = cfg.as_object() {
@@ -989,11 +1040,14 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
                     }
                     if array_fields.contains(&k.as_str()) {
                         if let Some(arr) = v.as_array() {
-                            let strings: Vec<String> = arr.iter()
+                            let strings: Vec<String> = arr
+                                .iter()
                                 .filter_map(|item| {
                                     if let Some(s) = item.as_str() {
                                         Some(s.to_string())
-                                    } else { item.as_i64().map(|n| n.to_string()) }
+                                    } else {
+                                        item.as_i64().map(|n| n.to_string())
+                                    }
                                 })
                                 .collect();
                             map.insert(k.clone(), json!(strings.join(", ")));
@@ -1017,7 +1071,7 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
         } else {
             HashMap::new()
         };
-        
+
         // 从 env 文件读取测试字段
         for field in test_fields {
             let env_key = format!(
@@ -1029,10 +1083,10 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
                 config_map.insert(field.to_string(), json!(value));
             }
         }
-        
+
         // 仅真实渠道配置项算“已配置”，测试字段和裸 enabled 不算
         let has_config = channel_has_persisted_config(channel_config);
-        
+
         channels.push(ChannelConfig {
             id: channel_id.to_string(),
             channel_type: channel_type.to_string(),
@@ -1040,7 +1094,7 @@ pub async fn get_channels_config() -> Result<Vec<ChannelConfig>, String> {
             config: config_map,
         });
     }
-    
+
     info!("[渠道配置] ✓ 返回 {} 个渠道配置", channels.len());
     for ch in &channels {
         debug!("[渠道配置] - {}: enabled={}", ch.id, ch.enabled);
@@ -1055,16 +1109,16 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
         "[保存渠道配置] 保存渠道配置: {} ({})",
         channel.id, channel.channel_type
     );
-    
+
     let mut config = load_openclaw_config()?;
     let env_path = platform::get_env_file_path();
     debug!("[保存渠道配置] 环境文件路径: {}", env_path);
-    
+
     // 确保 channels 对象存在
     if config.get("channels").is_none() {
         config["channels"] = json!({});
     }
-    
+
     // 确保 plugins 对象存在
     if config.get("plugins").is_none() {
         config["plugins"] = json!({
@@ -1074,14 +1128,14 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
     if config["plugins"].get("entries").is_none() {
         config["plugins"]["entries"] = json!({});
     }
-    
+
     // 这些字段只用于测试，不保存到 openclaw.json，而是保存到 env 文件
     let test_only_fields = ["userId", "testChatId", "testChannelId"];
     let array_fields = ["allowFrom", "groupAllowFrom"];
-    
+
     // 构建渠道配置
     let mut channel_obj = json!({});
-    
+
     // 添加渠道特定配置
     for (key, value) in &channel.config {
         if test_only_fields.contains(&key.as_str()) {
@@ -1123,7 +1177,7 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
             channel_obj[key] = value.clone();
         }
     }
-    
+
     if has_meaningful_channel_value(&channel_obj) {
         channel_obj["enabled"] = json!(true);
         config["channels"][&channel.id] = channel_obj;
@@ -1134,19 +1188,19 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
         if let Some(channels) = config.get_mut("channels").and_then(|v| v.as_object_mut()) {
             channels.remove(&channel.id);
         }
-        if let Some(entries) = config.pointer_mut("/plugins/entries").and_then(|v| v.as_object_mut()) {
+        if let Some(entries) = config
+            .pointer_mut("/plugins/entries")
+            .and_then(|v| v.as_object_mut())
+        {
             entries.remove(&channel.id);
         }
     }
-    
+
     // 保存配置
     info!("[保存渠道配置] 写入配置文件...");
     match save_openclaw_config(&config) {
         Ok(_) => {
-            info!(
-                "[保存渠道配置] ✓ {} 配置保存成功",
-                channel.channel_type
-            );
+            info!("[保存渠道配置] ✓ {} 配置保存成功", channel.channel_type);
             Ok(format!("{} 配置已保存", channel.channel_type))
         }
         Err(e) => {
@@ -1160,24 +1214,27 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
 #[command]
 pub async fn clear_channel_config(channel_id: String) -> Result<String, String> {
     info!("[清空渠道配置] 清空渠道配置: {}", channel_id);
-    
+
     let mut config = load_openclaw_config()?;
     let env_path = platform::get_env_file_path();
-    
+
     // 从 channels 对象中删除该渠道
     if let Some(channels) = config.get_mut("channels").and_then(|v| v.as_object_mut()) {
         channels.remove(&channel_id);
         info!("[清空渠道配置] 已从 channels 中删除: {}", channel_id);
     }
-    
+
     // 从 plugins.entries 中删除
-    if let Some(entries) = config.pointer_mut("/plugins/entries").and_then(|v| v.as_object_mut()) {
+    if let Some(entries) = config
+        .pointer_mut("/plugins/entries")
+        .and_then(|v| v.as_object_mut())
+    {
         entries.remove(&channel_id);
         info!("[清空渠道配置] 已从 plugins.entries 中删除: {}", channel_id);
     }
-    
+
     // 清除相关的环境变量
-    let env_prefixes = vec![
+    let env_prefixes = [
         format!("OPENCLAW_{}_USERID", channel_id.to_uppercase()),
         format!("OPENCLAW_{}_TESTCHATID", channel_id.to_uppercase()),
         format!("OPENCLAW_{}_TESTCHANNELID", channel_id.to_uppercase()),
@@ -1185,7 +1242,7 @@ pub async fn clear_channel_config(channel_id: String) -> Result<String, String> 
     for env_key in env_prefixes {
         let _ = file::remove_env_value(&env_path, &env_key);
     }
-    
+
     // 保存配置
     match save_openclaw_config(&config) {
         Ok(_) => {
@@ -1218,7 +1275,8 @@ pub fn ensure_channel_plugins_enabled() -> Result<(), String> {
 
     let channel_ids = builtin_channel_plugin_ids();
 
-    let entries = config["plugins"]["entries"].as_object_mut()
+    let entries = config["plugins"]["entries"]
+        .as_object_mut()
         .ok_or("plugins.entries 不是对象")?;
 
     let mut changed = false;
@@ -1278,10 +1336,8 @@ pub async fn get_desktop_config() -> Result<Value, String> {
         return Ok(json!({}));
     }
 
-    let content = file::read_file(&path)
-        .map_err(|e| format!("读取桌面配置失败: {}", e))?;
-    serde_json::from_str(&content)
-        .map_err(|e| format!("解析桌面配置失败: {}", e))
+    let content = file::read_file(&path).map_err(|e| format!("读取桌面配置失败: {}", e))?;
+    serde_json::from_str(&content).map_err(|e| format!("解析桌面配置失败: {}", e))
 }
 
 /// 保存桌面端专用配置（合并写入 ~/.openclawcn/desktop.json）
@@ -1316,8 +1372,7 @@ pub async fn save_desktop_config(config: Value) -> Result<(), String> {
 
     let content = serde_json::to_string_pretty(&existing)
         .map_err(|e| format!("序列化桌面配置失败: {}", e))?;
-    file::write_file(&path, &content)
-        .map_err(|e| format!("写入桌面配置失败: {}", e))?;
+    file::write_file(&path, &content).map_err(|e| format!("写入桌面配置失败: {}", e))?;
 
     info!("[Config] 桌面配置已保存: {}", path);
     Ok(())
@@ -1369,7 +1424,9 @@ pub async fn pick_folder() -> Result<Option<String>, String> {
 pub async fn autostart_is_enabled(app: tauri::AppHandle) -> Result<bool, String> {
     use tauri_plugin_autostart::ManagerExt;
     let manager = app.autolaunch();
-    manager.is_enabled().map_err(|e| format!("检查自启状态失败: {}", e))
+    manager
+        .is_enabled()
+        .map_err(|e| format!("检查自启状态失败: {}", e))
 }
 
 /// 启用开机自启
@@ -1377,7 +1434,9 @@ pub async fn autostart_is_enabled(app: tauri::AppHandle) -> Result<bool, String>
 pub async fn autostart_enable(app: tauri::AppHandle) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     let manager = app.autolaunch();
-    manager.enable().map_err(|e| format!("启用自启失败: {}", e))?;
+    manager
+        .enable()
+        .map_err(|e| format!("启用自启失败: {}", e))?;
     info!("[Config] 已启用开机自启");
     Ok(())
 }
@@ -1387,14 +1446,16 @@ pub async fn autostart_enable(app: tauri::AppHandle) -> Result<(), String> {
 pub async fn autostart_disable(app: tauri::AppHandle) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     let manager = app.autolaunch();
-    manager.disable().map_err(|e| format!("禁用自启失败: {}", e))?;
+    manager
+        .disable()
+        .map_err(|e| format!("禁用自启失败: {}", e))?;
     info!("[Config] 已禁用开机自启");
     Ok(())
 }
 
 // ============ 配对码审批 ============
 
-use crate::models::status::{PairingRequest, PairingApproveResult};
+use crate::models::status::{PairingApproveResult, PairingRequest};
 
 /// 获取指定渠道的待审批配对请求列表
 #[command]
@@ -1413,7 +1474,11 @@ pub async fn list_pairing_requests(channel: String) -> Result<Vec<PairingRequest
                 if let Some(requests_val) = wrapper.get("requests") {
                     match serde_json::from_value::<Vec<PairingRequest>>(requests_val.clone()) {
                         Ok(requests) => {
-                            info!("[配对请求] ✓ {} 有 {} 个待审批请求", channel, requests.len());
+                            info!(
+                                "[配对请求] ✓ {} 有 {} 个待审批请求",
+                                channel,
+                                requests.len()
+                            );
                             return Ok(requests);
                         }
                         Err(e) => {
@@ -1423,11 +1488,18 @@ pub async fn list_pairing_requests(channel: String) -> Result<Vec<PairingRequest
                 }
                 // Fallback: try parsing as direct array
                 if let Ok(requests) = serde_json::from_value::<Vec<PairingRequest>>(wrapper) {
-                    info!("[配对请求] ✓ {} 有 {} 个待审批请求（直接数组）", channel, requests.len());
+                    info!(
+                        "[配对请求] ✓ {} 有 {} 个待审批请求（直接数组）",
+                        channel,
+                        requests.len()
+                    );
                     return Ok(requests);
                 }
             }
-            warn!("[配对请求] JSON 解析失败，输出: {}", &trimmed[..trimmed.len().min(200)]);
+            warn!(
+                "[配对请求] JSON 解析失败，输出: {}",
+                &trimmed[..trimmed.len().min(200)]
+            );
             Ok(vec![])
         }
         Err(e) => {
@@ -1440,7 +1512,10 @@ pub async fn list_pairing_requests(channel: String) -> Result<Vec<PairingRequest
 
 /// 审批配对码
 #[command]
-pub async fn approve_pairing_code(channel: String, code: String) -> Result<PairingApproveResult, String> {
+pub async fn approve_pairing_code(
+    channel: String,
+    code: String,
+) -> Result<PairingApproveResult, String> {
     info!("[配对审批] 审批 {} 配对码: {}", channel, code);
 
     // 简单剥离 ANSI 转义序列（CLI 输出带颜色码）
@@ -1448,8 +1523,16 @@ pub async fn approve_pairing_code(channel: String, code: String) -> Result<Pairi
         let mut out = String::with_capacity(s.len());
         let mut in_esc = false;
         for c in s.chars() {
-            if c == '\x1b' { in_esc = true; continue; }
-            if in_esc { if c.is_ascii_alphabetic() { in_esc = false; } continue; }
+            if c == '\x1b' {
+                in_esc = true;
+                continue;
+            }
+            if in_esc {
+                if c.is_ascii_alphabetic() {
+                    in_esc = false;
+                }
+                continue;
+            }
             out.push(c);
         }
         out
@@ -1483,17 +1566,29 @@ mod tests {
     #[test]
     fn channel_value_ignores_enabled_and_empty_fields() {
         assert!(!has_meaningful_channel_value(&json!({ "enabled": true })));
-        assert!(!has_meaningful_channel_value(&json!({ "enabled": true, "token": "   " })));
-        assert!(!has_meaningful_channel_value(&json!({ "testChannelId": "123" })));
-        assert!(has_meaningful_channel_value(&json!({ "enabled": true, "token": "abc" })));
+        assert!(!has_meaningful_channel_value(
+            &json!({ "enabled": true, "token": "   " })
+        ));
+        assert!(!has_meaningful_channel_value(
+            &json!({ "testChannelId": "123" })
+        ));
+        assert!(has_meaningful_channel_value(
+            &json!({ "enabled": true, "token": "abc" })
+        ));
         assert!(has_meaningful_channel_value(&json!({ "allowFrom": ["x"] })));
     }
 
     #[test]
     fn channel_has_persisted_config_only_counts_real_channel_config() {
         assert!(!channel_has_persisted_config(None));
-        assert!(!channel_has_persisted_config(Some(&json!({ "enabled": true }))));
-        assert!(!channel_has_persisted_config(Some(&json!({ "userId": "10001" }))));
-        assert!(channel_has_persisted_config(Some(&json!({ "botToken": "123:abc" }))));
+        assert!(!channel_has_persisted_config(Some(
+            &json!({ "enabled": true })
+        )));
+        assert!(!channel_has_persisted_config(Some(
+            &json!({ "userId": "10001" })
+        )));
+        assert!(channel_has_persisted_config(Some(
+            &json!({ "botToken": "123:abc" })
+        )));
     }
 }

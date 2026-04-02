@@ -1,11 +1,11 @@
-use std::process::{Command, Output};
+use crate::utils::file;
+use crate::utils::platform;
+use log::{debug, info, warn};
+use std::collections::HashMap;
 use std::io;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
-use crate::utils::platform;
-use crate::utils::file;
-use log::{info, debug, warn};
+use std::process::{Command, Output};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -63,8 +63,8 @@ pub fn get_extended_path() -> String {
     }
 
     // Unix: 添加常见的可执行文件路径
-    paths.push("/opt/homebrew/bin".to_string());  // Homebrew on Apple Silicon
-    paths.push("/usr/local/bin".to_string());      // Homebrew on Intel / 常规安装
+    paths.push("/opt/homebrew/bin".to_string()); // Homebrew on Apple Silicon
+    paths.push("/usr/local/bin".to_string()); // Homebrew on Intel / 常规安装
     paths.push("/usr/bin".to_string());
     paths.push("/bin".to_string());
 
@@ -76,7 +76,10 @@ pub fn get_extended_path() -> String {
         if let Ok(version) = std::fs::read_to_string(&nvm_default) {
             let version = version.trim();
             if !version.is_empty() {
-                paths.insert(0, format!("{}/.nvm/versions/node/v{}/bin", home_str, version));
+                paths.insert(
+                    0,
+                    format!("{}/.nvm/versions/node/v{}/bin", home_str, version),
+                );
             }
         }
         // 也添加常见 nvm 版本路径
@@ -114,17 +117,17 @@ pub fn get_extended_path() -> String {
 pub fn run_command(cmd: &str, args: &[&str]) -> io::Result<Output> {
     let mut command = Command::new(cmd);
     command.args(args);
-    
+
     // 在非 Windows 系统上使用扩展的 PATH
     #[cfg(not(windows))]
     {
         let extended_path = get_extended_path();
         command.env("PATH", extended_path);
     }
-    
+
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
-    
+
     command.output()
 }
 
@@ -146,17 +149,17 @@ pub fn run_command_output(cmd: &str, args: &[&str]) -> Result<String, String> {
 pub fn run_bash(script: &str) -> io::Result<Output> {
     let mut command = Command::new("bash");
     command.arg("-c").arg(script);
-    
+
     // 在非 Windows 系统上使用扩展的 PATH
     #[cfg(not(windows))]
     {
         let extended_path = get_extended_path();
         command.env("PATH", extended_path);
     }
-    
+
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
-    
+
     command.output()
 }
 
@@ -169,7 +172,10 @@ pub fn run_bash_output(script: &str) -> Result<String, String> {
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
                 if stderr.is_empty() {
-                    Err(format!("Command failed with exit code: {:?}", output.status.code()))
+                    Err(format!(
+                        "Command failed with exit code: {:?}",
+                        output.status.code()
+                    ))
                 } else {
                     Err(stderr)
                 }
@@ -183,10 +189,10 @@ pub fn run_bash_output(script: &str) -> Result<String, String> {
 pub fn run_cmd(script: &str) -> io::Result<Output> {
     let mut cmd = Command::new("cmd");
     cmd.args(["/c", script]);
-    
+
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
-    
+
     cmd.output()
 }
 
@@ -201,7 +207,10 @@ pub fn run_cmd_output(script: &str) -> Result<String, String> {
                 if stderr.is_empty() {
                     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
                     if stdout.is_empty() {
-                        Err(format!("Command failed with exit code: {:?}", output.status.code()))
+                        Err(format!(
+                            "Command failed with exit code: {:?}",
+                            output.status.code()
+                        ))
                     } else {
                         Err(stdout)
                     }
@@ -219,11 +228,18 @@ pub fn run_cmd_output(script: &str) -> Result<String, String> {
 pub fn run_powershell(script: &str) -> io::Result<Output> {
     let mut cmd = Command::new("powershell");
     // 使用 -ExecutionPolicy Bypass 绕过执行策略限制
-    cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script]);
-    
+    cmd.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        script,
+    ]);
+
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
-    
+
     cmd.output()
 }
 
@@ -238,7 +254,10 @@ pub fn run_powershell_output(script: &str) -> Result<String, String> {
                 if stderr.is_empty() {
                     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
                     if stdout.is_empty() {
-                        Err(format!("Command failed with exit code: {:?}", output.status.code()))
+                        Err(format!(
+                            "Command failed with exit code: {:?}",
+                            output.status.code()
+                        ))
                     } else {
                         Err(stdout)
                     }
@@ -250,7 +269,6 @@ pub fn run_powershell_output(script: &str) -> Result<String, String> {
         Err(e) => Err(e.to_string()),
     }
 }
-
 
 /// 获取当前平台的 node-runtime 子目录名
 fn get_node_platform_dir() -> &'static str {
@@ -282,13 +300,15 @@ fn get_bundled_node_path() -> Option<String> {
             .join("node-runtime")
     } else {
         // 生产模式: bundle_dir 是 <resource_dir>/gateway-bundle，同级的 node-runtime
-        PathBuf::from(&bundle_dir)
-            .parent()?
-            .join("node-runtime")
+        PathBuf::from(&bundle_dir).parent()?.join("node-runtime")
     };
 
     let platform_dir = get_node_platform_dir();
-    let node_binary = if cfg!(windows) { "node.exe" } else { "bin/node" };
+    let node_binary = if cfg!(windows) {
+        "node.exe"
+    } else {
+        "bin/node"
+    };
     let node_path = node_runtime_dir.join(platform_dir).join(node_binary);
 
     if node_path.exists() {
@@ -351,7 +371,9 @@ pub fn get_node_path() -> Option<String> {
             }
         }
         // 最后尝试通过用户 shell 查找
-        if let Ok(path) = run_bash_output("source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; which node 2>/dev/null") {
+        if let Ok(path) = run_bash_output(
+            "source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; which node 2>/dev/null",
+        ) {
             if !path.is_empty() && std::path::Path::new(&path).exists() {
                 info!("[Shell] [开发模式] 通过用户 shell 找到 Node.js: {}", path);
                 return Some(path);
@@ -376,16 +398,34 @@ fn get_windows_node_paths() -> Vec<String> {
     if let Some(home) = dirs::home_dir() {
         let home_str = home.display().to_string();
         // nvm for Windows 用户安装
-        paths.push(format!("{}\\AppData\\Roaming\\nvm\\current\\node.exe", home_str));
+        paths.push(format!(
+            "{}\\AppData\\Roaming\\nvm\\current\\node.exe",
+            home_str
+        ));
         // fnm
-        paths.push(format!("{}\\AppData\\Roaming\\fnm\\aliases\\default\\node.exe", home_str));
-        paths.push(format!("{}\\AppData\\Local\\fnm\\aliases\\default\\node.exe", home_str));
+        paths.push(format!(
+            "{}\\AppData\\Roaming\\fnm\\aliases\\default\\node.exe",
+            home_str
+        ));
+        paths.push(format!(
+            "{}\\AppData\\Local\\fnm\\aliases\\default\\node.exe",
+            home_str
+        ));
         paths.push(format!("{}\\.fnm\\aliases\\default\\node.exe", home_str));
         // volta
-        paths.push(format!("{}\\AppData\\Local\\Volta\\bin\\node.exe", home_str));
+        paths.push(format!(
+            "{}\\AppData\\Local\\Volta\\bin\\node.exe",
+            home_str
+        ));
         // scoop
-        paths.push(format!("{}\\scoop\\apps\\nodejs\\current\\node.exe", home_str));
-        paths.push(format!("{}\\scoop\\apps\\nodejs-lts\\current\\node.exe", home_str));
+        paths.push(format!(
+            "{}\\scoop\\apps\\nodejs\\current\\node.exe",
+            home_str
+        ));
+        paths.push(format!(
+            "{}\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+            home_str
+        ));
     }
 
     // nvm-windows 符号链接
@@ -430,11 +470,17 @@ fn get_unix_node_paths() -> Vec<String> {
         if let Ok(version) = std::fs::read_to_string(&nvm_default) {
             let version = version.trim();
             if !version.is_empty() {
-                paths.insert(0, format!("{}/.nvm/versions/node/v{}/bin/node", home_str, version));
+                paths.insert(
+                    0,
+                    format!("{}/.nvm/versions/node/v{}/bin/node", home_str, version),
+                );
             }
         }
         for version in ["v22.22.0", "v22.12.0", "v22.11.0", "v22.0.0", "v23.0.0"] {
-            paths.push(format!("{}/.nvm/versions/node/{}/bin/node", home_str, version));
+            paths.push(format!(
+                "{}/.nvm/versions/node/{}/bin/node",
+                home_str, version
+            ));
         }
 
         // fnm
@@ -491,12 +537,12 @@ pub fn get_openclaw_path() -> Option<String> {
             }
         }
     }
-    
+
     // Fallback: check whether openclaw is in PATH
     if command_exists("openclaw") {
         return Some("openclaw".to_string());
     }
-    
+
     // Final fallback: ask the user shell
     if !platform::is_windows() {
         if let Ok(path) = run_bash_output("source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null; which openclaw 2>/dev/null") {
@@ -506,39 +552,47 @@ pub fn get_openclaw_path() -> Option<String> {
             }
         }
     }
-    
+
     None
 }
 
 /// Get likely Unix openclaw install paths
 fn get_unix_openclaw_paths() -> Vec<String> {
     let mut paths = Vec::new();
-    
+
     // Common global npm install paths
     paths.push("/usr/local/bin/openclaw".to_string());
     paths.push("/opt/homebrew/bin/openclaw".to_string()); // Homebrew on Apple Silicon
     paths.push("/usr/bin/openclaw".to_string());
-    
+
     if let Some(home) = dirs::home_dir() {
         let home_str = home.display().to_string();
-        
+
         // User-scoped global npm installs
         paths.push(format!("{}/.npm-global/bin/openclaw", home_str));
         paths.push(format!("{}/.openclawcn/npm-global/bin/openclaw", home_str));
-        
+
         // nvm global package paths for likely Node versions
-        for version in ["v22.0.0", "v22.1.0", "v22.2.0", "v22.11.0", "v22.12.0", "v23.0.0"] {
-            paths.push(format!("{}/.nvm/versions/node/{}/bin/openclaw", home_str, version));
+        for version in [
+            "v22.0.0", "v22.1.0", "v22.2.0", "v22.11.0", "v22.12.0", "v23.0.0",
+        ] {
+            paths.push(format!(
+                "{}/.nvm/versions/node/{}/bin/openclaw",
+                home_str, version
+            ));
         }
-        
+
         let nvm_default = format!("{}/.nvm/alias/default", home_str);
         if let Ok(version) = std::fs::read_to_string(&nvm_default) {
             let version = version.trim();
             if !version.is_empty() {
-                paths.insert(0, format!("{}/.nvm/versions/node/v{}/bin/openclaw", home_str, version));
+                paths.insert(
+                    0,
+                    format!("{}/.nvm/versions/node/v{}/bin/openclaw", home_str, version),
+                );
             }
         }
-        
+
         paths.push(format!("{}/.fnm/aliases/default/bin/openclaw", home_str));
         paths.push(format!("{}/.volta/bin/openclaw", home_str));
         paths.push(format!("{}/.pnpm/bin/openclaw", home_str));
@@ -546,19 +600,22 @@ fn get_unix_openclaw_paths() -> Vec<String> {
         paths.push(format!("{}/.asdf/shims/openclaw", home_str));
         paths.push(format!("{}/.local/share/mise/shims/openclaw", home_str));
         paths.push(format!("{}/.yarn/bin/openclaw", home_str));
-        paths.push(format!("{}/.config/yarn/global/node_modules/.bin/openclaw", home_str));
+        paths.push(format!(
+            "{}/.config/yarn/global/node_modules/.bin/openclaw",
+            home_str
+        ));
     }
-    
+
     paths
 }
 
 /// Get likely Windows openclaw install paths
 fn get_windows_openclaw_paths() -> Vec<String> {
     let mut paths = Vec::new();
-    
+
     // 1. nvm4w install path
     paths.push(r"C:\nvm4w\nodejs\openclaw.cmd".to_string());
-    
+
     // 2. User-scoped global npm paths
     if let Ok(appdata) = std::env::var("APPDATA") {
         paths.push(format!(r"{}\npm\openclaw.cmd", appdata));
@@ -567,10 +624,10 @@ fn get_windows_openclaw_paths() -> Vec<String> {
         let npm_path = format!(r"{}\AppData\Roaming\npm\openclaw.cmd", home.display());
         paths.push(npm_path);
     }
-    
+
     // 3. Program Files Node.js path
     paths.push(r"C:\Program Files\nodejs\openclaw.cmd".to_string());
-    
+
     paths
 }
 
@@ -608,8 +665,13 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     }
 
     // 优先使用 bundle 模式：node + openclaw.mjs
-    if let (Some(node_path), Some((bundle_dir, entry_point))) = (get_node_path(), get_bundle_entry()) {
-        debug!("[Shell] bundle 模式: node={}, entry={}, dir={}", node_path, entry_point, bundle_dir);
+    if let (Some(node_path), Some((bundle_dir, entry_point))) =
+        (get_node_path(), get_bundle_entry())
+    {
+        debug!(
+            "[Shell] bundle 模式: node={}, entry={}, dir={}",
+            node_path, entry_point, bundle_dir
+        );
 
         // 将 node 所在目录加入 PATH
         if let Some(parent) = Path::new(&node_path).parent() {
@@ -625,7 +687,12 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
-        cmd.env("OPENCLAW_GATEWAY_PORT", crate::gateway::GLOBAL_GATEWAY_PORT.load(std::sync::atomic::Ordering::SeqCst).to_string());
+        cmd.env(
+            "OPENCLAW_GATEWAY_PORT",
+            crate::gateway::GLOBAL_GATEWAY_PORT
+                .load(std::sync::atomic::Ordering::SeqCst)
+                .to_string(),
+        );
         cmd.env("OPENCLAW_DESKTOP", "1");
         cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
         cmd.env("PATH", &extended_path);
@@ -653,7 +720,9 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
 
     // 生产模式：不回退到全局 openclaw，打包应用必须自包含
     if !cfg!(debug_assertions) {
-        warn!("[Shell] 生产模式下 bundle 模式不可用（Node.js 或 entry 缺失），不回退到全局 openclaw");
+        warn!(
+            "[Shell] 生产模式下 bundle 模式不可用（Node.js 或 entry 缺失），不回退到全局 openclaw"
+        );
         return Err("内置 openclaw 不可用，请重新安装应用".to_string());
     }
 
@@ -664,7 +733,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     })?;
 
     debug!("[Shell] [开发模式] 回退到全局 openclaw: {}", openclaw_path);
-    
+
     // 将 openclaw 所在目录加入 PATH
     if let Some(parent) = Path::new(&openclaw_path).parent() {
         let parent_str = parent.to_string_lossy();
@@ -681,7 +750,12 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
-            .env("OPENCLAW_GATEWAY_PORT", crate::gateway::GLOBAL_GATEWAY_PORT.load(std::sync::atomic::Ordering::SeqCst).to_string())
+            .env(
+                "OPENCLAW_GATEWAY_PORT",
+                crate::gateway::GLOBAL_GATEWAY_PORT
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                    .to_string(),
+            )
             .env("OPENCLAW_DESKTOP", "1")
             .env("OPENCLAW_STATE_DIR", platform::get_config_dir())
             .env("PATH", &extended_path);
@@ -700,7 +774,12 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
-            .env("OPENCLAW_GATEWAY_PORT", crate::gateway::GLOBAL_GATEWAY_PORT.load(std::sync::atomic::Ordering::SeqCst).to_string())
+            .env(
+                "OPENCLAW_GATEWAY_PORT",
+                crate::gateway::GLOBAL_GATEWAY_PORT
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                    .to_string(),
+            )
             .env("OPENCLAW_DESKTOP", "1")
             .env("OPENCLAW_STATE_DIR", platform::get_config_dir())
             .env("PATH", &extended_path);
@@ -757,7 +836,7 @@ pub fn session_gateway_token() -> &'static str {
 pub fn load_openclaw_env_vars() -> HashMap<String, String> {
     let mut env_vars = HashMap::new();
     let env_path = platform::get_env_file_path();
-    
+
     if let Ok(content) = file::read_file(&env_path) {
         for line in content.lines() {
             let line = line.trim();
@@ -770,18 +849,14 @@ pub fn load_openclaw_env_vars() -> HashMap<String, String> {
             if let Some((key, value)) = line.split_once('=') {
                 let key = key.trim();
                 // 去除值周围的引号
-                let value = value.trim()
-                    .trim_matches('"')
-                    .trim_matches('\'');
+                let value = value.trim().trim_matches('"').trim_matches('\'');
                 env_vars.insert(key.to_string(), value.to_string());
             }
         }
     }
-    
+
     env_vars
 }
-
-
 
 /// 检查端口是否可用（未被占用）
 /// 同时检查 127.0.0.1 和 0.0.0.0，确保无论 lanAccess 设置如何，端口都真正可用
@@ -809,7 +884,10 @@ pub fn find_available_port(start_port: u16, min_port: u16) -> Option<u16> {
         }
         port -= 1;
     }
-    warn!("[Shell] 在 {}-{} 范围内未找到可用端口", min_port, start_port);
+    warn!(
+        "[Shell] 在 {}-{} 范围内未找到可用端口",
+        min_port, start_port
+    );
     None
 }
 
@@ -817,20 +895,28 @@ pub fn find_available_port(start_port: u16, min_port: u16) -> Option<u16> {
 /// 优先使用 bundle 模式（node + openclaw.mjs），回退到全局 openclaw 命令
 /// port: 指定启动的端口号
 pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process::Child> {
-    info!("[Shell] 后台启动 openclaw gateway (with handle), 端口: {}...", port);
+    info!(
+        "[Shell] 后台启动 openclaw gateway (with handle), 端口: {}...",
+        port
+    );
 
     let port_str = port.to_string();
 
     // 读取局域网访问设置
     let lan_access = get_lan_access_setting();
     let bind_mode = if lan_access { "lan" } else { "loopback" };
-    info!("[Shell] Gateway 绑定模式: {} (lanAccess={})", bind_mode, lan_access);
+    info!(
+        "[Shell] Gateway 绑定模式: {} (lanAccess={})",
+        bind_mode, lan_access
+    );
 
     // 读取代理配置
     let proxy_config = get_proxy_config();
     if proxy_config.enabled {
-        info!("[Shell] 代理已启用: http={:?}, https={:?}, no_proxy={:?}",
-            proxy_config.http, proxy_config.https, proxy_config.no_proxy);
+        info!(
+            "[Shell] 代理已启用: http={:?}, https={:?}, no_proxy={:?}",
+            proxy_config.http, proxy_config.https, proxy_config.no_proxy
+        );
     }
 
     let user_env_vars = load_openclaw_env_vars();
@@ -851,8 +937,13 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
     }
 
     // 优先使用 bundle 模式：node + openclaw.mjs
-    if let (Some(node_path), Some((bundle_dir, entry_point))) = (get_node_path(), get_bundle_entry()) {
-        info!("[Shell] bundle 模式启动 gateway: node={}, entry={}, dir={}", node_path, entry_point, bundle_dir);
+    if let (Some(node_path), Some((bundle_dir, entry_point))) =
+        (get_node_path(), get_bundle_entry())
+    {
+        info!(
+            "[Shell] bundle 模式启动 gateway: node={}, entry={}, dir={}",
+            node_path, entry_point, bundle_dir
+        );
 
         // 将 node 所在目录加入 PATH
         if let Some(parent) = Path::new(&node_path).parent() {
@@ -862,7 +953,16 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
 
         let mut cmd = Command::new(&node_path);
         cmd.args(["--no-deprecation", &entry_point]);
-        cmd.args(["gateway", "--port", &port_str, "--bind", bind_mode, "--desktop-internal", "--force", "--allow-unconfigured"]);
+        cmd.args([
+            "gateway",
+            "--port",
+            &port_str,
+            "--bind",
+            bind_mode,
+            "--desktop-internal",
+            "--force",
+            "--allow-unconfigured",
+        ]);
         cmd.current_dir(&bundle_dir);
 
         for (key, value) in &user_env_vars {
@@ -887,16 +987,23 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         // Gateway 日志始终写入文件，便于诊断启动问题
         // 使用 append 模式保留历史日志（方便排查重启前的崩溃原因）
         cmd.stdin(std::process::Stdio::null());
-        let log_dir = std::env::var("OPENCLAW_GATEWAY_LOG_DIR")
-            .unwrap_or_else(|_| {
-                let default_dir = std::path::PathBuf::from(platform::get_config_dir()).join("logs");
-                let _ = std::fs::create_dir_all(&default_dir);
-                default_dir.to_string_lossy().to_string()
-            });
+        let log_dir = std::env::var("OPENCLAW_GATEWAY_LOG_DIR").unwrap_or_else(|_| {
+            let default_dir = std::path::PathBuf::from(platform::get_config_dir()).join("logs");
+            let _ = std::fs::create_dir_all(&default_dir);
+            default_dir.to_string_lossy().to_string()
+        });
         info!("[Shell] Gateway 日志目录: {}", log_dir);
         let log_path = std::path::Path::new(&log_dir);
-        let separator = format!("\n--- gateway start {} (port {}) ---\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), port);
-        match std::fs::OpenOptions::new().create(true).append(true).open(log_path.join("gateway.stdout.log")) {
+        let separator = format!(
+            "\n--- gateway start {} (port {}) ---\n",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            port
+        );
+        match std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path.join("gateway.stdout.log"))
+        {
             Ok(mut f) => {
                 use std::io::Write;
                 let _ = f.write_all(separator.as_bytes());
@@ -907,7 +1014,11 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
                 cmd.stdout(std::process::Stdio::null());
             }
         }
-        match std::fs::OpenOptions::new().create(true).append(true).open(log_path.join("gateway.stderr.log")) {
+        match std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path.join("gateway.stderr.log"))
+        {
             Ok(mut f) => {
                 use std::io::Write;
                 let _ = f.write_all(separator.as_bytes());
@@ -922,14 +1033,21 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         info!("[Shell] 启动 gateway 进程: {:?}", cmd);
         return match cmd.spawn() {
             Ok(child) => {
-                info!("[Shell] Gateway 进程已启动, PID: {}, 端口: {}", child.id(), port);
+                info!(
+                    "[Shell] Gateway 进程已启动, PID: {}, 端口: {}",
+                    child.id(),
+                    port
+                );
                 Ok(child)
             }
             Err(e) => {
                 warn!("[Shell] Gateway 启动失败 (bundle 模式): {}", e);
                 Err(io::Error::new(
                     e.kind(),
-                    format!("启动失败 (node={}, entry={}): {}", node_path, entry_point, e)
+                    format!(
+                        "启动失败 (node={}, entry={}): {}",
+                        node_path, entry_point, e
+                    ),
                 ))
             }
         };
@@ -937,10 +1055,12 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
 
     // 生产模式：不回退到全局 openclaw，打包应用必须自包含
     if !cfg!(debug_assertions) {
-        warn!("[Shell] 生产模式下 bundle 模式不可用（Node.js 或 entry 缺失），不回退到全局 openclaw");
+        warn!(
+            "[Shell] 生产模式下 bundle 模式不可用（Node.js 或 entry 缺失），不回退到全局 openclaw"
+        );
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
-            "内置 openclaw 不可用，请重新安装应用"
+            "内置 openclaw 不可用，请重新安装应用",
         ));
     }
 
@@ -949,7 +1069,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         warn!("[Shell] 找不到 openclaw（bundle 和全局都不可用）");
         io::Error::new(
             io::ErrorKind::NotFound,
-            "找不到 openclaw，请确保项目已构建（pnpm build）且 Node.js 已安装"
+            "找不到 openclaw，请确保项目已构建（pnpm build）且 Node.js 已安装",
         )
     })?;
 
@@ -964,11 +1084,31 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
 
     let mut cmd = if openclaw_path.ends_with(".cmd") {
         let mut c = Command::new("cmd");
-        c.args(["/c", &openclaw_path, "gateway", "--port", &port_str, "--bind", bind_mode, "--desktop-internal", "--force", "--allow-unconfigured"]);
+        c.args([
+            "/c",
+            &openclaw_path,
+            "gateway",
+            "--port",
+            &port_str,
+            "--bind",
+            bind_mode,
+            "--desktop-internal",
+            "--force",
+            "--allow-unconfigured",
+        ]);
         c
     } else {
         let mut c = Command::new(&openclaw_path);
-        c.args(["gateway", "--port", &port_str, "--bind", bind_mode, "--desktop-internal", "--force", "--allow-unconfigured"]);
+        c.args([
+            "gateway",
+            "--port",
+            &port_str,
+            "--bind",
+            bind_mode,
+            "--desktop-internal",
+            "--force",
+            "--allow-unconfigured",
+        ]);
         c
     };
 
@@ -998,14 +1138,18 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
     info!("[Shell] [开发模式] 启动 gateway 进程, 端口: {}...", port);
     match cmd.spawn() {
         Ok(child) => {
-            info!("[Shell] Gateway 进程已启动, PID: {}, 端口: {}", child.id(), port);
+            info!(
+                "[Shell] Gateway 进程已启动, PID: {}, 端口: {}",
+                child.id(),
+                port
+            );
             Ok(child)
         }
         Err(e) => {
             warn!("[Shell] Gateway 启动失败: {}", e);
             Err(io::Error::new(
                 e.kind(),
-                format!("启动失败 (路径: {}): {}", openclaw_path, e)
+                format!("启动失败 (路径: {}): {}", openclaw_path, e),
             ))
         }
     }
@@ -1021,7 +1165,8 @@ pub fn command_exists(cmd: &str) -> bool {
         #[cfg(windows)]
         command.creation_flags(CREATE_NO_WINDOW);
 
-        command.output()
+        command
+            .output()
             .map(|o| o.status.success())
             .unwrap_or(false)
     } else {
@@ -1050,13 +1195,25 @@ pub fn get_proxy_config() -> ProxyConfig {
     if let Ok(content) = file::read_file(&config_path) {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
             if let Some(proxy) = json.get("proxy") {
-                let enabled = proxy.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+                let enabled = proxy
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 if enabled {
                     return ProxyConfig {
                         enabled: true,
-                        http: proxy.get("http").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                        https: proxy.get("https").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                        no_proxy: proxy.get("noProxy").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        http: proxy
+                            .get("http")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        https: proxy
+                            .get("https")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        no_proxy: proxy
+                            .get("noProxy")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
                     };
                 }
             }

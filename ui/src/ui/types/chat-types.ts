@@ -14,6 +14,7 @@ export type MessageGroup = {
   kind: "group";
   key: string;
   role: string;
+  senderLabel?: string;
   messages: Array<{ message: unknown; key: string }>;
   timestamp: number;
   isStreaming: boolean;
@@ -30,6 +31,7 @@ export type MessageContentItem = {
 /** Normalized message structure for rendering */
 export type NormalizedMessage = {
   role: string;
+  senderLabel?: string;
   content: MessageContentItem[];
   timestamp: number;
   id?: string;

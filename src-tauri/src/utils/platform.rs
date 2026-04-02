@@ -50,7 +50,6 @@ pub fn get_exec_approvals_path() -> String {
     }
 }
 
-
 /// 检测当前平台是否为 macOS
 pub fn is_macos() -> bool {
     env::consts::OS == "macos"

@@ -1,9 +1,9 @@
+use log::{debug, info, warn};
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read as IoRead, Write as IoWrite};
 use std::sync::Mutex;
-use log::{info, warn, debug};
 use tauri::{command, AppHandle, Emitter, Manager};
-use portable_pty::{CommandBuilder, PtySize, native_pty_system, MasterPty};
 
 #[cfg(not(target_os = "windows"))]
 use std::os::unix::fs::PermissionsExt;
@@ -54,11 +54,7 @@ fn get_shell() -> (&'static str, Vec<&'static str>) {
 }
 
 /// 从 PTY master 持续读取并通过 Tauri 事件发送到前端
-fn spawn_reader_thread(
-    app: AppHandle,
-    id: String,
-    mut reader: Box<dyn IoRead + Send>,
-) {
+fn spawn_reader_thread(app: AppHandle, id: String, mut reader: Box<dyn IoRead + Send>) {
     std::thread::spawn(move || {
         debug!("[Terminal] reader 线程启动: {}", id);
         let mut buf = [0u8; 4096];
@@ -90,7 +86,11 @@ fn spawn_reader_thread(
 
 /// 创建终端会话（使用 PTY），返回会话 ID
 #[command]
-pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16>) -> Result<String, String> {
+pub async fn terminal_create(
+    app: AppHandle,
+    cols: Option<u16>,
+    rows: Option<u16>,
+) -> Result<String, String> {
     let state = app.state::<TerminalState>();
 
     let id = {
@@ -104,16 +104,21 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
     let actual_rows = rows.unwrap_or(24);
 
     let (shell, args) = get_shell();
-    info!("[Terminal] 创建终端会话 {}: {} {:?} ({}x{})", id, shell, args, actual_cols, actual_rows);
+    info!(
+        "[Terminal] 创建终端会话 {}: {} {:?} ({}x{})",
+        id, shell, args, actual_cols, actual_rows
+    );
 
     // 打开 PTY
     let pty_system = native_pty_system();
-    let pair = pty_system.openpty(PtySize {
-        rows: actual_rows,
-        cols: actual_cols,
-        pixel_width: 0,
-        pixel_height: 0,
-    }).map_err(|e| format!("打开 PTY 失败: {}", e))?;
+    let pair = pty_system
+        .openpty(PtySize {
+            rows: actual_rows,
+            cols: actual_cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| format!("打开 PTY 失败: {}", e))?;
 
     let mut cmd = CommandBuilder::new(shell);
     for arg in &args {
@@ -140,8 +145,7 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
                 path_parts.push(node_dir.display().to_string());
             }
 
-            let entry_point = crate::utils::shell::get_bundle_entry()
-                .map(|(_, entry)| entry);
+            let entry_point = crate::utils::shell::get_bundle_entry().map(|(_, entry)| entry);
 
             if let Some(entry) = entry_point {
                 cmd.env("OPENCLAW_INTERNAL_NODE", &node_path);
@@ -158,7 +162,8 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
                     let sh_path = wrapper_dir.join("openclaw");
                     let sh_content = "#!/bin/sh\nexec \"$OPENCLAW_INTERNAL_NODE\" --no-deprecation \"$OPENCLAW_INTERNAL_ENTRY\" \"$@\"\n";
                     let _ = std::fs::write(&sh_path, sh_content);
-                    let _ = std::fs::set_permissions(&sh_path, std::fs::Permissions::from_mode(0o755));
+                    let _ =
+                        std::fs::set_permissions(&sh_path, std::fs::Permissions::from_mode(0o755));
                 }
             }
         }
@@ -199,19 +204,28 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
     cmd.env("OPENCLAW_GATEWAY_PORT", port.to_string());
     cmd.env("OPENCLAW_DESKTOP", "1");
     cmd.env("OPENCLAW_DESKTOP_TERMINAL", "1");
-    cmd.env("OPENCLAW_STATE_DIR", crate::utils::platform::get_config_dir());
+    cmd.env(
+        "OPENCLAW_STATE_DIR",
+        crate::utils::platform::get_config_dir(),
+    );
 
     // 在 slave 端启动子进程
-    let child = pair.slave.spawn_command(cmd)
+    let child = pair
+        .slave
+        .spawn_command(cmd)
         .map_err(|e| format!("启动终端失败: {}", e))?;
 
     // 释放 slave — 只通过 master 交互
     drop(pair.slave);
 
     // 从 master 克隆 reader 和 writer
-    let reader = pair.master.try_clone_reader()
+    let reader = pair
+        .master
+        .try_clone_reader()
         .map_err(|e| format!("获取 PTY reader 失败: {}", e))?;
-    let writer = pair.master.take_writer()
+    let writer = pair
+        .master
+        .take_writer()
         .map_err(|e| format!("获取 PTY writer 失败: {}", e))?;
 
     // 启动读取线程
@@ -220,11 +234,14 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
     // 先将会话插入 state，避免退出检测线程启动时找不到会话
     {
         let mut sessions = state.sessions.lock().unwrap();
-        sessions.insert(id.clone(), TerminalSession {
-            writer,
-            master: pair.master,
-            child,
-        });
+        sessions.insert(
+            id.clone(),
+            TerminalSession {
+                writer,
+                master: pair.master,
+                child,
+            },
+        );
     }
 
     // 启动退出检测线程（会话已存在于 state 中）
@@ -250,7 +267,8 @@ pub async fn terminal_create(app: AppHandle, cols: Option<u16>, rows: Option<u16
                             "data": "\r\n[进程已退出]\r\n",
                         });
                         let _ = app_exit.emit("terminal-output", payload);
-                        let _ = app_exit.emit("terminal-exit", serde_json::json!({ "id": id_exit }));
+                        let _ =
+                            app_exit.emit("terminal-exit", serde_json::json!({ "id": id_exit }));
                         break;
                     }
                     Ok(None) => {} // 仍在运行
@@ -273,9 +291,13 @@ pub async fn terminal_write(app: AppHandle, id: String, data: String) -> Result<
     let mut sessions = state.sessions.lock().unwrap();
 
     if let Some(session) = sessions.get_mut(&id) {
-        session.writer.write_all(data.as_bytes())
+        session
+            .writer
+            .write_all(data.as_bytes())
             .map_err(|e| format!("写入终端失败: {}", e))?;
-        session.writer.flush()
+        session
+            .writer
+            .flush()
             .map_err(|e| format!("刷新终端失败: {}", e))?;
         Ok(())
     } else {
@@ -285,17 +307,25 @@ pub async fn terminal_write(app: AppHandle, id: String, data: String) -> Result<
 
 /// 调整终端大小
 #[command]
-pub async fn terminal_resize(app: AppHandle, id: String, cols: u16, rows: u16) -> Result<(), String> {
+pub async fn terminal_resize(
+    app: AppHandle,
+    id: String,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
     let state = app.state::<TerminalState>();
     let sessions = state.sessions.lock().unwrap();
 
     if let Some(session) = sessions.get(&id) {
-        session.master.resize(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        }).map_err(|e| format!("调整终端大小失败: {}", e))?;
+        session
+            .master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("调整终端大小失败: {}", e))?;
         Ok(())
     } else {
         Err(format!("终端会话 {} 不存在", id))

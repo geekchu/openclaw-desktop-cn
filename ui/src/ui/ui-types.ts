@@ -10,6 +10,8 @@ export type ChatQueueItem = {
   createdAt: number;
   attachments?: ChatAttachment[];
   refreshSessions?: boolean;
+  localCommandName?: string;
+  localCommandArgs?: string;
 };
 
 export const CRON_CHANNEL_LAST = "last";

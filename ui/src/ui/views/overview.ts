@@ -20,11 +20,25 @@ export type OverviewProps = {
   cronEnabled: boolean | null;
   cronNext: number | null;
   lastChannelsRefresh: number | null;
+  usageResult?: unknown;
+  sessionsResult?: unknown;
+  skillsReport?: unknown;
+  cronJobs?: unknown[];
+  cronStatus?: unknown;
+  attentionItems?: unknown[];
+  eventLog?: unknown[];
+  overviewLogLines?: unknown;
+  showGatewayToken?: boolean;
+  showGatewayPassword?: boolean;
   onSettingsChange: (next: UiSettings) => void;
   onPasswordChange: (next: string) => void;
   onSessionKeyChange: (next: string) => void;
+  onToggleGatewayTokenVisibility?: () => void;
+  onToggleGatewayPasswordVisibility?: () => void;
   onConnect: () => void;
   onRefresh: () => void;
+  onNavigate?: (tab: string) => void;
+  onRefreshLogs?: () => void;
 };
 
 export function renderOverview(props: OverviewProps) {

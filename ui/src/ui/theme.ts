@@ -1,4 +1,6 @@
 export type ThemeMode = "system" | "light" | "dark";
+export type ThemeName = "claw" | "dash" | "knot";
+export const VALID_THEME_NAMES: ThemeName[] = ["claw", "dash", "knot"];
 export type ResolvedTheme = "light" | "dark";
 
 export function getSystemTheme(): ResolvedTheme {

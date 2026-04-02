@@ -207,7 +207,6 @@ export class OpenClawApp extends LitElement {
   @state() configIssues: unknown[] = [];
   @state() configSaving = false;
   @state() configApplying = false;
-  @state() updateRunning = false;
   @state() applySessionKey = this.settings.lastActiveSessionKey;
   @state() configSnapshot: ConfigSnapshot | null = null;
   @state() configSchema: unknown = null;
@@ -217,6 +216,11 @@ export class OpenClawApp extends LitElement {
   @state() configForm: Record<string, unknown> | null = null;
   @state() configFormOriginal: Record<string, unknown> | null = null;
   @state() configFormDirty = false;
+  @state() onestopApiKey = "";
+  @state() onestopSelectedModel = "";
+  @state() onestopShowApiKey = false;
+  @state() onestopActiveCategory = "all";
+  @state() onestopSaving = false;
   @state() configFormMode: "form" | "raw" = "form";
   @state() configSearchQuery = "";
   @state() configActiveSection: string | null = null;

@@ -1,9 +1,9 @@
+use log::{error, info, warn};
 use std::net::TcpStream;
 use std::process::Child;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use std::sync::Mutex;
 use std::time::Duration;
-use log::{info, warn, error};
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::Manager;
@@ -18,7 +18,8 @@ pub const DEFAULT_PORT: u16 = 28789;
 pub const MIN_PORT: u16 = 28700;
 
 /// 全局共享的 Gateway 端口引用，供不依赖 Tauri AppHandle 的底层的 shell 脚本直接获取
-pub static GLOBAL_GATEWAY_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(28789);
+pub static GLOBAL_GATEWAY_PORT: std::sync::atomic::AtomicU16 =
+    std::sync::atomic::AtomicU16::new(28789);
 
 /// Gateway 进程管理器
 /// 负责启动、停止、健康检查 openclaw gateway 子进程
@@ -92,13 +93,20 @@ impl GatewayManager {
             .ok_or_else(|| format!("在 {}-{} 范围内未找到可用端口", MIN_PORT, DEFAULT_PORT))?;
 
         if port != DEFAULT_PORT {
-            info!("[Gateway] 默认端口 {} 被占用，使用端口 {}", DEFAULT_PORT, port);
+            info!(
+                "[Gateway] 默认端口 {} 被占用，使用端口 {}",
+                DEFAULT_PORT, port
+            );
         }
 
         let child = shell::spawn_openclaw_gateway_with_handle(port)
             .map_err(|e| format!("启动 gateway 失败: {}", e))?;
 
-        info!("[Gateway] gateway 进程已启动, PID: {}, 端口: {}", child.id(), port);
+        info!(
+            "[Gateway] gateway 进程已启动, PID: {}, 端口: {}",
+            child.id(),
+            port
+        );
 
         self.set_port(port);
         *guard = Some(child);
@@ -160,16 +168,14 @@ impl GatewayManager {
         use std::io::{Read, Write};
         let port = self.get_port();
         let addr = format!("127.0.0.1:{}", port);
-        let mut stream = match TcpStream::connect_timeout(
-            &addr.parse().unwrap(),
-            Duration::from_millis(500),
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                warn!("[Gateway] is_ready: TCP 连接失败: {}", e);
-                return false;
-            }
-        };
+        let mut stream =
+            match TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_millis(500)) {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!("[Gateway] is_ready: TCP 连接失败: {}", e);
+                    return false;
+                }
+            };
         let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
         let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
         // 发送最简 HTTP 请求
@@ -211,7 +217,8 @@ impl GatewayManager {
 
         loop {
             if self.is_ready() {
-                let elapsed = std::time::Instant::now().duration_since(deadline - Duration::from_secs(timeout_secs));
+                let elapsed = std::time::Instant::now()
+                    .duration_since(deadline - Duration::from_secs(timeout_secs));
                 info!("[Gateway] gateway 已就绪 ({:.1}秒)", elapsed.as_secs_f64());
                 return true;
             }
@@ -227,7 +234,10 @@ impl GatewayManager {
                 if let Some(ref mut child) = *guard {
                     match child.try_wait() {
                         Ok(Some(status)) => {
-                            error!("[Gateway] gateway 进程意外退出, 退出码: {:?}", status.code());
+                            error!(
+                                "[Gateway] gateway 进程意外退出, 退出码: {:?}",
+                                status.code()
+                            );
                             return false;
                         }
                         Ok(None) => {} // 仍在运行
@@ -260,7 +270,8 @@ impl GatewayManager {
 
 /// 发送系统桌面通知
 fn send_notification(handle: &AppHandle, body: &str) {
-    let _ = handle.notification()
+    let _ = handle
+        .notification()
         .builder()
         .title("OpenClaw桌面版")
         .body(body)
@@ -352,18 +363,23 @@ pub fn health_check_loop(handle: &AppHandle) {
                     navigate_webview_to_gateway(handle, port);
                 } else {
                     consecutive_failures += 1;
-                    error!("[Gateway] 自动重启超时 (连续失败 {}次)", consecutive_failures);
+                    error!(
+                        "[Gateway] 自动重启超时 (连续失败 {}次)",
+                        consecutive_failures
+                    );
                     let _ = handle.emit("gateway-status", "Gateway 重启超时");
                     update_tray_status(handle, false);
                 }
             }
             Err(e) => {
                 consecutive_failures += 1;
-                error!("[Gateway] 自动重启失败 (连续失败 {}次): {}", consecutive_failures, e);
+                error!(
+                    "[Gateway] 自动重启失败 (连续失败 {}次): {}",
+                    consecutive_failures, e
+                );
                 update_tray_status(handle, false);
                 if consecutive_failures >= max_consecutive_failures {
-                    let _ = handle.emit("gateway-status",
-                        "Gateway 启动失败，已进入低频重试模式");
+                    let _ = handle.emit("gateway-status", "Gateway 启动失败，已进入低频重试模式");
                     send_notification(handle, "Gateway 启动失败，已进入低频重试模式");
                 } else {
                     let _ = handle.emit("gateway-status", format!("重启失败: {}", e).as_str());
@@ -377,15 +393,20 @@ pub fn health_check_loop(handle: &AppHandle) {
 pub fn navigate_webview_to_gateway(handle: &AppHandle, port: u16) {
     let gm = handle.state::<GatewayManager>();
     if gm.get_last_navigated_port() == port {
-        info!("[Gateway] navigate_webview_to_gateway: 防抖跳过 (port={})", port);
+        info!(
+            "[Gateway] navigate_webview_to_gateway: 防抖跳过 (port={})",
+            port
+        );
         return; // 防抖：如果在其它线程刚做过该端口的导航，就跳过
     }
 
+    let token = crate::read_gateway_token();
+
     // 使用 127.0.0.1 而不是 localhost，避免某些 WebView 的安全限制
-    let url = match crate::read_gateway_token() {
-        Some(token) => {
+    let url = match &token {
+        Some(t) => {
             info!("[Gateway] navigate_webview_to_gateway: 使用 token");
-            format!("http://127.0.0.1:{}?token={}", port, token)
+            format!("http://127.0.0.1:{}?token={}", port, t)
         }
         None => {
             info!("[Gateway] navigate_webview_to_gateway: 无 token");
@@ -398,9 +419,19 @@ pub fn navigate_webview_to_gateway(handle: &AppHandle, port: u16) {
 
     // 使用 JavaScript 执行导航，因为 window.navigate() 在某些情况下不生效
     if let Some(window) = handle.get_webview_window("main") {
-        let js = format!("window.location.href = '{}';", url);
+        // 使用 JSON 序列化确保 URL 字符串安全转义
+        let url_json = match serde_json::to_string(&url) {
+            Ok(json) => json,
+            Err(e) => {
+                error!("[Gateway] URL JSON 序列化失败: {}", e);
+                return;
+            }
+        };
+        let js = format!("window.location.href = {};", url_json);
         match window.eval(&js) {
-            Ok(_) => info!("[Gateway] navigate_webview_to_gateway: JS 导航已执行"),
+            Ok(_) => {
+                info!("[Gateway] navigate_webview_to_gateway: JS 导航已执行");
+            }
             Err(e) => error!("[Gateway] navigate_webview_to_gateway: JS 导航失败: {}", e),
         }
     } else {

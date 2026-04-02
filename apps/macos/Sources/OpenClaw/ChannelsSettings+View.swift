@@ -10,31 +10,78 @@ extension ChannelsSettings {
         .onAppear {
             self.store.start()
             self.ensureSelection()
+            self.syncSelectedChannelState()
         }
         .onChange(of: self.orderedChannels) { _, _ in
             self.ensureSelection()
+            self.syncSelectedChannelState()
+        }
+        .onChange(of: self.selectedChannel) { _, _ in
+            self.syncSelectedChannelState()
         }
         .onDisappear { self.store.stop() }
+        .confirmationDialog(
+            "Clear configuration?",
+            isPresented: Binding(
+                get: { self.clearConfirmationChannelId != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        self.clearConfirmationChannelId = nil
+                    }
+                }))
+        {
+            Button("Clear Configuration", role: .destructive) {
+                guard let channelId = self.clearConfirmationChannelId else { return }
+                self.clearConfirmationChannelId = nil
+                self.pairingCode = ""
+                self.testTargetValue = ""
+                Task { await self.store.clearChannelConfig(channelId) }
+            }
+            Button("Cancel", role: .cancel) {
+                self.clearConfirmationChannelId = nil
+            }
+        } message: {
+            if let channelId = self.clearConfirmationChannelId {
+                Text("This removes the saved \(self.store.resolveChannelLabel(channelId)) configuration.")
+            }
+        }
     }
 
     private var sidebar: some View {
         SettingsSidebarScroll {
             LazyVStack(alignment: .leading, spacing: 8) {
-                if !self.enabledChannels.isEmpty {
-                    self.sidebarSectionHeader("Configured")
-                    ForEach(self.enabledChannels) { channel in
+                if self.desktopActionsEnabled {
+                    ForEach(self.orderedChannels) { channel in
                         self.sidebarRow(channel)
                     }
-                }
+                } else {
+                    if !self.enabledChannels.isEmpty {
+                        self.sidebarSectionHeader("Configured")
+                        ForEach(self.enabledChannels) { channel in
+                            self.sidebarRow(channel)
+                        }
+                    }
 
-                if !self.availableChannels.isEmpty {
-                    self.sidebarSectionHeader("Available")
-                    ForEach(self.availableChannels) { channel in
-                        self.sidebarRow(channel)
+                    if !self.availableChannels.isEmpty {
+                        self.sidebarSectionHeader("Available")
+                        ForEach(self.availableChannels) { channel in
+                            self.sidebarRow(channel)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func syncSelectedChannelState() {
+        self.pairingCode = ""
+        self.testTargetValue = self.selectedChannel.flatMap { self.store.storedTestTargetValue(for: $0.id) } ?? ""
+        guard self.desktopActionsEnabled else {
+            Task { await self.store.syncDesktopMessageActions(for: nil) }
+            return
+        }
+        let channelId = self.selectedChannel?.id
+        Task { await self.store.syncDesktopMessageActions(for: channelId) }
     }
 
     private var detail: some View {
@@ -50,9 +97,9 @@ extension ChannelsSettings {
 
     private var emptyDetail: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Channels")
+            Text(self.emptyTitle)
                 .font(.title3.weight(.semibold))
-            Text("Select a channel to view status and settings.")
+            Text(self.emptyDescription)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

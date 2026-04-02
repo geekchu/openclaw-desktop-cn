@@ -545,6 +545,12 @@ const channelInfo: Record<
         required: true,
       },
       {
+        key: "testChatId",
+        label: "测试 Chat ID",
+        type: "text",
+        placeholder: "用于发送测试消息的 chat_id (可选)",
+      },
+      {
         key: "encryptKey",
         label: "Encrypt Key",
         type: "password",
@@ -656,13 +662,25 @@ const channelInfo: Record<
         placeholder: "群组 ID",
       },
       {
+        key: "cliPath",
+        label: "imsg 命令路径",
+        type: "text",
+        placeholder: "本机 imsg 路径，或 SSH 包装脚本路径",
+      },
+      {
+        key: "remoteHost",
+        label: "远程 Mac 主机",
+        type: "text",
+        placeholder: "可选，如: user@mac-mini，用于远程附件拉取",
+      },
+      {
         key: "dbPath",
         label: "chat.db 路径",
         type: "text",
         placeholder: "可选 (如果由于权限问题失败可以填文件拷贝路径)",
       },
     ],
-    helpText: "仅支持 macOS",
+    helpText: "支持本机 macOS，或通过 SSH 连接远程 Mac 上的 imsg",
   },
   whatsapp: {
     name: "WhatsApp",
@@ -756,6 +774,18 @@ const channelInfo: Record<
           { value: "markdown", label: "Markdown" },
           { value: "card", label: "AI 卡片" },
         ],
+      },
+      {
+        key: "cardTemplateId",
+        label: "卡片模板 ID",
+        type: "text",
+        placeholder: "messageType=card 时必填",
+      },
+      {
+        key: "cardTemplateKey",
+        label: "卡片内容字段",
+        type: "text",
+        placeholder: "可选，默认 content",
       },
       {
         key: "agentId",
@@ -1463,6 +1493,8 @@ export class OpenClawConfigChannels extends LitElement {
         discord: 4,
         slack: 5,
         imessage: 6,
+        telegram: 7,
+        qqbot: 8,
       };
       result.sort(
         (a, b) => (channelOrder[a.channel_type] ?? 99) - (channelOrder[b.channel_type] ?? 99),
@@ -1531,6 +1563,14 @@ export class OpenClawConfigChannels extends LitElement {
     const info = channelInfo[channel.channel_type];
     const requiredFields = info?.fields.filter((field) => field.required) ?? [];
     for (const field of requiredFields) {
+      if (
+        channel.channel_type === "qqbot" &&
+        field.key === "clientSecret" &&
+        typeof config.clientSecretFile === "string" &&
+        config.clientSecretFile.trim() !== ""
+      ) {
+        continue;
+      }
       const value = config[field.key];
       if (value == null || typeof value !== "string" || value.trim() === "") {
         return `${field.label} is required`;
@@ -1576,6 +1616,50 @@ export class OpenClawConfigChannels extends LitElement {
         config.appToken.trim() === ""
       ) {
         return "Socket 模式需要配置 App Token";
+      }
+    }
+    if (channel.channel_type === "feishu") {
+      const connectionMode =
+        typeof config.connectionMode === "string" && config.connectionMode.trim()
+          ? config.connectionMode.trim()
+          : "websocket";
+      if (connectionMode === "webhook") {
+        if (
+          !config.verificationToken ||
+          typeof config.verificationToken !== "string" ||
+          config.verificationToken.trim() === ""
+        ) {
+          return "Webhook 模式需要配置 Verification Token";
+        }
+        if (
+          !config.encryptKey ||
+          typeof config.encryptKey !== "string" ||
+          config.encryptKey.trim() === ""
+        ) {
+          return "Webhook 模式需要配置 Encrypt Key";
+        }
+      }
+    }
+    if (channel.channel_type === "wecom") {
+      if (
+        typeof config.encodingAesKey !== "string" ||
+        config.encodingAesKey.trim().length !== 43
+      ) {
+        return "EncodingAESKey 必须为 43 位";
+      }
+    }
+    if (channel.channel_type === "dingtalk") {
+      const messageType =
+        typeof config.messageType === "string" && config.messageType.trim()
+          ? config.messageType.trim()
+          : "markdown";
+      if (
+        messageType === "card" &&
+        (!config.cardTemplateId ||
+          typeof config.cardTemplateId !== "string" ||
+          config.cardTemplateId.trim() === "")
+      ) {
+        return "AI 卡片模式需要配置卡片模板 ID";
       }
     }
 
@@ -1865,6 +1949,75 @@ export class OpenClawConfigChannels extends LitElement {
         return typeof signingSecret === "string" && signingSecret.trim() !== "";
       }
       return typeof appToken === "string" && appToken.trim() !== "";
+    }
+    if (channel.channel_type === "feishu") {
+      const appId = channel.config.appId;
+      const appSecret = channel.config.appSecret;
+      if (
+        typeof appId !== "string" ||
+        appId.trim() === "" ||
+        typeof appSecret !== "string" ||
+        appSecret.trim() === ""
+      ) {
+        return false;
+      }
+      const connectionMode =
+        typeof channel.config.connectionMode === "string" && channel.config.connectionMode.trim()
+          ? channel.config.connectionMode.trim()
+          : "websocket";
+      if (connectionMode === "webhook") {
+        return (
+          typeof channel.config.verificationToken === "string" &&
+          channel.config.verificationToken.trim() !== "" &&
+          typeof channel.config.encryptKey === "string" &&
+          channel.config.encryptKey.trim() !== ""
+        );
+      }
+      return true;
+    }
+    if (channel.channel_type === "wecom") {
+      const token = channel.config.token;
+      const encodingAesKey = channel.config.encodingAesKey;
+      return (
+        typeof token === "string" &&
+        token.trim() !== "" &&
+        typeof encodingAesKey === "string" &&
+        encodingAesKey.trim().length === 43
+      );
+    }
+    if (channel.channel_type === "dingtalk") {
+      const clientId = channel.config.clientId;
+      const clientSecret = channel.config.clientSecret;
+      if (
+        typeof clientId !== "string" ||
+        clientId.trim() === "" ||
+        typeof clientSecret !== "string" ||
+        clientSecret.trim() === ""
+      ) {
+        return false;
+      }
+      const messageType =
+        typeof channel.config.messageType === "string" && channel.config.messageType.trim()
+          ? channel.config.messageType.trim()
+          : "markdown";
+      if (messageType === "card") {
+        return (
+          typeof channel.config.cardTemplateId === "string" &&
+          channel.config.cardTemplateId.trim() !== ""
+        );
+      }
+      return true;
+    }
+    if (channel.channel_type === "qqbot") {
+      const appId = channel.config.appId;
+      const clientSecret = channel.config.clientSecret;
+      const clientSecretFile = channel.config.clientSecretFile;
+      return (
+        typeof appId === "string" &&
+        appId.trim() !== "" &&
+        ((typeof clientSecret === "string" && clientSecret.trim() !== "") ||
+          (typeof clientSecretFile === "string" && clientSecretFile.trim() !== ""))
+      );
     }
 
     const requiredFields = info.fields.filter((field) => field.required);

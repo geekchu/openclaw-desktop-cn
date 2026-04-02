@@ -1,20 +1,20 @@
 use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
 use crate::utils::{platform, shell};
+use log::{debug, info, warn};
 use tauri::{command, Manager};
-use log::{info, warn, debug};
 
 /// 去除 ANSI 转义序列（颜色代码等）
 fn strip_ansi_codes(input: &str) -> String {
     // 匹配 ANSI 转义序列: ESC[ ... m 或 ESC[ ... 其他控制字符
     let mut result = String::with_capacity(input.len());
     let mut chars = input.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '\x1b' {
             // 跳过 ESC[...m 序列
             if chars.peek() == Some(&'[') {
                 chars.next(); // 跳过 '['
-                // 跳过直到遇到字母
+                              // 跳过直到遇到字母
                 while let Some(&next) = chars.peek() {
                     chars.next();
                     if next.is_ascii_alphabetic() {
@@ -33,12 +33,12 @@ fn strip_ansi_codes(input: &str) -> String {
 fn extract_json_from_output(output: &str) -> Option<String> {
     // 先去除 ANSI 颜色代码
     let clean_output = strip_ansi_codes(output);
-    
+
     // 按行查找 JSON 开始位置
     let lines: Vec<&str> = clean_output.lines().collect();
     let mut json_start_line = None;
     let mut json_end_line = None;
-    
+
     // 找到 JSON 开始行：
     // - 以 { 开头（JSON 对象）
     // - 或以 [" 或 [数字 开头（真正的 JSON 数组，不是 [plugins] 这样的文本）
@@ -51,13 +51,17 @@ fn extract_json_from_output(output: &str) -> Option<String> {
         // 检查是否是真正的 JSON 数组（以 [" 或 [数字 或 [{ 开头）
         if trimmed.starts_with('[') && trimmed.len() > 1 {
             let second_char = trimmed.chars().nth(1).unwrap_or(' ');
-            if second_char == '"' || second_char == '{' || second_char == '[' || second_char.is_ascii_digit() {
+            if second_char == '"'
+                || second_char == '{'
+                || second_char == '['
+                || second_char.is_ascii_digit()
+            {
                 json_start_line = Some(i);
                 break;
             }
         }
     }
-    
+
     // 找到 JSON 结束行（以 } 或 ] 结尾的行，从后往前找）
     for (i, line) in lines.iter().enumerate().rev() {
         let trimmed = line.trim();
@@ -70,7 +74,7 @@ fn extract_json_from_output(output: &str) -> Option<String> {
             break;
         }
     }
-    
+
     match (json_start_line, json_end_line) {
         (Some(start), Some(end)) if start <= end => {
             let json_lines: Vec<&str> = lines[start..=end].to_vec();
@@ -86,14 +90,18 @@ fn extract_json_from_output(output: &str) -> Option<String> {
 pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
     info!("[诊断] 开始运行系统诊断...");
     let mut results = Vec::new();
-    
+
     // 检查 OpenClaw 是否安装（全局安装或 bundle 模式）
     info!("[诊断] 检查 OpenClaw 安装状态...");
     let has_global = shell::get_openclaw_path().is_some();
     let has_bundle = shell::get_bundle_entry().is_some();
     let openclaw_installed = has_global || has_bundle;
-    info!("[诊断] OpenClaw 安装: {} (global={}, bundle={})",
-        if openclaw_installed { "✓" } else { "✗" }, has_global, has_bundle);
+    info!(
+        "[诊断] OpenClaw 安装: {} (global={}, bundle={})",
+        if openclaw_installed { "✓" } else { "✗" },
+        has_global,
+        has_bundle
+    );
     results.push(DiagnosticResult {
         name: "OpenClaw 安装".to_string(),
         passed: openclaw_installed,
@@ -110,7 +118,7 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
             Some("运行: npm install -g openclaw".to_string())
         },
     });
-    
+
     // 检查 Node.js（使用 get_node_path 以在生产模式下使用内置版本）
     let node_check = match shell::get_node_path() {
         Some(node_path) => shell::run_command_output(&node_path, &["--version"]),
@@ -119,16 +127,14 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
     results.push(DiagnosticResult {
         name: "Node.js".to_string(),
         passed: node_check.is_ok(),
-        message: node_check
-            .clone()
-            .unwrap_or_else(|_| "未安装".to_string()),
+        message: node_check.clone().unwrap_or_else(|_| "未安装".to_string()),
         suggestion: if node_check.is_err() {
             Some("请安装 Node.js 22+".to_string())
         } else {
             None
         },
     });
-    
+
     // 检查配置文件
     let config_path = platform::get_config_file_path();
     let config_exists = std::path::Path::new(&config_path).exists();
@@ -146,7 +152,7 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
             Some("运行 openclaw 初始化配置".to_string())
         },
     });
-    
+
     // 检查环境变量文件（不存在则自动创建）
     let env_path = platform::get_env_file_path();
     let env_exists = std::path::Path::new(&env_path).exists();
@@ -162,7 +168,7 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
         message: format!("环境变量文件: {}", env_path),
         suggestion: None,
     });
-    
+
     // 运行 openclaw doctor
     if openclaw_installed {
         let doctor_result = shell::run_openclaw(&["doctor"]);
@@ -176,7 +182,7 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
             suggestion: None,
         });
     }
-    
+
     Ok(results)
 }
 
@@ -190,7 +196,14 @@ pub async fn test_ai_connection() -> Result<AITestResult, String> {
 
     // 使用 openclaw 命令测试连接
     info!("[AI测试] 执行: openclaw agent --local --to +1234567890 --message 回复 OK");
-    let result = shell::run_openclaw(&["agent", "--local", "--to", "+1234567890", "--message", "回复 OK"]);
+    let result = shell::run_openclaw(&[
+        "agent",
+        "--local",
+        "--to",
+        "+1234567890",
+        "--message",
+        "回复 OK",
+    ]);
 
     let latency = start.elapsed().as_millis() as u64;
     info!("[AI测试] 命令执行完成, 耗时: {}ms", latency);
@@ -259,7 +272,11 @@ pub async fn test_ai_connection() -> Result<AITestResult, String> {
                 success,
                 provider: "current".to_string(),
                 model: "default".to_string(),
-                response: if success { Some(filtered.clone()) } else { None },
+                response: if success {
+                    Some(filtered.clone())
+                } else {
+                    None
+                },
                 error: if success { None } else { Some(filtered) },
                 latency_ms: Some(latency),
             })
@@ -278,7 +295,7 @@ pub async fn test_ai_connection() -> Result<AITestResult, String> {
 /// 获取渠道测试目标
 fn get_channel_test_target(channel_type: &str) -> Option<String> {
     let env_path = platform::get_env_file_path();
-    
+
     // 根据渠道类型获取测试目标的环境变量
     let env_key = match channel_type.to_lowercase().as_str() {
         "telegram" => "OPENCLAW_TELEGRAM_USERID",
@@ -291,7 +308,7 @@ fn get_channel_test_target(channel_type: &str) -> Option<String> {
         "imessage" => return None,
         _ => return None,
     };
-    
+
     crate::utils::file::read_env_value(&env_path, env_key)
 }
 
@@ -310,6 +327,181 @@ fn channel_requires_linked_status(channel_type: &str) -> bool {
     matches!(channel_type.to_lowercase().as_str(), "whatsapp")
 }
 
+fn channel_requires_probe_status(channel_type: &str) -> bool {
+    matches!(channel_type.to_lowercase().as_str(), "imessage")
+}
+
+fn channel_requires_running_status(channel_type: &str) -> bool {
+    matches!(channel_type.to_lowercase().as_str(), "dingtalk" | "qqbot")
+}
+
+fn channel_requires_connected_status(channel_type: &str) -> bool {
+    matches!(channel_type.to_lowercase().as_str(), "qqbot")
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedChannelStatus {
+    configured: bool,
+    linked: Option<bool>,
+    running: Option<bool>,
+    connected: Option<bool>,
+    probe_ok: Option<bool>,
+    last_error: Option<String>,
+    probe_error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ChannelStatusCheck {
+    Ready {
+        status_message: String,
+    },
+    NotConfigured,
+    NotReady {
+        status_message: String,
+        error: String,
+    },
+}
+
+fn read_status_bool(value: Option<&serde_json::Value>, key: &str) -> Option<bool> {
+    value
+        .and_then(|record| record.get(key))
+        .and_then(|field| field.as_bool())
+}
+
+fn read_status_string(value: Option<&serde_json::Value>, key: &str) -> Option<String> {
+    value
+        .and_then(|record| record.get(key))
+        .and_then(|field| field.as_str())
+        .map(|field| field.trim().to_string())
+        .filter(|field| !field.is_empty())
+}
+
+fn read_probe_ok(value: Option<&serde_json::Value>) -> Option<bool> {
+    value
+        .and_then(|record| record.get("probe"))
+        .and_then(|probe| probe.get("ok"))
+        .and_then(|field| field.as_bool())
+}
+
+fn read_probe_error(value: Option<&serde_json::Value>) -> Option<String> {
+    value
+        .and_then(|record| record.get("probe"))
+        .and_then(|probe| probe.get("error"))
+        .and_then(|field| field.as_str())
+        .map(|field| field.trim().to_string())
+        .filter(|field| !field.is_empty())
+}
+
+fn parse_channel_status(
+    json: &serde_json::Value,
+    channel_type: &str,
+) -> Option<ParsedChannelStatus> {
+    let channel_key = channel_type.to_lowercase();
+    let channels = json.get("channels")?.as_object()?;
+    let channel_summary = channels.get(&channel_key)?;
+    let default_account_id = json
+        .get("channelDefaultAccountId")
+        .and_then(|value| value.get(&channel_key))
+        .and_then(|value| value.as_str());
+    let default_account = json
+        .get("channelAccounts")
+        .and_then(|value| value.get(&channel_key))
+        .and_then(|value| value.as_array())
+        .and_then(|accounts| {
+            default_account_id
+                .and_then(|account_id| {
+                    accounts.iter().find(|account| {
+                        account.get("accountId").and_then(|value| value.as_str())
+                            == Some(account_id)
+                    })
+                })
+                .or_else(|| accounts.first())
+        });
+
+    Some(ParsedChannelStatus {
+        configured: read_status_bool(default_account, "configured")
+            .or_else(|| read_status_bool(Some(channel_summary), "configured"))
+            .unwrap_or(false),
+        linked: read_status_bool(default_account, "linked")
+            .or_else(|| read_status_bool(Some(channel_summary), "linked")),
+        running: read_status_bool(default_account, "running")
+            .or_else(|| read_status_bool(Some(channel_summary), "running")),
+        connected: read_status_bool(default_account, "connected")
+            .or_else(|| read_status_bool(Some(channel_summary), "connected")),
+        probe_ok: read_probe_ok(default_account).or_else(|| read_probe_ok(Some(channel_summary))),
+        last_error: read_status_string(default_account, "lastError")
+            .or_else(|| read_status_string(Some(channel_summary), "lastError")),
+        probe_error: read_probe_error(default_account)
+            .or_else(|| read_probe_error(Some(channel_summary))),
+    })
+}
+
+fn evaluate_channel_status(channel_type: &str, status: &ParsedChannelStatus) -> ChannelStatusCheck {
+    if !status.configured {
+        return ChannelStatusCheck::NotConfigured;
+    }
+
+    if channel_requires_linked_status(channel_type) && status.linked != Some(true) {
+        return ChannelStatusCheck::NotReady {
+            status_message: "等待扫码登录".to_string(),
+            error: format!("请先扫码登录 {}，然后重试", channel_type),
+        };
+    }
+
+    if channel_requires_probe_status(channel_type) && status.probe_ok != Some(true) {
+        return ChannelStatusCheck::NotReady {
+            status_message: "探测失败".to_string(),
+            error: status
+                .probe_error
+                .clone()
+                .or_else(|| status.last_error.clone())
+                .unwrap_or_else(|| format!("请确认 {} 已可用，然后重试", channel_type)),
+        };
+    }
+
+    if channel_requires_running_status(channel_type) && status.running != Some(true) {
+        return ChannelStatusCheck::NotReady {
+            status_message: "未运行".to_string(),
+            error: status
+                .last_error
+                .clone()
+                .or_else(|| status.probe_error.clone())
+                .unwrap_or_else(|| {
+                    format!("请确认 {} Gateway 已启动并保持在线，然后重试", channel_type)
+                }),
+        };
+    }
+
+    if channel_requires_connected_status(channel_type) && status.connected != Some(true) {
+        return ChannelStatusCheck::NotReady {
+            status_message: if status.running == Some(true) {
+                "已启动但未连接".to_string()
+            } else {
+                "未连接".to_string()
+            },
+            error: status
+                .last_error
+                .clone()
+                .or_else(|| status.probe_error.clone())
+                .unwrap_or_else(|| format!("请确认 {} 已连接成功，然后重试", channel_type)),
+        };
+    }
+
+    let status_message = if status.linked == Some(true) {
+        "已链接".to_string()
+    } else if status.connected == Some(true) {
+        "已连接".to_string()
+    } else if status.running == Some(true) {
+        "运行中".to_string()
+    } else if status.probe_ok == Some(true) {
+        "探测正常".to_string()
+    } else {
+        "已配置".to_string()
+    };
+
+    ChannelStatusCheck::Ready { status_message }
+}
+
 /// 从文本输出解析渠道状态
 /// 格式: "- Telegram default: enabled, configured, mode:polling, token:config"
 #[cfg(target_os = "windows")]
@@ -324,9 +516,13 @@ fn sh_single_quote(value: &str) -> String {
 #[cfg(not(target_os = "windows"))]
 fn build_unix_openclaw_launcher(app: &tauri::AppHandle) -> Result<(String, String), String> {
     let mut path_parts: Vec<String> = Vec::new();
-    let mut extra_env: Vec<(String, String)> = shell::load_openclaw_env_vars().into_iter().collect();
+    let mut extra_env: Vec<(String, String)> =
+        shell::load_openclaw_env_vars().into_iter().collect();
 
-    extra_env.push(("OPENCLAW_GATEWAY_TOKEN".to_string(), shell::session_gateway_token().to_string()));
+    extra_env.push((
+        "OPENCLAW_GATEWAY_TOKEN".to_string(),
+        shell::session_gateway_token().to_string(),
+    ));
     extra_env.push(("OPENCLAW_DESKTOP".to_string(), "1".to_string()));
     extra_env.push(("OPENCLAW_NO_RESPAWN".to_string(), "1".to_string()));
     let gm = app.state::<crate::gateway::GatewayManager>();
@@ -382,7 +578,6 @@ fn build_unix_openclaw_launcher(app: &tauri::AppHandle) -> Result<(String, Strin
     Ok((env_lines, launcher))
 }
 
-
 #[cfg(target_os = "windows")]
 fn build_windows_whatsapp_login_script(app: &tauri::AppHandle) -> Result<String, String> {
     let mut extended_path = shell::get_extended_path();
@@ -393,8 +588,12 @@ fn build_windows_whatsapp_login_script(app: &tauri::AppHandle) -> Result<String,
         }
     }
 
-    let mut extra_env: Vec<(String, String)> = shell::load_openclaw_env_vars().into_iter().collect();
-    extra_env.push(("OPENCLAW_GATEWAY_TOKEN".to_string(), shell::session_gateway_token().to_string()));
+    let mut extra_env: Vec<(String, String)> =
+        shell::load_openclaw_env_vars().into_iter().collect();
+    extra_env.push((
+        "OPENCLAW_GATEWAY_TOKEN".to_string(),
+        shell::session_gateway_token().to_string(),
+    ));
     extra_env.push(("OPENCLAW_DESKTOP".to_string(), "1".to_string()));
     extra_env.push(("OPENCLAW_NO_RESPAWN".to_string(), "1".to_string()));
     let gm = app.state::<crate::gateway::GatewayManager>();
@@ -498,7 +697,6 @@ Write-Host ''
 Read-Host 'Press Enter to close'
 "#,
         env_lines, launcher
-
     ))
 }
 
@@ -507,11 +705,16 @@ Read-Host 'Press Enter to close'
 pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, String> {
     info!("[渠道测试] 测试渠道: {}", channel_type);
     let channel_lower = channel_type.to_lowercase();
-    
+
     // 使用 openclaw channels status --json 检查渠道状态
     info!("[渠道测试] 步骤1: 检查渠道状态...");
-    let status_result = shell::run_openclaw(&["channels", "status", "--json"]);
-    
+    let status_args = if channel_requires_probe_status(&channel_type) {
+        vec!["channels", "status", "--json", "--probe"]
+    } else {
+        vec!["channels", "status", "--json"]
+    };
+    let status_result = shell::run_openclaw(&status_args);
+
     let mut channel_ok = false;
     let mut status_message = String::new();
     let mut debug_info = String::new();
@@ -524,13 +727,16 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
             let mut json_parsed = false;
             if let Some(json_str) = extract_json_from_output(&clean_output) {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                    if let Some(channels) = json.get("channels").and_then(|c| c.as_object()) {
-                        if let Some(ch) = channels.get(&channel_lower) {
-                            json_parsed = true;
-                            let configured = ch.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
-                            let linked = ch.get("linked").and_then(|v| v.as_bool()).unwrap_or(false);
-                            
-                            if !configured {
+                    if let Some(parsed_status) = parse_channel_status(&json, &channel_type) {
+                        json_parsed = true;
+                        match evaluate_channel_status(&channel_type, &parsed_status) {
+                            ChannelStatusCheck::Ready {
+                                status_message: parsed_message,
+                            } => {
+                                channel_ok = true;
+                                status_message = parsed_message;
+                            }
+                            ChannelStatusCheck::NotConfigured => {
                                 info!("[渠道测试] {} 未配置", channel_type);
                                 return Ok(ChannelTestResult {
                                     success: false,
@@ -539,35 +745,23 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                                     error: Some(format!("请先在消息渠道设置中配置 {} 的凭据并保存，然后重启 Gateway", channel_type)),
                                 });
                             }
-                            
-                            channel_ok = if channel_requires_linked_status(&channel_type) {
-                                configured && linked
-                            } else {
-                                configured
-                            };
-                            status_message = if linked {
-                                "已链接".to_string()
-                            } else if channel_requires_linked_status(&channel_type) {
-                                "等待扫码登录".to_string()
-                            } else {
-                                "已配置".to_string()
-                            };
-                            
-                            // 渠道已配置但需要链接状态（如 WhatsApp 需要扫码）
-                            if !channel_ok && channel_requires_linked_status(&channel_type) {
-                                info!("[渠道测试] {} 已配置但未链接", channel_type);
+                            ChannelStatusCheck::NotReady {
+                                status_message: parsed_message,
+                                error,
+                            } => {
+                                info!("[渠道测试] {} 状态未就绪: {}", channel_type, parsed_message);
                                 return Ok(ChannelTestResult {
                                     success: false,
                                     channel: channel_type.clone(),
-                                    message: format!("{} {}", channel_type, status_message),
-                                    error: Some(format!("请先扫码登录 {}，然后重试", channel_type)),
+                                    message: format!("{} {}", channel_type, parsed_message),
+                                    error: Some(error),
                                 });
                             }
                         }
                     }
                 }
             }
-            
+
             if !channel_ok && !json_parsed {
                 debug_info = format!("无法解析 {} 的状态", channel_type);
                 info!("[渠道测试] {}", debug_info);
@@ -578,7 +772,7 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
             info!("[渠道测试] {}", debug_info);
         }
     }
-    
+
     // 如果渠道状态不 OK，直接返回失败
     if !channel_ok {
         info!("[渠道测试] {} 状态检查失败，不发送测试消息", channel_type);
@@ -594,12 +788,15 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
             error: Some(error_msg),
         });
     }
-    
+
     info!("[渠道测试] {} 状态正常 ({})", channel_type, status_message);
-    
-    // 对于 WhatsApp 和 iMessage，只返回状态检查结果，不发送测试消息
+
+    // 对于不支持发送测试消息的渠道，只返回状态检查结果
     if !channel_needs_send_test(&channel_type) {
-        info!("[渠道测试] {} 不需要发送测试消息（状态检查即可）", channel_type);
+        info!(
+            "[渠道测试] {} 不需要发送测试消息（状态检查即可）",
+            channel_type
+        );
         return Ok(ChannelTestResult {
             success: true,
             channel: channel_type.clone(),
@@ -607,49 +804,72 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
             error: None,
         });
     }
-    
+
     // 尝试发送测试消息
     info!("[渠道测试] 步骤2: 获取测试目标...");
     let test_target = get_channel_test_target(&channel_type);
-    
+
     if let Some(target) = test_target {
         info!("[渠道测试] 步骤3: 发送测试消息到 {}...", target);
         let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
         let message = format!("🤖 OpenClaw 测试消息\n\n✅ 连接成功！\n⏰ {}", timestamp);
-        
+
         // 使用 openclaw message send 发送测试消息
-        info!("[渠道测试] 执行: openclaw message send --channel {} --target {} ...", channel_lower, target);
+        info!(
+            "[渠道测试] 执行: openclaw message send --channel {} --target {} ...",
+            channel_lower, target
+        );
         let send_result = shell::run_openclaw(&[
-            "message", "send",
-            "--channel", &channel_lower,
-            "--target", &target,
-            "--message", &message,
-            "--json"
+            "message",
+            "send",
+            "--channel",
+            &channel_lower,
+            "--target",
+            &target,
+            "--message",
+            &message,
+            "--json",
         ]);
-        
+
         match send_result {
             Ok(output) => {
                 info!("[渠道测试] 发送命令输出长度: {}", output.len());
-                
+
                 // 检查发送是否成功
                 let send_ok = if let Some(json_str) = extract_json_from_output(&output) {
                     info!("[渠道测试] 提取到 JSON: {}", json_str);
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&json_str) {
                         // 检查各种成功标志
                         let has_ok = json.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
-                        let has_success = json.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+                        let has_success = json
+                            .get("success")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
                         let has_message_id = json.get("messageId").is_some();
-                        let has_payload_ok = json.get("payload").and_then(|p| p.get("ok")).and_then(|v| v.as_bool()).unwrap_or(false);
-                        let has_payload_message_id = json.get("payload").and_then(|p| p.get("messageId")).is_some();
-                        let has_payload_result_message_id = json.get("payload")
+                        let has_payload_ok = json
+                            .get("payload")
+                            .and_then(|p| p.get("ok"))
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let has_payload_message_id = json
+                            .get("payload")
+                            .and_then(|p| p.get("messageId"))
+                            .is_some();
+                        let has_payload_result_message_id = json
+                            .get("payload")
                             .and_then(|p| p.get("result"))
                             .and_then(|r| r.get("messageId"))
                             .is_some();
-                        
+
                         info!("[渠道测试] 判断条件: ok={}, success={}, messageId={}, payload.ok={}, payload.messageId={}, payload.result.messageId={}",
                             has_ok, has_success, has_message_id, has_payload_ok, has_payload_message_id, has_payload_result_message_id);
-                        
-                        has_ok || has_success || has_message_id || has_payload_ok || has_payload_message_id || has_payload_result_message_id
+
+                        has_ok
+                            || has_success
+                            || has_message_id
+                            || has_payload_ok
+                            || has_payload_message_id
+                            || has_payload_result_message_id
                     } else {
                         info!("[渠道测试] JSON 解析失败");
                         false
@@ -657,9 +877,10 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
                 } else {
                     info!("[渠道测试] 未提取到 JSON，检查关键词");
                     // 如果没有 JSON，检查是否有错误关键词
-                    !output.to_lowercase().contains("error") && !output.to_lowercase().contains("failed")
+                    !output.to_lowercase().contains("error")
+                        && !output.to_lowercase().contains("failed")
                 };
-                
+
                 if send_ok {
                     info!("[渠道测试] ✓ {} 测试消息发送成功", channel_type);
                     Ok(ChannelTestResult {
@@ -697,8 +918,11 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
             "feishu" => "请配置 OPENCLAW_FEISHU_TESTCHATID",
             _ => "请配置测试目标",
         };
-        
-        info!("[渠道测试] {} 未配置测试目标，跳过发送消息 ({})", channel_type, hint);
+
+        info!(
+            "[渠道测试] {} 未配置测试目标，跳过发送消息 ({})",
+            channel_type, hint
+        );
         Ok(ChannelTestResult {
             success: true,
             channel: channel_type.clone(),
@@ -708,7 +932,6 @@ pub async fn test_channel(channel_type: String) -> Result<ChannelTestResult, Str
     }
 }
 
-
 /// 获取系统信息
 #[command]
 pub async fn get_system_info() -> Result<SystemInfo, String> {
@@ -716,7 +939,7 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
     let os = platform::get_os();
     let arch = platform::get_arch();
     info!("[系统信息] OS: {}, Arch: {}", os, arch);
-    
+
     // 获取 OS 版本
     let os_version = if platform::is_macos() {
         shell::run_command_output("sw_vers", &["-productVersion"])
@@ -727,7 +950,7 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
     } else {
         "unknown".to_string()
     };
-    
+
     let has_bundle = shell::get_bundle_entry().is_some() && shell::get_node_path().is_some();
     let has_global = shell::get_openclaw_path().is_some();
     let openclaw_installed = has_bundle || has_global;
@@ -736,10 +959,10 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
     } else {
         None
     };
-    
-    let node_version = shell::get_node_path()
-        .and_then(|p| shell::run_command_output(&p, &["--version"]).ok());
-    
+
+    let node_version =
+        shell::get_node_path().and_then(|p| shell::run_command_output(&p, &["--version"]).ok());
+
     Ok(SystemInfo {
         os,
         os_version,
@@ -753,15 +976,18 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 
 /// 启动渠道登录（如 WhatsApp 扫码）
 #[command]
-pub async fn start_channel_login(app: tauri::AppHandle, channel_type: String) -> Result<String, String> {
+pub async fn start_channel_login(
+    app: tauri::AppHandle,
+    channel_type: String,
+) -> Result<String, String> {
     info!("[渠道登录] 开始渠道登录流程: {}", channel_type);
-    
+
     match channel_type.as_str() {
         "whatsapp" => {
             info!("[渠道登录] WhatsApp 登录流程...");
             info!("[渠道登录] 启用 whatsapp 插件...");
             let _ = shell::run_openclaw(&["plugins", "enable", "whatsapp"]);
-            
+
             #[cfg(target_os = "macos")]
             {
                 let env_path = platform::get_env_file_path();
@@ -846,22 +1072,22 @@ read -p "按回车键关闭此窗口..."
                     env_lines,
                     launcher
                 );
-                
+
                 let script_path = "/tmp/openclaw_whatsapp_login.command";
                 std::fs::write(script_path, script_content)
                     .map_err(|e| format!("创建脚本失败: {}", e))?;
-                
+
                 std::process::Command::new("chmod")
                     .args(["+x", script_path])
                     .output()
                     .map_err(|e| format!("设置权限失败: {}", e))?;
-                
+
                 std::process::Command::new("open")
                     .arg(script_path)
                     .spawn()
                     .map_err(|e| format!("启动终端失败: {}", e))?;
             }
-            
+
             #[cfg(target_os = "linux")]
             {
                 let env_path = platform::get_env_file_path();
@@ -884,35 +1110,38 @@ read -p "按回车键关闭..."
                     env_lines,
                     launcher
                 );
-                
+
                 let script_path = "/tmp/openclaw_whatsapp_login.sh";
                 std::fs::write(script_path, &script_content)
                     .map_err(|e| format!("创建脚本失败: {}", e))?;
-                
+
                 std::process::Command::new("chmod")
                     .args(["+x", script_path])
                     .output()
                     .map_err(|e| format!("设置权限失败: {}", e))?;
-                
+
                 let terminals = ["gnome-terminal", "xfce4-terminal", "konsole", "xterm"];
                 let mut launched = false;
-                
+
                 for term in terminals {
                     let result = std::process::Command::new(term)
                         .args(["--", script_path])
                         .spawn();
-                    
+
                     if result.is_ok() {
                         launched = true;
                         break;
                     }
                 }
-                
+
                 if !launched {
-                    return Err("无法启动终端，请手动运行: openclaw channels login --channel whatsapp".to_string());
+                    return Err(
+                        "无法启动终端，请手动运行: openclaw channels login --channel whatsapp"
+                            .to_string(),
+                    );
                 }
             }
-            
+
             #[cfg(target_os = "windows")]
             {
                 let script_path = std::env::temp_dir().join("openclaw-whatsapp-login.ps1");
@@ -942,26 +1171,206 @@ read -p "按回车键关闭..."
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::{channel_requires_linked_status, parse_channel_status_text};
-
-    #[test]
-    fn parse_channel_status_text_marks_whatsapp_as_link_pending() {
-        let parsed = parse_channel_status_text(
-            "- WhatsApp default: enabled, configured, mode:web",
-            "whatsapp",
-        )
-        .expect("should parse whatsapp status line");
-        assert!(parsed.0);
-        assert!(parsed.1);
-        assert!(!parsed.2);
-    }
+    use super::{
+        channel_needs_send_test, channel_requires_connected_status, channel_requires_linked_status,
+        channel_requires_probe_status, channel_requires_running_status, evaluate_channel_status,
+        parse_channel_status, ChannelStatusCheck,
+    };
+    use serde_json::json;
 
     #[test]
     fn only_whatsapp_requires_linked_status() {
         assert!(channel_requires_linked_status("whatsapp"));
         assert!(!channel_requires_linked_status("telegram"));
+    }
+
+    #[test]
+    fn only_direct_send_channels_require_test_targets() {
+        assert!(channel_needs_send_test("telegram"));
+        assert!(channel_needs_send_test("discord"));
+        assert!(channel_needs_send_test("slack"));
+        assert!(channel_needs_send_test("feishu"));
+        assert!(!channel_needs_send_test("whatsapp"));
+        assert!(!channel_needs_send_test("imessage"));
+        assert!(!channel_needs_send_test("wecom"));
+        assert!(!channel_needs_send_test("dingtalk"));
+        assert!(!channel_needs_send_test("qqbot"));
+    }
+
+    #[test]
+    fn only_imessage_requires_status_probe() {
+        assert!(channel_requires_probe_status("imessage"));
+        assert!(!channel_requires_probe_status("whatsapp"));
+        assert!(!channel_requires_probe_status("dingtalk"));
+    }
+
+    #[test]
+    fn runtime_required_channels_are_limited_to_dingtalk_and_qqbot() {
+        assert!(channel_requires_running_status("dingtalk"));
+        assert!(channel_requires_running_status("qqbot"));
+        assert!(channel_requires_connected_status("qqbot"));
+        assert!(!channel_requires_running_status("wecom"));
+        assert!(!channel_requires_connected_status("dingtalk"));
+    }
+
+    #[test]
+    fn parse_channel_status_prefers_default_account_snapshot() {
+        let payload = json!({
+            "channels": {
+                "qqbot": {
+                    "configured": true
+                }
+            },
+            "channelDefaultAccountId": {
+                "qqbot": "work"
+            },
+            "channelAccounts": {
+                "qqbot": [
+                    {
+                        "accountId": "default",
+                        "configured": true,
+                        "running": false,
+                        "connected": false
+                    },
+                    {
+                        "accountId": "work",
+                        "configured": true,
+                        "running": true,
+                        "connected": true
+                    }
+                ]
+            }
+        });
+
+        let parsed = parse_channel_status(&payload, "qqbot").expect("qqbot status");
+        assert_eq!(parsed.running, Some(true));
+        assert_eq!(parsed.connected, Some(true));
+    }
+
+    #[test]
+    fn whatsapp_requires_linked_session() {
+        let payload = json!({
+            "channels": {
+                "whatsapp": {
+                    "configured": true,
+                    "linked": false
+                }
+            }
+        });
+
+        let parsed = parse_channel_status(&payload, "whatsapp").expect("whatsapp status");
+        assert_eq!(
+            evaluate_channel_status("whatsapp", &parsed),
+            ChannelStatusCheck::NotReady {
+                status_message: "等待扫码登录".to_string(),
+                error: "请先扫码登录 whatsapp，然后重试".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn imessage_requires_probe_success() {
+        let payload = json!({
+            "channels": {
+                "imessage": {
+                    "configured": true,
+                    "probe": {
+                        "ok": false,
+                        "error": "imsg not found"
+                    }
+                }
+            }
+        });
+
+        let parsed = parse_channel_status(&payload, "imessage").expect("imessage status");
+        assert_eq!(
+            evaluate_channel_status("imessage", &parsed),
+            ChannelStatusCheck::NotReady {
+                status_message: "探测失败".to_string(),
+                error: "imsg not found".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn dingtalk_requires_running_gateway_state() {
+        let payload = json!({
+            "channels": {
+                "dingtalk": {
+                    "configured": true
+                }
+            },
+            "channelAccounts": {
+                "dingtalk": [
+                    {
+                        "accountId": "default",
+                        "configured": true,
+                        "running": false,
+                        "lastError": "Connection failed"
+                    }
+                ]
+            }
+        });
+
+        let parsed = parse_channel_status(&payload, "dingtalk").expect("dingtalk status");
+        assert_eq!(
+            evaluate_channel_status("dingtalk", &parsed),
+            ChannelStatusCheck::NotReady {
+                status_message: "未运行".to_string(),
+                error: "Connection failed".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn qqbot_requires_connected_runtime_state() {
+        let payload = json!({
+            "channels": {
+                "qqbot": {
+                    "configured": true
+                }
+            },
+            "channelAccounts": {
+                "qqbot": [
+                    {
+                        "accountId": "default",
+                        "configured": true,
+                        "running": true,
+                        "connected": false,
+                        "lastError": "Gateway disconnected"
+                    }
+                ]
+            }
+        });
+
+        let parsed = parse_channel_status(&payload, "qqbot").expect("qqbot status");
+        assert_eq!(
+            evaluate_channel_status("qqbot", &parsed),
+            ChannelStatusCheck::NotReady {
+                status_message: "已启动但未连接".to_string(),
+                error: "Gateway disconnected".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn wecom_can_still_pass_with_configuration_only() {
+        let payload = json!({
+            "channels": {
+                "wecom": {
+                    "configured": true
+                }
+            }
+        });
+
+        let parsed = parse_channel_status(&payload, "wecom").expect("wecom status");
+        assert_eq!(
+            evaluate_channel_status("wecom", &parsed),
+            ChannelStatusCheck::Ready {
+                status_message: "已配置".to_string(),
+            }
+        );
     }
 }

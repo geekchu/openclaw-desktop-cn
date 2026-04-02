@@ -4,19 +4,36 @@ import SwiftUI
 struct ConfigSettings: View {
     private let isPreview = ProcessInfo.processInfo.isPreview
     private let isNixMode = ProcessInfo.processInfo.isNixMode
+    private let fixedSectionKey: String?
+    private let headerTitleOverride: String?
+    private let headerDescriptionOverride: String?
     @Bindable var store: ChannelsStore
     @State private var hasLoaded = false
     @State private var activeSectionKey: String?
     @State private var activeSubsection: SubsectionSelection?
 
-    init(store: ChannelsStore = .shared) {
+    init(
+        store: ChannelsStore = .shared,
+        fixedSectionKey: String? = nil,
+        headerTitle: String? = nil,
+        headerDescription: String? = nil)
+    {
         self.store = store
+        self.fixedSectionKey = fixedSectionKey
+        self.headerTitleOverride = headerTitle
+        self.headerDescriptionOverride = headerDescription
     }
 
     var body: some View {
-        HStack(spacing: 16) {
-            self.sidebar
-            self.detail
+        Group {
+            if self.showsSidebar {
+                HStack(spacing: 16) {
+                    self.sidebar
+                    self.detail
+                }
+            } else {
+                self.detail
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {
@@ -64,11 +81,35 @@ extension ConfigSettings {
 
     private var sections: [ConfigSection] {
         guard let schema = self.store.configSchema else { return [] }
-        return self.resolveSections(schema)
+        let allSections = self.resolveSections(schema)
+        guard let fixedSectionKey else { return allSections }
+        return allSections.filter { $0.key == fixedSectionKey }
     }
 
     private var activeSection: ConfigSection? {
         self.sections.first { $0.key == self.activeSectionKey }
+    }
+
+    private var showsSidebar: Bool {
+        self.fixedSectionKey == nil
+    }
+
+    private var pageTitle: String {
+        self.headerTitleOverride
+            ?? (self.fixedSectionKey != nil ? (self.activeSection?.label ?? "Config") : "Config")
+    }
+
+    private var pageDescription: String {
+        if self.isNixMode {
+            return "This tab is read-only in Nix mode. Edit config via Nix and rebuild."
+        }
+        if let headerDescriptionOverride {
+            return headerDescriptionOverride
+        }
+        if self.fixedSectionKey != nil, let help = self.activeSection?.help, !help.isEmpty {
+            return help
+        }
+        return "Edit ~/.openclaw/openclaw.json using the schema-driven form."
     }
 
     private var sidebar: some View {
@@ -109,7 +150,9 @@ extension ConfigSettings {
     private var emptyDetail: some View {
         VStack(alignment: .leading, spacing: 8) {
             self.header
-            Text("Select a config section to view settings.")
+            Text(self.fixedSectionKey == nil
+                ? "Select a config section to view settings."
+                : "This settings section is unavailable in the current config schema.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -127,7 +170,10 @@ extension ConfigSettings {
                         .foregroundStyle(.secondary)
                 }
                 self.actionRow
-                self.sectionHeader(section)
+                if self.showsSidebar {
+                    self.sectionHeader(section)
+                }
+                self.subsectionNav(section)
                 self.sectionForm(section)
                 if self.store.configDirty, !self.isNixMode {
                     Text("Unsaved changes")
@@ -145,11 +191,9 @@ extension ConfigSettings {
 
     @ViewBuilder
     private var header: some View {
-        Text("Config")
+        Text(self.pageTitle)
             .font(.title3.weight(.semibold))
-        Text(self.isNixMode
-            ? "This tab is read-only in Nix mode. Edit config via Nix and rebuild."
-            : "Edit ~/.openclaw/openclaw.json using the schema-driven form.")
+        Text(self.pageDescription)
             .font(.callout)
             .foregroundStyle(.secondary)
     }
@@ -179,6 +223,39 @@ extension ConfigSettings {
             .disabled(self.isNixMode || self.store.isSavingConfig || !self.store.configDirty)
         }
         .buttonStyle(.bordered)
+    }
+
+    @ViewBuilder
+    private func subsectionNav(_ section: ConfigSection) -> some View {
+        let subsections = self.resolveSubsections(for: section)
+        if !subsections.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    self.subsectionChip(title: "All", selection: .all)
+                    ForEach(subsections) { sub in
+                        self.subsectionChip(title: sub.label, selection: .key(sub.key))
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private func subsectionChip(title: String, selection: SubsectionSelection) -> some View {
+        let isSelected = self.activeSubsection == selection
+        return Button {
+            self.activeSubsection = selection
+        } label: {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
+                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func sidebarSection(_ section: ConfigSection) -> some View {
@@ -269,11 +346,16 @@ extension ConfigSettings {
     }
 
     private func ensureSelection() {
-        guard let schema = self.store.configSchema else { return }
-        let sections = self.resolveSections(schema)
+        guard self.store.configSchema != nil else { return }
+        let sections = self.sections
         guard !sections.isEmpty else { return }
 
-        let active = sections.first { $0.key == self.activeSectionKey } ?? sections[0]
+        let active: ConfigSection
+        if let fixedSectionKey, let fixed = sections.first(where: { $0.key == fixedSectionKey }) {
+            active = fixed
+        } else {
+            active = sections.first { $0.key == self.activeSectionKey } ?? sections[0]
+        }
         if self.activeSectionKey != active.key {
             self.activeSectionKey = active.key
         }

@@ -1,9 +1,9 @@
+use crate::gateway::GatewayManager;
 use crate::models::ServiceStatus;
 use crate::utils::shell;
-use crate::gateway::GatewayManager;
-use tauri::{command, AppHandle, Manager};
-use std::process::Command;
 use log::{info, warn};
+use std::process::Command;
+use tauri::{command, AppHandle, Manager};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -21,7 +21,7 @@ fn check_port_listening(port: u16) -> Option<u32> {
             .args(["-ti", &format!(":{}", port)])
             .output()
             .ok()?;
-        
+
         if output.status.success() {
             String::from_utf8_lossy(&output.stdout)
                 .lines()
@@ -31,15 +31,15 @@ fn check_port_listening(port: u16) -> Option<u32> {
             None
         }
     }
-    
+
     #[cfg(windows)]
     {
         let mut cmd = Command::new("netstat");
         cmd.args(["-ano"]);
         cmd.creation_flags(CREATE_NO_WINDOW);
-        
+
         let output = cmd.output().ok()?;
-        
+
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines() {
@@ -72,7 +72,12 @@ fn get_process_memory_mb(pid: u32) -> Option<f64> {
                 let parts: Vec<&str> = line.split('"').collect();
                 // parts[9] 通常是内存值（第5个引号对的内容）
                 if parts.len() >= 10 {
-                    let mem_str = parts[9].replace(',', "").replace(" K", "").replace(" k", "").trim().to_string();
+                    let mem_str = parts[9]
+                        .replace(',', "")
+                        .replace(" K", "")
+                        .replace(" k", "")
+                        .trim()
+                        .to_string();
                     if let Ok(kb) = mem_str.parse::<f64>() {
                         return Some(kb / 1024.0);
                     }
@@ -91,7 +96,10 @@ fn get_process_memory_mb(pid: u32) -> Option<f64> {
         .output()
         .ok()?;
     if output.status.success() {
-        let kb: f64 = String::from_utf8_lossy(&output.stdout).trim().parse().ok()?;
+        let kb: f64 = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse()
+            .ok()?;
         Some(kb / 1024.0)
     } else {
         None
@@ -165,7 +173,7 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
         info!("[服务] 服务已在运行中");
         return Err("服务已在运行中".to_string());
     }
-    
+
     // 检查 openclaw 是否可用（bundle 模式或全局命令）
     let bundle_ok = shell::get_bundle_entry().is_some() && shell::get_node_path().is_some();
     if !bundle_ok {
@@ -173,7 +181,10 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
             // 开发模式：回退检查全局 openclaw
             if shell::get_openclaw_path().is_none() {
                 info!("[服务] [开发模式] 找不到 openclaw 命令");
-                return Err("找不到 openclaw 命令，请确保项目已构建（pnpm build）且 Node.js 已安装".to_string());
+                return Err(
+                    "找不到 openclaw 命令，请确保项目已构建（pnpm build）且 Node.js 已安装"
+                        .to_string(),
+                );
             }
         } else {
             // 生产模式：不回退，提示重新安装
@@ -181,18 +192,21 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
             return Err("内置 openclaw 不可用，请重新安装应用".to_string());
         }
     }
-    
+
     // 直接后台启动 gateway，通过 GatewayManager 绝对控股 PID
     info!("[服务] 后台集权管理启动 gateway...");
     let gm = app.state::<GatewayManager>();
     let port = gm.start().map_err(|e| format!("启动服务失败: {}", e))?;
 
     // 轮询等待端口开始监听及 HTTP 就绪（最多 60 秒）
-    info!("[服务] 等待 Gateway HTTP 存活探活 (60秒), 端口: {}...", port);
+    info!(
+        "[服务] 等待 Gateway HTTP 存活探活 (60秒), 端口: {}...",
+        port
+    );
     if gm.wait_for_ready(60) {
         // 启动成功，通知前端重新导航
         crate::gateway::navigate_webview_to_gateway(&app, port);
-        
+
         if let Some(pid) = check_port_listening(port) {
             info!("[服务] ✓ 启动成功, PID: {}, 端口: {}", pid, port);
             return Ok(format!("服务已启动，PID: {}, 端口: {}", pid, port));
@@ -200,7 +214,7 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
         info!("[服务] ✓ HTTP已就绪，但端口识别延迟");
         return Ok(format!("服务已启动，端口: {}", port));
     }
-    
+
     info!("[服务] 等待超时，HTTP 或端口仍未就绪");
     Err("服务启动超时（60秒），请检查 openclaw 日志".to_string())
 }
@@ -274,7 +288,9 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
     gm.stop();
     std::thread::sleep(std::time::Duration::from_secs(1));
 
-    let port = gm.start().map_err(|e| format!("重启 Gateway 失败: {}", e))?;
+    let port = gm
+        .start()
+        .map_err(|e| format!("重启 Gateway 失败: {}", e))?;
 
     if gm.wait_for_ready(60) {
         // 重启成功，通知前端重新导航
@@ -311,14 +327,14 @@ pub async fn get_logs(lines: Option<u32>) -> Result<Vec<String>, String> {
                 .filter_map(|line| {
                     // 日志是 JSON 格式，提取可读信息
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
-                        let time = v.get("time")
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
-                        let level = v.get("_meta")
+                        let time = v.get("time").and_then(|t| t.as_str()).unwrap_or("");
+                        let level = v
+                            .get("_meta")
                             .and_then(|m| m.get("logLevelName"))
                             .and_then(|l| l.as_str())
                             .unwrap_or("INFO");
-                        let msg = v.get("1")
+                        let msg = v
+                            .get("1")
                             .and_then(|m| m.as_str())
                             .or_else(|| v.get("0").and_then(|m| m.as_str()))
                             .unwrap_or("");
@@ -339,11 +355,13 @@ pub async fn get_logs(lines: Option<u32>) -> Result<Vec<String>, String> {
                 })
                 .collect();
             // 取最后 n 行
-            let start = if all_lines.len() > n { all_lines.len() - n } else { 0 };
+            let start = if all_lines.len() > n {
+                all_lines.len() - n
+            } else {
+                0
+            };
             Ok(all_lines[start..].to_vec())
         }
-        Err(_) => {
-            Ok(vec!["暂无日志文件".to_string()])
-        }
+        Err(_) => Ok(vec!["暂无日志文件".to_string()]),
     }
 }

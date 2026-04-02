@@ -108,7 +108,6 @@ export type AppViewState = {
   configIssues: unknown[];
   configSaving: boolean;
   configApplying: boolean;
-  updateRunning: boolean;
   applySessionKey: string;
   configSnapshot: ConfigSnapshot | null;
   configSchema: unknown;
@@ -118,6 +117,10 @@ export type AppViewState = {
   configForm: Record<string, unknown> | null;
   configFormOriginal: Record<string, unknown> | null;
   configFormMode: "form" | "raw";
+  onestopApiKey?: string;
+  onestopShowApiKey?: boolean;
+  onestopActiveCategory?: string;
+  onestopSaving?: boolean;
   configSearchQuery: string;
   configActiveSection: string | null;
   configActiveSubsection: string | null;
@@ -152,6 +155,7 @@ export type AppViewState = {
   nostrProfileFormState: NostrProfileFormState | null;
   nostrProfileAccountId: string | null;
   configFormDirty: boolean;
+  onestopSelectedModel: string;
   presenceLoading: boolean;
   presenceEntries: PresenceEntry[];
   presenceError: string | null;

@@ -9,11 +9,11 @@ extension ChannelsSettings {
         self.store.snapshot?.decodeChannel(id, as: type)
     }
 
-    private func configuredChannelTint(configured: Bool, running: Bool, hasError: Bool, probeOk: Bool?) -> Color {
+    private func configuredChannelTint(configured: Bool, ready: Bool, hasError: Bool, probeOk: Bool?) -> Color {
         if !configured { return .secondary }
         if hasError { return .orange }
         if probeOk == false { return .orange }
-        if running { return .green }
+        if ready { return .green }
         return .orange
     }
 
@@ -21,6 +21,33 @@ extension ChannelsSettings {
         if !configured { return "Not configured" }
         if running { return "Running" }
         return "Configured"
+    }
+
+    private func genericChannelSnapshot(_ id: String) -> (
+        configured: Bool,
+        linked: Bool,
+        running: Bool,
+        connected: Bool,
+        probeOk: Bool?,
+        probeStatus: Int?,
+        probeElapsedMs: Double?,
+        probeError: String?,
+        lastProbeAtMs: Double?,
+        lastError: String?
+    )? {
+        guard let status = self.channelStatusDictionary(id) else { return nil }
+        let probe = status["probe"]?.dictionaryValue
+        return (
+            configured: status["configured"]?.boolValue ?? false,
+            linked: status["linked"]?.boolValue ?? false,
+            running: status["running"]?.boolValue ?? false,
+            connected: status["connected"]?.boolValue ?? false,
+            probeOk: probe?["ok"]?.boolValue,
+            probeStatus: probe?["status"]?.intValue,
+            probeElapsedMs: probe?["elapsedMs"]?.doubleValue,
+            probeError: probe?["error"]?.stringValue,
+            lastProbeAtMs: status["lastProbeAt"]?.doubleValue,
+            lastError: status["lastError"]?.stringValue)
     }
 
     private func appendProbeDetails(
@@ -99,9 +126,7 @@ extension ChannelsSettings {
         if !status.configured { return .secondary }
         if !status.linked { return .red }
         if status.lastError != nil { return .orange }
-        if status.connected { return .green }
-        if status.running { return .orange }
-        return .orange
+        return .green
     }
 
     var telegramTint: Color {
@@ -109,7 +134,7 @@ extension ChannelsSettings {
         else { return .secondary }
         return self.configuredChannelTint(
             configured: status.configured,
-            running: status.running,
+            ready: status.configured,
             hasError: status.lastError != nil,
             probeOk: status.probe?.ok)
     }
@@ -119,7 +144,7 @@ extension ChannelsSettings {
         else { return .secondary }
         return self.configuredChannelTint(
             configured: status.configured,
-            running: status.running,
+            ready: status.configured,
             hasError: status.lastError != nil,
             probeOk: status.probe?.ok)
     }
@@ -129,7 +154,7 @@ extension ChannelsSettings {
         else { return .secondary }
         return self.configuredChannelTint(
             configured: status.configured,
-            running: status.running,
+            ready: status.configured,
             hasError: status.lastError != nil,
             probeOk: status.probe?.ok)
     }
@@ -139,7 +164,7 @@ extension ChannelsSettings {
         else { return .secondary }
         return self.configuredChannelTint(
             configured: status.configured,
-            running: status.running,
+            ready: status.configured,
             hasError: status.lastError != nil,
             probeOk: status.probe?.ok)
     }
@@ -149,9 +174,38 @@ extension ChannelsSettings {
         else { return .secondary }
         return self.configuredChannelTint(
             configured: status.configured,
-            running: status.running,
+            ready: status.probe?.ok == true,
             hasError: status.lastError != nil,
             probeOk: status.probe?.ok)
+    }
+
+    private func genericChannelReady(_ channelId: String, status: (
+        configured: Bool,
+        linked: Bool,
+        running: Bool,
+        connected: Bool,
+        probeOk: Bool?,
+        probeStatus: Int?,
+        probeElapsedMs: Double?,
+        probeError: String?,
+        lastProbeAtMs: Double?,
+        lastError: String?
+    )) -> Bool {
+        guard status.configured else { return false }
+        switch channelId {
+        case "dingtalk":
+            return status.running
+        case "qqbot":
+            return status.running && status.connected
+        case "wecom", "slack", "feishu":
+            return true
+        default:
+            if status.linked { return true }
+            if status.connected { return true }
+            if status.running { return true }
+            if status.probeOk == true { return true }
+            return status.configured
+        }
     }
 
     var whatsAppSummary: String {
@@ -331,8 +385,25 @@ extension ChannelsSettings {
     }
 
     var orderedChannels: [ChannelItem] {
-        let fallback = ["whatsapp", "telegram", "discord", "googlechat", "slack", "signal", "imessage"]
-        let order = self.store.snapshot?.channelOrder ?? fallback
+        let fallback = self.allowedChannelIds ?? [
+            "whatsapp",
+            "telegram",
+            "discord",
+            "feishu",
+            "googlechat",
+            "slack",
+            "signal",
+            "imessage",
+            "nostr",
+        ]
+        let sourceOrder = self.store.orderedChannelIds()
+        var order = self.desktopActionsEnabled ? fallback : (sourceOrder.isEmpty ? fallback : sourceOrder)
+        if let allowedChannelIds {
+            let allowed = Set(allowedChannelIds)
+            let filtered = order.filter { allowed.contains($0) }
+            let missing = allowedChannelIds.filter { !filtered.contains($0) }
+            order = filtered + missing
+        }
         let channels = order.enumerated().map { index, id in
             ChannelItem(
                 id: id,
@@ -340,6 +411,9 @@ extension ChannelsSettings {
                 detailTitle: self.resolveChannelDetailTitle(id),
                 systemImage: self.resolveChannelSystemImage(id),
                 sortOrder: index)
+        }
+        if self.desktopActionsEnabled {
+            return channels
         }
         return channels.sorted { lhs, rhs in
             let lhsEnabled = self.channelEnabled(lhs)
@@ -380,7 +454,7 @@ extension ChannelsSettings {
     @ViewBuilder
     func channelSection(_ channel: ChannelItem) -> some View {
         if channel.id == "whatsapp" {
-            self.whatsAppSection
+            self.whatsAppSection(channel)
         } else {
             self.genericChannelSection(channel)
         }
@@ -401,9 +475,16 @@ extension ChannelsSettings {
         case "imessage":
             return self.imessageTint
         default:
-            if self.channelHasError(channel) { return .orange }
-            if self.channelEnabled(channel) { return .green }
-            return .secondary
+            guard let status = self.genericChannelSnapshot(channel.id) else {
+                if self.channelHasError(channel) { return .orange }
+                if self.channelEnabled(channel) { return .green }
+                return .secondary
+            }
+            return self.configuredChannelTint(
+                configured: status.configured,
+                ready: self.genericChannelReady(channel.id, status: status),
+                hasError: self.channelHasError(channel),
+                probeOk: status.probeOk)
         }
     }
 
@@ -422,6 +503,14 @@ extension ChannelsSettings {
         case "imessage":
             return self.imessageSummary
         default:
+            if let status = self.genericChannelSnapshot(channel.id) {
+                if status.lastError?.isEmpty == false || status.probeOk == false {
+                    return "Error"
+                }
+                return self.configuredChannelSummary(
+                    configured: status.configured,
+                    running: status.running || status.connected)
+            }
             if self.channelHasError(channel) { return "Error" }
             if self.channelEnabled(channel) { return "Active" }
             return "Not configured"
@@ -443,11 +532,16 @@ extension ChannelsSettings {
         case "imessage":
             return self.imessageDetails
         default:
-            let status = self.channelStatusDictionary(channel.id)
-            if let err = status?["lastError"]?.stringValue, !err.isEmpty {
-                return "Error: \(err)"
-            }
-            return nil
+            guard let status = self.genericChannelSnapshot(channel.id) else { return nil }
+            var lines: [String] = []
+            return self.finishDetails(
+                lines: &lines,
+                probeOk: status.probeOk,
+                probeStatus: status.probeStatus,
+                probeElapsedMs: status.probeElapsedMs,
+                probeError: status.probeError,
+                lastProbeAtMs: status.lastProbeAtMs,
+                lastError: status.lastError)
         }
     }
 
@@ -521,8 +615,8 @@ extension ChannelsSettings {
             else { return false }
             return status.lastError?.isEmpty == false || status.probe?.ok == false
         default:
-            let status = self.channelStatusDictionary(channel.id)
-            return status?["lastError"]?.stringValue?.isEmpty == false
+            guard let status = self.genericChannelSnapshot(channel.id) else { return false }
+            return status.lastError?.isEmpty == false || status.probeOk == false
         }
     }
 

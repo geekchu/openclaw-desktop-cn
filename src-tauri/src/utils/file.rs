@@ -21,12 +21,11 @@ pub fn file_exists(path: &str) -> bool {
     Path::new(path).exists()
 }
 
-
 /// 从环境变量文件读取值
 /// 支持 `export KEY=VALUE` 和 `KEY=VALUE` 两种格式
 pub fn read_env_value(env_file: &str, key: &str) -> Option<String> {
     let content = read_file(env_file).ok()?;
-    
+
     for line in content.lines() {
         let line = line.trim();
         // 跳过注释和空行
@@ -37,13 +36,11 @@ pub fn read_env_value(env_file: &str, key: &str) -> Option<String> {
         let line = line.strip_prefix("export ").unwrap_or(line);
         // 匹配 KEY=VALUE
         if let Some(value_part) = line.strip_prefix(&format!("{}=", key)) {
-            let value = value_part
-                .trim_matches('"')
-                .trim_matches('\'');
+            let value = value_part.trim_matches('"').trim_matches('\'');
             return Some(value.to_string());
         }
     }
-    
+
     None
 }
 
@@ -56,28 +53,28 @@ pub fn set_env_value(env_file: &str, key: &str, value: &str) -> io::Result<()> {
     let escaped_value = value.replace('\\', "\\\\").replace('"', "\\\"");
     let new_line = format!("export {}=\"{}\"", key, escaped_value);
     let mut found = false;
-    
+
     let export_prefix = format!("export {}=", key);
     let bare_prefix = format!("{}=", key);
-    
+
     for line in &mut lines {
         let trimmed = line.trim();
         // 匹配 export KEY= 或 bare KEY= 格式
-        if trimmed.starts_with(&export_prefix) || 
-           (trimmed.starts_with(&bare_prefix) && !trimmed.starts_with("export ")) {
+        if trimmed.starts_with(&export_prefix)
+            || (trimmed.starts_with(&bare_prefix) && !trimmed.starts_with("export "))
+        {
             *line = new_line.clone();
             found = true;
             break;
         }
     }
-    
+
     if !found {
         lines.push(new_line);
     }
-    
+
     write_file(env_file, &lines.join("\n"))
 }
-
 
 /// 从环境变量文件中删除指定的值
 /// 支持删除 `export KEY=VALUE` 和 `KEY=VALUE` 两种格式
@@ -85,17 +82,17 @@ pub fn remove_env_value(env_file: &str, key: &str) -> io::Result<()> {
     let content = read_file(env_file).unwrap_or_default();
     let export_prefix = format!("export {}=", key);
     let bare_prefix = format!("{}=", key);
-    
+
     let lines: Vec<String> = content
         .lines()
         .filter(|line| {
             let trimmed = line.trim();
             // 保留不匹配的行（删除匹配 export KEY= 或 bare KEY= 的行）
-            !trimmed.starts_with(&export_prefix) && 
-            !(trimmed.starts_with(&bare_prefix) && !trimmed.starts_with("export "))
+            !trimmed.starts_with(&export_prefix)
+                && !(trimmed.starts_with(&bare_prefix) && !trimmed.starts_with("export "))
         })
         .map(|s| s.to_string())
         .collect();
-    
+
     write_file(env_file, &lines.join("\n"))
 }

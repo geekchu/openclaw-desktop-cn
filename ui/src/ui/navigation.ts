@@ -8,7 +8,7 @@ export const TAB_GROUPS = [
     tabs: ["overview", "instances", "sessions", "usage", "cron"],
   },
   { label: "agent", tabs: ["agents", "skills", "nodes"] },
-  { label: "settings", tabs: ["config", "debug", "logs"] },
+  { label: "settings", tabs: ["config", "onestop", "messages", "systemSettings", "debug", "logs"] },
   { label: "tools", tabs: ["terminal"] },
 ] as const;
 
@@ -31,7 +31,10 @@ export type Tab =
   | "aiAgents"
   | "debug"
   | "logs"
-  | "terminal";
+  | "terminal"
+  | "onestop"
+  | "messages"
+  | "systemSettings";
 
 const TAB_PATHS: Record<Tab, string> = {
   agents: "/agents",
@@ -53,6 +56,9 @@ const TAB_PATHS: Record<Tab, string> = {
   debug: "/debug",
   logs: "/logs",
   terminal: "/terminal",
+  onestop: "/onestop",
+  messages: "/messages",
+  systemSettings: "/system-settings",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -176,6 +182,12 @@ export function iconForTab(tab: Tab): IconName {
       return "scrollText";
     case "terminal":
       return "terminal";
+    case "onestop":
+      return "brain";
+    case "messages":
+      return "messageSquare";
+    case "systemSettings":
+      return "wrench";
     default:
       return "folder";
   }

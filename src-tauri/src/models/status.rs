@@ -116,4 +116,3 @@ pub struct PairingApproveResult {
     /// 消息
     pub message: String,
 }
-

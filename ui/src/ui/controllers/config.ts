@@ -224,3 +224,48 @@ export function removeConfigFormValue(state: ConfigState, path: Array<string | n
     state.configRaw = serializeConfigForm(base);
   }
 }
+
+export function findAgentConfigEntryIndex(config: unknown, agentId: string): number {
+  if (!config || typeof config !== "object") {
+    return -1;
+  }
+  const configObj = config as Record<string, unknown>;
+  const agents = configObj.agents;
+  if (!Array.isArray(agents)) {
+    return -1;
+  }
+  return agents.findIndex((agent: unknown) => {
+    if (agent && typeof agent === "object") {
+      const agentObj = agent as Record<string, unknown>;
+      return agentObj.id === agentId;
+    }
+    return false;
+  });
+}
+
+export function ensureAgentConfigEntry(state: ConfigState, agentId: string): number {
+  const config = state.configForm ?? state.configSnapshot?.config ?? {};
+  const agents = (config as Record<string, unknown>).agents;
+  if (!Array.isArray(agents)) {
+    return -1;
+  }
+  const index = findAgentConfigEntryIndex(config, agentId);
+  if (index >= 0) {
+    return index;
+  }
+  // Create new agent entry
+  agents.push({ id: agentId });
+  state.configFormDirty = true;
+  return agents.length - 1;
+}
+
+export async function openConfigFile(state: ConfigState): Promise<void> {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    await state.client.request("config.openFile", {});
+  } catch (err) {
+    state.lastError = String(err);
+  }
+}

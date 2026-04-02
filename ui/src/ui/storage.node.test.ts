@@ -224,9 +224,54 @@ describe("loadSettings default gateway URL derivation", () => {
     });
 
     expect(loadSettings()).toMatchObject({
-      gatewayUrl: gwUrl,
-      token: "gateway-a-token",
+      gatewayUrl: otherUrl,
+      token: "",
     });
+    expect(sessionStorage.getItem(`openclaw.control.token.v1:${gwUrl}`)).toBe("gateway-a-token");
+    expect(sessionStorage.getItem(`openclaw.control.token.v1:${otherUrl}`)).toBeNull();
+  });
+
+  it("restores the last selected non-default gatewayUrl from the root pointer", async () => {
+    setTestLocation({
+      protocol: "https:",
+      host: "gateway.example:8443",
+      pathname: "/",
+    });
+
+    const defaultGwUrl = expectedGatewayUrl("");
+    const otherUrl = "wss://other-gateway.example:8443/openclaw";
+    const { loadSettings, saveSettings } = await import("./storage.ts");
+
+    saveSettings({
+      gatewayUrl: otherUrl,
+      token: "other-session-token",
+      sessionKey: "ops",
+      lastActiveSessionKey: "ops",
+      theme: "claw",
+      themeMode: "dark",
+      chatFocusMode: false,
+      chatShowThinking: true,
+      chatShowToolCalls: true,
+      splitRatio: 0.6,
+      navCollapsed: false,
+      navWidth: 220,
+      navGroupsCollapsed: {},
+      borderRadius: 50,
+    });
+
+    expect(JSON.parse(localStorage.getItem("openclaw.control.settings.v1") ?? "{}")).toEqual({
+      gatewayUrl: otherUrl,
+    });
+
+    expect(loadSettings()).toMatchObject({
+      gatewayUrl: otherUrl,
+      token: "other-session-token",
+      sessionKey: "ops",
+      lastActiveSessionKey: "ops",
+      themeMode: "dark",
+    });
+
+    expect(loadSettings().gatewayUrl).not.toBe(defaultGwUrl);
   });
 
   it("does not persist gateway tokens when saving settings", async () => {
@@ -360,6 +405,36 @@ describe("loadSettings default gateway URL derivation", () => {
       themeMode: "light",
       navWidth: 320,
     });
+  });
+
+  it("preserves persisted border radius stops when reloading settings", async () => {
+    setTestLocation({
+      protocol: "https:",
+      host: "gateway.example:8443",
+      pathname: "/",
+    });
+
+    localStorage.setItem(
+      "openclaw.control.settings.v1",
+      JSON.stringify({
+        gatewayUrl: expectedGatewayUrl(""),
+        token: "",
+        sessionKey: "main",
+        lastActiveSessionKey: "main",
+        theme: "claw",
+        themeMode: "system",
+        borderRadius: 100,
+        chatFocusMode: false,
+        chatShowThinking: true,
+        chatShowToolCalls: false,
+        splitRatio: 0.6,
+        navCollapsed: false,
+        navGroupsCollapsed: {},
+      }),
+    );
+
+    const { loadSettings } = await import("./storage.ts");
+    expect(loadSettings().borderRadius).toBe(100);
   });
 
   it("scopes persisted session selection per gateway", async () => {

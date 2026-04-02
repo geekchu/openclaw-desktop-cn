@@ -34,7 +34,6 @@ try {
 
     Write-Host "[OpenClaw Build] Starting build..." -ForegroundColor Cyan
 
-    $env:BUILD_CONFIG = "release"
     node scripts/build-installer.js
 
     if ($LASTEXITCODE -ne 0) {

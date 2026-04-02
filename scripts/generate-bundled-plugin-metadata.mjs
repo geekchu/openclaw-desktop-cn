@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { collectBundledPluginSources } from "./lib/bundled-plugin-source-utils.mjs";
 import { formatGeneratedModule } from "./lib/format-generated-module.mjs";
 import { writeGeneratedOutput } from "./lib/generated-output-utils.mjs";
@@ -11,6 +12,7 @@ const DEFAULT_ENTRIES_OUTPUT_PATH = "src/generated/bundled-plugin-entries.genera
 const DEFAULT_CHANNEL_ENTRIES_OUTPUT_PATH = "src/generated/bundled-channel-entries.generated.ts";
 const DEFAULT_BUNDLED_CHANNEL_ENTRY_IDS = [
   "bluebubbles",
+  "dingtalk",
   "discord",
   "feishu",
   "imessage",
@@ -18,10 +20,13 @@ const DEFAULT_BUNDLED_CHANNEL_ENTRY_IDS = [
   "line",
   "mattermost",
   "nextcloud-talk",
+  "qqbot",
   "signal",
   "slack",
   "synology-chat",
   "telegram",
+  "wecom",
+  "whatsapp",
   "zalo",
 ];
 const MANIFEST_KEY = "openclaw";
@@ -65,17 +70,26 @@ function collectTopLevelPublicSurfaceArtifacts(params) {
   const excluded = new Set(
     [params.sourceEntry, params.setupEntry]
       .filter((entry) => typeof entry === "string" && entry.trim().length > 0)
-      .map((entry) => path.basename(entry)),
+      .flatMap((entry) => {
+        const basename = path.basename(entry);
+        const builtBasename = rewriteEntryToBuiltPath(entry);
+        return [basename, builtBasename].filter(
+          (value) => typeof value === "string" && value.length > 0,
+        );
+      }),
   );
-  const artifacts = fs
+  const artifacts = Array.from(
+    new Set(
+      fs
     .readdirSync(params.pluginDir, { withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .filter(isTopLevelPublicSurfaceSource)
     .filter((entry) => !excluded.has(entry))
     .map(rewriteEntryToBuiltPath)
-    .filter((entry) => typeof entry === "string" && entry.length > 0)
-    .toSorted((left, right) => left.localeCompare(right));
+        .filter((entry) => typeof entry === "string" && entry.length > 0),
+    ),
+  ).toSorted((left, right) => left.localeCompare(right));
   return artifacts.length > 0 ? artifacts : undefined;
 }
 
@@ -600,7 +614,7 @@ export async function writeBundledPluginMetadataModule(params = {}) {
   };
 }
 
-if (import.meta.url === new URL(process.argv[1] ?? "", "file:").href) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const check = process.argv.includes("--check");
   const result = await writeBundledPluginMetadataModule({ check });
   if (!result.changed) {

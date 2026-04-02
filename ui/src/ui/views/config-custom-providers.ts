@@ -271,9 +271,9 @@ export class CustomProvidersView extends LitElement {
       }
 
       // this.addLog("配置加载完成");
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Load Data Error:", e);
-      const errMsg = e?.message || String(e);
+      const errMsg = e instanceof Error ? e.message : String(e);
       this.error = errMsg;
       // this.addLog(`ERROR: ${errMsg}`);
     } finally {
@@ -893,10 +893,7 @@ export class CustomProvidersView extends LitElement {
   render() {
     if (this.loading) {
       return html`
-        <div class="onestop-section" style="position:relative;">
-          <!-- Debug Overlay -->
-
-
+        <div class="onestop-section">
           <div class="onestop-section__header">
             <div class="onestop-section__meta">
               <h3 class="onestop-section__title">自定义接入</h3>
@@ -912,7 +909,7 @@ export class CustomProvidersView extends LitElement {
           </div>
           <div class="onestop-custom-loading">
             <span class="onestop-loading__spinner">${icons.loader}</span>
-            <span class="onestop-loading__text" style="color: red; font-weight: bold;">${this.loadingStatus}</span>
+            <span class="onestop-loading__text">${this.loadingStatus}</span>
           </div>
         </div>
       `;

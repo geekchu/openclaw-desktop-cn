@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { render } from "lit";
+import { afterEach, describe, expect, it } from "vitest";
+import { renderChannels } from "./channels.ts";
 import {
   channelEnabled,
   resolveChannelConfigured,
   resolveChannelDisplayState,
 } from "./channels.shared.ts";
 import type { ChannelsProps } from "./channels.types.ts";
+import { shouldShowWhatsAppLogout } from "./channels.whatsapp.ts";
 
 function createProps(snapshot: ChannelsProps["snapshot"]): ChannelsProps {
   return {
@@ -41,7 +44,19 @@ function createProps(snapshot: ChannelsProps["snapshot"]): ChannelsProps {
   };
 }
 
+async function renderChannelsView(snapshot: ChannelsProps["snapshot"]) {
+  const container = document.createElement("div");
+  document.body.append(container);
+  render(renderChannels(createProps(snapshot)), container);
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  return container;
+}
+
 describe("channel display selectors", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
   it("returns the channel summary configured flag when present", () => {
     const props = createProps({
       ts: Date.now(),
@@ -116,5 +131,104 @@ describe("channel display selectors", () => {
     expect(displayState.running).toBeNull();
     expect(displayState.connected).toBeNull();
     expect(channelEnabled("signal", props)).toBe(false);
+  });
+
+  it("hides WhatsApp logout when multiple WhatsApp accounts are present", () => {
+    const props = createProps({
+      ts: Date.now(),
+      channelOrder: ["whatsapp"],
+      channelLabels: { whatsapp: "WhatsApp" },
+      channels: { whatsapp: { configured: true } },
+      channelAccounts: {
+        whatsapp: [
+          { accountId: "default", configured: true },
+          { accountId: "work", configured: true },
+        ],
+      },
+      channelDefaultAccountId: { whatsapp: "default" },
+    });
+
+    expect(shouldShowWhatsAppLogout(props)).toBe(false);
+  });
+
+  it("hides WhatsApp auth actions for multi-account setups in the view", async () => {
+    const container = await renderChannelsView({
+      ts: Date.now(),
+      channelOrder: ["whatsapp"],
+      channelLabels: { whatsapp: "WhatsApp" },
+      channelMeta: [{ id: "whatsapp", label: "WhatsApp", detailLabel: "WhatsApp" }],
+      channels: {
+        whatsapp: {
+          configured: true,
+          linked: true,
+          running: true,
+          connected: true,
+          reconnectAttempts: 0,
+        },
+      },
+      channelAccounts: {
+        whatsapp: [
+          { accountId: "default", configured: true, linked: true, running: true, connected: true },
+          { accountId: "work", configured: true, linked: true, running: true, connected: true },
+        ],
+      },
+      channelDefaultAccountId: { whatsapp: "default" },
+    });
+
+    expect(container.textContent).toContain("Multi-account WhatsApp linking is not available");
+    expect(container.textContent).not.toContain("Show QR");
+    expect(container.textContent).not.toContain("Relink");
+    expect(container.textContent).not.toContain("Wait for scan");
+    expect(container.textContent).not.toContain("Logout");
+  });
+
+  it("renders the dedicated Feishu channel card in channels view", async () => {
+    const container = await renderChannelsView({
+      ts: Date.now(),
+      channelOrder: ["feishu"],
+      channelLabels: { feishu: "Feishu" },
+      channelMeta: [{ id: "feishu", label: "Feishu", detailLabel: "Feishu" }],
+      channels: {
+        feishu: {
+          configured: true,
+          running: true,
+          domain: "open.feishu.cn",
+          appId: "cli_a123",
+          probe: { ok: false, status: 401, error: "token expired" },
+        },
+      },
+      channelAccounts: {
+        feishu: [{ accountId: "default", configured: true, running: true }],
+      },
+      channelDefaultAccountId: { feishu: "default" },
+    });
+
+    expect(container.textContent).toContain("应用 ID");
+    expect(container.textContent).toContain("open.feishu.cn");
+    expect(container.textContent).toContain("token expired");
+  });
+
+  it("surfaces generic channel probe failures in the card", async () => {
+    const container = await renderChannelsView({
+      ts: Date.now(),
+      channelOrder: ["matrix"],
+      channelLabels: { matrix: "Matrix" },
+      channelMeta: [{ id: "matrix", label: "Matrix", detailLabel: "Matrix" }],
+      channels: {
+        matrix: {
+          configured: true,
+          running: false,
+          connected: false,
+          lastProbeAt: Date.now(),
+          probe: { ok: false, status: 503, error: "homeserver unreachable" },
+        },
+      },
+      channelAccounts: {},
+      channelDefaultAccountId: {},
+    });
+
+    expect(container.textContent).toContain("Probe failed");
+    expect(container.textContent).toContain("503");
+    expect(container.textContent).toContain("homeserver unreachable");
   });
 });

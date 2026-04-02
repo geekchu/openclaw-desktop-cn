@@ -5,6 +5,7 @@ import type {
   ChannelUiMetaEntry,
   ChannelsStatusSnapshot,
   DiscordStatus,
+  FeishuStatus,
   GoogleChatStatus,
   IMessageStatus,
   NostrProfile,
@@ -16,6 +17,7 @@ import type {
 } from "../types.ts";
 import { renderChannelConfigSection } from "./channels.config.ts";
 import { renderDiscordCard } from "./channels.discord.ts";
+import { renderFeishuCard } from "./channels.feishu.ts";
 import { renderGoogleChatCard } from "./channels.googlechat.ts";
 import { renderIMessageCard } from "./channels.imessage.ts";
 import { renderNostrCard } from "./channels.nostr.ts";
@@ -41,6 +43,7 @@ export function renderChannels(props: ChannelsProps) {
   const signal = (channels?.signal ?? null) as SignalStatus | null;
   const imessage = (channels?.imessage ?? null) as IMessageStatus | null;
   const nostr = (channels?.nostr ?? null) as NostrStatus | null;
+  const feishu = (channels?.feishu ?? null) as FeishuStatus | null;
   const channelOrder = resolveChannelOrder(props.snapshot);
   const orderedChannels = channelOrder
     .map((key, index) => ({
@@ -67,6 +70,7 @@ export function renderChannels(props: ChannelsProps) {
           signal,
           imessage,
           nostr,
+          feishu,
           channelAccounts: props.snapshot?.channelAccounts ?? null,
         }),
       )}
@@ -100,7 +104,17 @@ function resolveChannelOrder(snapshot: ChannelsStatusSnapshot | null): ChannelKe
   if (snapshot?.channelOrder?.length) {
     return snapshot.channelOrder;
   }
-  return ["whatsapp", "telegram", "discord", "googlechat", "slack", "signal", "imessage", "nostr"];
+  return [
+    "whatsapp",
+    "telegram",
+    "discord",
+    "feishu",
+    "googlechat",
+    "slack",
+    "signal",
+    "imessage",
+    "nostr",
+  ];
 }
 
 function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChannelData) {
@@ -149,6 +163,13 @@ function renderChannel(key: ChannelKey, props: ChannelsProps, data: ChannelsChan
         imessage: data.imessage,
         accountCountLabel,
       });
+    case "feishu":
+      return renderFeishuCard({
+        props,
+        feishu: data.feishu,
+        feishuAccounts: data.channelAccounts?.feishu ?? [],
+        accountCountLabel,
+      });
     case "nostr": {
       const nostrAccounts = data.channelAccounts?.nostr ?? [];
       const primaryAccount = nostrAccounts[0];
@@ -190,6 +211,8 @@ function renderGenericChannelCard(
   const displayState = resolveChannelDisplayState(key, props);
   const lastError =
     typeof displayState.status?.lastError === "string" ? displayState.status.lastError : undefined;
+  const lastProbeAt =
+    typeof displayState.status?.lastProbeAt === "number" ? displayState.status.lastProbeAt : null;
   const accounts = channelAccounts[key] ?? [];
   const accountCountLabel = renderChannelAccountCount(key, channelAccounts);
 
@@ -218,14 +241,37 @@ function renderGenericChannelCard(
                 <span class="label">Connected</span>
                 <span>${formatNullableBoolean(displayState.connected)}</span>
               </div>
+              <div>
+                <span class="label">Last probe</span>
+                <span>${lastProbeAt ? formatRelativeTimestamp(lastProbeAt) : "n/a"}</span>
+              </div>
             </div>
           `}
       ${lastError
         ? html`<div class="callout danger" style="margin-top: 12px;">${lastError}</div>`
         : nothing}
+      ${renderGenericProbeCallout(displayState.status?.probe)}
       ${renderChannelConfigSection({ channelId: key, props })}
     </div>
   `;
+}
+
+function readObjectRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function renderGenericProbeCallout(probe: unknown) {
+  const record = readObjectRecord(probe);
+  if (!record || typeof record.ok !== "boolean") {
+    return nothing;
+  }
+  const status = typeof record.status === "number" ? String(record.status) : null;
+  const error = typeof record.error === "string" ? record.error : null;
+  const parts = [record.ok ? "Probe ok" : "Probe failed", status, error].filter(Boolean);
+  return html`<div class="callout" style="margin-top: 12px;">${parts.join(" · ")}</div>`;
 }
 
 function resolveChannelMetaMap(

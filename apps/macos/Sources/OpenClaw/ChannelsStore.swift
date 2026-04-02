@@ -219,10 +219,54 @@ struct ConfigSnapshot: Codable {
     let issues: [Issue]?
 }
 
+struct ChannelPairingRequest: Codable, Identifiable {
+    let code: String
+    let requesterId: String?
+    let createdAt: String?
+
+    var id: String {
+        self.code
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case code
+        case requesterId = "id"
+        case createdAt
+    }
+}
+
 @MainActor
 @Observable
 final class ChannelsStore {
     static let shared = ChannelsStore()
+    private static let defaultChannelLabels: [String: String] = [
+        "dingtalk": "DingTalk",
+        "discord": "Discord",
+        "feishu": "Feishu",
+        "googlechat": "Google Chat",
+        "imessage": "iMessage",
+        "nostr": "Nostr",
+        "qqbot": "QQ",
+        "signal": "Signal",
+        "slack": "Slack",
+        "telegram": "Telegram",
+        "wecom": "WeCom",
+        "whatsapp": "WhatsApp",
+    ]
+    private static let defaultChannelSystemImages: [String: String] = [
+        "dingtalk": "bubble.left.and.bubble.right",
+        "discord": "bubble.left.and.bubble.right",
+        "feishu": "message",
+        "googlechat": "bubble.left.and.bubble.right",
+        "imessage": "message",
+        "nostr": "dot.radiowaves.left.and.right",
+        "qqbot": "message",
+        "signal": "dot.radiowaves.left.and.right",
+        "slack": "bubble.left.and.bubble.right",
+        "telegram": "paperplane",
+        "wecom": "message",
+        "whatsapp": "phone",
+    ]
 
     var snapshot: ChannelsStatusSnapshot?
     var lastError: String?
@@ -242,6 +286,11 @@ final class ChannelsStore {
     var configUiHints: [String: ConfigUiHint] = [:]
     var configDraft: [String: Any] = [:]
     var configDirty = false
+    var channelTesting = false
+    var channelClearing = false
+    var pairingLoading = false
+    var pairingApprovalLoading = false
+    var pairingRequests: [ChannelPairingRequest] = []
 
     let interval: TimeInterval = 45
     let isPreview: Bool
@@ -260,7 +309,7 @@ final class ChannelsStore {
         if let label = self.snapshot?.channelLabels[id], !label.isEmpty {
             return label
         }
-        return id
+        return Self.defaultChannelLabels[id] ?? id
     }
 
     func resolveChannelDetailLabel(_ id: String) -> String {
@@ -280,7 +329,7 @@ final class ChannelsStore {
         if let symbol = self.snapshot?.channelSystemImages?[id], !symbol.isEmpty {
             return symbol
         }
-        return "message"
+        return Self.defaultChannelSystemImages[id] ?? "message"
     }
 
     func orderedChannelIds() -> [String] {

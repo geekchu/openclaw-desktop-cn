@@ -95,6 +95,11 @@ struct ConfigSchemaNode {
         return raw.compactMap { ConfigSchemaNode(raw: $0) }
     }
 
+    var variants: [ConfigSchemaNode] {
+        let rawVariants = self.anyOf.isEmpty ? self.oneOf : self.anyOf
+        return rawVariants.filter { !$0.isNullSchema }
+    }
+
     var literalValue: Any? {
         if let constValue { return constValue }
         if let enumValues, enumValues.count == 1 { return enumValues[0] }
@@ -141,6 +146,91 @@ struct ConfigSchemaNode {
         default:
             return ""
         }
+    }
+
+    func resolvedFormNode(preferredValue: Any?) -> ConfigSchemaNode {
+        let variants = self.variants
+        guard !variants.isEmpty else { return self }
+
+        if variants.count == 1, let only = variants.first {
+            return only.resolvedFormNode(preferredValue: preferredValue)
+        }
+
+        if let preferredValue,
+           let match = variants.first(where: { $0.matchesPreferredValue(preferredValue) })
+        {
+            return match.resolvedFormNode(preferredValue: preferredValue)
+        }
+
+        if let defaultValue = self.explicitDefault,
+           let match = variants.first(where: { $0.matchesPreferredValue(defaultValue) })
+        {
+            return match.resolvedFormNode(preferredValue: defaultValue)
+        }
+
+        let preferredKinds = ["string", "integer", "number", "boolean", "array", "object"]
+        for kind in preferredKinds {
+            if let match = variants.first(where: { $0.supportsSchemaKind(kind) }) {
+                return match.resolvedFormNode(preferredValue: preferredValue)
+            }
+        }
+
+        return variants[0].resolvedFormNode(preferredValue: preferredValue)
+    }
+
+    private func supportsSchemaKind(_ kind: String) -> Bool {
+        if self.schemaType == kind {
+            return true
+        }
+        switch kind {
+        case "object":
+            return !self.properties.isEmpty || self.additionalProperties != nil
+        case "array":
+            return self.items != nil
+        case "number":
+            return self.schemaType == "integer"
+        default:
+            return false
+        }
+    }
+
+    private func matchesPreferredValue(_ value: Any) -> Bool {
+        switch value {
+        case is NSNull:
+            return self.isNullSchema
+        case let boolean as Bool:
+            return self.supportsSchemaKind("boolean") && self.matchesConstProperties(in: nil)
+        case let text as String:
+            return self.supportsSchemaKind("string") && self.matchesConstProperties(in: nil)
+        case let dict as [String: Any]:
+            return self.supportsSchemaKind("object") && self.matchesConstProperties(in: dict)
+        case is [Any]:
+            return self.supportsSchemaKind("array") && self.matchesConstProperties(in: nil)
+        case let number as NSNumber:
+            if Self.isBooleanNumber(number) {
+                return self.supportsSchemaKind("boolean") && self.matchesConstProperties(in: nil)
+            }
+            return (self.supportsSchemaKind("integer") || self.supportsSchemaKind("number"))
+                && self.matchesConstProperties(in: nil)
+        default:
+            return false
+        }
+    }
+
+    private func matchesConstProperties(in dict: [String: Any]?) -> Bool {
+        for (key, property) in self.properties {
+            let expected = property.constValue ?? property.literalValue
+            guard let expected else { continue }
+            guard let dict else { continue }
+            guard let actual = dict[key], String(describing: actual) == String(describing: expected) else {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func isBooleanNumber(_ number: NSNumber) -> Bool {
+        CFGetTypeID(number) == CFBooleanGetTypeID()
     }
 
     func node(at path: ConfigPath) -> ConfigSchemaNode? {
