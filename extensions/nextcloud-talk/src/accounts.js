@@ -1,0 +1,89 @@
+import { resolveMergedAccountConfig } from "openclaw/plugin-sdk/account-resolution";
+import { tryReadSecretFileSync } from "openclaw/plugin-sdk/core";
+import { createAccountListHelpers, DEFAULT_ACCOUNT_ID, normalizeAccountId, resolveAccountWithDefaultFallback, } from "../runtime-api.js";
+import { normalizeResolvedSecretInputString } from "./secret-input.js";
+function isTruthyEnvValue(value) {
+    const normalized = (value ?? "").trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on";
+}
+const debugAccounts = (...args) => {
+    if (isTruthyEnvValue(process.env.OPENCLAW_DEBUG_NEXTCLOUD_TALK_ACCOUNTS)) {
+        console.warn("[nextcloud-talk:accounts]", ...args);
+    }
+};
+const { listAccountIds: listNextcloudTalkAccountIdsInternal, resolveDefaultAccountId: resolveDefaultNextcloudTalkAccountId, } = createAccountListHelpers("nextcloud-talk", {
+    normalizeAccountId,
+});
+export { resolveDefaultNextcloudTalkAccountId };
+export function listNextcloudTalkAccountIds(cfg) {
+    const ids = listNextcloudTalkAccountIdsInternal(cfg);
+    debugAccounts("listNextcloudTalkAccountIds", ids);
+    return ids;
+}
+function mergeNextcloudTalkAccountConfig(cfg, accountId) {
+    return resolveMergedAccountConfig({
+        channelConfig: cfg.channels?.["nextcloud-talk"],
+        accounts: cfg.channels?.["nextcloud-talk"]?.accounts,
+        accountId,
+        omitKeys: ["defaultAccount"],
+        normalizeAccountId,
+    });
+}
+function resolveNextcloudTalkSecret(cfg, opts) {
+    const merged = mergeNextcloudTalkAccountConfig(cfg, opts.accountId ?? DEFAULT_ACCOUNT_ID);
+    const envSecret = process.env.NEXTCLOUD_TALK_BOT_SECRET?.trim();
+    if (envSecret && (!opts.accountId || opts.accountId === DEFAULT_ACCOUNT_ID)) {
+        return { secret: envSecret, source: "env" };
+    }
+    if (merged.botSecretFile) {
+        const fileSecret = tryReadSecretFileSync(merged.botSecretFile, "Nextcloud Talk bot secret file", { rejectSymlink: true });
+        if (fileSecret) {
+            return { secret: fileSecret, source: "secretFile" };
+        }
+    }
+    const inlineSecret = normalizeResolvedSecretInputString({
+        value: merged.botSecret,
+        path: `channels.nextcloud-talk.accounts.${opts.accountId ?? DEFAULT_ACCOUNT_ID}.botSecret`,
+    });
+    if (inlineSecret) {
+        return { secret: inlineSecret, source: "config" };
+    }
+    return { secret: "", source: "none" };
+}
+export function resolveNextcloudTalkAccount(params) {
+    const baseEnabled = params.cfg.channels?.["nextcloud-talk"]?.enabled !== false;
+    const resolve = (accountId) => {
+        const merged = mergeNextcloudTalkAccountConfig(params.cfg, accountId);
+        const accountEnabled = merged.enabled !== false;
+        const enabled = baseEnabled && accountEnabled;
+        const secretResolution = resolveNextcloudTalkSecret(params.cfg, { accountId });
+        const baseUrl = merged.baseUrl?.trim()?.replace(/\/$/, "") ?? "";
+        debugAccounts("resolve", {
+            accountId,
+            enabled,
+            secretSource: secretResolution.source,
+            baseUrl: baseUrl ? "[set]" : "[missing]",
+        });
+        return {
+            accountId,
+            enabled,
+            name: merged.name?.trim() || undefined,
+            baseUrl,
+            secret: secretResolution.secret,
+            secretSource: secretResolution.source,
+            config: merged,
+        };
+    };
+    return resolveAccountWithDefaultFallback({
+        accountId: params.accountId,
+        normalizeAccountId,
+        resolvePrimary: resolve,
+        hasCredential: (account) => account.secretSource !== "none",
+        resolveDefaultAccountId: () => resolveDefaultNextcloudTalkAccountId(params.cfg),
+    });
+}
+export function listEnabledNextcloudTalkAccounts(cfg) {
+    return listNextcloudTalkAccountIds(cfg)
+        .map((accountId) => resolveNextcloudTalkAccount({ cfg, accountId }))
+        .filter((account) => account.enabled);
+}

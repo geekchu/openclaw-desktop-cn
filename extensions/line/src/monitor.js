@@ -1,0 +1,221 @@
+import { createChannelReplyPipeline } from "openclaw/plugin-sdk/channel-reply-pipeline";
+import { dispatchReplyWithBufferedBlockDispatcher, chunkMarkdownText, } from "openclaw/plugin-sdk/reply-runtime";
+import { danger, logVerbose, waitForAbortSignal, } from "openclaw/plugin-sdk/runtime-env";
+import { normalizePluginHttpPath, registerPluginHttpRoute, } from "openclaw/plugin-sdk/webhook-ingress";
+import { deliverLineAutoReply } from "./auto-reply-delivery.js";
+import { createLineBot } from "./bot.js";
+import { processLineMessage } from "./markdown-to-line.js";
+import { sendLineReplyChunks } from "./reply-chunks.js";
+import { createFlexMessage, createImageMessage, createLocationMessage, createQuickReplyItems, createTextMessageWithQuickReplies, getUserDisplayName, pushMessageLine, pushMessagesLine, pushTextMessageWithQuickReplies, replyMessageLine, showLoadingAnimation, } from "./send.js";
+import { buildTemplateMessageFromPayload } from "./template-messages.js";
+import { createLineNodeWebhookHandler } from "./webhook-node.js";
+const runtimeState = new Map();
+function recordChannelRuntimeState(params) {
+    const key = `${params.channel}:${params.accountId}`;
+    const existing = runtimeState.get(key) ?? {
+        running: false,
+        lastStartAt: null,
+        lastStopAt: null,
+        lastError: null,
+    };
+    runtimeState.set(key, { ...existing, ...params.state });
+}
+export function getLineRuntimeState(accountId) {
+    return runtimeState.get(`line:${accountId}`);
+}
+function startLineLoadingKeepalive(params) {
+    const intervalMs = params.intervalMs ?? 18_000;
+    const loadingSeconds = params.loadingSeconds ?? 20;
+    let stopped = false;
+    const trigger = () => {
+        if (stopped) {
+            return;
+        }
+        void showLoadingAnimation(params.userId, {
+            accountId: params.accountId,
+            loadingSeconds,
+        }).catch(() => { });
+    };
+    trigger();
+    const timer = setInterval(trigger, intervalMs);
+    return () => {
+        if (stopped) {
+            return;
+        }
+        stopped = true;
+        clearInterval(timer);
+    };
+}
+export async function monitorLineProvider(opts) {
+    const { channelAccessToken, channelSecret, accountId, config, runtime, abortSignal, webhookPath, } = opts;
+    const resolvedAccountId = accountId ?? "default";
+    const token = channelAccessToken.trim();
+    const secret = channelSecret.trim();
+    if (!token) {
+        throw new Error("LINE webhook mode requires a non-empty channel access token.");
+    }
+    if (!secret) {
+        throw new Error("LINE webhook mode requires a non-empty channel secret.");
+    }
+    recordChannelRuntimeState({
+        channel: "line",
+        accountId: resolvedAccountId,
+        state: {
+            running: true,
+            lastStartAt: Date.now(),
+        },
+    });
+    const bot = createLineBot({
+        channelAccessToken: token,
+        channelSecret: secret,
+        accountId,
+        runtime,
+        config,
+        onMessage: async (ctx) => {
+            if (!ctx) {
+                return;
+            }
+            const { ctxPayload, replyToken, route } = ctx;
+            recordChannelRuntimeState({
+                channel: "line",
+                accountId: resolvedAccountId,
+                state: {
+                    lastInboundAt: Date.now(),
+                },
+            });
+            const shouldShowLoading = Boolean(ctx.userId && !ctx.isGroup);
+            const displayNamePromise = ctx.userId
+                ? getUserDisplayName(ctx.userId, { accountId: ctx.accountId })
+                : Promise.resolve(ctxPayload.From);
+            const stopLoading = shouldShowLoading
+                ? startLineLoadingKeepalive({ userId: ctx.userId, accountId: ctx.accountId })
+                : null;
+            const displayName = await displayNamePromise;
+            logVerbose(`line: received message from ${displayName} (${ctxPayload.From})`);
+            try {
+                const textLimit = 5000;
+                let replyTokenUsed = false;
+                const { onModelSelected, ...replyPipeline } = createChannelReplyPipeline({
+                    cfg: config,
+                    agentId: route.agentId,
+                    channel: "line",
+                    accountId: route.accountId,
+                });
+                const { queuedFinal } = await dispatchReplyWithBufferedBlockDispatcher({
+                    ctx: ctxPayload,
+                    cfg: config,
+                    dispatcherOptions: {
+                        ...replyPipeline,
+                        deliver: async (payload, _info) => {
+                            const lineData = payload.channelData?.line ?? {};
+                            if (ctx.userId && !ctx.isGroup) {
+                                void showLoadingAnimation(ctx.userId, { accountId: ctx.accountId }).catch(() => { });
+                            }
+                            const { replyTokenUsed: nextReplyTokenUsed } = await deliverLineAutoReply({
+                                payload,
+                                lineData,
+                                to: ctxPayload.From,
+                                replyToken,
+                                replyTokenUsed,
+                                accountId: ctx.accountId,
+                                textLimit,
+                                deps: {
+                                    buildTemplateMessageFromPayload,
+                                    processLineMessage,
+                                    chunkMarkdownText,
+                                    sendLineReplyChunks,
+                                    replyMessageLine,
+                                    pushMessageLine,
+                                    pushTextMessageWithQuickReplies,
+                                    createQuickReplyItems,
+                                    createTextMessageWithQuickReplies,
+                                    pushMessagesLine,
+                                    createFlexMessage,
+                                    createImageMessage,
+                                    createLocationMessage,
+                                    onReplyError: (replyErr) => {
+                                        logVerbose(`line: reply token failed, falling back to push: ${String(replyErr)}`);
+                                    },
+                                },
+                            });
+                            replyTokenUsed = nextReplyTokenUsed;
+                            recordChannelRuntimeState({
+                                channel: "line",
+                                accountId: resolvedAccountId,
+                                state: {
+                                    lastOutboundAt: Date.now(),
+                                },
+                            });
+                        },
+                        onError: (err, info) => {
+                            runtime.error?.(danger(`line ${info.kind} reply failed: ${String(err)}`));
+                        },
+                    },
+                    replyOptions: {
+                        onModelSelected,
+                    },
+                });
+                if (!queuedFinal) {
+                    logVerbose(`line: no response generated for message from ${ctxPayload.From}`);
+                }
+            }
+            catch (err) {
+                runtime.error?.(danger(`line: auto-reply failed: ${String(err)}`));
+                if (replyToken) {
+                    try {
+                        await replyMessageLine(replyToken, [{ type: "text", text: "Sorry, I encountered an error processing your message." }], { accountId: ctx.accountId });
+                    }
+                    catch (replyErr) {
+                        runtime.error?.(danger(`line: error reply failed: ${String(replyErr)}`));
+                    }
+                }
+            }
+            finally {
+                stopLoading?.();
+            }
+        },
+    });
+    const normalizedPath = normalizePluginHttpPath(webhookPath, "/line/webhook") ?? "/line/webhook";
+    const unregisterHttp = registerPluginHttpRoute({
+        path: normalizedPath,
+        auth: "plugin",
+        replaceExisting: true,
+        pluginId: "line",
+        accountId: resolvedAccountId,
+        log: (msg) => logVerbose(msg),
+        handler: createLineNodeWebhookHandler({ channelSecret: secret, bot, runtime }),
+    });
+    logVerbose(`line: registered webhook handler at ${normalizedPath}`);
+    let stopped = false;
+    const stopHandler = () => {
+        if (stopped) {
+            return;
+        }
+        stopped = true;
+        logVerbose(`line: stopping provider for account ${resolvedAccountId}`);
+        unregisterHttp();
+        recordChannelRuntimeState({
+            channel: "line",
+            accountId: resolvedAccountId,
+            state: {
+                running: false,
+                lastStopAt: Date.now(),
+            },
+        });
+    };
+    if (abortSignal?.aborted) {
+        stopHandler();
+    }
+    else if (abortSignal) {
+        abortSignal.addEventListener("abort", stopHandler, { once: true });
+        await waitForAbortSignal(abortSignal);
+    }
+    return {
+        account: bot.account,
+        handleWebhook: bot.handleWebhook,
+        stop: () => {
+            stopHandler();
+            abortSignal?.removeEventListener("abort", stopHandler);
+        },
+    };
+}

@@ -1,0 +1,25 @@
+export function buildEmbeddedCompactionRuntimeContext(params) {
+    return {
+        sessionKey: params.sessionKey ?? undefined,
+        messageChannel: params.messageChannel ?? undefined,
+        messageProvider: params.messageProvider ?? undefined,
+        agentAccountId: params.agentAccountId ?? undefined,
+        currentChannelId: params.currentChannelId ?? undefined,
+        currentThreadTs: params.currentThreadTs ?? undefined,
+        currentMessageId: params.currentMessageId ?? undefined,
+        authProfileId: params.authProfileId ?? undefined,
+        workspaceDir: params.workspaceDir,
+        agentDir: params.agentDir,
+        config: params.config,
+        skillsSnapshot: params.skillsSnapshot,
+        senderIsOwner: params.senderIsOwner,
+        senderId: params.senderId ?? undefined,
+        provider: params.provider ?? undefined,
+        model: params.modelId ?? undefined,
+        thinkLevel: params.thinkLevel,
+        reasoningLevel: params.reasoningLevel,
+        bashElevated: params.bashElevated,
+        extraSystemPrompt: params.extraSystemPrompt,
+        ownerNumbers: params.ownerNumbers,
+    };
+}

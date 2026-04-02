@@ -1,0 +1,340 @@
+import { loadConfig } from "../config/config.js";
+import { callGateway } from "../gateway/call.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
+import { normalizeDeliveryContext } from "../utils/delivery-context.js";
+import { ensureRuntimePluginsLoaded } from "./runtime-plugins.js";
+import { SUBAGENT_ENDED_OUTCOME_KILLED, SUBAGENT_ENDED_REASON_COMPLETE, SUBAGENT_ENDED_REASON_ERROR, SUBAGENT_ENDED_REASON_KILLED, } from "./subagent-lifecycle-events.js";
+import { emitSubagentEndedHookOnce, runOutcomesEqual } from "./subagent-registry-completion.js";
+import { getSubagentSessionRuntimeMs, getSubagentSessionStartedAt, persistSubagentSessionTiming, resolveArchiveAfterMs, safeRemoveAttachmentsDir, } from "./subagent-registry-helpers.js";
+const log = createSubsystemLogger("agents/subagent-registry");
+function shouldDeleteAttachments(entry) {
+    return entry.cleanup === "delete" || !entry.retainAttachmentsOnKeep;
+}
+export function createSubagentRunManager(params) {
+    const waitForSubagentCompletion = async (runId, waitTimeoutMs) => {
+        try {
+            const timeoutMs = Math.max(1, Math.floor(waitTimeoutMs));
+            const wait = await callGateway({
+                method: "agent.wait",
+                params: {
+                    runId,
+                    timeoutMs,
+                },
+                timeoutMs: timeoutMs + 10_000,
+            });
+            if (wait?.status !== "ok" && wait?.status !== "error" && wait?.status !== "timeout") {
+                return;
+            }
+            const entry = params.runs.get(runId);
+            if (!entry) {
+                return;
+            }
+            let mutated = false;
+            if (typeof wait.startedAt === "number") {
+                entry.startedAt = wait.startedAt;
+                if (typeof entry.sessionStartedAt !== "number") {
+                    entry.sessionStartedAt = wait.startedAt;
+                }
+                mutated = true;
+            }
+            if (typeof wait.endedAt === "number") {
+                entry.endedAt = wait.endedAt;
+                mutated = true;
+            }
+            if (!entry.endedAt) {
+                entry.endedAt = Date.now();
+                mutated = true;
+            }
+            const waitError = typeof wait.error === "string" ? wait.error : undefined;
+            const outcome = wait.status === "error"
+                ? { status: "error", error: waitError }
+                : wait.status === "timeout"
+                    ? { status: "timeout" }
+                    : { status: "ok" };
+            if (!runOutcomesEqual(entry.outcome, outcome)) {
+                entry.outcome = outcome;
+                mutated = true;
+            }
+            if (mutated) {
+                params.persist();
+            }
+            await params.completeSubagentRun({
+                runId,
+                endedAt: entry.endedAt,
+                outcome,
+                reason: wait.status === "error" ? SUBAGENT_ENDED_REASON_ERROR : SUBAGENT_ENDED_REASON_COMPLETE,
+                sendFarewell: true,
+                accountId: entry.requesterOrigin?.accountId,
+                triggerCleanup: true,
+            });
+        }
+        catch {
+            // ignore
+        }
+    };
+    const markSubagentRunForSteerRestart = (runId) => {
+        const key = runId.trim();
+        if (!key) {
+            return false;
+        }
+        const entry = params.runs.get(key);
+        if (!entry) {
+            return false;
+        }
+        if (entry.suppressAnnounceReason === "steer-restart") {
+            return true;
+        }
+        entry.suppressAnnounceReason = "steer-restart";
+        params.persist();
+        return true;
+    };
+    const clearSubagentRunSteerRestart = (runId) => {
+        const key = runId.trim();
+        if (!key) {
+            return false;
+        }
+        const entry = params.runs.get(key);
+        if (!entry) {
+            return false;
+        }
+        if (entry.suppressAnnounceReason !== "steer-restart") {
+            return true;
+        }
+        entry.suppressAnnounceReason = undefined;
+        params.persist();
+        // If the interrupted run already finished while suppression was active, retry
+        // cleanup now so completion output is not lost when restart dispatch fails.
+        params.resumedRuns.delete(key);
+        if (typeof entry.endedAt === "number" && !entry.cleanupCompletedAt) {
+            params.resumeSubagentRun(key);
+        }
+        return true;
+    };
+    const replaceSubagentRunAfterSteer = (replaceParams) => {
+        const previousRunId = replaceParams.previousRunId.trim();
+        const nextRunId = replaceParams.nextRunId.trim();
+        if (!previousRunId || !nextRunId) {
+            return false;
+        }
+        const previous = params.runs.get(previousRunId);
+        const source = previous ?? replaceParams.fallback;
+        if (!source) {
+            return false;
+        }
+        if (previousRunId !== nextRunId) {
+            params.clearPendingLifecycleError(previousRunId);
+            if (shouldDeleteAttachments(source)) {
+                void safeRemoveAttachmentsDir(source);
+            }
+            params.runs.delete(previousRunId);
+            params.resumedRuns.delete(previousRunId);
+        }
+        const now = Date.now();
+        const cfg = loadConfig();
+        const archiveAfterMs = resolveArchiveAfterMs(cfg);
+        const spawnMode = source.spawnMode === "session" ? "session" : "run";
+        const archiveAtMs = spawnMode === "session" || source.cleanup === "keep"
+            ? undefined
+            : archiveAfterMs
+                ? now + archiveAfterMs
+                : undefined;
+        const runTimeoutSeconds = replaceParams.runTimeoutSeconds ?? source.runTimeoutSeconds ?? 0;
+        const waitTimeoutMs = params.resolveSubagentWaitTimeoutMs(cfg, runTimeoutSeconds);
+        const preserveFrozenResultFallback = replaceParams.preserveFrozenResultFallback === true;
+        const sessionStartedAt = getSubagentSessionStartedAt(source) ?? now;
+        const accumulatedRuntimeMs = getSubagentSessionRuntimeMs(source, typeof source.endedAt === "number" ? source.endedAt : now) ?? 0;
+        const next = {
+            ...source,
+            runId: nextRunId,
+            createdAt: now,
+            startedAt: now,
+            sessionStartedAt,
+            accumulatedRuntimeMs,
+            endedAt: undefined,
+            endedReason: undefined,
+            endedHookEmittedAt: undefined,
+            wakeOnDescendantSettle: undefined,
+            outcome: undefined,
+            frozenResultText: undefined,
+            frozenResultCapturedAt: undefined,
+            fallbackFrozenResultText: preserveFrozenResultFallback ? source.frozenResultText : undefined,
+            fallbackFrozenResultCapturedAt: preserveFrozenResultFallback
+                ? source.frozenResultCapturedAt
+                : undefined,
+            cleanupCompletedAt: undefined,
+            cleanupHandled: false,
+            suppressAnnounceReason: undefined,
+            announceRetryCount: undefined,
+            lastAnnounceRetryAt: undefined,
+            spawnMode,
+            archiveAtMs,
+            runTimeoutSeconds,
+        };
+        params.runs.set(nextRunId, next);
+        params.ensureListener();
+        params.persist();
+        if (archiveAtMs) {
+            params.startSweeper();
+        }
+        void waitForSubagentCompletion(nextRunId, waitTimeoutMs);
+        return true;
+    };
+    const registerSubagentRun = (registerParams) => {
+        const now = Date.now();
+        const cfg = loadConfig();
+        const archiveAfterMs = resolveArchiveAfterMs(cfg);
+        const spawnMode = registerParams.spawnMode === "session" ? "session" : "run";
+        const archiveAtMs = spawnMode === "session" || registerParams.cleanup === "keep"
+            ? undefined
+            : archiveAfterMs
+                ? now + archiveAfterMs
+                : undefined;
+        const runTimeoutSeconds = registerParams.runTimeoutSeconds ?? 0;
+        const waitTimeoutMs = params.resolveSubagentWaitTimeoutMs(cfg, runTimeoutSeconds);
+        const requesterOrigin = normalizeDeliveryContext(registerParams.requesterOrigin);
+        params.runs.set(registerParams.runId, {
+            runId: registerParams.runId,
+            childSessionKey: registerParams.childSessionKey,
+            controllerSessionKey: registerParams.controllerSessionKey ?? registerParams.requesterSessionKey,
+            requesterSessionKey: registerParams.requesterSessionKey,
+            requesterOrigin,
+            requesterDisplayKey: registerParams.requesterDisplayKey,
+            task: registerParams.task,
+            cleanup: registerParams.cleanup,
+            expectsCompletionMessage: registerParams.expectsCompletionMessage,
+            spawnMode,
+            label: registerParams.label,
+            model: registerParams.model,
+            workspaceDir: registerParams.workspaceDir,
+            runTimeoutSeconds,
+            createdAt: now,
+            startedAt: now,
+            sessionStartedAt: now,
+            accumulatedRuntimeMs: 0,
+            archiveAtMs,
+            cleanupHandled: false,
+            wakeOnDescendantSettle: undefined,
+            attachmentsDir: registerParams.attachmentsDir,
+            attachmentsRootDir: registerParams.attachmentsRootDir,
+            retainAttachmentsOnKeep: registerParams.retainAttachmentsOnKeep,
+        });
+        params.ensureListener();
+        params.persist();
+        if (archiveAtMs) {
+            params.startSweeper();
+        }
+        // Wait for subagent completion via gateway RPC (cross-process).
+        // The in-process lifecycle listener is a fallback for embedded runs.
+        void waitForSubagentCompletion(registerParams.runId, waitTimeoutMs);
+    };
+    const releaseSubagentRun = (runId) => {
+        params.clearPendingLifecycleError(runId);
+        const entry = params.runs.get(runId);
+        if (entry) {
+            if (shouldDeleteAttachments(entry)) {
+                void safeRemoveAttachmentsDir(entry);
+            }
+            void params.notifyContextEngineSubagentEnded({
+                childSessionKey: entry.childSessionKey,
+                reason: "released",
+                workspaceDir: entry.workspaceDir,
+            });
+        }
+        const didDelete = params.runs.delete(runId);
+        if (didDelete) {
+            params.persist();
+        }
+        if (params.runs.size === 0) {
+            params.stopSweeper();
+        }
+    };
+    const markSubagentRunTerminated = (markParams) => {
+        const runIds = new Set();
+        if (typeof markParams.runId === "string" && markParams.runId.trim()) {
+            runIds.add(markParams.runId.trim());
+        }
+        if (typeof markParams.childSessionKey === "string" && markParams.childSessionKey.trim()) {
+            for (const [runId, entry] of params.runs.entries()) {
+                if (entry.childSessionKey === markParams.childSessionKey.trim()) {
+                    runIds.add(runId);
+                }
+            }
+        }
+        if (runIds.size === 0) {
+            return 0;
+        }
+        const now = Date.now();
+        const reason = markParams.reason?.trim() || "killed";
+        let updated = 0;
+        const entriesByChildSessionKey = new Map();
+        for (const runId of runIds) {
+            params.clearPendingLifecycleError(runId);
+            const entry = params.runs.get(runId);
+            if (!entry) {
+                continue;
+            }
+            if (typeof entry.endedAt === "number") {
+                continue;
+            }
+            entry.endedAt = now;
+            entry.outcome = { status: "error", error: reason };
+            entry.endedReason = SUBAGENT_ENDED_REASON_KILLED;
+            entry.cleanupHandled = true;
+            entry.cleanupCompletedAt = now;
+            entry.suppressAnnounceReason = "killed";
+            if (!entriesByChildSessionKey.has(entry.childSessionKey)) {
+                entriesByChildSessionKey.set(entry.childSessionKey, entry);
+            }
+            updated += 1;
+        }
+        if (updated > 0) {
+            params.persist();
+            for (const entry of entriesByChildSessionKey.values()) {
+                void persistSubagentSessionTiming(entry).catch((err) => {
+                    log.warn("failed to persist killed subagent session timing", {
+                        err,
+                        runId: entry.runId,
+                        childSessionKey: entry.childSessionKey,
+                    });
+                });
+                if (shouldDeleteAttachments(entry)) {
+                    void safeRemoveAttachmentsDir(entry);
+                }
+                params.completeCleanupBookkeeping({
+                    runId: entry.runId,
+                    entry,
+                    cleanup: entry.cleanup,
+                    completedAt: now,
+                });
+                const cfg = loadConfig();
+                ensureRuntimePluginsLoaded({
+                    config: cfg,
+                    workspaceDir: entry.workspaceDir,
+                    allowGatewaySubagentBinding: true,
+                });
+                void emitSubagentEndedHookOnce({
+                    entry,
+                    reason: SUBAGENT_ENDED_REASON_KILLED,
+                    sendFarewell: true,
+                    accountId: entry.requesterOrigin?.accountId,
+                    outcome: SUBAGENT_ENDED_OUTCOME_KILLED,
+                    error: reason,
+                    inFlightRunIds: params.endedHookInFlightRunIds,
+                    persist: () => params.persist(),
+                }).catch(() => {
+                    // Hook failures should not break termination flow.
+                });
+            }
+        }
+        return updated;
+    };
+    return {
+        clearSubagentRunSteerRestart,
+        markSubagentRunForSteerRestart,
+        markSubagentRunTerminated,
+        registerSubagentRun,
+        releaseSubagentRun,
+        replaceSubagentRunAfterSteer,
+        waitForSubagentCompletion,
+    };
+}

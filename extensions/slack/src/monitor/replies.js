@@ -1,0 +1,163 @@
+import { deliverTextOrMediaReply, resolveSendableOutboundReplyParts, } from "openclaw/plugin-sdk/reply-payload";
+import { chunkMarkdownTextWithMode } from "openclaw/plugin-sdk/reply-runtime";
+import { createReplyReferencePlanner } from "openclaw/plugin-sdk/reply-runtime";
+import { isSilentReplyText, SILENT_REPLY_TOKEN } from "openclaw/plugin-sdk/reply-runtime";
+import { parseSlackBlocksInput } from "../blocks-input.js";
+import { markdownToSlackMrkdwnChunks } from "../format.js";
+import { SLACK_TEXT_LIMIT } from "../limits.js";
+import { sendMessageSlack } from "../send.js";
+export function readSlackReplyBlocks(payload) {
+    const slackData = payload.channelData?.slack;
+    if (!slackData || typeof slackData !== "object" || Array.isArray(slackData)) {
+        return undefined;
+    }
+    try {
+        return parseSlackBlocksInput(slackData.blocks);
+    }
+    catch {
+        return undefined;
+    }
+}
+export async function deliverReplies(params) {
+    for (const payload of params.replies) {
+        // Keep reply tags opt-in: when replyToMode is off, explicit reply tags
+        // must not force threading.
+        const inlineReplyToId = params.replyToMode === "off" ? undefined : payload.replyToId;
+        const threadTs = inlineReplyToId ?? params.replyThreadTs;
+        const reply = resolveSendableOutboundReplyParts(payload);
+        const slackBlocks = readSlackReplyBlocks(payload);
+        if (!reply.hasContent && !slackBlocks?.length) {
+            continue;
+        }
+        if (!reply.hasMedia && slackBlocks?.length) {
+            const trimmed = reply.trimmedText;
+            if (!trimmed && !slackBlocks?.length) {
+                continue;
+            }
+            if (trimmed && isSilentReplyText(trimmed, SILENT_REPLY_TOKEN)) {
+                continue;
+            }
+            await sendMessageSlack(params.target, trimmed, {
+                token: params.token,
+                threadTs,
+                accountId: params.accountId,
+                ...(slackBlocks?.length ? { blocks: slackBlocks } : {}),
+                ...(params.identity ? { identity: params.identity } : {}),
+            });
+            params.runtime.log?.(`delivered reply to ${params.target}`);
+            continue;
+        }
+        const delivered = await deliverTextOrMediaReply({
+            payload,
+            text: reply.text,
+            chunkText: !reply.hasMedia
+                ? (value) => {
+                    const trimmed = value.trim();
+                    if (!trimmed || isSilentReplyText(trimmed, SILENT_REPLY_TOKEN)) {
+                        return [];
+                    }
+                    return [trimmed];
+                }
+                : undefined,
+            sendText: async (trimmed) => {
+                await sendMessageSlack(params.target, trimmed, {
+                    token: params.token,
+                    threadTs,
+                    accountId: params.accountId,
+                    ...(params.identity ? { identity: params.identity } : {}),
+                });
+            },
+            sendMedia: async ({ mediaUrl, caption }) => {
+                await sendMessageSlack(params.target, caption ?? "", {
+                    token: params.token,
+                    mediaUrl,
+                    threadTs,
+                    accountId: params.accountId,
+                    ...(params.identity ? { identity: params.identity } : {}),
+                });
+            },
+        });
+        if (delivered !== "empty") {
+            params.runtime.log?.(`delivered reply to ${params.target}`);
+        }
+    }
+}
+/**
+ * Compute effective threadTs for a Slack reply based on replyToMode.
+ * - "off": stay in thread if already in one, otherwise main channel
+ * - "first": first reply goes to thread, subsequent replies to main channel
+ * - "all": all replies go to thread
+ */
+export function resolveSlackThreadTs(params) {
+    const planner = createSlackReplyReferencePlanner({
+        replyToMode: params.replyToMode,
+        incomingThreadTs: params.incomingThreadTs,
+        messageTs: params.messageTs,
+        hasReplied: params.hasReplied,
+        isThreadReply: params.isThreadReply,
+    });
+    return planner.use();
+}
+function createSlackReplyReferencePlanner(params) {
+    // Keep backward-compatible behavior: when a thread id is present and caller
+    // does not provide explicit classification, stay in thread. Callers that can
+    // distinguish Slack's auto-populated top-level thread_ts should pass
+    // `isThreadReply: false` to preserve replyToMode behavior.
+    const effectiveIsThreadReply = params.isThreadReply ?? Boolean(params.incomingThreadTs);
+    const effectiveMode = effectiveIsThreadReply ? "all" : params.replyToMode;
+    return createReplyReferencePlanner({
+        replyToMode: effectiveMode,
+        existingId: params.incomingThreadTs,
+        startId: params.messageTs,
+        hasReplied: params.hasReplied,
+    });
+}
+export function createSlackReplyDeliveryPlan(params) {
+    const replyReference = createSlackReplyReferencePlanner({
+        replyToMode: params.replyToMode,
+        incomingThreadTs: params.incomingThreadTs,
+        messageTs: params.messageTs,
+        hasReplied: params.hasRepliedRef.value,
+        isThreadReply: params.isThreadReply,
+    });
+    return {
+        nextThreadTs: () => replyReference.use(),
+        markSent: () => {
+            replyReference.markSent();
+            params.hasRepliedRef.value = replyReference.hasReplied();
+        },
+    };
+}
+export async function deliverSlackSlashReplies(params) {
+    const messages = [];
+    const chunkLimit = Math.min(params.textLimit, SLACK_TEXT_LIMIT);
+    for (const payload of params.replies) {
+        const reply = resolveSendableOutboundReplyParts(payload);
+        const text = reply.hasText && !isSilentReplyText(reply.trimmedText, SILENT_REPLY_TOKEN)
+            ? reply.trimmedText
+            : undefined;
+        const combined = [text ?? "", ...reply.mediaUrls].filter(Boolean).join("\n");
+        if (!combined) {
+            continue;
+        }
+        const chunkMode = params.chunkMode ?? "length";
+        const markdownChunks = chunkMode === "newline"
+            ? chunkMarkdownTextWithMode(combined, chunkLimit, chunkMode)
+            : [combined];
+        const chunks = markdownChunks.flatMap((markdown) => markdownToSlackMrkdwnChunks(markdown, chunkLimit, { tableMode: params.tableMode }));
+        if (!chunks.length && combined) {
+            chunks.push(combined);
+        }
+        for (const chunk of chunks) {
+            messages.push(chunk);
+        }
+    }
+    if (messages.length === 0) {
+        return;
+    }
+    // Slack slash command responses can be multi-part by sending follow-ups via response_url.
+    const responseType = params.ephemeral ? "ephemeral" : "in_channel";
+    for (const text of messages) {
+        await params.respond({ text, response_type: responseType });
+    }
+}

@@ -1,0 +1,47 @@
+import { describeWebhookAccountSnapshot } from "openclaw/plugin-sdk/account-helpers";
+import { resolveLineAccount, } from "../runtime-api.js";
+import { hasLineCredentials, parseLineAllowFromId } from "./account-helpers.js";
+import { lineConfigAdapter } from "./config-adapter.js";
+import { LineChannelConfigSchema } from "./config-schema.js";
+export const lineChannelMeta = {
+    id: "line",
+    label: "LINE",
+    selectionLabel: "LINE (Messaging API)",
+    detailLabel: "LINE Bot",
+    docsPath: "/channels/line",
+    docsLabel: "line",
+    blurb: "LINE Messaging API bot for Japan/Taiwan/Thailand markets.",
+    systemImage: "message.fill",
+};
+export const lineChannelPluginCommon = {
+    meta: {
+        ...lineChannelMeta,
+        quickstartAllowFrom: true,
+    },
+    capabilities: {
+        chatTypes: ["direct", "group"],
+        reactions: false,
+        threads: false,
+        media: true,
+        nativeCommands: false,
+        blockStreaming: true,
+    },
+    reload: { configPrefixes: ["channels.line"] },
+    configSchema: LineChannelConfigSchema,
+    config: {
+        ...lineConfigAdapter,
+        isConfigured: (account) => hasLineCredentials(account),
+        describeAccount: (account) => describeWebhookAccountSnapshot({
+            account,
+            configured: hasLineCredentials(account),
+            extra: {
+                tokenSource: account.tokenSource ?? undefined,
+            },
+        }),
+    },
+};
+export function isLineConfigured(cfg, accountId) {
+    return hasLineCredentials(resolveLineAccount({ cfg, accountId }));
+}
+export { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../runtime-api.js";
+export { parseLineAllowFromId };
