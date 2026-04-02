@@ -2,6 +2,7 @@
 
 import bluebubblesChannelEntry from "../../extensions/bluebubbles/index.js";
 import bluebubblesChannelSetupEntry from "../../extensions/bluebubbles/setup-entry.js";
+import dingtalkChannelEntry from "../../extensions/dingtalk/index.js";
 import discordChannelEntry from "../../extensions/discord/index.js";
 import discordChannelSetupEntry from "../../extensions/discord/setup-entry.js";
 import feishuChannelEntry from "../../extensions/feishu/index.js";
@@ -16,6 +17,7 @@ import mattermostChannelEntry from "../../extensions/mattermost/index.js";
 import mattermostChannelSetupEntry from "../../extensions/mattermost/setup-entry.js";
 import nextcloudTalkChannelEntry from "../../extensions/nextcloud-talk/index.js";
 import nextcloudTalkChannelSetupEntry from "../../extensions/nextcloud-talk/setup-entry.js";
+import qqbotChannelEntry from "../../extensions/qqbot/index.js";
 import signalChannelEntry from "../../extensions/signal/index.js";
 import signalChannelSetupEntry from "../../extensions/signal/setup-entry.js";
 import slackChannelEntry from "../../extensions/slack/index.js";
@@ -24,6 +26,9 @@ import synologyChatChannelEntry from "../../extensions/synology-chat/index.js";
 import synologyChatChannelSetupEntry from "../../extensions/synology-chat/setup-entry.js";
 import telegramChannelEntry from "../../extensions/telegram/index.js";
 import telegramChannelSetupEntry from "../../extensions/telegram/setup-entry.js";
+import wecomChannelEntry from "../../extensions/wecom/index.js";
+import whatsappChannelEntry from "../../extensions/whatsapp/index.js";
+import whatsappChannelSetupEntry from "../../extensions/whatsapp/setup-entry.js";
 import zaloChannelEntry from "../../extensions/zalo/index.js";
 import zaloChannelSetupEntry from "../../extensions/zalo/setup-entry.js";
 
@@ -32,6 +37,10 @@ export const GENERATED_BUNDLED_CHANNEL_ENTRIES = [
     id: "bluebubbles",
     entry: bluebubblesChannelEntry,
     setupEntry: bluebubblesChannelSetupEntry,
+  },
+  {
+    id: "dingtalk",
+    entry: dingtalkChannelEntry,
   },
   {
     id: "discord",
@@ -69,6 +78,10 @@ export const GENERATED_BUNDLED_CHANNEL_ENTRIES = [
     setupEntry: nextcloudTalkChannelSetupEntry,
   },
   {
+    id: "qqbot",
+    entry: qqbotChannelEntry,
+  },
+  {
     id: "signal",
     entry: signalChannelEntry,
     setupEntry: signalChannelSetupEntry,
@@ -87,6 +100,15 @@ export const GENERATED_BUNDLED_CHANNEL_ENTRIES = [
     id: "telegram",
     entry: telegramChannelEntry,
     setupEntry: telegramChannelSetupEntry,
+  },
+  {
+    id: "wecom",
+    entry: wecomChannelEntry,
+  },
+  {
+    id: "whatsapp",
+    entry: whatsappChannelEntry,
+    setupEntry: whatsappChannelSetupEntry,
   },
   {
     id: "zalo",

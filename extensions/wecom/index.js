@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import * as crypto from "node:crypto";
 import { mkdirSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { defineChannelPluginEntry } from "openclaw/plugin-sdk/core";
 import { WecomCrypto } from "./crypto.js";
 import {
   generateAgentId,
@@ -682,7 +683,7 @@ const wecomChannelPlugin = {
   config: {
     listAccountIds: (cfg) => {
       const wecom = cfg?.channels?.wecom;
-      if (!wecom || !wecom.enabled) {
+      if (!wecom || wecom.enabled === false) {
         return [];
       }
       return [DEFAULT_ACCOUNT_ID];
@@ -704,11 +705,20 @@ const wecomChannelPlugin = {
     },
     defaultAccountId: (cfg) => {
       const wecom = cfg?.channels?.wecom;
-      if (!wecom || !wecom.enabled) {
+      if (!wecom || wecom.enabled === false) {
         return null;
       }
       return DEFAULT_ACCOUNT_ID;
     },
+    isConfigured: (account) =>
+      Boolean(
+        account &&
+          typeof account === "object" &&
+          typeof account.token === "string" &&
+          account.token.trim() &&
+          typeof account.encodingAesKey === "string" &&
+          account.encodingAesKey.trim().length === 43,
+      ),
     setAccountEnabled: ({ cfg, accountId: _accountId, enabled }) => {
       if (!cfg.channels) {
         cfg.channels = {};
@@ -1798,33 +1808,29 @@ async function deliverWecomReply({ payload, senderId, streamId }) {
 // Plugin Registration
 // =============================================================================
 
-const plugin = {
-  // Plugin id should match `openclaw.plugin.json` id (and config.plugins.entries key).
+function registerWecomFull(api) {
+  logger.info("WeCom plugin registering...");
+
+  _openclawConfig = api.config;
+
+  api.registerHttpRoute({
+    path: "/webhooks/wecom",
+    handler: wecomHttpHandler,
+    auth: "plugin",
+    match: "prefix",
+  });
+  logger.info("WeCom HTTP handler registered");
+}
+
+const plugin = defineChannelPluginEntry({
   id: "wecom",
   name: "Enterprise WeChat",
   description: "Enterprise WeChat AI Bot channel plugin for OpenClaw",
+  plugin: wecomChannelPlugin,
   configSchema: { type: "object", additionalProperties: false, properties: {} },
-  register(api) {
-    logger.info("WeCom plugin registering...");
-
-    // Save runtime for message processing
-    setRuntime(api.runtime);
-    _openclawConfig = api.config;
-
-    // Register channel
-    api.registerChannel({ plugin: wecomChannelPlugin });
-    logger.info("WeCom channel registered");
-
-    // Register HTTP handler for webhooks
-    api.registerHttpRoute({
-      path: "/webhooks/wecom",
-      handler: wecomHttpHandler,
-      auth: "plugin",
-      match: "prefix",
-    });
-    logger.info("WeCom HTTP handler registered");
-  },
-};
+  setRuntime,
+  registerFull: registerWecomFull,
+});
 
 export default plugin;
 export const register = (api) => plugin.register(api);

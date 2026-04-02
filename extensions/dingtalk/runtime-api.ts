@@ -12,3 +12,4 @@ export { buildChannelConfigSchema } from "../../src/channels/plugins/config-sche
 export { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../../src/routing/account-id.js";
 export { formatDocsLink } from "../../src/terminal/links.js";
 export type { ChannelSetupWizardAdapter as ChannelOnboardingAdapter } from "../../src/channels/plugins/setup-wizard-types.js";
+export type { ChannelLogSink } from "../../src/channels/plugins/types.core.js";

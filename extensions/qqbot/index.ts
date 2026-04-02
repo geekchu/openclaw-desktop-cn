@@ -1,20 +1,16 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
+import { defineChannelPluginEntry } from "openclaw/plugin-sdk/core";
 import { qqbotPlugin } from "./src/channel.js";
 import { setQQBotRuntime } from "./src/runtime.js";
 
-const plugin = {
+export default defineChannelPluginEntry({
   id: "qqbot",
   name: "QQ Bot",
   description: "QQ Bot channel plugin",
-  configSchema: emptyPluginConfigSchema(),
-  register(api: OpenClawPluginApi) {
-    setQQBotRuntime(api.runtime);
-    api.registerChannel({ plugin: qqbotPlugin });
-  },
-};
-
-export default plugin;
+  plugin: qqbotPlugin,
+  configSchema: emptyPluginConfigSchema,
+  setRuntime: setQQBotRuntime,
+});
 
 export { qqbotPlugin } from "./src/channel.js";
 export { setQQBotRuntime, getQQBotRuntime } from "./src/runtime.js";

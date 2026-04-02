@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
+import { releasePinnedPluginChannelRegistry } from "../plugins/runtime.js";
 import { createChannelTestPluginBase } from "../test-utils/channel-plugins.js";
 import { channelsHandlers } from "./server-methods/channels.js";
 import { setRegistry } from "./server.agent.gateway-server-agent.mocks.js";
@@ -156,6 +157,9 @@ describe("gateway server channels", () => {
         },
       ]),
     );
+    // This assertion calls the handler directly rather than going through the
+    // booted gateway, so release the startup pin and follow the test registry.
+    releasePinnedPluginChannelRegistry();
 
     const responses: Array<{
       ok: boolean;

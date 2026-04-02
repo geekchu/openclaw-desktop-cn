@@ -1335,6 +1335,349 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
     },
   },
   {
+    dirName: "dingtalk",
+    idHint: "dingtalk",
+    source: {
+      source: "./index.ts",
+      built: "index.js",
+    },
+    publicSurfaceArtifacts: ["runtime-api.js", "vitest.config.js"],
+    runtimeSidecarArtifacts: ["runtime-api.js"],
+    packageName: "@soimy/dingtalk",
+    packageVersion: "3.1.1",
+    packageDescription: "DingTalk (钉钉) channel plugin for OpenClaw",
+    packageManifest: {
+      extensions: ["./index.ts"],
+      channel: {
+        id: "dingtalk",
+        label: "DingTalk",
+        selectionLabel: "DingTalk (钉钉)",
+        docsPath: "/channels/dingtalk",
+        docsLabel: "dingtalk",
+        blurb: "钉钉企业内部机器人，使用 Stream 模式，无需公网 IP。",
+        order: 70,
+        aliases: ["dd", "ding"],
+      },
+      install: {
+        npmSpec: "@soimy/dingtalk",
+        localPath: ".",
+        defaultChoice: "npm",
+      },
+    },
+    manifest: {
+      id: "dingtalk",
+      configSchema: {
+        type: "object",
+        additionalProperties: true,
+        properties: {},
+      },
+      channels: ["dingtalk"],
+      channelConfigs: {
+        dingtalk: {
+          schema: {
+            $schema: "http://json-schema.org/draft-07/schema#",
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+              },
+              enabled: {
+                default: true,
+                type: "boolean",
+              },
+              clientId: {
+                type: "string",
+              },
+              clientSecret: {
+                type: "string",
+              },
+              robotCode: {
+                type: "string",
+              },
+              corpId: {
+                type: "string",
+              },
+              agentId: {
+                anyOf: [
+                  {
+                    type: "string",
+                  },
+                  {
+                    type: "number",
+                  },
+                ],
+              },
+              dmPolicy: {
+                default: "open",
+                type: "string",
+                enum: ["open", "pairing", "allowlist"],
+              },
+              groupPolicy: {
+                default: "open",
+                type: "string",
+                enum: ["open", "allowlist"],
+              },
+              allowFrom: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+              },
+              showThinking: {
+                default: true,
+                type: "boolean",
+              },
+              debug: {
+                default: false,
+                type: "boolean",
+              },
+              messageType: {
+                default: "markdown",
+                type: "string",
+                enum: ["markdown", "card"],
+              },
+              cardTemplateId: {
+                type: "string",
+              },
+              cardTemplateKey: {
+                default: "content",
+                type: "string",
+              },
+              groups: {
+                type: "object",
+                propertyNames: {
+                  type: "string",
+                },
+                additionalProperties: {
+                  type: "object",
+                  properties: {
+                    systemPrompt: {
+                      type: "string",
+                    },
+                  },
+                  additionalProperties: false,
+                },
+              },
+              maxConnectionAttempts: {
+                default: 10,
+                type: "integer",
+                minimum: 1,
+                maximum: 9007199254740991,
+              },
+              initialReconnectDelay: {
+                default: 1000,
+                type: "integer",
+                minimum: 100,
+                maximum: 9007199254740991,
+              },
+              maxReconnectDelay: {
+                default: 60000,
+                type: "integer",
+                minimum: 1000,
+                maximum: 9007199254740991,
+              },
+              reconnectJitter: {
+                default: 0.3,
+                type: "number",
+                minimum: 0,
+                maximum: 1,
+              },
+              proactivePermissionHint: {
+                default: {
+                  enabled: true,
+                  cooldownHours: 24,
+                },
+                type: "object",
+                properties: {
+                  enabled: {
+                    default: true,
+                    type: "boolean",
+                  },
+                  cooldownHours: {
+                    default: 24,
+                    type: "integer",
+                    minimum: 1,
+                    maximum: 720,
+                  },
+                },
+                required: ["enabled", "cooldownHours"],
+                additionalProperties: false,
+              },
+              accounts: {
+                type: "object",
+                propertyNames: {
+                  type: "string",
+                },
+                additionalProperties: {
+                  type: "object",
+                  properties: {
+                    name: {
+                      type: "string",
+                    },
+                    enabled: {
+                      default: true,
+                      type: "boolean",
+                    },
+                    clientId: {
+                      type: "string",
+                    },
+                    clientSecret: {
+                      type: "string",
+                    },
+                    robotCode: {
+                      type: "string",
+                    },
+                    corpId: {
+                      type: "string",
+                    },
+                    agentId: {
+                      anyOf: [
+                        {
+                          type: "string",
+                        },
+                        {
+                          type: "number",
+                        },
+                      ],
+                    },
+                    dmPolicy: {
+                      default: "open",
+                      type: "string",
+                      enum: ["open", "pairing", "allowlist"],
+                    },
+                    groupPolicy: {
+                      default: "open",
+                      type: "string",
+                      enum: ["open", "allowlist"],
+                    },
+                    allowFrom: {
+                      type: "array",
+                      items: {
+                        type: "string",
+                      },
+                    },
+                    showThinking: {
+                      default: true,
+                      type: "boolean",
+                    },
+                    debug: {
+                      default: false,
+                      type: "boolean",
+                    },
+                    messageType: {
+                      default: "markdown",
+                      type: "string",
+                      enum: ["markdown", "card"],
+                    },
+                    cardTemplateId: {
+                      type: "string",
+                    },
+                    cardTemplateKey: {
+                      default: "content",
+                      type: "string",
+                    },
+                    groups: {
+                      type: "object",
+                      propertyNames: {
+                        type: "string",
+                      },
+                      additionalProperties: {
+                        type: "object",
+                        properties: {
+                          systemPrompt: {
+                            type: "string",
+                          },
+                        },
+                        additionalProperties: false,
+                      },
+                    },
+                    maxConnectionAttempts: {
+                      default: 10,
+                      type: "integer",
+                      minimum: 1,
+                      maximum: 9007199254740991,
+                    },
+                    initialReconnectDelay: {
+                      default: 1000,
+                      type: "integer",
+                      minimum: 100,
+                      maximum: 9007199254740991,
+                    },
+                    maxReconnectDelay: {
+                      default: 60000,
+                      type: "integer",
+                      minimum: 1000,
+                      maximum: 9007199254740991,
+                    },
+                    reconnectJitter: {
+                      default: 0.3,
+                      type: "number",
+                      minimum: 0,
+                      maximum: 1,
+                    },
+                    proactivePermissionHint: {
+                      default: {
+                        enabled: true,
+                        cooldownHours: 24,
+                      },
+                      type: "object",
+                      properties: {
+                        enabled: {
+                          default: true,
+                          type: "boolean",
+                        },
+                        cooldownHours: {
+                          default: 24,
+                          type: "integer",
+                          minimum: 1,
+                          maximum: 720,
+                        },
+                      },
+                      required: ["enabled", "cooldownHours"],
+                      additionalProperties: false,
+                    },
+                  },
+                  required: [
+                    "enabled",
+                    "dmPolicy",
+                    "groupPolicy",
+                    "showThinking",
+                    "debug",
+                    "messageType",
+                    "cardTemplateKey",
+                    "maxConnectionAttempts",
+                    "initialReconnectDelay",
+                    "maxReconnectDelay",
+                    "reconnectJitter",
+                    "proactivePermissionHint",
+                  ],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: [
+              "enabled",
+              "dmPolicy",
+              "groupPolicy",
+              "showThinking",
+              "debug",
+              "messageType",
+              "cardTemplateKey",
+              "maxConnectionAttempts",
+              "initialReconnectDelay",
+              "maxReconnectDelay",
+              "reconnectJitter",
+              "proactivePermissionHint",
+            ],
+            additionalProperties: false,
+          },
+          label: "DingTalk",
+          description: "钉钉企业内部机器人，使用 Stream 模式，无需公网 IP。",
+        },
+      },
+    },
+  },
+  {
     dirName: "discord",
     idHint: "discord",
     source: {
@@ -4498,7 +4841,7 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
               dmPolicy: {
                 default: "pairing",
                 type: "string",
-                enum: ["open", "pairing", "allowlist"],
+                enum: ["open", "pairing", "allowlist", "disabled"],
               },
               allowFrom: {
                 type: "array",
@@ -5055,7 +5398,7 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
                     },
                     dmPolicy: {
                       type: "string",
-                      enum: ["open", "pairing", "allowlist"],
+                      enum: ["open", "pairing", "allowlist", "disabled"],
                     },
                     allowFrom: {
                       type: "array",
@@ -9537,7 +9880,7 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
         },
         dbPath: {
           label: "Database Path",
-          placeholder: "~/.openclaw/memory/lancedb",
+          placeholder: "~/.openclawcn/memory/lancedb",
           advanced: true,
         },
         autoCapture: {
@@ -11869,6 +12212,135 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
           cliDescription: "QIANFAN API key",
         },
       ],
+    },
+  },
+  {
+    dirName: "qqbot",
+    idHint: "qqbot",
+    source: {
+      source: "./index.ts",
+      built: "index.js",
+    },
+    publicSurfaceArtifacts: ["runtime-api.js"],
+    runtimeSidecarArtifacts: ["runtime-api.js"],
+    packageName: "@sliverp/qqbot",
+    packageVersion: "1.5.0",
+    packageManifest: {
+      extensions: ["./index.ts"],
+    },
+    manifest: {
+      id: "qqbot",
+      configSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+      channels: ["qqbot"],
+      skills: ["skills/qqbot-cron", "skills/qqbot-media"],
+      name: "QQ Bot Channel",
+      description: "QQ Bot channel plugin with message support, cron jobs, and proactive messaging",
+      channelConfigs: {
+        qqbot: {
+          schema: {
+            $schema: "http://json-schema.org/draft-07/schema#",
+            type: "object",
+            properties: {
+              enabled: {
+                default: true,
+                type: "boolean",
+              },
+              name: {
+                type: "string",
+              },
+              appId: {
+                type: "string",
+              },
+              clientSecret: {
+                type: "string",
+              },
+              clientSecretFile: {
+                type: "string",
+              },
+              dmPolicy: {
+                default: "open",
+                type: "string",
+                enum: ["open", "pairing", "allowlist"],
+              },
+              allowFrom: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+              },
+              systemPrompt: {
+                type: "string",
+              },
+              imageServerBaseUrl: {
+                type: "string",
+              },
+              markdownSupport: {
+                default: true,
+                type: "boolean",
+              },
+              accounts: {
+                type: "object",
+                propertyNames: {
+                  type: "string",
+                },
+                additionalProperties: {
+                  type: "object",
+                  properties: {
+                    enabled: {
+                      default: true,
+                      type: "boolean",
+                    },
+                    name: {
+                      type: "string",
+                    },
+                    appId: {
+                      type: "string",
+                    },
+                    clientSecret: {
+                      type: "string",
+                    },
+                    clientSecretFile: {
+                      type: "string",
+                    },
+                    dmPolicy: {
+                      default: "open",
+                      type: "string",
+                      enum: ["open", "pairing", "allowlist"],
+                    },
+                    allowFrom: {
+                      type: "array",
+                      items: {
+                        type: "string",
+                      },
+                    },
+                    systemPrompt: {
+                      type: "string",
+                    },
+                    imageServerBaseUrl: {
+                      type: "string",
+                    },
+                    markdownSupport: {
+                      default: true,
+                      type: "boolean",
+                    },
+                  },
+                  required: ["enabled", "dmPolicy", "markdownSupport"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["enabled", "dmPolicy", "markdownSupport"],
+            additionalProperties: false,
+          },
+          label: "QQ Bot Channel",
+          description:
+            "QQ Bot channel plugin with message support, cron jobs, and proactive messaging",
+        },
+      },
     },
   },
   {
@@ -17901,6 +18373,162 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
           cliDescription: "Volcano Engine API key",
         },
       ],
+    },
+  },
+  {
+    dirName: "wecom",
+    idHint: "wecom",
+    source: {
+      source: "./index.js",
+      built: "index.js",
+    },
+    publicSurfaceArtifacts: [
+      "crypto.js",
+      "dynamic-agent.js",
+      "image-processor.js",
+      "logger.js",
+      "stream-manager.js",
+      "utils.js",
+      "webhook.js",
+    ],
+    packageName: "@sunnoy/wecom",
+    packageVersion: "1.2.1",
+    packageDescription: "Enterprise WeChat AI Bot channel plugin for OpenClaw",
+    packageManifest: {
+      extensions: ["./index.js"],
+      channel: {
+        id: "wecom",
+        label: "Enterprise WeChat",
+        selectionLabel: "Enterprise WeChat (AI Bot)",
+        docsPath: "/channels/wecom",
+        docsLabel: "wecom",
+        blurb: "Support for Enterprise WeChat (WeCom) AI Bot integration",
+        order: 90,
+        aliases: ["wecom", "wework"],
+      },
+      install: {
+        defaultChoice: "npm",
+        npmSpec: "@sunnoy/wecom",
+      },
+    },
+    manifest: {
+      id: "wecom",
+      configSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+      channels: ["wecom"],
+      name: "OpenClaw WeCom",
+      description: "Enterprise WeChat (WeCom) messaging channel plugin for OpenClaw",
+      channelConfigs: {
+        wecom: {
+          schema: {
+            $schema: "http://json-schema.org/draft-07/schema#",
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              enabled: {
+                type: "boolean",
+                description: "Enable WeCom channel",
+                default: true,
+              },
+              token: {
+                type: "string",
+                description: "WeCom bot token from admin console",
+              },
+              encodingAesKey: {
+                type: "string",
+                description: "WeCom message encryption key (43 characters)",
+                minLength: 43,
+                maxLength: 43,
+              },
+              commands: {
+                type: "object",
+                description: "Command whitelist configuration",
+                additionalProperties: false,
+                properties: {
+                  enabled: {
+                    type: "boolean",
+                    description: "Enable command whitelist filtering",
+                    default: true,
+                  },
+                  allowlist: {
+                    type: "array",
+                    description: "Allowed commands (e.g., /new, /status, /help)",
+                    items: {
+                      type: "string",
+                    },
+                    default: ["/new", "/status", "/help", "/compact"],
+                  },
+                },
+              },
+              dynamicAgents: {
+                type: "object",
+                description: "Dynamic agent routing configuration",
+                additionalProperties: false,
+                properties: {
+                  enabled: {
+                    type: "boolean",
+                    description: "Enable per-user/per-group agent isolation",
+                    default: true,
+                  },
+                },
+              },
+              dm: {
+                type: "object",
+                description: "Direct message (private chat) configuration",
+                additionalProperties: false,
+                properties: {
+                  createAgentOnFirstMessage: {
+                    type: "boolean",
+                    description: "Create separate agent for each user",
+                    default: true,
+                  },
+                },
+              },
+              groupChat: {
+                type: "object",
+                description: "Group chat configuration",
+                additionalProperties: false,
+                properties: {
+                  enabled: {
+                    type: "boolean",
+                    description: "Enable group chat support",
+                    default: true,
+                  },
+                  requireMention: {
+                    type: "boolean",
+                    description: "Only respond when @mentioned in groups",
+                    default: true,
+                  },
+                },
+              },
+              adminUsers: {
+                type: "array",
+                description: "Admin users who bypass command allowlist and dynamic agent routing",
+                items: {
+                  type: "string",
+                },
+                default: [],
+              },
+            },
+          },
+          uiHints: {
+            token: {
+              sensitive: true,
+              label: "Bot Token",
+            },
+            encodingAesKey: {
+              sensitive: true,
+              label: "Encoding AES Key",
+              help: "43-character encryption key from WeCom admin console",
+            },
+          },
+          label: "Enterprise WeChat",
+          description: "Support for Enterprise WeChat (WeCom) AI Bot integration",
+        },
+      },
     },
   },
   {

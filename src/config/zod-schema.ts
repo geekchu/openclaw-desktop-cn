@@ -233,6 +233,7 @@ export const OpenClawSchema = z
     $schema: z.string().optional(),
     meta: z
       .object({
+        version: z.string().optional(),
         lastTouchedVersion: z.string().optional(),
         // Accept any string unchanged (backwards-compatible) and coerce numeric Unix
         // timestamps to ISO strings (agent file edits may write Date.now()).

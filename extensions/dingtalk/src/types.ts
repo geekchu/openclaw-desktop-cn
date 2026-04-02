@@ -12,11 +12,11 @@
 import type {
   OpenClawConfig,
   OpenClawPluginApi,
-  ChannelLogSink as SDKChannelLogSink,
   ChannelAccountSnapshot as SDKChannelAccountSnapshot,
   ChannelGatewayContext as SDKChannelGatewayContext,
   ChannelPlugin as SDKChannelPlugin,
 } from "openclaw/plugin-sdk";
+import type { ChannelLogSink as SDKChannelLogSink } from "../runtime-api.js";
 
 export interface DingtalkPluginModule {
   id: string;
@@ -516,6 +516,31 @@ export function listDingTalkAccountIds(cfg: OpenClawConfig): string[] {
   }
 
   return accountIds;
+}
+
+/**
+ * Resolve the default DingTalk account ID for status/diagnostic flows.
+ * Prefer a fully configured top-level account, otherwise fall back to the
+ * first fully configured named account, then the first declared account.
+ */
+export function resolveDefaultDingTalkAccountId(cfg: OpenClawConfig): string {
+  const dingtalk = cfg.channels?.dingtalk as DingTalkChannelConfig | undefined;
+  if (!dingtalk) {
+    return DEFAULT_ACCOUNT_ID;
+  }
+
+  if (dingtalk.clientId && dingtalk.clientSecret) {
+    return DEFAULT_ACCOUNT_ID;
+  }
+
+  const configuredNamedAccountId = Object.entries(dingtalk.accounts ?? {}).find(
+    ([, account]) => Boolean(account?.clientId && account?.clientSecret),
+  )?.[0];
+  if (configuredNamedAccountId) {
+    return configuredNamedAccountId;
+  }
+
+  return listDingTalkAccountIds(cfg)[0] ?? DEFAULT_ACCOUNT_ID;
 }
 
 /**

@@ -366,6 +366,7 @@ describe("memory plugin e2e", () => {
 
   test("local file backend stores and searches memories without LanceDB", async () => {
     const { createMemoryStore } = await import("./index.js");
+    const dbPath = path.join(os.tmpdir(), "openclaw-memory-test-local-file");
     const store = createMemoryStore({ dbPath, vectorDim: 3, backend: "local-file" });
 
     const stored = await store.store({
@@ -389,6 +390,7 @@ describe("memory plugin e2e", () => {
 
   test("local file backend serializes concurrent writes", async () => {
     const { createMemoryStore } = await import("./index.js");
+    const dbPath = path.join(os.tmpdir(), "openclaw-memory-test-concurrent");
     const store = createMemoryStore({ dbPath, vectorDim: 2, backend: "local-file" });
 
     await Promise.all([

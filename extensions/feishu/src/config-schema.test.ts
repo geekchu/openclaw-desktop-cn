@@ -45,6 +45,14 @@ describe("FeishuConfigSchema webhook validation", () => {
     expect(result.groupPolicy).toBe("open");
   });
 
+  it("accepts dmPolicy=disabled to match the shared desktop message settings surface", () => {
+    const result = FeishuConfigSchema.safeParse({
+      dmPolicy: "disabled",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("rejects top-level webhook mode without verificationToken", () => {
     const result = FeishuConfigSchema.safeParse({
       connectionMode: "webhook",

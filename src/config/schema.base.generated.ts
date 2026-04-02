@@ -10,6 +10,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
       meta: {
         type: "object",
         properties: {
+          version: {
+            type: "string",
+          },
           lastTouchedVersion: {
             type: "string",
           },

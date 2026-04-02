@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import type { ResolvedQQBotAccount, QQBotAccountConfig } from "./types.js";
 
@@ -5,6 +6,18 @@ export const DEFAULT_ACCOUNT_ID = "default";
 
 interface QQBotChannelConfig extends QQBotAccountConfig {
   accounts?: Record<string, QQBotAccountConfig>;
+}
+
+function readQQBotSecretFile(filePath: string | undefined): string {
+  const normalized = filePath?.trim();
+  if (!normalized) {
+    return "";
+  }
+  try {
+    return fs.readFileSync(normalized, "utf8").trim();
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -34,16 +47,24 @@ export function listQQBotAccountIds(cfg: OpenClawConfig): string[] {
  */
 export function resolveDefaultQQBotAccountId(cfg: OpenClawConfig): string {
   const qqbot = cfg.channels?.qqbot as QQBotChannelConfig | undefined;
-  // 如果有默认账户配置，返回 default
+  // Prefer a fully configured top-level account. A partial top-level draft
+  // should not hide a working named account from status/diagnostic flows.
+  if (qqbot?.appId && (qqbot.clientSecret || qqbot.clientSecretFile)) {
+    return DEFAULT_ACCOUNT_ID;
+  }
+  const configuredNamedAccountId = Object.entries(qqbot?.accounts ?? {}).find(
+    ([, account]) => Boolean(account?.appId && (account.clientSecret || account.clientSecretFile)),
+  )?.[0];
+  if (configuredNamedAccountId) {
+    return configuredNamedAccountId;
+  }
   if (qqbot?.appId) {
     return DEFAULT_ACCOUNT_ID;
   }
-  // 否则返回第一个配置的账户
-  if (qqbot?.accounts) {
-    const ids = Object.keys(qqbot.accounts);
-    if (ids.length > 0) {
-      return ids[0];
-    }
+  // 否则返回第一个账户
+  const firstAccountId = Object.keys(qqbot?.accounts ?? {})[0];
+  if (firstAccountId) {
+    return firstAccountId;
   }
   return DEFAULT_ACCOUNT_ID;
 }
@@ -91,7 +112,7 @@ export function resolveQQBotAccount(
     clientSecret = accountConfig.clientSecret;
     secretSource = "config";
   } else if (accountConfig.clientSecretFile) {
-    // 从文件读取（运行时处理）
+    clientSecret = readQQBotSecretFile(accountConfig.clientSecretFile);
     secretSource = "file";
   } else if (process.env.QQBOT_CLIENT_SECRET && resolvedAccountId === DEFAULT_ACCOUNT_ID) {
     clientSecret = process.env.QQBOT_CLIENT_SECRET;

@@ -33,6 +33,83 @@ describe("channel config + status helpers", () => {
     expect((dingtalkPlugin as any).config.describeAccount(account).name).toBe("Main");
   });
 
+  it("includes the default account in mixed top-level plus named-account setups", () => {
+    const cfg = {
+      channels: {
+        dingtalk: {
+          clientId: "top-id",
+          clientSecret: "top-secret",
+          accounts: {
+            main: { clientId: "id1", clientSecret: "sec1", enabled: true, name: "Main" },
+          },
+        },
+      },
+    } as any;
+
+    const ids = (dingtalkPlugin as any).config.listAccountIds(cfg);
+    const defaultAccount = (dingtalkPlugin as any).config.resolveAccount(cfg);
+
+    expect(ids).toEqual(["default", "main"]);
+    expect(defaultAccount.accountId).toBe("default");
+    expect(defaultAccount.config.clientId).toBe("top-id");
+  });
+
+  it("keeps describeAccount configured state aligned with clientSecret requirements", () => {
+    const cfg = {
+      channels: {
+        dingtalk: {
+          accounts: {
+            partial: { clientId: "id-only", enabled: true, name: "Partial" },
+          },
+        },
+      },
+    } as any;
+
+    const account = (dingtalkPlugin as any).config.resolveAccount(cfg, "partial");
+    const snapshot = (dingtalkPlugin as any).config.describeAccount(account);
+
+    expect(account.configured).toBe(false);
+    expect(snapshot.configured).toBe(false);
+  });
+
+  it("prefers a configured named account as the default when top-level credentials are incomplete", () => {
+    const cfg = {
+      channels: {
+        dingtalk: {
+          clientId: "partial-top-level",
+          accounts: {
+            main: { clientId: "id1", clientSecret: "sec1", enabled: true, name: "Main" },
+          },
+        },
+      },
+    } as any;
+
+    expect((dingtalkPlugin as any).config.defaultAccountId(cfg)).toBe("main");
+    expect((dingtalkPlugin as any).config.resolveAccount(cfg).accountId).toBe("main");
+    expect((dingtalkPlugin as any).groups.resolveRequireMention({ cfg })).toBe(true);
+  });
+
+  it("does not fall back to the top-level account for an explicit unknown account id", () => {
+    const cfg = {
+      channels: {
+        dingtalk: {
+          clientId: "top-id",
+          clientSecret: "top-secret",
+          accounts: {
+            main: { clientId: "id1", clientSecret: "sec1", enabled: true, name: "Main" },
+          },
+        },
+      },
+    } as any;
+
+    const account = (dingtalkPlugin as any).config.resolveAccount(cfg, "missing");
+
+    expect(account.accountId).toBe("missing");
+    expect(account.config.clientId).toBe("");
+    expect(account.config.clientSecret).toBe("");
+    expect(account.configured).toBe(false);
+  });
+
   it("validates outbound resolveTarget and messaging/security helpers", () => {
     const resolved = (dingtalkPlugin as any).outbound.resolveTarget({ to: "group:cidAbC" } as any);
     const invalid = (dingtalkPlugin as any).outbound.resolveTarget({ to: "   " } as any);
@@ -42,9 +119,24 @@ describe("channel config + status helpers", () => {
     expect((dingtalkPlugin as any).messaging.normalizeTarget("dingtalk:user_1")).toBe("user_1");
 
     const dmPolicy = (dingtalkPlugin as any).security.resolveDmPolicy({
-      account: { config: {} },
+      cfg: {
+        channels: {
+          dingtalk: {
+            accounts: {
+              main: {
+                dmPolicy: "allowlist",
+                allowFrom: ["user_1"],
+              },
+            },
+          },
+        },
+      },
+      accountId: "main",
+      account: { config: { dmPolicy: "allowlist", allowFrom: ["user_1"] } },
     } as any);
-    expect(dmPolicy.policy).toBe("open");
+    expect(dmPolicy.policy).toBe("allowlist");
+    expect(dmPolicy.policyPath).toBe("channels.dingtalk.accounts.main.dmPolicy");
+    expect(dmPolicy.allowFromPath).toBe("channels.dingtalk.accounts.main.allowFrom");
     expect(dmPolicy.normalizeEntry("dd:User1")).toBe("User1");
   });
 

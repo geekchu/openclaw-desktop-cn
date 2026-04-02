@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   collectBundledPluginMetadata,
+  renderBundledChannelEntriesModule,
   writeBundledPluginMetadataModule,
 } from "../../scripts/generate-bundled-plugin-metadata.mjs";
 import {
@@ -107,6 +108,28 @@ describe("bundled plugin metadata", () => {
       }),
     );
   });
+
+  it("captures bundled WeCom channel config schema metadata", () => {
+    const wecom = BUNDLED_PLUGIN_METADATA.find((entry) => entry.dirName === "wecom");
+    expect(wecom?.manifest.channelConfigs?.wecom).toEqual(
+      expect.objectContaining({
+        schema: expect.objectContaining({ type: "object" }),
+      }),
+    );
+  });
+
+  it(
+    "keeps bundled channel entries aligned with bundled messaging channel manifests",
+    { timeout: BUNDLED_PLUGIN_METADATA_TEST_TIMEOUT_MS },
+    async () => {
+      const entries = await collectBundledPluginMetadata({ repoRoot });
+      const rendered = renderBundledChannelEntriesModule(entries);
+
+      expect(rendered).toContain('id: "dingtalk"');
+      expect(rendered).toContain('id: "qqbot"');
+      expect(rendered).toContain('id: "wecom"');
+    },
+  );
 
   it("excludes test-only public surface artifacts", () => {
     BUNDLED_PLUGIN_METADATA.forEach((entry) =>
@@ -279,6 +302,66 @@ describe("bundled plugin metadata", () => {
           runtimeSidecarArtifacts?: string[];
         }
       | undefined;
+    expect(firstEntry?.publicSurfaceArtifacts).toEqual(["api.js", "runtime-api.js"]);
+    expect(firstEntry?.runtimeSidecarArtifacts).toEqual(["runtime-api.js"]);
+  });
+
+  it("ignores built copies of source entrypoints and deduplicates source-plus-built public artifacts", async () => {
+    const tempRoot = createGeneratedPluginTempRoot("openclaw-bundled-plugin-built-artifacts-");
+
+    writeJson(path.join(tempRoot, "extensions", "alpha", "package.json"), {
+      name: "@openclaw/alpha",
+      version: "0.0.1",
+      openclaw: {
+        extensions: ["./index.ts"],
+        setupEntry: "./setup-entry.ts",
+      },
+    });
+    writeJson(path.join(tempRoot, "extensions", "alpha", "openclaw.plugin.json"), {
+      id: "alpha",
+      configSchema: { type: "object" },
+    });
+    fs.writeFileSync(
+      path.join(tempRoot, "extensions", "alpha", "index.ts"),
+      "export {};\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(tempRoot, "extensions", "alpha", "index.js"),
+      "export {};\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(tempRoot, "extensions", "alpha", "setup-entry.ts"),
+      "export {};\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(tempRoot, "extensions", "alpha", "setup-entry.js"),
+      "export {};\n",
+      "utf8",
+    );
+    fs.writeFileSync(path.join(tempRoot, "extensions", "alpha", "api.ts"), "export {};\n", "utf8");
+    fs.writeFileSync(path.join(tempRoot, "extensions", "alpha", "api.js"), "export {};\n", "utf8");
+    fs.writeFileSync(
+      path.join(tempRoot, "extensions", "alpha", "runtime-api.ts"),
+      "export {};\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(tempRoot, "extensions", "alpha", "runtime-api.js"),
+      "export {};\n",
+      "utf8",
+    );
+
+    const entries = await collectBundledPluginMetadata({ repoRoot: tempRoot });
+    const firstEntry = entries[0] as
+      | {
+          publicSurfaceArtifacts?: string[];
+          runtimeSidecarArtifacts?: string[];
+        }
+      | undefined;
+
     expect(firstEntry?.publicSurfaceArtifacts).toEqual(["api.js", "runtime-api.js"]);
     expect(firstEntry?.runtimeSidecarArtifacts).toEqual(["runtime-api.js"]);
   });

@@ -27,11 +27,7 @@
     "resolveJsonModule": true,
     "rootDir": ".",
     "useDefineForClassFields": false,
-    "types": ["node", "vitest/globals"],
-    "paths": {
-      "openclaw/plugin-sdk": ["../../dist/plugin-sdk/plugin-sdk/index.d.ts"],
-      "openclaw/plugin-sdk/*": ["../../dist/plugin-sdk/plugin-sdk/*.d.ts"]
-    }
+    "types": ["node", "vitest/globals"]
   },
   "include": ["index.ts", "src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

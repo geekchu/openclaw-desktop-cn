@@ -6,7 +6,7 @@ import {
   resetProcessRegistryForTests,
 } from "./bash-process-registry.js";
 import { createExecTool } from "./bash-tools.exec.js";
-import { killProcessTree } from "./shell-utils.js";
+import { killProcessTree } from "../process/kill-tree.js";
 
 afterEach(() => {
   resetProcessRegistryForTests();

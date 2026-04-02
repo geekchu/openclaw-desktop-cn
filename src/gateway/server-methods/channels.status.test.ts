@@ -126,6 +126,49 @@ describe("channelsHandlers channels.status", () => {
         channels: {
           whatsapp: expect.objectContaining({
             configured: true,
+            logoutSupported: false,
+          }),
+        },
+      }),
+      undefined,
+    );
+  });
+
+  it("marks channels with gateway logout support in the summary", async () => {
+    mocks.listChannelPlugins.mockReturnValue([
+      {
+        id: "whatsapp",
+        config: {
+          listAccountIds: () => ["default"],
+          resolveAccount: () => ({}),
+          isEnabled: () => true,
+          isConfigured: async () => true,
+        },
+        gateway: {
+          logoutAccount: async () => ({
+            accountId: "default",
+            cleared: true,
+          }),
+        },
+      },
+    ]);
+    const respond = vi.fn();
+    const opts = createOptions(
+      { probe: false, timeoutMs: 2000 },
+      {
+        respond,
+      },
+    );
+
+    await channelsHandlers["channels.status"](opts);
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        channels: {
+          whatsapp: expect.objectContaining({
+            configured: true,
+            logoutSupported: true,
           }),
         },
       }),

@@ -12,8 +12,8 @@ import {
   applyQQBotAccountConfig,
   resolveDefaultQQBotAccountId,
 } from "./config.js";
+import { QQBotChannelConfigSchema } from "./config-schema.js";
 import { startGateway } from "./gateway.js";
-import { qqbotOnboardingAdapter } from "./onboarding.js";
 import { sendText, sendMedia } from "./outbound.js";
 import { getQQBotRuntime } from "./runtime.js";
 import type { ResolvedQQBotAccount } from "./types.js";
@@ -62,6 +62,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
     blurb: "Connect to QQ via official QQ Bot API",
     order: 50,
   },
+  configSchema: QQBotChannelConfigSchema,
   capabilities: {
     chatTypes: ["direct", "group"],
     media: true,
@@ -74,8 +75,6 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
     blockStreaming: false,
   },
   reload: { configPrefixes: ["channels.qqbot"] },
-  // CLI onboarding wizard
-  onboarding: qqbotOnboardingAdapter,
 
   config: {
     listAccountIds: (cfg) => listQQBotAccountIds(cfg),

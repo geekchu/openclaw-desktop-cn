@@ -20,7 +20,6 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc || true",
     "dev": "tsc --watch",
     "prepack": "npm install --omit=dev"
   },
@@ -58,7 +57,7 @@
   },
   "openclaw": {
     "extensions": [
-      "./dist/index.js"
+      "./index.ts"
     ]
   }
 }

@@ -241,7 +241,10 @@ export const channelsHandlers: GatewayRequestHandlers = {
           : {
               configured: defaultAccount?.configured ?? false,
             };
-        channelsMap[plugin.id] = summary;
+        channelsMap[plugin.id] = {
+          ...summary,
+          logoutSupported: Boolean(plugin.gateway?.logoutAccount),
+        };
         accountsMap[plugin.id] = accounts;
         defaultAccountIdMap[plugin.id] = defaultAccountId;
       } catch (err) {
@@ -250,6 +253,7 @@ export const channelsHandlers: GatewayRequestHandlers = {
         channelsMap[plugin.id] = {
           configured: false,
           lastError: message,
+          logoutSupported: Boolean(plugin.gateway?.logoutAccount),
         };
         accountsMap[plugin.id] = [
           {

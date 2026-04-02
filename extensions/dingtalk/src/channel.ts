@@ -10,7 +10,6 @@ import { ConnectionManager } from "./connection-manager.js";
 import { isMessageProcessed, markMessageProcessed } from "./dedup.js";
 import { handleDingTalkMessage } from "./inbound-handler.js";
 import { getLogger } from "./logger-context.js";
-import { dingtalkOnboardingAdapter } from "./onboarding.js";
 import { resolveOriginalPeerId } from "./peer-id-registry.js";
 import {
   detectMediaTypeFromExtension,
@@ -27,7 +26,7 @@ import type {
   DingTalkChannelPlugin,
   ResolvedAccount,
 } from "./types.js";
-import { ConnectionState } from "./types.js";
+import { ConnectionState, resolveDefaultDingTalkAccountId } from "./types.js";
 import {
   cleanupOrphanedTempFiles,
   formatDingTalkErrorPayloadLog,
@@ -87,7 +86,6 @@ export const dingtalkPlugin: DingTalkChannelPlugin = {
     aliases: ["dd", "ding"],
   },
   configSchema: buildChannelConfigSchema(DingTalkConfigSchema),
-  onboarding: dingtalkOnboardingAdapter,
   capabilities: {
     chatTypes: ["direct", "group"] as Array<"direct" | "group">,
     reactions: false,
@@ -100,17 +98,25 @@ export const dingtalkPlugin: DingTalkChannelPlugin = {
   config: {
     listAccountIds: (cfg: OpenClawConfig): string[] => {
       const config = getConfig(cfg);
-      return config.accounts && Object.keys(config.accounts).length > 0
-        ? Object.keys(config.accounts)
-        : isConfigured(cfg)
-          ? ["default"]
-          : [];
+      const ids = config.accounts ? Object.keys(config.accounts) : [];
+      if (isConfigured(cfg)) {
+        return ["default", ...ids.filter((id) => id !== "default")];
+      }
+      return ids;
     },
     resolveAccount: (cfg: OpenClawConfig, accountId?: string | null) => {
       const config = getConfig(cfg);
-      const id = accountId || "default";
+      const trimmedAccountId = accountId?.trim();
+      const id = trimmedAccountId || resolveDefaultDingTalkAccountId(cfg);
       const account = config.accounts?.[id];
-      const resolvedConfig = account || config;
+      const resolvedConfig =
+        account ??
+        (!trimmedAccountId || id === "default"
+          ? config
+          : ({
+              clientId: "",
+              clientSecret: "",
+            } as typeof config));
       const configured = Boolean(resolvedConfig.clientId && resolvedConfig.clientSecret);
       return {
         accountId: id,
@@ -120,28 +126,36 @@ export const dingtalkPlugin: DingTalkChannelPlugin = {
         name: resolvedConfig.name || null,
       };
     },
-    defaultAccountId: (): string => "default",
+    defaultAccountId: (cfg: OpenClawConfig): string => resolveDefaultDingTalkAccountId(cfg),
     isConfigured: (account: ResolvedAccount): boolean =>
       Boolean(account.config?.clientId && account.config?.clientSecret),
     describeAccount: (account: ResolvedAccount) => ({
       accountId: account.accountId,
       name: account.config?.name || "DingTalk",
       enabled: account.enabled,
-      configured: Boolean(account.config?.clientId),
+      configured: Boolean(account.config?.clientId && account.config?.clientSecret),
     }),
   },
   security: {
-    resolveDmPolicy: ({ account }: any) => ({
-      policy: account.config?.dmPolicy || "open",
-      allowFrom: account.config?.allowFrom || [],
-      policyPath: "channels.dingtalk.dmPolicy",
-      allowFromPath: "channels.dingtalk.allowFrom",
-      approveHint: "使用 /allow dingtalk:<userId> 批准用户",
-      normalizeEntry: (raw: string) => raw.replace(/^(dingtalk|dd|ding):/i, ""),
-    }),
+    resolveDmPolicy: ({ cfg, accountId, account }: any) => {
+      const resolvedAccountId = accountId || resolveDefaultDingTalkAccountId(cfg);
+      const usesNamedAccount = Boolean(cfg?.channels?.dingtalk?.accounts?.[resolvedAccountId]);
+      const basePath = usesNamedAccount
+        ? `channels.dingtalk.accounts.${resolvedAccountId}`
+        : "channels.dingtalk";
+      return {
+        policy: account.config?.dmPolicy || "open",
+        allowFrom: account.config?.allowFrom || [],
+        policyPath: `${basePath}.dmPolicy`,
+        allowFromPath: `${basePath}.allowFrom`,
+        approveHint: "使用 /allow dingtalk:<userId> 批准用户",
+        normalizeEntry: (raw: string) => raw.replace(/^(dingtalk|dd|ding):/i, ""),
+      };
+    },
   },
   groups: {
-    resolveRequireMention: ({ cfg }: any): boolean => getConfig(cfg).groupPolicy !== "open",
+    resolveRequireMention: ({ cfg, accountId }: any): boolean =>
+      getConfig(cfg, accountId || resolveDefaultDingTalkAccountId(cfg)).groupPolicy !== "open",
     resolveGroupIntroHint: ({ groupId, groupChannel }: any): string | undefined => {
       const parts = [`conversationId=${groupId}`];
       if (groupChannel) {

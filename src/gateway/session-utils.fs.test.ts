@@ -501,6 +501,44 @@ describe("readSessionMessages", () => {
     expect(typeof marker.timestamp).toBe("number");
   });
 
+  test("avoids whole-file read for oversized transcripts", () => {
+    const sessionId = "test-session-large-transcript";
+    const transcriptPath = path.join(tmpDir, `${sessionId}.jsonl`);
+    fs.writeFileSync(transcriptPath, "", "utf-8");
+
+    const statSpy = vi.spyOn(fs, "statSync").mockReturnValue({
+      size: 201 * 1024 * 1024,
+    } as fs.Stats);
+    const openSpy = vi.spyOn(fs, "openSync").mockReturnValue(123);
+    const readFileSpy = vi.spyOn(fs, "readFileSync");
+    const readSpy = vi.spyOn(fs, "readSync").mockImplementation((fd, buf, offset) => {
+      expect(fd).toBe(123);
+      const payload = Buffer.from(
+        `${JSON.stringify({ message: { role: "user", content: "Hello" } })}\n`,
+        "utf-8",
+      );
+      payload.copy(buf as Buffer, typeof offset === "number" ? offset : 0);
+      return payload.length;
+    });
+    const closeSpy = vi.spyOn(fs, "closeSync").mockImplementation(() => undefined);
+
+    try {
+      const out = readSessionMessages(sessionId, storePath);
+      expect(out).toHaveLength(1);
+      expect(out[0]).toMatchObject({ role: "user", content: "Hello" });
+      expect(readFileSpy).not.toHaveBeenCalledWith(transcriptPath, "utf-8");
+      expect(openSpy).toHaveBeenCalledWith(transcriptPath, "r");
+      expect(readSpy).toHaveBeenCalled();
+      expect(closeSpy).toHaveBeenCalledWith(123);
+    } finally {
+      statSpy.mockRestore();
+      openSpy.mockRestore();
+      readFileSpy.mockRestore();
+      readSpy.mockRestore();
+      closeSpy.mockRestore();
+    }
+  });
+
   test.each([
     {
       sessionId: "cross-agent-default-root",

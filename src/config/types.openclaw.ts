@@ -31,6 +31,8 @@ import type { ToolsConfig } from "./types.tools.js";
 
 export type OpenClawConfig = {
   meta?: {
+    /** Config schema version (used by desktop app for migration). */
+    version?: string;
     /** Last OpenClaw version that wrote this config. */
     lastTouchedVersion?: string;
     /** ISO timestamp when this config was last written. */

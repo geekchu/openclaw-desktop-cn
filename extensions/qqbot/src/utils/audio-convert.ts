@@ -1,19 +1,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { decode, isSilk } from "silk-wasm";
 
-/**
- * 检查文件是否为 SILK 格式（QQ/微信语音常用格式）
- * QQ 语音文件通常以 .amr 扩展名保存，但实际编码可能是 SILK v3
- * SILK 文件头部标识: 0x02 "#!SILK_V3"
- */
-function isSilkFile(filePath: string): boolean {
-  try {
-    const buf = fs.readFileSync(filePath);
-    return isSilk(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
-  } catch {
-    return false;
-  }
+let silkRuntimePromise:
+  | Promise<{
+      decode: typeof import("silk-wasm").decode;
+      isSilk: typeof import("silk-wasm").isSilk;
+    }>
+  | undefined;
+
+function loadSilkRuntime() {
+  silkRuntimePromise ??= import("silk-wasm");
+  return silkRuntimePromise;
 }
 
 /**
@@ -96,6 +93,7 @@ export async function convertSilkToWav(
     strippedBuf.byteOffset,
     strippedBuf.byteLength,
   );
+  const { decode, isSilk } = await loadSilkRuntime();
 
   // 验证是否为 SILK 格式
   if (!isSilk(rawData)) {

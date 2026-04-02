@@ -10,7 +10,7 @@ const ChannelActionsSchema = z
   .strict()
   .optional();
 
-const DmPolicySchema = z.enum(["open", "pairing", "allowlist"]);
+const DmPolicySchema = z.enum(["open", "pairing", "allowlist", "disabled"]);
 const GroupPolicySchema = z.union([
   z.enum(["open", "allowlist", "disabled"]),
   z.literal("allowall").transform(() => "open" as const),

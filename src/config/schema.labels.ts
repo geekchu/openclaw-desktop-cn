@@ -2,6 +2,7 @@ import { MEDIA_AUDIO_FIELD_LABELS } from "./media-audio-field-metadata.js";
 
 export const FIELD_LABELS: Record<string, string> = {
   meta: "Metadata",
+  "meta.version": "Config Schema Version",
   "meta.lastTouchedVersion": "Config Last Touched Version",
   "meta.lastTouchedAt": "Config Last Touched At",
   env: "Environment",

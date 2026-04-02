@@ -1,7 +1,12 @@
-import type { OpenClawConfig, ChannelOnboardingAdapter, WizardPrompter } from "openclaw/plugin-sdk";
+import type { OpenClawConfig, WizardPrompter } from "openclaw/plugin-sdk";
+import type { ChannelOnboardingAdapter } from "../runtime-api.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId, formatDocsLink } from "../runtime-api.js";
 import type { DingTalkConfig, DingTalkChannelConfig } from "./types.js";
-import { listDingTalkAccountIds, resolveDingTalkAccount } from "./types.js";
+import {
+  listDingTalkAccountIds,
+  resolveDefaultDingTalkAccountId,
+  resolveDingTalkAccount,
+} from "./types.js";
 
 const channel = "dingtalk" as const;
 
@@ -165,7 +170,7 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
   },
   configure: async ({ cfg, prompter, accountOverrides, shouldPromptAccountIds }) => {
     const override = accountOverrides[channel]?.trim();
-    let accountId = override ? normalizeAccountId(override) : DEFAULT_ACCOUNT_ID;
+    let accountId = override ? normalizeAccountId(override) : resolveDefaultDingTalkAccountId(cfg);
 
     if (shouldPromptAccountIds && !override) {
       accountId = await promptDingTalkAccountId({
@@ -174,7 +179,7 @@ export const dingtalkOnboardingAdapter: ChannelOnboardingAdapter = {
         label: "DingTalk",
         currentId: accountId,
         listAccountIds: listDingTalkAccountIds,
-        defaultAccountId: DEFAULT_ACCOUNT_ID,
+        defaultAccountId: resolveDefaultDingTalkAccountId(cfg),
       });
     }
 

@@ -17,4 +17,14 @@ describe("bundled channel entry shape guards", () => {
     expect(bundled.bundledChannelPlugins).toEqual([]);
     expect(bundled.bundledChannelSetupPlugins).toEqual([]);
   });
+
+  it("keeps bundled desktop messaging channel entries that export channelPlugin wrappers", async () => {
+    const bundled = await import("./bundled.js");
+    const channelIds = bundled.bundledChannelPlugins.map((plugin) => plugin.id);
+
+    expect(channelIds).toContain("dingtalk");
+    expect(channelIds).toContain("qqbot");
+    expect(channelIds).toContain("wecom");
+    expect(channelIds).toContain("whatsapp");
+  });
 });

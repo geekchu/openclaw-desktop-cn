@@ -507,6 +507,309 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
     },
   },
   {
+    pluginId: "dingtalk",
+    channelId: "dingtalk",
+    label: "DingTalk",
+    description: "钉钉企业内部机器人，使用 Stream 模式，无需公网 IP。",
+    schema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+        },
+        enabled: {
+          default: true,
+          type: "boolean",
+        },
+        clientId: {
+          type: "string",
+        },
+        clientSecret: {
+          type: "string",
+        },
+        robotCode: {
+          type: "string",
+        },
+        corpId: {
+          type: "string",
+        },
+        agentId: {
+          anyOf: [
+            {
+              type: "string",
+            },
+            {
+              type: "number",
+            },
+          ],
+        },
+        dmPolicy: {
+          default: "open",
+          type: "string",
+          enum: ["open", "pairing", "allowlist"],
+        },
+        groupPolicy: {
+          default: "open",
+          type: "string",
+          enum: ["open", "allowlist"],
+        },
+        allowFrom: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        showThinking: {
+          default: true,
+          type: "boolean",
+        },
+        debug: {
+          default: false,
+          type: "boolean",
+        },
+        messageType: {
+          default: "markdown",
+          type: "string",
+          enum: ["markdown", "card"],
+        },
+        cardTemplateId: {
+          type: "string",
+        },
+        cardTemplateKey: {
+          default: "content",
+          type: "string",
+        },
+        groups: {
+          type: "object",
+          propertyNames: {
+            type: "string",
+          },
+          additionalProperties: {
+            type: "object",
+            properties: {
+              systemPrompt: {
+                type: "string",
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        maxConnectionAttempts: {
+          default: 10,
+          type: "integer",
+          minimum: 1,
+          maximum: 9007199254740991,
+        },
+        initialReconnectDelay: {
+          default: 1000,
+          type: "integer",
+          minimum: 100,
+          maximum: 9007199254740991,
+        },
+        maxReconnectDelay: {
+          default: 60000,
+          type: "integer",
+          minimum: 1000,
+          maximum: 9007199254740991,
+        },
+        reconnectJitter: {
+          default: 0.3,
+          type: "number",
+          minimum: 0,
+          maximum: 1,
+        },
+        proactivePermissionHint: {
+          default: {
+            enabled: true,
+            cooldownHours: 24,
+          },
+          type: "object",
+          properties: {
+            enabled: {
+              default: true,
+              type: "boolean",
+            },
+            cooldownHours: {
+              default: 24,
+              type: "integer",
+              minimum: 1,
+              maximum: 720,
+            },
+          },
+          required: ["enabled", "cooldownHours"],
+          additionalProperties: false,
+        },
+        accounts: {
+          type: "object",
+          propertyNames: {
+            type: "string",
+          },
+          additionalProperties: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+              },
+              enabled: {
+                default: true,
+                type: "boolean",
+              },
+              clientId: {
+                type: "string",
+              },
+              clientSecret: {
+                type: "string",
+              },
+              robotCode: {
+                type: "string",
+              },
+              corpId: {
+                type: "string",
+              },
+              agentId: {
+                anyOf: [
+                  {
+                    type: "string",
+                  },
+                  {
+                    type: "number",
+                  },
+                ],
+              },
+              dmPolicy: {
+                default: "open",
+                type: "string",
+                enum: ["open", "pairing", "allowlist"],
+              },
+              groupPolicy: {
+                default: "open",
+                type: "string",
+                enum: ["open", "allowlist"],
+              },
+              allowFrom: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+              },
+              showThinking: {
+                default: true,
+                type: "boolean",
+              },
+              debug: {
+                default: false,
+                type: "boolean",
+              },
+              messageType: {
+                default: "markdown",
+                type: "string",
+                enum: ["markdown", "card"],
+              },
+              cardTemplateId: {
+                type: "string",
+              },
+              cardTemplateKey: {
+                default: "content",
+                type: "string",
+              },
+              groups: {
+                type: "object",
+                propertyNames: {
+                  type: "string",
+                },
+                additionalProperties: {
+                  type: "object",
+                  properties: {
+                    systemPrompt: {
+                      type: "string",
+                    },
+                  },
+                  additionalProperties: false,
+                },
+              },
+              maxConnectionAttempts: {
+                default: 10,
+                type: "integer",
+                minimum: 1,
+                maximum: 9007199254740991,
+              },
+              initialReconnectDelay: {
+                default: 1000,
+                type: "integer",
+                minimum: 100,
+                maximum: 9007199254740991,
+              },
+              maxReconnectDelay: {
+                default: 60000,
+                type: "integer",
+                minimum: 1000,
+                maximum: 9007199254740991,
+              },
+              reconnectJitter: {
+                default: 0.3,
+                type: "number",
+                minimum: 0,
+                maximum: 1,
+              },
+              proactivePermissionHint: {
+                default: {
+                  enabled: true,
+                  cooldownHours: 24,
+                },
+                type: "object",
+                properties: {
+                  enabled: {
+                    default: true,
+                    type: "boolean",
+                  },
+                  cooldownHours: {
+                    default: 24,
+                    type: "integer",
+                    minimum: 1,
+                    maximum: 720,
+                  },
+                },
+                required: ["enabled", "cooldownHours"],
+                additionalProperties: false,
+              },
+            },
+            required: [
+              "enabled",
+              "dmPolicy",
+              "groupPolicy",
+              "showThinking",
+              "debug",
+              "messageType",
+              "cardTemplateKey",
+              "maxConnectionAttempts",
+              "initialReconnectDelay",
+              "maxReconnectDelay",
+              "reconnectJitter",
+              "proactivePermissionHint",
+            ],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: [
+        "enabled",
+        "dmPolicy",
+        "groupPolicy",
+        "showThinking",
+        "debug",
+        "messageType",
+        "cardTemplateKey",
+        "maxConnectionAttempts",
+        "initialReconnectDelay",
+        "maxReconnectDelay",
+        "reconnectJitter",
+        "proactivePermissionHint",
+      ],
+      additionalProperties: false,
+    },
+  },
+  {
     pluginId: "discord",
     channelId: "discord",
     label: "Discord",
@@ -3403,7 +3706,7 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
         dmPolicy: {
           default: "pairing",
           type: "string",
-          enum: ["open", "pairing", "allowlist"],
+          enum: ["open", "pairing", "allowlist", "disabled"],
         },
         allowFrom: {
           type: "array",
@@ -3960,7 +4263,7 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
               },
               dmPolicy: {
                 type: "string",
-                enum: ["open", "pairing", "allowlist"],
+                enum: ["open", "pairing", "allowlist", "disabled"],
               },
               allowFrom: {
                 type: "array",
@@ -8770,6 +9073,107 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
     },
   },
   {
+    pluginId: "qqbot",
+    channelId: "qqbot",
+    label: "QQ Bot Channel",
+    description: "QQ Bot channel plugin with message support, cron jobs, and proactive messaging",
+    schema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      properties: {
+        enabled: {
+          default: true,
+          type: "boolean",
+        },
+        name: {
+          type: "string",
+        },
+        appId: {
+          type: "string",
+        },
+        clientSecret: {
+          type: "string",
+        },
+        clientSecretFile: {
+          type: "string",
+        },
+        dmPolicy: {
+          default: "open",
+          type: "string",
+          enum: ["open", "pairing", "allowlist"],
+        },
+        allowFrom: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        systemPrompt: {
+          type: "string",
+        },
+        imageServerBaseUrl: {
+          type: "string",
+        },
+        markdownSupport: {
+          default: true,
+          type: "boolean",
+        },
+        accounts: {
+          type: "object",
+          propertyNames: {
+            type: "string",
+          },
+          additionalProperties: {
+            type: "object",
+            properties: {
+              enabled: {
+                default: true,
+                type: "boolean",
+              },
+              name: {
+                type: "string",
+              },
+              appId: {
+                type: "string",
+              },
+              clientSecret: {
+                type: "string",
+              },
+              clientSecretFile: {
+                type: "string",
+              },
+              dmPolicy: {
+                default: "open",
+                type: "string",
+                enum: ["open", "pairing", "allowlist"],
+              },
+              allowFrom: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+              },
+              systemPrompt: {
+                type: "string",
+              },
+              imageServerBaseUrl: {
+                type: "string",
+              },
+              markdownSupport: {
+                default: true,
+                type: "boolean",
+              },
+            },
+            required: ["enabled", "dmPolicy", "markdownSupport"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["enabled", "dmPolicy", "markdownSupport"],
+      additionalProperties: false,
+    },
+  },
+  {
     pluginId: "signal",
     channelId: "signal",
     label: "Signal",
@@ -13554,6 +13958,114 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
           ],
         },
       ],
+    },
+  },
+  {
+    pluginId: "wecom",
+    channelId: "wecom",
+    label: "Enterprise WeChat",
+    description: "Support for Enterprise WeChat (WeCom) AI Bot integration",
+    schema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        enabled: {
+          type: "boolean",
+          description: "Enable WeCom channel",
+          default: true,
+        },
+        token: {
+          type: "string",
+          description: "WeCom bot token from admin console",
+        },
+        encodingAesKey: {
+          type: "string",
+          description: "WeCom message encryption key (43 characters)",
+          minLength: 43,
+          maxLength: 43,
+        },
+        commands: {
+          type: "object",
+          description: "Command whitelist configuration",
+          additionalProperties: false,
+          properties: {
+            enabled: {
+              type: "boolean",
+              description: "Enable command whitelist filtering",
+              default: true,
+            },
+            allowlist: {
+              type: "array",
+              description: "Allowed commands (e.g., /new, /status, /help)",
+              items: {
+                type: "string",
+              },
+              default: ["/new", "/status", "/help", "/compact"],
+            },
+          },
+        },
+        dynamicAgents: {
+          type: "object",
+          description: "Dynamic agent routing configuration",
+          additionalProperties: false,
+          properties: {
+            enabled: {
+              type: "boolean",
+              description: "Enable per-user/per-group agent isolation",
+              default: true,
+            },
+          },
+        },
+        dm: {
+          type: "object",
+          description: "Direct message (private chat) configuration",
+          additionalProperties: false,
+          properties: {
+            createAgentOnFirstMessage: {
+              type: "boolean",
+              description: "Create separate agent for each user",
+              default: true,
+            },
+          },
+        },
+        groupChat: {
+          type: "object",
+          description: "Group chat configuration",
+          additionalProperties: false,
+          properties: {
+            enabled: {
+              type: "boolean",
+              description: "Enable group chat support",
+              default: true,
+            },
+            requireMention: {
+              type: "boolean",
+              description: "Only respond when @mentioned in groups",
+              default: true,
+            },
+          },
+        },
+        adminUsers: {
+          type: "array",
+          description: "Admin users who bypass command allowlist and dynamic agent routing",
+          items: {
+            type: "string",
+          },
+          default: [],
+        },
+      },
+    },
+    uiHints: {
+      token: {
+        sensitive: true,
+        label: "Bot Token",
+      },
+      encodingAesKey: {
+        sensitive: true,
+        label: "Encoding AES Key",
+        help: "43-character encryption key from WeCom admin console",
+      },
     },
   },
   {
