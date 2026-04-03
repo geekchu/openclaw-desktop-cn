@@ -95,6 +95,25 @@ describe("legacy config-channels validation", () => {
     ).toBe("EncodingAESKey 必须为 43 位");
   });
 
+  it("treats wecom token-only configs as valid", () => {
+    const element = createElement();
+    const channel: LegacyChannelConfig = {
+      id: "wecom",
+      channel_type: "wecom",
+      enabled: true,
+      config: {
+        token: "wecom-token",
+      },
+    };
+
+    expect(element.hasValidConfig(channel)).toBe(true);
+    expect(
+      element.validateConfigBeforeSave(channel, {
+        token: "wecom-token",
+      }),
+    ).toBeNull();
+  });
+
   it("treats dingtalk card mode without template id as not configured", () => {
     const element = createElement();
     const channel: LegacyChannelConfig = {

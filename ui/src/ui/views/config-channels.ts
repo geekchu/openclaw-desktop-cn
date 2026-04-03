@@ -739,8 +739,7 @@ const channelInfo: Record<
         key: "encodingAesKey",
         label: "EncodingAESKey",
         type: "password",
-        placeholder: "企业微信消息加密密钥 (43位)",
-        required: true,
+        placeholder: "企业微信消息加密密钥 (可选，43位)",
       },
     ],
     helpText: "企业微信 AI Bot，使用回调模式接收消息",
@@ -1641,10 +1640,9 @@ export class OpenClawConfigChannels extends LitElement {
       }
     }
     if (channel.channel_type === "wecom") {
-      if (
-        typeof config.encodingAesKey !== "string" ||
-        config.encodingAesKey.trim().length !== 43
-      ) {
+      const encodingAesKey =
+        typeof config.encodingAesKey === "string" ? config.encodingAesKey.trim() : "";
+      if (encodingAesKey !== "" && encodingAesKey.length !== 43) {
         return "EncodingAESKey 必须为 43 位";
       }
     }
@@ -1981,8 +1979,9 @@ export class OpenClawConfigChannels extends LitElement {
       return (
         typeof token === "string" &&
         token.trim() !== "" &&
-        typeof encodingAesKey === "string" &&
-        encodingAesKey.trim().length === 43
+        (encodingAesKey == null ||
+          (typeof encodingAesKey === "string" &&
+            (encodingAesKey.trim() === "" || encodingAesKey.trim().length === 43)))
       );
     }
     if (channel.channel_type === "dingtalk") {
