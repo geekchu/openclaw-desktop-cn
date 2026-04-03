@@ -195,7 +195,7 @@ describe("card-service", () => {
   });
 
   it("formatContentForCard truncates and annotates content", () => {
-    const content = `${"x".repeat(510)}`;
+    const content = "x".repeat(510);
     const result = formatContentForCard(content, "thinking");
 
     expect(result).toContain("思考中");

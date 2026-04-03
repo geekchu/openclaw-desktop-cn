@@ -1,11 +1,5 @@
 import nodePath from "node:path";
-import {
-  codingTools,
-  createEditTool,
-  createReadTool,
-  createWriteTool,
-  readTool,
-} from "@mariozechner/pi-coding-agent";
+import { codingTools, createReadTool, readTool } from "@mariozechner/pi-coding-agent";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";

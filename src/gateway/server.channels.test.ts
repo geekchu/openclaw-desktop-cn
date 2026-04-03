@@ -174,7 +174,7 @@ describe("gateway server channels", () => {
     }> = [];
     await channelsHandlers["channels.status"]({
       params: { probe: false, timeoutMs: 2000 },
-      respond: (ok: boolean, payload: any) => {
+      respond: (ok: boolean, payload: unknown) => {
         responses.push({
           ok,
           payload: payload as {

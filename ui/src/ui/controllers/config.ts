@@ -117,8 +117,18 @@ export function applyConfigSnapshot(state: ConfigState, snapshot: ConfigSnapshot
 
   // 从配置恢复一站式选中模型（重启后 onestopSelectedModel 为空）
   if (!state.onestopSelectedModel) {
-    const cfg = snapshot.config as Record<string, any> | undefined;
-    const primary = cfg?.agents?.defaults?.model?.primary as string | undefined;
+    const cfg = snapshot.config as
+      | {
+          agents?: {
+            defaults?: {
+              model?: {
+                primary?: string;
+              };
+            };
+          };
+        }
+      | undefined;
+    const primary = cfg?.agents?.defaults?.model?.primary;
     if (primary?.startsWith("onestop/")) {
       state.onestopSelectedModel = primary.slice("onestop/".length);
     }
@@ -245,7 +255,7 @@ export function findAgentConfigEntryIndex(config: unknown, agentId: string): num
 
 export function ensureAgentConfigEntry(state: ConfigState, agentId: string): number {
   const config = state.configForm ?? state.configSnapshot?.config ?? {};
-  const agents = (config as Record<string, unknown>).agents;
+  const agents = config.agents;
   if (!Array.isArray(agents)) {
     return -1;
   }

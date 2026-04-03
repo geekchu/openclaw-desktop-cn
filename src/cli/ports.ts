@@ -185,7 +185,7 @@ export function listPortListenersWindows(port: number): PortProcess[] {
       }
     }
     return results;
-  } catch (_err) {
+  } catch {
     return [];
   }
 }

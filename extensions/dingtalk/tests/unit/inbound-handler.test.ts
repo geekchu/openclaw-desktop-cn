@@ -1,7 +1,8 @@
-import axios from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const shared = vi.hoisted(() => ({
+  axiosGetMock: vi.fn(),
+  axiosPostMock: vi.fn(),
   sendBySessionMock: vi.fn(),
   sendMessageMock: vi.fn(),
   extractMessageContentMock: vi.fn(),
@@ -18,8 +19,8 @@ const shared = vi.hoisted(() => ({
 
 vi.mock("axios", () => ({
   default: {
-    post: vi.fn(),
-    get: vi.fn(),
+    post: shared.axiosPostMock,
+    get: shared.axiosGetMock,
   },
   isAxiosError: (err: unknown) => Boolean((err as { isAxiosError?: boolean })?.isAxiosError),
 }));
@@ -58,8 +59,8 @@ import {
   resetProactivePermissionHintStateForTest,
 } from "../../src/inbound-handler.js";
 
-const mockedAxiosPost = vi.mocked(axios.post);
-const mockedAxiosGet = vi.mocked(axios.get);
+const mockedAxiosPost = shared.axiosPostMock;
+const mockedAxiosGet = shared.axiosGetMock;
 
 function buildRuntime() {
   return {

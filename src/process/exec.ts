@@ -103,19 +103,6 @@ export function shouldSpawnWithShell(params: {
   return false;
 }
 
-/**
- * Escape a single argument for cmd.exe when using `shell: true`.
- * Wraps in double quotes if the arg contains spaces or shell metacharacters,
- * and escapes inner double quotes with backslash.
- */
-function escapeShellArg(arg: string): string {
-  // eslint-disable-next-line no-control-regex
-  if (!/[ "&|<>^%]/.test(arg)) {
-    return arg;
-  }
-  return `"${arg.replace(/"/g, '\\"')}"`;
-}
-
 // Simple promise-wrapped execFile with optional verbosity logging.
 export async function runExec(
   command: string,

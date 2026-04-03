@@ -4,6 +4,13 @@ import { resetProcessRegistryForTests } from "./bash-process-registry.js";
 import { createExecTool } from "./bash-tools.exec.js";
 import { createProcessTool } from "./bash-tools.process.js";
 
+function getSessionId(details: unknown): string {
+  const sessionId =
+    details && typeof details === "object" ? (details as { sessionId?: unknown }).sessionId : null;
+  expect(typeof sessionId).toBe("string");
+  return sessionId as string;
+}
+
 afterEach(() => {
   resetProcessRegistryForTests();
 });
@@ -19,7 +26,7 @@ test("process send-keys encodes Enter for pty sessions", async () => {
   });
 
   expect(result.details.status).toBe("running");
-  const sessionId = (result.details as any).sessionId;
+  const sessionId = getSessionId(result.details);
   expect(sessionId).toBeTruthy();
 
   await processTool.execute("toolcall", {
@@ -54,7 +61,7 @@ test("process submit sends Enter for pty sessions", async () => {
   });
 
   expect(result.details.status).toBe("running");
-  const sessionId = (result.details as any).sessionId;
+  const sessionId = getSessionId(result.details);
   expect(sessionId).toBeTruthy();
 
   await processTool.execute("toolcall", {

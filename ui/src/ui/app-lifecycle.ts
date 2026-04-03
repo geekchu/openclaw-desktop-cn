@@ -124,7 +124,7 @@ const CHAT_SCROLL_PROPERTIES = new Set([
  * This is needed to work around macOS WebKit's lack of overflow-anchor support,
  * which can cause scroll position to jump unexpectedly during re-renders.
  */
-export function handleWillUpdate(host: LifecycleHost, changed: Map<PropertyKey, unknown>) {
+export function handleWillUpdate(host: LifecycleHost, _changed: Map<PropertyKey, unknown>) {
   // Save scroll position for all changes on chat tab
   // macOS WebKit lacks overflow-anchor support, so we need to manually preserve scroll position
   if (host.tab !== "chat") {

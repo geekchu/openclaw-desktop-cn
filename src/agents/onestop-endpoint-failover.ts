@@ -46,7 +46,9 @@ export function isUsingPrimary(): boolean {
  * Starts the background health-check timer if not already running.
  */
 export function switchToFallback(): void {
-  if (!_usingPrimary) return;
+  if (!_usingPrimary) {
+    return;
+  }
   _usingPrimary = false;
   startHealthCheck();
 }
@@ -65,7 +67,9 @@ export function switchToPrimary(): void {
  * Returns the (possibly rewritten) URL.
  */
 export function resolveOnestopUrl(baseUrl: string | undefined): string | undefined {
-  if (!baseUrl) return baseUrl;
+  if (!baseUrl) {
+    return baseUrl;
+  }
   // Only rewrite URLs that belong to the onestop service
   if (baseUrl.includes(PRIMARY_HOST) || baseUrl.includes(FALLBACK_HOST)) {
     return getOnestopBaseUrl();
@@ -99,7 +103,9 @@ async function healthCheckTick(): Promise<void> {
 }
 
 function startHealthCheck(): void {
-  if (_healthTimer) return;
+  if (_healthTimer) {
+    return;
+  }
   _healthTimer = setInterval(() => {
     void healthCheckTick();
   }, HEALTH_CHECK_INTERVAL_MS);

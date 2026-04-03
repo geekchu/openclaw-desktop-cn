@@ -140,3 +140,10 @@ changelog/fragments/
 
 # Local scratch workspace
 .tmp/
+src-tauri/gateway-bundle/
+src-tauri/node-runtime/
+src-tauri/target/
+tmp-control-ui/
+build-error.log
+src-tauri/clippy.txt
+src-tauri/errors.log

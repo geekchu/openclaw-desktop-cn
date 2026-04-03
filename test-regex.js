@@ -9,5 +9,5 @@ const cases = [
   "openclaw.json",
   ".openclawcn",
 ];
-const re = /(?<![a-zA-Z0-9\-_])\.openclaw(?![a-zA-Z0-9\-_\.]|cn)/g;
+const re = /(?<![a-zA-Z0-9_-])\.openclaw(?![a-zA-Z0-9_.-]|cn)/g;
 cases.forEach((c) => console.log(c, "->", c.replace(re, ".openclawcn")));

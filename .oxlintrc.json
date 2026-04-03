@@ -29,11 +29,17 @@
     "extensions/",
     "node_modules/",
     "patches/",
+    "packages/memory-host-sdk/src/**/*.d.ts",
+    "packages/memory-host-sdk/src/**/*.js",
     "pnpm-lock.yaml",
     "skills/",
-    "src/auto-reply/reply/export-html/template.js",
-    "src/canvas-host/a2ui/a2ui.bundle.js",
+    "src/**/*.d.ts",
+    "src/**/*.js",
+    "src-tauri/gateway-bundle/",
+    "src-tauri/node-runtime/",
+    "src-tauri/target/",
     "Swabble/",
+    "tmp-control-ui/",
     "vendor/"
   ]
 }

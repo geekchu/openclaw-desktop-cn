@@ -1,3 +1,5 @@
+import type { FitAddon } from "@xterm/addon-fit";
+import type { Terminal as XTermTerminal } from "@xterm/xterm";
 import { html, nothing } from "lit";
 
 export type TerminalProps = {
@@ -5,9 +7,32 @@ export type TerminalProps = {
   gatewayUrl: string;
 };
 
+type TauriEvent<T> = {
+  payload: T;
+};
+
+type TerminalOutputPayload = {
+  id?: string;
+  data?: string;
+};
+
+type TerminalExitPayload = string | { id?: string };
+
+type TauriApi = {
+  core?: {
+    invoke: <T = unknown>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
+  };
+  event?: {
+    listen: <T = unknown>(
+      eventName: string,
+      handler: (event: TauriEvent<T>) => void,
+    ) => Promise<() => void>;
+  };
+};
+
 // ── 模块级状态 ──
-let _terminal: any = null;
-let _fitAddon: any = null;
+let _terminal: XTermTerminal | null = null;
+let _fitAddon: FitAddon | null = null;
 let _sessionId: string | null = null;
 let _unlistenOutput: (() => void) | null = null;
 let _unlistenExit: (() => void) | null = null;
@@ -31,6 +56,9 @@ let _pendingQueue: string[] = [];
 // 控制键回显过滤（仅在用户按下控制键后短窗口内生效）
 const _pendingEchoStrips = new Set<string>();
 let _echoStripTimer: ReturnType<typeof setTimeout> | null = null;
+const ESC = String.fromCharCode(27);
+const ALT_SCREEN_BUFFER_RE = new RegExp(`${ESC}\\[\\?1049[hl]`, "g");
+const ANSI_ESCAPE_RE = new RegExp(`${ESC}(?:\\[[0-9;]*[A-Za-z~]|.)`, "g");
 
 const SESSION_STORAGE_KEY = "openclaw-terminal-session-id";
 
@@ -49,15 +77,15 @@ function restoreSessionId() {
   }
 }
 
-function getTauri(): any {
-  const w = window as any;
+function getTauri(): TauriApi | null {
+  const w = window as Window & { __TAURI__?: TauriApi };
   return w.__TAURI__ ?? null;
 }
 
-async function invoke(cmd: string, args?: Record<string, unknown>): Promise<any> {
+async function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const tauri = getTauri();
   if (tauri?.core?.invoke) {
-    return tauri.core.invoke(cmd, args);
+    return tauri.core.invoke<T>(cmd, args);
   }
   throw new Error("Tauri invoke not available");
 }
@@ -183,7 +211,7 @@ function disposeTerminal() {
 // 过滤 ConPTY 备用屏幕缓冲区切换（防止 TUI 应用切换屏幕）
 // 注意：不过滤 \x1b[3J (ED3)，否则会导致 ConPTY 与 xterm 状态不同步
 function filterOutput(data: string): string {
-  return data.replace(/\x1b\[\?1049[hl]/g, ""); // 备用屏幕缓冲区切换
+  return data.replace(ALT_SCREEN_BUFFER_RE, ""); // 备用屏幕缓冲区切换
 }
 
 // 注册预期的控制键回显，500ms 内未匹配则自动过期
@@ -249,35 +277,38 @@ async function attachSession() {
 
   try {
     const tauri = getTauri();
-    const earlyEvents: Array<{ id: string; data: string }> = [];
+    const earlyEvents: Array<{ id?: string; data: string }> = [];
     let ready = false;
 
     if (tauri?.event?.listen) {
-      _unlistenOutput = await tauri.event.listen("terminal-output", (event: any) => {
-        const payload = event.payload;
-        if (!payload?.data) {
-          return;
-        }
-        if (ready && payload.id === _sessionId) {
-          const filtered = stripExpectedEchoes(filterOutput(payload.data));
-          // DEBUG: 检查 ^f 来源
-          if (filtered.includes("^f") || filtered.includes("^F")) {
-            console.warn(
-              "[terminal-debug] ^f detected in output, raw hex:",
-              JSON.stringify(payload.data),
-              "filtered:",
-              JSON.stringify(filtered),
-            );
+      _unlistenOutput = await tauri.event.listen<TerminalOutputPayload>(
+        "terminal-output",
+        (event) => {
+          const payload = event.payload;
+          if (!payload?.data) {
+            return;
           }
-          term.write(filtered);
-        } else if (!ready) {
-          earlyEvents.push({
-            id: payload.id,
-            data: stripExpectedEchoes(filterOutput(payload.data)),
-          });
-        }
-      });
-      _unlistenExit = await tauri.event.listen("terminal-exit", (event: any) => {
+          if (ready && payload.id === _sessionId) {
+            const filtered = stripExpectedEchoes(filterOutput(payload.data));
+            // DEBUG: 检查 ^f 来源
+            if (filtered.includes("^f") || filtered.includes("^F")) {
+              console.warn(
+                "[terminal-debug] ^f detected in output, raw hex:",
+                JSON.stringify(payload.data),
+                "filtered:",
+                JSON.stringify(filtered),
+              );
+            }
+            term.write(filtered);
+          } else if (!ready) {
+            earlyEvents.push({
+              id: payload.id,
+              data: stripExpectedEchoes(filterOutput(payload.data)),
+            });
+          }
+        },
+      );
+      _unlistenExit = await tauri.event.listen<TerminalExitPayload>("terminal-exit", (event) => {
         const exitId = typeof event.payload === "string" ? event.payload : event.payload?.id;
         if (exitId === _sessionId) {
           term.writeln("\r\n\x1b[90m会话已结束，按任意键重启\x1b[0m");
@@ -287,11 +318,11 @@ async function attachSession() {
       });
     }
 
-    _sessionId = await invoke("terminal_create", {
+    const sessionId = await invoke<string>("terminal_create", {
       cols: term.cols || 80,
       rows: term.rows || 24,
     });
-    saveSessionId(_sessionId);
+    saveSessionId(sessionId);
     _lastCols = term.cols || 80;
     _lastRows = term.rows || 24;
 
@@ -302,8 +333,8 @@ async function attachSession() {
     }
     ready = true;
     updateStatusIndicator("connected");
-  } catch (e: any) {
-    term.writeln(`\x1b[31m创建终端失败: ${e}\x1b[0m`);
+  } catch (e: unknown) {
+    term.writeln(`\x1b[31m创建终端失败: ${String(e)}\x1b[0m`);
     updateStatusIndicator("error");
   } finally {
     _attachBusy = false;
@@ -312,7 +343,7 @@ async function attachSession() {
 
 // 重新连接到已有的 PTY 会话（tab 切换回来时 / 页面刷新后）
 // 返回 true 表示成功，false 表示会话已不存在
-async function reattachSession(term: any): Promise<boolean> {
+async function reattachSession(term: XTermTerminal): Promise<boolean> {
   // 重置命令拦截状态
   _inputBuffer = "";
   _enterPending = false;
@@ -329,16 +360,19 @@ async function reattachSession(term: any): Promise<boolean> {
 
   const tauri = getTauri();
   if (tauri?.event?.listen) {
-    _unlistenOutput = await tauri.event.listen("terminal-output", (event: any) => {
-      const payload = event.payload;
-      if (!payload?.data) {
-        return;
-      }
-      if (payload.id === _sessionId) {
-        term.write(stripExpectedEchoes(filterOutput(payload.data)));
-      }
-    });
-    _unlistenExit = await tauri.event.listen("terminal-exit", (event: any) => {
+    _unlistenOutput = await tauri.event.listen<TerminalOutputPayload>(
+      "terminal-output",
+      (event) => {
+        const payload = event.payload;
+        if (!payload?.data) {
+          return;
+        }
+        if (payload.id === _sessionId) {
+          term.write(stripExpectedEchoes(filterOutput(payload.data)));
+        }
+      },
+    );
+    _unlistenExit = await tauri.event.listen<TerminalExitPayload>("terminal-exit", (event) => {
       const exitId = typeof event.payload === "string" ? event.payload : event.payload?.id;
       if (exitId === _sessionId) {
         term.writeln("\r\n\x1b[90m会话已结束，按任意键重启\x1b[0m");
@@ -511,7 +545,7 @@ async function createTerminalInstance(container: HTMLElement) {
     }
 
     // 剥离 ANSI 转义序列后维护输入缓冲区
-    const stripped = data.replace(/\x1b(?:\[[0-9;]*[A-Za-z~]|.)/g, "");
+    const stripped = data.replace(ANSI_ESCAPE_RE, "");
     for (const ch of stripped) {
       if (ch === "\r" || ch === "\n") {
         /* Enter 在下方处理 */
@@ -623,25 +657,7 @@ async function initTerminal(container: HTMLElement) {
     await waitForLayout(container);
 
     // 销毁旧 xterm DOM（不销毁 PTY 会话）
-    cleanupResizeObserver();
-    if (_unlistenOutput) {
-      _unlistenOutput();
-      _unlistenOutput = null;
-    }
-    if (_unlistenExit) {
-      _unlistenExit();
-      _unlistenExit = null;
-    }
-    if (_terminal) {
-      try {
-        _terminal.dispose();
-      } catch {
-        /* ignore */
-      }
-      _terminal = null;
-    }
-    _fitAddon = null;
-    _currentContainer = null;
+    disposeTerminal();
 
     // 创建全新 xterm 实例
     const term = await createTerminalInstance(container);
@@ -712,17 +728,32 @@ export function renderTerminal(props: TerminalProps) {
       <div class="terminal-toolbar">
         <div class="terminal-toolbar__left">
           <div class="terminal-status">
-            <span id="terminal-status-dot" class="terminal-status__dot ${_sessionId ? "terminal-status__dot--ok" : ""}"></span>
-            <span id="terminal-status-text" class="terminal-status__label">${_sessionId ?? "终端"}</span>
+            <span
+              id="terminal-status-dot"
+              class="terminal-status__dot ${_sessionId ? "terminal-status__dot--ok" : ""}"
+            ></span>
+            <span id="terminal-status-text" class="terminal-status__label"
+              >${_sessionId ?? "终端"}</span
+            >
           </div>
         </div>
         <div class="terminal-toolbar__actions">
           <button class="terminal-toolbar__btn" @click=${handleClear} title="清屏">
-            <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M5 12h14" />
+              <path d="M12 5l7 7-7 7" />
+            </svg>
             清屏
           </button>
-          <button class="terminal-toolbar__btn terminal-toolbar__btn--restart" @click=${handleRestart} title="重启终端">
-            <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          <button
+            class="terminal-toolbar__btn terminal-toolbar__btn--restart"
+            @click=${handleRestart}
+            title="重启终端"
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
             重启
           </button>
         </div>

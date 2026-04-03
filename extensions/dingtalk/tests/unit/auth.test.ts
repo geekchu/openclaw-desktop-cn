@@ -1,13 +1,15 @@
-import axios from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const shared = vi.hoisted(() => ({
+  axiosPostMock: vi.fn(),
+}));
 
 vi.mock("axios", () => ({
   default: {
-    post: vi.fn(),
+    post: shared.axiosPostMock,
   },
 }));
-
-const mockedAxiosPost = vi.mocked(axios.post);
+const mockedAxiosPost = shared.axiosPostMock;
 
 async function loadAuthModule() {
   vi.resetModules();

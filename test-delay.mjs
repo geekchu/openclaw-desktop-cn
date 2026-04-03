@@ -1,7 +1,5 @@
 import { forceFreePortAndWait } from "./dist/cli/ports.js";
-import { loadConfig } from "./dist/config/config.js";
 import { startGatewayServer } from "./dist/gateway/server.impl.js";
-import { createDefaultRuntime } from "./dist/runtime.js";
 
 async function main() {
   console.time("port-kill");
@@ -13,7 +11,7 @@ async function main() {
   }
 
   console.time("gateway-start");
-  const server = await startGatewayServer(28789, {
+  await startGatewayServer(28789, {
     bind: "loopback",
   });
   console.timeEnd("gateway-start");
