@@ -1,5 +1,7 @@
 use log::{error, info, warn};
+use std::fs::read_to_string;
 use std::net::TcpStream;
+use std::path::PathBuf;
 use std::process::Child;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::Mutex;
@@ -25,9 +27,10 @@ pub static GLOBAL_GATEWAY_PORT: std::sync::atomic::AtomicU16 =
 /// 负责启动、停止、健康检查 openclaw gateway 子进程
 pub struct GatewayManager {
     child: Mutex<Option<Child>>,
+    last_start_failure_reason: Mutex<Option<String>>,
     /// 当前使用的端口（可能因端口占用而动态变化）
     port: AtomicU16,
-    /// 更新期间设置为 true，阻止健康检查线程自动重启 gateway
+    /// 手动停止或更新期间设置为 true，阻止健康检查线程自动重启 gateway
     suppress_restart: AtomicBool,
     /// 最后一次引导前端 WebView 导航过的有效端口
     last_navigated_port: AtomicU16,
@@ -37,6 +40,7 @@ impl GatewayManager {
     pub fn new(port: u16) -> Self {
         Self {
             child: Mutex::new(None),
+            last_start_failure_reason: Mutex::new(None),
             port: AtomicU16::new(port),
             suppress_restart: AtomicBool::new(false),
             last_navigated_port: AtomicU16::new(0),
@@ -45,6 +49,14 @@ impl GatewayManager {
 
     pub fn get_last_navigated_port(&self) -> u16 {
         self.last_navigated_port.load(Ordering::SeqCst)
+    }
+
+    pub fn take_last_start_failure_reason(&self) -> Option<String> {
+        self.last_start_failure_reason.lock().unwrap().take()
+    }
+
+    fn set_last_start_failure_reason(&self, reason: Option<String>) {
+        *self.last_start_failure_reason.lock().unwrap() = reason;
     }
 
     pub fn set_last_navigated_port(&self, port: u16) {
@@ -62,7 +74,7 @@ impl GatewayManager {
         GLOBAL_GATEWAY_PORT.store(port, Ordering::SeqCst);
     }
 
-    /// 设置抑制自动重启标志（更新前调用）
+    /// 设置抑制自动重启标志（手动停止或更新前调用）
     pub fn set_suppress_restart(&self, val: bool) {
         self.suppress_restart.store(val, Ordering::SeqCst);
     }
@@ -74,6 +86,7 @@ impl GatewayManager {
 
     pub fn start(&self) -> Result<u16, String> {
         let mut guard = self.child.lock().unwrap();
+        self.set_last_start_failure_reason(None);
 
         // 检查之前是否已经拉起了存活的底层终端句柄，如果有则拦截覆盖
         if let Some(ref mut child) = *guard {
@@ -234,9 +247,14 @@ impl GatewayManager {
                 if let Some(ref mut child) = *guard {
                     match child.try_wait() {
                         Ok(Some(status)) => {
+                            let reason = read_recent_gateway_start_failure().unwrap_or_else(|| {
+                                format!("Gateway 进程意外退出 (退出码: {:?})", status.code())
+                            });
+                            self.set_last_start_failure_reason(Some(reason.clone()));
                             error!(
-                                "[Gateway] gateway 进程意外退出, 退出码: {:?}",
-                                status.code()
+                                "[Gateway] gateway 进程意外退出, 退出码: {:?}, 原因: {}",
+                                status.code(),
+                                reason
                             );
                             return false;
                         }
@@ -266,6 +284,42 @@ impl GatewayManager {
             false
         }
     }
+}
+
+fn gateway_stderr_log_path() -> PathBuf {
+    PathBuf::from(crate::utils::platform::get_config_dir())
+        .join("logs")
+        .join("gateway.stderr.log")
+}
+
+fn read_recent_gateway_start_failure() -> Option<String> {
+    let content = read_to_string(gateway_stderr_log_path()).ok()?;
+    let start = content
+        .rfind("\n--- gateway start ")
+        .map_or(0, |idx| idx + 1);
+    let section = &content[start..];
+    let lines: Vec<&str> = section
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("--- gateway start "))
+        .collect();
+
+    if lines.is_empty() {
+        return None;
+    }
+
+    if let Some(config_invalid_idx) = lines.iter().position(|line| *line == "Config invalid") {
+        let mut summary = vec!["Config invalid".to_string()];
+        for line in &lines[(config_invalid_idx + 1)..] {
+            if line.starts_with("Run: ") {
+                break;
+            }
+            summary.push((*line).to_string());
+        }
+        return Some(summary.join("; "));
+    }
+
+    lines.last().map(|line| (*line).to_string())
 }
 
 /// 发送系统桌面通知
@@ -351,6 +405,9 @@ pub fn health_check_loop(handle: &AppHandle) {
         // 子进程已退出，尝试重启
         warn!("[Gateway] 子进程已退出，尝试自动重启...");
         let _ = handle.emit("gateway-status", "Gateway 已断开，正在重启...");
+        if let Err(e) = crate::commands::config::ensure_channel_plugins_enabled() {
+            warn!("[Gateway] 自动重启前配置修复失败: {}", e);
+        }
 
         match gm.start() {
             Ok(port) => {
@@ -363,11 +420,20 @@ pub fn health_check_loop(handle: &AppHandle) {
                     navigate_webview_to_gateway(handle, port);
                 } else {
                     consecutive_failures += 1;
-                    error!(
-                        "[Gateway] 自动重启超时 (连续失败 {}次)",
-                        consecutive_failures
-                    );
-                    let _ = handle.emit("gateway-status", "Gateway 重启超时");
+                    if let Some(reason) = gm.take_last_start_failure_reason() {
+                        error!(
+                            "[Gateway] 自动重启失败 (连续失败 {}次): {}",
+                            consecutive_failures, reason
+                        );
+                        let msg = format!("Gateway 启动失败: {}", reason);
+                        let _ = handle.emit("gateway-status", msg.as_str());
+                    } else {
+                        error!(
+                            "[Gateway] 自动重启超时 (连续失败 {}次)",
+                            consecutive_failures
+                        );
+                        let _ = handle.emit("gateway-status", "Gateway 重启超时");
+                    }
                     update_tray_status(handle, false);
                 }
             }

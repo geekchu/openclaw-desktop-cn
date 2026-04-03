@@ -1,3 +1,8 @@
+; Tauri's NSIS template auto-checks the "Run app" checkbox on the finish page.
+; Leave it unchecked so install completion does not immediately launch the app
+; and start background processes while the installer is still exiting.
+!define MUI_FINISHPAGE_RUN_NOTCHECKED
+
 Var LegacyInstallDir
 Var LegacyMainBinary
 Var LegacyRegistryHit
@@ -83,10 +88,14 @@ Function PathContainsNonAscii
   FileClose $3
 
   ClearErrors
-  ExecWait '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$2" "$0"' $1
+  ; Use nsExec so the legacy-path probe does not flash a PowerShell console window.
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$2" "$0"'
+  Pop $1
   Delete "$2"
 
-  ${If} ${Errors}
+  ${If} $1 == "error"
+    StrCpy $0 ""
+  ${ElseIf} $1 == "timeout"
     StrCpy $0 ""
   ${ElseIf} $1 == 0
     StrCpy $0 "1"

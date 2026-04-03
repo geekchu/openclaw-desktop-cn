@@ -1,3 +1,4 @@
+use crate::commands::config;
 use crate::gateway::GatewayManager;
 use crate::models::ServiceStatus;
 use crate::utils::shell;
@@ -196,6 +197,10 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
     // 直接后台启动 gateway，通过 GatewayManager 绝对控股 PID
     info!("[服务] 后台集权管理启动 gateway...");
     let gm = app.state::<GatewayManager>();
+    gm.set_suppress_restart(false);
+    if let Err(e) = config::ensure_channel_plugins_enabled() {
+        warn!("[服务] 启动前配置修复失败: {}", e);
+    }
     let port = gm.start().map_err(|e| format!("启动服务失败: {}", e))?;
 
     // 轮询等待端口开始监听及 HTTP 就绪（最多 60 秒）
@@ -215,6 +220,11 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
         return Ok(format!("服务已启动，端口: {}", port));
     }
 
+    if let Some(reason) = gm.take_last_start_failure_reason() {
+        info!("[服务] Gateway 启动失败: {}", reason);
+        return Err(format!("服务启动失败: {}", reason));
+    }
+
     info!("[服务] 等待超时，HTTP 或端口仍未就绪");
     Err("服务启动超时（60秒），请检查 openclaw 日志".to_string())
 }
@@ -227,7 +237,6 @@ pub async fn stop_service(app: AppHandle) -> Result<String, String> {
     let gm = app.state::<GatewayManager>();
     gm.set_suppress_restart(true);
     gm.stop();
-    gm.set_suppress_restart(false);
 
     std::thread::sleep(std::time::Duration::from_millis(500));
 
@@ -285,8 +294,12 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 重启服务...");
 
     let gm = app.state::<GatewayManager>();
+    gm.set_suppress_restart(false);
     gm.stop();
     std::thread::sleep(std::time::Duration::from_secs(1));
+    if let Err(e) = config::ensure_channel_plugins_enabled() {
+        warn!("[服务] 重启前配置修复失败: {}", e);
+    }
 
     let port = gm
         .start()
@@ -298,6 +311,9 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
         info!("[服务] ✓ 重启成功，端口: {}", port);
         Ok(format!("服务已重启，端口: {}", port))
     } else {
+        if let Some(reason) = gm.take_last_start_failure_reason() {
+            return Err(format!("Gateway 重启失败: {}", reason));
+        }
         Err("Gateway 重启超时（60秒）".to_string())
     }
 }

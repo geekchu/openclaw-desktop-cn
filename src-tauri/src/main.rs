@@ -202,10 +202,17 @@ fn main() {
                         let handle = app.clone();
                         std::thread::spawn(move || {
                             let gm = handle.state::<gateway::GatewayManager>();
+                            gm.set_suppress_restart(false);
+                            if let Err(e) = config::ensure_channel_plugins_enabled() {
+                                log::warn!("[Tray] 启动前配置修复失败: {}", e);
+                            }
                             match gm.start() {
                                 Ok(port) => {
                                     if gm.wait_for_ready(60) {
                                         crate::gateway::navigate_webview_to_gateway(&handle, port);
+                                    } else if let Some(reason) = gm.take_last_start_failure_reason()
+                                    {
+                                        log::error!("[Tray] 启动 Gateway 失败: {}", reason);
                                     }
                                 }
                                 Err(e) => {
@@ -218,6 +225,7 @@ fn main() {
                         let handle = app.clone();
                         std::thread::spawn(move || {
                             let gm = handle.state::<gateway::GatewayManager>();
+                            gm.set_suppress_restart(true);
                             gm.stop();
                         });
                     }
@@ -225,12 +233,19 @@ fn main() {
                         let handle = app.clone();
                         std::thread::spawn(move || {
                             let gm = handle.state::<gateway::GatewayManager>();
+                            gm.set_suppress_restart(false);
                             gm.stop();
                             std::thread::sleep(std::time::Duration::from_secs(1));
+                            if let Err(e) = config::ensure_channel_plugins_enabled() {
+                                log::warn!("[Tray] 重启前配置修复失败: {}", e);
+                            }
                             match gm.start() {
                                 Ok(port) => {
                                     if gm.wait_for_ready(60) {
                                         crate::gateway::navigate_webview_to_gateway(&handle, port);
+                                    } else if let Some(reason) = gm.take_last_start_failure_reason()
+                                    {
+                                        log::error!("[Tray] 重启 Gateway 失败: {}", reason);
                                     }
                                 }
                                 Err(e) => {
@@ -318,6 +333,9 @@ fn main() {
                         if gm.wait_for_ready(300) {
                             // Gateway 就绪，导航 webview 到 gateway URL
                             gateway::navigate_webview_to_gateway(&handle, port);
+                        } else if let Some(reason) = gm.take_last_start_failure_reason() {
+                            let msg = format!("启动失败: {}", reason);
+                            let _ = handle.emit("gateway-status", msg.as_str());
                         } else {
                             let _ = handle.emit("gateway-status", "Gateway 启动超时");
                             gateway::send_startup_timeout_notification(&handle);

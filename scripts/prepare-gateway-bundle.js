@@ -99,6 +99,129 @@ function run(cmd, opts = {}) {
   execSync(cmd, { stdio: "inherit", cwd: projectRoot, windowsHide: true, ...opts });
 }
 
+function isRetryableRemoveError(error) {
+  return (
+    error &&
+    typeof error === "object" &&
+    ["EPERM", "EBUSY", "ENOTEMPTY"].includes(error.code)
+  );
+}
+
+function tryRemovePath(pathValue, { label = pathValue, strict = true } = {}) {
+  if (!existsSync(pathValue)) {
+    return true;
+  }
+
+  try {
+    rmSync(pathValue, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 200,
+    });
+    return true;
+  } catch (error) {
+    if (!strict && process.platform === "win32" && isRetryableRemoveError(error)) {
+      console.warn(`[bundle] 跳过忙碌路径: ${label} (${error.code})`);
+      return false;
+    }
+    throw error;
+  }
+}
+
+function cleanupBusyPath(pathValue, { label = pathValue } = {}) {
+  if (tryRemovePath(pathValue, { label, strict: false })) {
+    return [];
+  }
+
+  if (!existsSync(pathValue)) {
+    return [];
+  }
+
+  let children;
+  try {
+    children = readdirSync(pathValue, { withFileTypes: true });
+  } catch {
+    return [pathValue];
+  }
+
+  const skipped = [];
+  for (const child of children) {
+    skipped.push(
+      ...cleanupBusyPath(join(pathValue, child.name), {
+        label: `${label}/${child.name}`,
+      }),
+    );
+  }
+
+  if (!tryRemovePath(pathValue, { label, strict: false })) {
+    skipped.push(pathValue);
+  }
+
+  return skipped;
+}
+
+function removeOptionalPath(pathValue, { label = pathValue } = {}) {
+  if (!existsSync(pathValue)) {
+    return false;
+  }
+  return tryRemovePath(pathValue, { label, strict: false });
+}
+
+function resetBundleDirectory(dirPath) {
+  if (!existsSync(dirPath)) {
+    mkdirSync(dirPath, { recursive: true });
+    return;
+  }
+
+  try {
+    tryRemovePath(dirPath, { label: dirPath, strict: true });
+    mkdirSync(dirPath, { recursive: true });
+    return;
+  } catch (error) {
+    if (!(process.platform === "win32" && isRetryableRemoveError(error))) {
+      throw error;
+    }
+
+    console.warn(
+      `[bundle] 无法整体删除 ${dirPath} (${error.code})，回退到原地清理以绕过被占用的文件...`,
+    );
+    mkdirSync(dirPath, { recursive: true });
+
+    const skippedPaths = [];
+    for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+      const childPath = join(dirPath, entry.name);
+      if (entry.name !== "node_modules") {
+        tryRemovePath(childPath, {
+          label: `${dirPath}/${entry.name}`,
+          strict: true,
+        });
+        continue;
+      }
+
+      if (!existsSync(childPath)) {
+        continue;
+      }
+
+      for (const nestedEntry of readdirSync(childPath, { withFileTypes: true })) {
+        const nestedPath = join(childPath, nestedEntry.name);
+        skippedPaths.push(
+          ...cleanupBusyPath(nestedPath, {
+            label: `${dirPath}/node_modules/${nestedEntry.name}`,
+          }),
+        );
+      }
+    }
+
+    if (skippedPaths.length > 0) {
+      const uniqueSkipped = [...new Set(skippedPaths)];
+      console.warn(
+        `[bundle] 以下路径仍被占用，将尽量复用原有内容继续构建:\n${uniqueSkipped.join("\n")}`,
+      );
+    }
+  }
+}
+
 function isCrossTargetBundle(bundleTarget) {
   return bundleTarget.os !== process.platform || bundleTarget.cpu !== process.arch;
 }
@@ -249,8 +372,8 @@ console.log("\n[bundle] === Step 0.5: 精简 Node.js 运行环境 ===");
       }
       for (const f of ["CHANGELOG.md", "README.md", "LICENSE"]) {
         const fp = join(platDir, f);
-        if (existsSync(fp)) {
-          rmSync(fp, { force: true });
+        if (!removeOptionalPath(fp, { label: fp })) {
+          continue;
         }
       }
     }
@@ -304,10 +427,7 @@ if (process.env.BUILD_CONFIG === "release") {
 
 // Step 3: 清理并创建 bundle 目录
 console.log("\n[bundle] === Step 3: 创建 gateway-bundle ===");
-if (existsSync(bundleDir)) {
-  rmSync(bundleDir, { recursive: true, force: true });
-}
-mkdirSync(bundleDir, { recursive: true });
+resetBundleDirectory(bundleDir);
 
 // Step 4: 复制文件
 console.log("\n[bundle] === Step 4: 复制文件 ===");
@@ -493,7 +613,7 @@ if (existsSync(extDir)) {
         console.log(`[bundle] 复制 extension/${extName} skill: ${skillPath}`);
         // 先删除目标路径（可能是符号链接或文件）
         if (existsSync(destSkillDir)) {
-          rmSync(destSkillDir, { recursive: true, force: true });
+          tryRemovePath(destSkillDir, { label: destSkillDir, strict: true });
         }
         mkdirSync(dirname(destSkillDir), { recursive: true });
         copyIfExists(srcSkillDir, destSkillDir);
@@ -531,8 +651,7 @@ console.log("\n[bundle] === Step 6: 删除桌面版不需要的重量级包 ==="
     }
     for (const pkg of heavyPkgsToRemove) {
       const pkgPath = join(nmDir, pkg);
-      if (existsSync(pkgPath)) {
-        rmSync(pkgPath, { recursive: true, force: true });
+      if (removeOptionalPath(pkgPath, { label: pkgPath })) {
         console.log(`[bundle] 删除 ${pkgPath.replace(bundleDir, ".")}`);
         heavyRemoved++;
       }
@@ -609,8 +728,9 @@ console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
       const fullPath = join(dir, entry.name);
       if (entry.isDirectory()) {
         if (dirsToRemove.has(entry.name)) {
-          rmSync(fullPath, { recursive: true, force: true });
-          removedCount++;
+          if (removeOptionalPath(fullPath, { label: fullPath })) {
+            removedCount++;
+          }
         } else {
           cleanDir(fullPath, depth + 1);
         }
@@ -626,8 +746,9 @@ console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
             entry.name.endsWith(".ts.map") ||
             entry.name.endsWith(".mjs.map"));
         if (shouldRemove) {
-          rmSync(fullPath, { force: true });
-          removedCount++;
+          if (removeOptionalPath(fullPath, { label: fullPath })) {
+            removedCount++;
+          }
         }
       }
     }
@@ -644,8 +765,7 @@ console.log("\n[bundle] === Step 7: 清理不必要的文件 ===");
       // 删除 tsconfig 等开发文件
       for (const devFile of ["tsconfig.json", "tsconfig.build.json", ".eslintrc.json"]) {
         const devPath = join(extPath, devFile);
-        if (existsSync(devPath)) {
-          rmSync(devPath, { force: true });
+        if (removeOptionalPath(devPath, { label: devPath })) {
           removedCount++;
         }
       }

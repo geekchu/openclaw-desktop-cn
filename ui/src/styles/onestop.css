@@ -414,6 +414,15 @@
   color: var(--text);
 }
 
+.onestop-apikey__icon svg,
+.onestop-apikey__toggle svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+}
+
+
 .onestop-apikey__save {
   flex-shrink: 0;
   padding: 8px 16px;
@@ -642,6 +651,12 @@
   display: inline-flex;
 }
 
+.onestop-custom-loading svg {
+  width: 20px;
+  height: 20px;
+}
+
+
 .onestop-loading__text {
   color: var(--muted);
 }
@@ -684,6 +699,11 @@
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+}
+
+.onestop-refresh-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .onestop-custom-overview {
@@ -832,6 +852,11 @@
   color: var(--accent-hover);
 }
 
+.onestop-custom-btn-text svg {
+  width: 14px;
+  height: 14px;
+}
+
 .onestop-custom-btn-text--danger {
   color: #f87171;
 }
@@ -913,6 +938,12 @@
   color: var(--text);
 }
 
+.onestop-custom-providers-list__title svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+
 .onestop-custom-provider-select {
   padding: 18px;
 }
@@ -940,6 +971,12 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.onestop-custom-model-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .onestop-custom-provider-option:hover,
@@ -1090,6 +1127,11 @@
   color: var(--accent);
 }
 
+.onestop-custom-model-item__check svg {
+  width: 16px;
+  height: 16px;
+}
+
 .onestop-custom-model-item__badge,
 .onestop-custom-tag {
   display: inline-block;
@@ -1135,6 +1177,7 @@
 }
 
 .onestop-custom-model-tag__remove {
+  padding: 0 2px;
   border: none;
   background: none;
   color: var(--muted);
@@ -1159,6 +1202,9 @@
 
 .onestop-custom-error,
 .onestop-custom-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 12px 16px;
   border: 1px solid #ef444430;
   border-radius: var(--radius-md);
@@ -1382,5 +1428,32 @@
   .onestop-custom-model-row__actions {
     width: 100%;
     justify-content: flex-end;
+    align-items: center;
   }
+}
+
+/* Restored missing SVG sizing & hover effects */
+
+.onestop-custom-provider-option__arrow,
+.onestop-custom-provider-custom__icon {
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.onestop-custom-provider-option:hover .onestop-custom-provider-option__arrow,
+.onestop-custom-model-item:hover .onestop-custom-provider-custom__icon {
+  color: var(--accent);
+}
+
+/* Restored missing spin animation */
+
+@keyframes onestop-custom-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.onestop-custom-spin {
+  animation: onestop-custom-spin 1s linear infinite;
 }

@@ -73,6 +73,148 @@ fn channel_has_persisted_config(channel_config: Option<&Value>) -> bool {
     channel_config.is_some_and(has_meaningful_channel_value)
 }
 
+fn is_placeholder_channel_value(value: &Value) -> bool {
+    match value {
+        Value::Null => true,
+        Value::String(text) => text.trim().is_empty(),
+        Value::Array(items) => items.is_empty() || items.iter().all(is_placeholder_channel_value),
+        Value::Object(map) => {
+            map.is_empty()
+                || map.iter().all(|(key, item)| {
+                    key == "enabled"
+                        || is_test_only_channel_field(key)
+                        || is_placeholder_channel_value(item)
+                })
+        }
+        Value::Bool(_) | Value::Number(_) => false,
+    }
+}
+
+fn normalize_desktop_channel_value(value: &mut Value) -> usize {
+    match value {
+        Value::String(text) => {
+            let trimmed = text.trim();
+            if trimmed.len() != text.len() {
+                *text = trimmed.to_string();
+                return 1;
+            }
+            0
+        }
+        Value::Array(items) => {
+            let mut changed = 0;
+            for item in items.iter_mut() {
+                changed += normalize_desktop_channel_value(item);
+            }
+            let before_len = items.len();
+            items.retain(|item| !is_placeholder_channel_value(item));
+            if items.len() != before_len {
+                changed += before_len - items.len();
+            }
+            changed
+        }
+        Value::Object(map) => {
+            let mut changed = 0;
+            for item in map.values_mut() {
+                changed += normalize_desktop_channel_value(item);
+            }
+            let keys_to_remove: Vec<String> = map
+                .iter()
+                .filter(|(key, item)| {
+                    key.as_str() != "enabled" && is_placeholder_channel_value(item)
+                })
+                .map(|(key, _)| key.clone())
+                .collect();
+            changed += keys_to_remove.len();
+            for key in keys_to_remove {
+                map.remove(&key);
+            }
+            changed
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) => 0,
+    }
+}
+
+fn preserve_empty_desktop_channel_presence(channel_id: &str) -> bool {
+    matches!(channel_id, "whatsapp" | "imessage")
+}
+
+fn should_persist_desktop_channel_config(channel_id: &str, channel_config: &Value) -> bool {
+    has_meaningful_channel_value(channel_config)
+        || preserve_empty_desktop_channel_presence(channel_id)
+}
+
+fn repair_invalid_desktop_channel_configs(config: &mut Value) -> usize {
+    let Some(channels) = config
+        .get_mut("channels")
+        .and_then(|value| value.as_object_mut())
+    else {
+        return 0;
+    };
+
+    let supported_ids: Vec<&str> = desktop_supported_channel_types()
+        .into_iter()
+        .map(|(channel_id, _, _)| channel_id)
+        .collect();
+
+    let mut changed = 0;
+    let mut channels_to_remove = Vec::new();
+
+    for channel_id in supported_ids {
+        let Some(channel_value) = channels.get_mut(channel_id) else {
+            continue;
+        };
+
+        if !channel_value.is_object() {
+            info!(
+                "[配置初始化] 移除畸形的 channels.{} 配置（必须为对象）",
+                channel_id
+            );
+            channels_to_remove.push(channel_id.to_string());
+            continue;
+        }
+
+        changed += normalize_desktop_channel_value(channel_value);
+
+        if channel_id == "wecom" {
+            if let Some(channel_obj) = channel_value.as_object_mut() {
+                let should_remove_aes = channel_obj
+                    .get("encodingAesKey")
+                    .and_then(|value| value.as_str())
+                    .is_some_and(|value| value.len() != 43);
+                if should_remove_aes {
+                    warn!(
+                        "[配置初始化] 移除无效的 channels.wecom.encodingAesKey，避免启动校验失败"
+                    );
+                    channel_obj.remove("encodingAesKey");
+                    changed += 1;
+                }
+            }
+        }
+
+        if !channel_has_persisted_config(Some(channel_value)) {
+            if preserve_empty_desktop_channel_presence(channel_id) {
+                info!(
+                    "[配置初始化] 保留空的 channels.{} 占位对象，维持渠道默认运行语义",
+                    channel_id
+                );
+                continue;
+            }
+            info!(
+                "[配置初始化] 移除空的 channels.{} 占位配置，避免历史残留阻塞启动",
+                channel_id
+            );
+            channels_to_remove.push(channel_id.to_string());
+        }
+    }
+
+    for channel_id in channels_to_remove {
+        channels.remove(&channel_id);
+        changed += 1;
+    }
+
+    changed
+}
+
 /// 获取 openclaw.json 配置
 fn load_openclaw_config() -> Result<Value, String> {
     let config_path = platform::get_config_file_path();
@@ -1178,7 +1320,7 @@ pub async fn save_channel_config(channel: ChannelConfig) -> Result<String, Strin
         }
     }
 
-    if has_meaningful_channel_value(&channel_obj) {
+    if should_persist_desktop_channel_config(&channel.id, &channel_obj) {
         channel_obj["enabled"] = json!(true);
         config["channels"][&channel.id] = channel_obj;
         config["plugins"]["entries"][&channel.id] = json!({
@@ -1264,6 +1406,7 @@ pub async fn clear_channel_config(channel_id: String) -> Result<String, String> 
 /// 因为桌面版使用 Tauri 自带的更新机制，不需要 OpenClaw 的 npm 更新检查
 pub fn ensure_channel_plugins_enabled() -> Result<(), String> {
     let mut config = load_openclaw_config()?;
+    let repaired_channels = repair_invalid_desktop_channel_configs(&mut config);
 
     // 确保 plugins.entries 存在
     if config.get("plugins").is_none() {
@@ -1285,6 +1428,14 @@ pub fn ensure_channel_plugins_enabled() -> Result<(), String> {
             entries.insert(id.to_string(), json!({ "enabled": true }));
             changed = true;
         }
+    }
+
+    if repaired_channels > 0 {
+        changed = true;
+        info!(
+            "[配置初始化] 已修复 {} 个启动前无效渠道配置",
+            repaired_channels
+        );
     }
 
     // 禁用 OpenClaw 内置更新检查（桌面版使用 Tauri 更新机制）
@@ -1560,7 +1711,10 @@ pub async fn approve_pairing_code(
 
 #[cfg(test)]
 mod tests {
-    use super::{channel_has_persisted_config, has_meaningful_channel_value};
+    use super::{
+        channel_has_persisted_config, has_meaningful_channel_value,
+        repair_invalid_desktop_channel_configs,
+    };
     use serde_json::json;
 
     #[test]
@@ -1590,5 +1744,193 @@ mod tests {
         assert!(channel_has_persisted_config(Some(
             &json!({ "botToken": "123:abc" })
         )));
+    }
+
+    #[test]
+    fn repair_invalid_desktop_channel_configs_removes_empty_placeholder_channels() {
+        let mut config = json!({
+            "channels": {
+                "wecom": {
+                    "enabled": true,
+                    "token": "   ",
+                    "encodingAesKey": ""
+                },
+                "dingtalk": {
+                    "enabled": true,
+                    "clientId": "",
+                    "clientSecret": "   "
+                },
+                "telegram": {
+                    "enabled": true,
+                    "botToken": "123:abc"
+                }
+            }
+        });
+
+        let repaired = repair_invalid_desktop_channel_configs(&mut config);
+
+        assert!(repaired > 0);
+        assert!(config.pointer("/channels/wecom").is_none());
+        assert!(config.pointer("/channels/dingtalk").is_none());
+        assert_eq!(
+            config.pointer("/channels/telegram/botToken"),
+            Some(&json!("123:abc"))
+        );
+    }
+
+    #[test]
+    fn repair_invalid_desktop_channel_configs_drops_invalid_wecom_aes_but_keeps_token() {
+        let mut config = json!({
+            "channels": {
+                "wecom": {
+                    "enabled": true,
+                    "token": "wecom-token",
+                    "encodingAesKey": "short"
+                }
+            }
+        });
+
+        let repaired = repair_invalid_desktop_channel_configs(&mut config);
+
+        assert!(repaired > 0);
+        assert_eq!(
+            config.pointer("/channels/wecom/token"),
+            Some(&json!("wecom-token"))
+        );
+        assert!(config.pointer("/channels/wecom/encodingAesKey").is_none());
+    }
+
+    #[test]
+    fn repair_invalid_desktop_channel_configs_removes_wecom_when_invalid_aes_is_all_that_remains() {
+        let mut config = json!({
+            "channels": {
+                "wecom": {
+                    "enabled": true,
+                    "token": "   ",
+                    "encodingAesKey": "short"
+                }
+            }
+        });
+
+        let repaired = repair_invalid_desktop_channel_configs(&mut config);
+
+        assert!(repaired > 0);
+        assert!(config.pointer("/channels/wecom").is_none());
+    }
+
+    #[test]
+    fn repair_invalid_desktop_channel_configs_removes_malformed_scalar_channel_values() {
+        let mut config = json!({
+            "channels": {
+                "wecom": "broken",
+                "telegram": {
+                    "botToken": "123:abc"
+                }
+            }
+        });
+
+        let repaired = repair_invalid_desktop_channel_configs(&mut config);
+
+        assert!(repaired > 0);
+        assert!(config.pointer("/channels/wecom").is_none());
+        assert_eq!(
+            config.pointer("/channels/telegram/botToken"),
+            Some(&json!("123:abc"))
+        );
+    }
+
+    #[test]
+    fn repair_invalid_desktop_channel_configs_preserves_empty_whatsapp_and_imessage_objects() {
+        let mut config = json!({
+            "channels": {
+                "whatsapp": {
+                    "enabled": true,
+                    "allowFrom": [],
+                    "groupAllowFrom": []
+                },
+                "imessage": {
+                    "enabled": true
+                },
+                "wecom": {
+                    "enabled": true,
+                    "token": "   ",
+                    "encodingAesKey": ""
+                }
+            }
+        });
+
+        let repaired = repair_invalid_desktop_channel_configs(&mut config);
+
+        assert!(repaired > 0);
+        assert_eq!(
+            config.pointer("/channels/whatsapp/enabled"),
+            Some(&json!(true))
+        );
+        assert_eq!(
+            config.pointer("/channels/imessage/enabled"),
+            Some(&json!(true))
+        );
+        assert!(config.pointer("/channels/wecom").is_none());
+    }
+
+    #[test]
+    fn should_persist_desktop_channel_config_preserves_empty_whatsapp_and_imessage() {
+        assert!(super::should_persist_desktop_channel_config(
+            "whatsapp",
+            &json!({})
+        ));
+        assert!(super::should_persist_desktop_channel_config(
+            "imessage",
+            &json!({})
+        ));
+        assert!(!super::should_persist_desktop_channel_config(
+            "wecom",
+            &json!({})
+        ));
+        assert!(super::should_persist_desktop_channel_config(
+            "telegram",
+            &json!({ "botToken": "123:abc" })
+        ));
+    }
+
+    #[test]
+    fn repair_invalid_desktop_channel_configs_counts_trimmed_string_repairs() {
+        let mut config = json!({
+            "channels": {
+                "telegram": {
+                    "enabled": true,
+                    "botToken": " 123:abc "
+                }
+            }
+        });
+
+        let repaired = repair_invalid_desktop_channel_configs(&mut config);
+
+        assert_eq!(repaired, 1);
+        assert_eq!(
+            config.pointer("/channels/telegram/botToken"),
+            Some(&json!("123:abc"))
+        );
+    }
+
+    #[test]
+    fn repair_invalid_desktop_channel_configs_counts_placeholder_cleanup_for_preserved_channels() {
+        let mut config = json!({
+            "channels": {
+                "whatsapp": {
+                    "enabled": true,
+                    "allowFrom": ["   "]
+                }
+            }
+        });
+
+        let repaired = repair_invalid_desktop_channel_configs(&mut config);
+
+        assert!(repaired > 0);
+        assert_eq!(
+            config.pointer("/channels/whatsapp/enabled"),
+            Some(&json!(true))
+        );
+        assert!(config.pointer("/channels/whatsapp/allowFrom").is_none());
     }
 }

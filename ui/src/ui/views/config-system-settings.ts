@@ -6,6 +6,7 @@
  */
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { checkForUpdate, downloadUpdate, installUpdate, closeUpdateResource } from "./updater.js";
 
 export const CLAW_CONFIG_SYSTEM = "claw-config-system";
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
@@ -85,6 +86,20 @@ export class SystemSettingsView extends LitElement {
   @state() private proxySaveStatus: "idle" | "success" | "error" = "idle";
   @state() private proxyNeedsRestart = false;
 
+  /* ── update states ── */
+  @state() private updateChecking = false;
+  @state() private updateAvailable = false;
+  @state() private updateVersion = "";
+  @state() private updateNotes = "";
+  @state() private updateDownloading = false;
+  @state() private updateProgress = 0;
+  @state() private updateError = "";
+  @state() private updateDone = false;
+  @state() private updateInstalled = false;
+  @state() private updateRestarting = false;
+  private _updateRid: number | null = null;
+  private _downloadedBytesRid: number | null = null;
+
   /* ── lifecycle ── */
   override connectedCallback() {
     super.connectedCallback();
@@ -97,6 +112,15 @@ export class SystemSettingsView extends LitElement {
     super.disconnectedCallback();
     this._loadAbort?.abort();
     this._loadAbort = null;
+    void this._cleanupUpdateResources();
+  }
+
+  private async _cleanupUpdateResources() {
+    if (this._updateRid != null) {
+      await closeUpdateResource(this._updateRid);
+      this._updateRid = null;
+    }
+    this._downloadedBytesRid = null;
   }
 
   private async _loadConfig() {
@@ -464,6 +488,20 @@ export class SystemSettingsView extends LitElement {
     const t = (window as unknown as { __TAURI__?: { core?: { invoke?: unknown } } }).__TAURI__;
     if (t?.core?.invoke) {
       void (t.core.invoke as (cmd: string) => Promise<void>)("plugin:process|restart");
+    }
+  }
+
+  private async _resumeGatewayAfterFailedUpdateRestart(
+    invokeFn: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>,
+    wasRunning: boolean,
+  ) {
+    if (!wasRunning) {
+      return;
+    }
+    try {
+      await invokeFn("start_service");
+    } catch (resumeErr) {
+      console.error("恢复 Gateway 失败", resumeErr);
     }
   }
 
@@ -996,6 +1034,50 @@ export class SystemSettingsView extends LitElement {
       border-width: 1.5px;
     }
 
+    /* ── update card ── */
+    .update-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0 4px;
+    }
+    .update-info {
+      flex: 1;
+      padding-right: 16px;
+    }
+    .update-progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .update-progress-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--mg-border, rgba(255, 255, 255, 0.08));
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .update-progress-fill {
+      height: 100%;
+      background: var(--info, #3b82f6);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+    .update-progress-pct {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--mg-text-secondary, #8b949e);
+      min-width: 36px;
+      text-align: right;
+    }
+    .update-error {
+      font-size: 13px;
+      color: var(--danger, #f85149);
+      margin-top: 6px;
+    }
+
   `;
 
   /* ── SVG icons ── */
@@ -1054,6 +1136,7 @@ export class SystemSettingsView extends LitElement {
         ${this._renderProxyCard()}
         ${this._renderIdentityCard()}
         ${this._renderAdvancedCard()}
+        ${this._renderUpdateCard()}
       </div>
     `;
   }
@@ -1607,4 +1690,226 @@ export class SystemSettingsView extends LitElement {
       </div>`;
   }
 
+  /* ── Update card ── */
+
+  private async _handleCheckUpdate() {
+    // 释放旧的更新资源
+    await this._cleanupUpdateResources();
+    this.updateChecking = true;
+    this.updateError = "";
+    this.updateAvailable = false;
+    this.updateDone = false;
+    this.updateInstalled = false;
+    this.updateRestarting = false;
+    this.updateDownloading = false;
+    this.updateProgress = 0;
+
+    const result = await checkForUpdate();
+    switch (result.status) {
+      case "available":
+        this.updateAvailable = true;
+        this.updateVersion = result.version;
+        this.updateNotes = result.body;
+        this._updateRid = result.rid;
+        break;
+      case "up-to-date":
+        this.updateDone = true;
+        break;
+      case "error":
+        this.updateError = result.message;
+        break;
+    }
+    this.updateChecking = false;
+  }
+
+  private async _handleDownloadUpdate() {
+    if (this._updateRid == null) {
+      this.updateError = "无法下载：更新信息缺失，请重新检查";
+      return;
+    }
+    this.updateDownloading = true;
+    this.updateProgress = 0;
+    this.updateError = "";
+    try {
+      this._downloadedBytesRid = await downloadUpdate(this._updateRid, (percent) => {
+        this.updateProgress = percent;
+      });
+      // 下载完成，显示重启按钮
+      this.updateInstalled = true;
+      this.updateDownloading = false;
+    } catch (e: unknown) {
+      this.updateError = String(e instanceof Error ? e.message : e);
+      this.updateDownloading = false;
+    }
+  }
+
+  private async _handleRestart() {
+    const t = (
+      window as unknown as {
+        __TAURI__?: {
+          core?: { invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
+        };
+      }
+    ).__TAURI__;
+    if (!t?.core?.invoke) {
+      this.updateError = "Tauri API 不可用，请手动重启应用";
+      this.updateRestarting = false;
+      return;
+    }
+
+    this.updateRestarting = true;
+    this.updateError = "";
+    let gatewayWasRunning = false;
+
+    try {
+      const status = (await t.core.invoke("get_service_status")) as { running?: boolean } | null;
+      gatewayWasRunning = status?.running === true;
+    } catch {
+      gatewayWasRunning = false;
+    }
+
+    // 先彻底关闭 Gateway 子进程，释放文件锁，防止安装更新时冲突
+    try {
+      await t.core.invoke("stop_gateway");
+    } catch {
+      /* best-effort */
+    }
+
+    if (this._updateRid != null && this._downloadedBytesRid != null) {
+      try {
+        await installUpdate(this._updateRid, this._downloadedBytesRid);
+        // Windows NSIS 默认会在此步骤抛弃 Promise 直接强杀重启，代码执行不到这里。
+        // 而在 macOS/Linux 设备上，该过程只在后台提取替换文件，随后秒返回成功。
+        // 我们必须主动触发 Tauri 重启以使新版本生效。
+        try {
+          await t.core.invoke("plugin:process|restart");
+        } catch (restartErr) {
+          // 重启失败，提示用户手动重启
+          console.error("重启失败", restartErr);
+          await this._resumeGatewayAfterFailedUpdateRestart(t.core.invoke, gatewayWasRunning);
+          this.updateError = "更新已安装，但自动重启失败。请手动关闭并重新打开应用。";
+          this.updateRestarting = false;
+        }
+        return;
+      } catch (e: unknown) {
+        console.error("更新安装失败", e);
+        await this._resumeGatewayAfterFailedUpdateRestart(t.core.invoke, gatewayWasRunning);
+        this.updateError = `更新安装失败: ${e instanceof Error ? e.message : String(e)}`;
+        this.updateRestarting = false;
+        return;
+      }
+    }
+
+    // 普通用户手动重启（无更新包的情况）
+    try {
+      await t.core.invoke("plugin:process|restart");
+    } catch {
+      this.updateError = "重启失败，请手动关闭并重新打开应用";
+      this.updateRestarting = false;
+    }
+  }
+
+  private _renderUpdateCard() {
+    return html`
+      <div class="card">
+        <div class="card-title">
+          <div class="card-title-icon blue">${this._updateIcon}</div>
+          <div>
+            <div class="title-text">软件更新</div>
+            <div class="title-sub">检查并安装最新版本</div>
+          </div>
+        </div>
+
+        ${
+          this.updateInstalled
+            ? html`
+          <div class="update-row">
+            <div class="update-info">
+              <div class="toggle-text-primary">✅ 更新已下载完成，重启后生效</div>
+              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
+            </div>
+            <button class="btn-primary" ?disabled=${this.updateRestarting} @click=${() => this._handleRestart()}>
+              ${
+                this.updateRestarting
+                  ? html`
+                      <span class="spinner spinner-sm"></span> 重启中…
+                    `
+                  : "重启应用"
+              }
+            </button>
+          </div>
+        `
+            : this.updateDownloading
+              ? html`
+          <div class="update-row">
+            <div class="update-info">
+              <div class="toggle-text-primary">正在下载 v${this.updateVersion}...</div>
+              <div class="update-progress-wrap">
+                <div class="update-progress-bar">
+                  <div class="update-progress-fill" style="width:${this.updateProgress}%"></div>
+                </div>
+                <span class="update-progress-pct">${this.updateProgress}%</span>
+              </div>
+            </div>
+          </div>
+        `
+              : this.updateAvailable
+                ? html`
+          <div class="update-row">
+            <div class="update-info">
+              <div class="toggle-text-primary">🎉 发现新版本 v${this.updateVersion}</div>
+              ${this.updateNotes ? html`<div class="toggle-text-secondary">${this.updateNotes}</div>` : nothing}
+              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
+            </div>
+            <button class="btn-primary" @click=${() => this._handleDownloadUpdate()}>下载并安装</button>
+          </div>
+        `
+                : html`
+          <div class="update-row">
+            <div class="update-info">
+              ${
+                this.updateDone
+                  ? html`
+                      <div class="toggle-text-primary">✅ 当前已是最新版本</div>
+                    `
+                  : html`
+                      <div class="toggle-text-primary">点击按钮检查是否有新版本可用</div>
+                    `
+              }
+              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
+            </div>
+            <button class="btn-primary" ?disabled=${this.updateChecking} @click=${() => this._handleCheckUpdate()}>
+              ${
+                this.updateChecking
+                  ? html`
+                      <span class="spinner spinner-sm"></span> 检查中…
+                    `
+                  : "检查更新"
+              }
+            </button>
+          </div>
+        `
+        }
+      </div>
+    `;
+  }
+
+  private get _updateIcon() {
+    return html`
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    `;
+  }
 }
