@@ -14,7 +14,7 @@
  * 5. 在 gateway-bundle/ 中运行 npm install --omit=dev 生成平铺的 node_modules/
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -45,12 +45,20 @@ function getWindowsPowerShellExe() {
   );
 }
 
+function execWindowsPowerShell(script, opts = {}) {
+  const encodedScript = Buffer.from(script, "utf16le").toString("base64");
+  return execFileSync(getWindowsPowerShellExe(), ["-NoProfile", "-EncodedCommand", encodedScript], {
+    windowsHide: true,
+    ...opts,
+  });
+}
+
 // Windows: cargo tauri build 的子进程可能丢失用户 PATH，导致找不到 pnpm/bash 等工具。
 // 从系统环境变量重新拼接完整 PATH 以确保工具可用。
 if (process.platform === "win32") {
   try {
-    const fullPath = execSync(
-      `"${getWindowsPowerShellExe()}" -NoProfile -Command "[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')"`,
+    const fullPath = execWindowsPowerShell(
+      "[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')",
       { encoding: "utf-8", windowsHide: true },
     ).trim();
     if (fullPath) {
@@ -99,12 +107,117 @@ function run(cmd, opts = {}) {
   execSync(cmd, { stdio: "inherit", cwd: projectRoot, windowsHide: true, ...opts });
 }
 
+function terminateStaleWindowsBundleProcessTrees() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  try {
+    const staleMatrixCryptoDir = existsSync(
+      join(bundleDir, "node_modules", "@matrix-org", "matrix-sdk-crypto-nodejs"),
+    );
+    const terminated = execWindowsPowerShell(
+      `
+        $ErrorActionPreference = 'Stop'
+        $currentPid = ${process.pid}
+        $hasStaleMatrixCryptoDir = ${staleMatrixCryptoDir ? "$true" : "$false"}
+        $processes = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name, CommandLine)
+        $currentTree = New-Object 'System.Collections.Generic.HashSet[int]'
+        $currentQueue = New-Object 'System.Collections.Generic.Queue[int]'
+        $targets = New-Object 'System.Collections.Generic.HashSet[int]'
+        $queue = New-Object 'System.Collections.Generic.Queue[int]'
+
+        [void]$currentTree.Add([int]$currentPid)
+        $currentQueue.Enqueue([int]$currentPid)
+
+        while ($currentQueue.Count -gt 0) {
+          $parentId = $currentQueue.Dequeue()
+          foreach ($child in $processes) {
+            if ($child.ParentProcessId -eq $parentId -and -not $currentTree.Contains([int]$child.ProcessId)) {
+              [void]$currentTree.Add([int]$child.ProcessId)
+              $currentQueue.Enqueue([int]$child.ProcessId)
+            }
+          }
+        }
+
+        foreach ($process in $processes) {
+          if ($currentTree.Contains([int]$process.ProcessId)) {
+            continue
+          }
+          $hasLiveParent =
+            $process.ParentProcessId -gt 0 -and
+            ($processes | Where-Object { $_.ProcessId -eq $process.ParentProcessId } | Select-Object -First 1)
+          $isPrepareRoot =
+            $process.Name -eq 'node.exe' -and
+            $process.CommandLine -and
+            $process.CommandLine -like '*scripts/prepare-gateway-bundle.js*'
+          # Only target orphaned gateway-bundle npm install roots here. Live
+          # installs from another terminal should not be touched even if they
+          # happen to use the same flags.
+          $isBundleInstall =
+            -not $hasLiveParent -and
+            $process.Name -in @('node.exe', 'cmd.exe', 'npm.exe') -and
+            $process.CommandLine -and
+            (
+              $process.CommandLine -like '*npm-cli.js*install --omit=dev --install-strategy=hoisted*' -or
+              $process.CommandLine -like '*npm install --omit=dev --install-strategy=hoisted*'
+            )
+          # If the npm root already exited but matrix-sdk-crypto's postinstall
+          # helper survived, clean up the exact orphan command shape that was
+          # observed in failed bundle builds on Windows.
+          $isMatrixCryptoOrphan =
+            $hasStaleMatrixCryptoDir -and
+            -not $hasLiveParent -and
+            $process.Name -in @('node.exe', 'cmd.exe') -and
+            $process.CommandLine -and
+            (
+              $process.CommandLine -eq 'node  download-lib.js' -or
+              $process.CommandLine -eq 'node download-lib.js' -or
+              $process.CommandLine -like '*cmd.exe /d /s /c node download-lib.js'
+            )
+
+          if ($isPrepareRoot -or $isBundleInstall -or $isMatrixCryptoOrphan) {
+            [void]$targets.Add([int]$process.ProcessId)
+            $queue.Enqueue([int]$process.ProcessId)
+          }
+        }
+
+        while ($queue.Count -gt 0) {
+          $parentId = $queue.Dequeue()
+          foreach ($child in $processes) {
+            if ($child.ParentProcessId -eq $parentId -and -not $targets.Contains([int]$child.ProcessId)) {
+              [void]$targets.Add([int]$child.ProcessId)
+              $queue.Enqueue([int]$child.ProcessId)
+            }
+          }
+        }
+
+        if ($targets.Count -eq 0) {
+          return
+        }
+
+        $targetIds = @($targets) | Sort-Object -Descending
+        Stop-Process -Id $targetIds -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 800
+        $targetIds | ForEach-Object { Write-Output $_ }
+      `,
+      { encoding: "utf-8", windowsHide: true },
+    )
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (terminated.length > 0) {
+      console.warn(`[bundle] 已终止残留 bundle 构建进程: ${terminated.join(", ")}`);
+    }
+  } catch (error) {
+    console.warn(`[bundle] 清理残留 bundle 构建进程失败，继续构建: ${error.message}`);
+  }
+}
+
 function isRetryableRemoveError(error) {
-  return (
-    error &&
-    typeof error === "object" &&
-    ["EPERM", "EBUSY", "ENOTEMPTY"].includes(error.code)
-  );
+  return error && typeof error === "object" && ["EPERM", "EBUSY", "ENOTEMPTY"].includes(error.code);
 }
 
 function tryRemovePath(pathValue, { label = pathValue, strict = true } = {}) {
@@ -168,6 +281,10 @@ function removeOptionalPath(pathValue, { label = pathValue } = {}) {
   return tryRemovePath(pathValue, { label, strict: false });
 }
 
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function resetBundleDirectory(dirPath) {
   if (!existsSync(dirPath)) {
     mkdirSync(dirPath, { recursive: true });
@@ -221,6 +338,99 @@ function resetBundleDirectory(dirPath) {
     }
   }
 }
+
+function prepareBundleNodeModulesForInstall(nodeModulesDir) {
+  if (!existsSync(nodeModulesDir)) {
+    return [];
+  }
+
+  console.warn(`[bundle] 安装前清理残留 node_modules: ${nodeModulesDir}`);
+
+  const skippedPaths = [];
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (tryRemovePath(nodeModulesDir, { label: nodeModulesDir, strict: false })) {
+      return [];
+    }
+
+    if (!existsSync(nodeModulesDir)) {
+      return [];
+    }
+
+    for (const entry of readdirSync(nodeModulesDir, { withFileTypes: true })) {
+      skippedPaths.push(
+        ...cleanupBusyPath(join(nodeModulesDir, entry.name), {
+          label: `${nodeModulesDir}/${entry.name}`,
+        }),
+      );
+    }
+
+    if (!existsSync(nodeModulesDir)) {
+      return [];
+    }
+
+    if (attempt < 3) {
+      console.warn(`[bundle] node_modules 仍有忙锁，等待后重试 (${attempt}/3)`);
+      sleep(400 * attempt);
+    }
+  }
+
+  if (!existsSync(nodeModulesDir)) {
+    return [];
+  }
+
+  const remainingPaths = [nodeModulesDir];
+  const uniqueSkipped = [...new Set([...skippedPaths, ...remainingPaths])];
+  console.warn(
+    `[bundle] 以下 node_modules 路径仍无法清理，后续将尝试重试安装:\n${uniqueSkipped.join("\n")}`,
+  );
+  return uniqueSkipped;
+}
+
+function installBundleDependencies(bundleTarget) {
+  const installCmd = "npm install --omit=dev --install-strategy=hoisted";
+  const nodeModulesDir = join(bundleDir, "node_modules");
+
+  if (process.platform === "win32") {
+    prepareBundleNodeModulesForInstall(nodeModulesDir);
+  }
+
+  try {
+    run(installCmd, {
+      cwd: bundleDir,
+    });
+  } catch (error) {
+    if (process.platform !== "win32") {
+      throw error;
+    }
+
+    console.warn("[bundle] npm install 失败，尝试清理残留 node_modules 后重试一次...");
+    prepareBundleNodeModulesForInstall(nodeModulesDir);
+    sleep(800);
+    run(installCmd, {
+      cwd: bundleDir,
+    });
+  }
+
+  if (!isCrossTargetBundle(bundleTarget)) {
+    return;
+  }
+
+  const targetSpecs = collectTargetOptionalDependencySpecs(nodeModulesDir, bundleTarget);
+  if (targetSpecs.length > 0) {
+    console.log(`[bundle] 检测到跨目标打包，补装 ${targetSpecs.length} 个目标平台原生可选依赖`);
+    // Force-install the target prebuilt packages into the bundle even when the
+    // current build host has a different CPU architecture. We skip lifecycle
+    // scripts here because these packages are already prebuilt artifacts.
+    run(`npm install --no-save --force --ignore-scripts ${targetSpecs.join(" ")}`, {
+      cwd: bundleDir,
+      env: {
+        ...process.env,
+      },
+    });
+  }
+}
+
+terminateStaleWindowsBundleProcessTrees();
 
 function isCrossTargetBundle(bundleTarget) {
   return bundleTarget.os !== process.platform || bundleTarget.cpu !== process.arch;
@@ -385,7 +595,9 @@ console.log("\n[bundle] === Step 1: 编译 TypeScript ===");
 // Windows: 跳过 canvas:a2ui:bundle (bash脚本在Windows下失败)，使用已有bundle
 if (process.platform === "win32") {
   console.log("[bundle] Windows: 跳过 canvas:a2ui:bundle，使用已有bundle");
-  run("node scripts/tsdown-build.mjs && node scripts/runtime-postbuild.mjs && node scripts/build-stamp.mjs && pnpm build:plugin-sdk:dts && node --import tsx scripts/write-plugin-sdk-entry-dts.ts && node --import tsx scripts/canvas-a2ui-copy.ts && node --import tsx scripts/copy-hook-metadata.ts && node --import tsx scripts/copy-export-html-templates.ts && node --import tsx scripts/write-build-info.ts && node --import tsx scripts/write-cli-startup-metadata.ts && node --import tsx scripts/write-cli-compat.ts");
+  run(
+    "node scripts/tsdown-build.mjs && node scripts/runtime-postbuild.mjs && node scripts/build-stamp.mjs && pnpm build:plugin-sdk:dts && node --import tsx scripts/write-plugin-sdk-entry-dts.ts && node --import tsx scripts/canvas-a2ui-copy.ts && node --import tsx scripts/copy-hook-metadata.ts && node --import tsx scripts/copy-export-html-templates.ts && node --import tsx scripts/write-build-info.ts && node --import tsx scripts/write-cli-startup-metadata.ts && node --import tsx scripts/write-cli-compat.ts",
+  );
 } else {
   run("pnpm build");
 }
@@ -557,28 +769,7 @@ const bundleTarget = resolveBundleTarget();
 console.log(
   `[bundle] npm install 目标架构: triple=${bundleTarget.triple}, os=${bundleTarget.os}, cpu=${bundleTarget.cpu}`,
 );
-run("npm install --omit=dev --install-strategy=hoisted", {
-  cwd: bundleDir,
-});
-
-if (isCrossTargetBundle(bundleTarget)) {
-  const targetSpecs = collectTargetOptionalDependencySpecs(
-    join(bundleDir, "node_modules"),
-    bundleTarget,
-  );
-  if (targetSpecs.length > 0) {
-    console.log(`[bundle] 检测到跨目标打包，补装 ${targetSpecs.length} 个目标平台原生可选依赖`);
-    // Force-install the target prebuilt packages into the bundle even when the
-    // current build host has a different CPU architecture. We skip lifecycle
-    // scripts here because these packages are already prebuilt artifacts.
-    run(`npm install --no-save --force --ignore-scripts ${targetSpecs.join(" ")}`, {
-      cwd: bundleDir,
-      env: {
-        ...process.env,
-      },
-    });
-  }
-}
+installBundleDependencies(bundleTarget);
 
 // Step 5.5: 解析 extension 中声明在 node_modules 内的 skills 路径
 // 某些 extension（如 tlon）的 openclaw.plugin.json 中 skills 路径指向 node_modules 子目录
