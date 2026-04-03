@@ -13,10 +13,10 @@ describe("wecom channel config adapter", () => {
       },
     };
 
-    const account = pluginEntry.channelPlugin.config.resolveAccount(cfg, "default");
+    const account = pluginEntry.channelPlugin!.config!.resolveAccount!(cfg, "default");
 
-    expect(pluginEntry.channelPlugin.config.listAccountIds(cfg)).toEqual(["default"]);
-    expect(pluginEntry.channelPlugin.config.isConfigured(account, cfg)).toBe(true);
+    expect(pluginEntry.channelPlugin!.config!.listAccountIds!(cfg)).toEqual(["default"]);
+    expect(pluginEntry.channelPlugin!.config!.isConfigured!(account, cfg)).toBe(true);
   });
 
   it("does not mark incomplete credentials as configured", () => {
@@ -30,9 +30,9 @@ describe("wecom channel config adapter", () => {
       },
     };
 
-    const account = pluginEntry.channelPlugin.config.resolveAccount(cfg, "default");
+    const account = pluginEntry.channelPlugin!.config!.resolveAccount!(cfg, "default");
 
-    expect(pluginEntry.channelPlugin.config.isConfigured(account, cfg)).toBe(false);
+    expect(pluginEntry.channelPlugin!.config!.isConfigured!(account, cfg)).toBe(false);
   });
 
   it("treats config without an explicit enabled flag as enabled by default", () => {
@@ -45,7 +45,7 @@ describe("wecom channel config adapter", () => {
       },
     };
 
-    expect(pluginEntry.channelPlugin.config.listAccountIds(cfg)).toEqual(["default"]);
-    expect(pluginEntry.channelPlugin.config.defaultAccountId(cfg)).toBe("default");
+    expect(pluginEntry.channelPlugin!.config!.listAccountIds!(cfg)).toEqual(["default"]);
+    expect(pluginEntry.channelPlugin!.config!.defaultAccountId!(cfg)).toBe("default");
   });
 });

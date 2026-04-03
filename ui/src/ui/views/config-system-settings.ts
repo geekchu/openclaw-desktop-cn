@@ -6,7 +6,13 @@
  */
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { checkForUpdate, downloadUpdate, installUpdate, closeUpdateResource } from "./updater.js";
+import {
+  checkForUpdate,
+  downloadUpdate,
+  installUpdate,
+  closeUpdateResource,
+  closeDownloadedBytesResource,
+} from "./updater.js";
 
 export const CLAW_CONFIG_SYSTEM = "claw-config-system";
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
@@ -116,11 +122,14 @@ export class SystemSettingsView extends LitElement {
   }
 
   private async _cleanupUpdateResources() {
+    if (this._downloadedBytesRid != null) {
+      await closeDownloadedBytesResource(this._downloadedBytesRid);
+      this._downloadedBytesRid = null;
+    }
     if (this._updateRid != null) {
       await closeUpdateResource(this._updateRid);
       this._updateRid = null;
     }
-    this._downloadedBytesRid = null;
   }
 
   private async _loadConfig() {
@@ -1726,6 +1735,10 @@ export class SystemSettingsView extends LitElement {
     if (this._updateRid == null) {
       this.updateError = "无法下载：更新信息缺失，请重新检查";
       return;
+    }
+    if (this._downloadedBytesRid != null) {
+      await closeDownloadedBytesResource(this._downloadedBytesRid);
+      this._downloadedBytesRid = null;
     }
     this.updateDownloading = true;
     this.updateProgress = 0;

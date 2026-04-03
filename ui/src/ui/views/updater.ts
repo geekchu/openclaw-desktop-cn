@@ -6,6 +6,18 @@ function getTauri(): any { // eslint-disable-line @typescript-eslint/no-explicit
   return (window as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).__TAURI__ ?? null;
 }
 
+async function closeResource(rid: number): Promise<void> {
+  const tauri = getTauri();
+  if (!tauri?.core?.invoke) {
+    return;
+  }
+  try {
+    await tauri.core.invoke("plugin:resources|close", { rid });
+  } catch {
+    // ignore - 资源可能已被释放
+  }
+}
+
 /** 检查更新的结果类型 */
 export type CheckUpdateResult =
   | { status: "available"; version: string; body: string; rid: number }
@@ -56,6 +68,14 @@ export async function closeUpdateResource(rid: number): Promise<void> {
   } catch {
     // ignore - 资源可能已被释放
   }
+}
+
+/**
+ * 关闭 download 返回的 bytesRid 资源。
+ * 对齐 Tauri 官方 guest-js 的 Update.close() 语义，避免重复检查/卸载组件时泄漏资源。
+ */
+export async function closeDownloadedBytesResource(rid: number): Promise<void> {
+  await closeResource(rid);
 }
 
 /**

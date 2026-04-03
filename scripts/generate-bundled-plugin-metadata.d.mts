@@ -31,3 +31,6 @@ export function writeBundledPluginMetadataModule(params?: {
   wrote: boolean;
   outputPaths: string[];
 }>;
+
+export function renderBundledPluginEntriesModule(entries: BundledPluginMetadataEntry[]): string;
+export function renderBundledChannelEntriesModule(entries: BundledPluginMetadataEntry[]): string;

@@ -315,7 +315,7 @@ function hydrateSettings(
       !Array.isArray(parsed.navGroupsCollapsed)
         ? (parsed.navGroupsCollapsed as Record<string, boolean>)
         : gatewayDefaults.navGroupsCollapsed,
-    locale: isSupportedLocale(parsed.locale) ? parsed.locale : undefined,
+    locale: isSupportedLocale(parsed.locale as string) ? parsed.locale as NonNullable<UiSettings["locale"]> : undefined,
   };
 }
 

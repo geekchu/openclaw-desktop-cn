@@ -8,8 +8,39 @@ import { renderCustomProviders } from "./config-custom-providers.js";
 
 // ─── Tauri invoke helper ─────────────────────────────────────
 
+type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+type TauriBridge = {
+  core?: {
+    invoke?: TauriInvoke;
+  };
+};
+
+type OnestopConfig = {
+  models?: {
+    providers?: Record<
+      string,
+      {
+        apiKey?: string;
+        baseUrl?: string;
+        models?: Array<Record<string, unknown>>;
+      }
+    >;
+  };
+  agents?: {
+    defaults?: {
+      models?: Record<string, Record<string, unknown>>;
+      model?: {
+        primary?: string;
+      };
+    };
+  };
+  meta?: {
+    lastTouchedAt?: string;
+  };
+};
+
 function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const t = (window as any).__TAURI__;
+  const t = (window as typeof window & { __TAURI__?: TauriBridge }).__TAURI__;
   if (t?.core?.invoke) {
     return t.core.invoke(cmd, args) as Promise<T>;
   }
@@ -40,7 +71,9 @@ const PRICING_URL = `https://${DISPLAY_HOST}/pricing`;
 
 /** Switch to fallback host and start background recovery probe. */
 function switchToFallbackHost(): void {
-  if (_apiHost === FALLBACK_API_HOST) return;
+  if (_apiHost === FALLBACK_API_HOST) {
+    return;
+  }
   _apiHost = FALLBACK_API_HOST;
   startEndpointHealthCheck();
 }
@@ -69,10 +102,14 @@ async function probeEndpoint(): Promise<boolean> {
 }
 
 function startEndpointHealthCheck(): void {
-  if (_endpointHealthTimer) return;
+  if (_endpointHealthTimer) {
+    return;
+  }
   _endpointHealthTimer = setInterval(() => {
     void probeEndpoint().then((ok) => {
-      if (ok) switchToPrimaryHost();
+      if (ok) {
+        switchToPrimaryHost();
+      }
     });
   }, ENDPOINT_HEALTH_INTERVAL_MS);
 }
@@ -107,7 +144,7 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
 
   // 单次原子写入：get_config → 修改全部字段 → save_config
   // 避免多次写文件触发 gateway 的文件监视器反复重启
-  const cfg = await invoke<Record<string, any>>("get_config");
+  const cfg = await invoke<OnestopConfig>("get_config");
 
   // 1. 设置 provider 配置 (models.providers.onestop)
   if (!cfg.models) {
@@ -254,7 +291,7 @@ function loadExistingApiKey(requestUpdate: () => void): void {
   }
   _existingKeyLoadPromise = (async () => {
     try {
-      const cfg = await invoke<Record<string, any>>("get_config");
+      const cfg = await invoke<OnestopConfig>("get_config");
       const apiKey = cfg?.models?.providers?.onestop?.apiKey;
       if (typeof apiKey === "string" && apiKey.length > 0) {
         // 脱敏显示：前4后4，中间用 • 填充
@@ -880,11 +917,6 @@ function renderOnestopContent(props: OnestopProps) {
   for (const m of _cachedModels) {
     providerNames[m.providerKey] = m.provider;
   }
-
-  // 当前选中模型信息
-  const selectedModelInfo = props.selectedModel
-    ? _cachedModels.find((m) => m.id === props.selectedModel)
-    : null;
 
   // 切换模型：更新 provider 配置（包括白名单和 primary）
   const handleSwitchModel = async (modelId: string) => {
