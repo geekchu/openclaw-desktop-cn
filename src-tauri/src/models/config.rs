@@ -90,6 +90,8 @@ pub struct ConfiguredProvider {
     pub name: String,
     /// API 地址
     pub base_url: String,
+    /// Provider 级 API 类型
+    pub api_type: Option<String>,
     /// API Key (脱敏显示)
     pub api_key_masked: Option<String>,
     /// 是否有 API Key
@@ -109,10 +111,17 @@ pub struct ConfiguredModel {
     pub name: String,
     /// API 类型
     pub api_type: Option<String>,
+    /// 支持的输入类型
+    #[serde(default)]
+    pub input: Vec<String>,
     /// 上下文窗口
     pub context_window: Option<u32>,
     /// 最大输出
     pub max_tokens: Option<u32>,
+    /// 是否支持推理模式
+    pub reasoning: Option<bool>,
+    /// 成本配置
+    pub cost: Option<ModelCostConfig>,
     /// 是否为主模型
     pub is_primary: bool,
 }

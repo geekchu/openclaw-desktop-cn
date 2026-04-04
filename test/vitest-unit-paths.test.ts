@@ -6,7 +6,11 @@ describe("isUnitConfigTestFile", () => {
     expect(isUnitConfigTestFile("src/infra/git-commit.test.ts")).toBe(true);
     expect(isUnitConfigTestFile("test/format-error.test.ts")).toBe(true);
     expect(isUnitConfigTestFile("ui/src/ui/views/channels.test.ts")).toBe(true);
+    expect(isUnitConfigTestFile("ui/src/ui/views/config-channels.pairing.test.ts")).toBe(true);
+    expect(isUnitConfigTestFile("ui/src/ui/views/config-custom-providers.test.ts")).toBe(true);
+    expect(isUnitConfigTestFile("ui/src/ui/views/config-onestop.test.ts")).toBe(true);
     expect(isUnitConfigTestFile("ui/src/ui/views/chat.test.ts")).toBe(true);
+    expect(isUnitConfigTestFile("ui/src/ui/controllers/config.test.ts")).toBe(true);
   });
 
   it("rejects files excluded from the unit config", () => {

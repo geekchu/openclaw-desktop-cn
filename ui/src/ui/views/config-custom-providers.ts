@@ -50,14 +50,23 @@ interface ConfiguredModel {
   id: string;
   name: string;
   api_type: string | null;
+  input: string[];
   context_window: number | null;
   max_tokens: number | null;
+  reasoning: boolean | null;
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  } | null;
   is_primary: boolean;
 }
 
 interface ConfiguredProvider {
   name: string;
   base_url: string;
+  api_type: string | null;
   api_key_masked: string | null;
   has_api_key: boolean;
   models: ConfiguredModel[];
@@ -68,6 +77,12 @@ interface AIConfigOverview {
   configured_providers: ConfiguredProvider[];
   available_models: string[];
 }
+
+const BUILTIN_API_TYPE_OPTIONS = [
+  "openai-completions",
+  "openai-responses",
+  "anthropic-messages",
+] as const;
 
 // ─── SVG Icons ──────────────────────────────────────────────
 
@@ -89,7 +104,9 @@ const icons = {
   trash: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="3 6 5 6 21 6"></polyline>
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      <path
+        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+      ></path>
     </svg>
   `,
   edit: html`
@@ -220,8 +237,26 @@ export class CustomProvidersView extends LitElement {
   @state() deleting = false;
 
   private _loadAbort: AbortController | null = null;
+  private _aiConfigRequestVersion = 0;
 
   @state() expandedProviders = new Set<string>();
+
+  private nextAiConfigRequestVersion(): number {
+    this._aiConfigRequestVersion += 1;
+    return this._aiConfigRequestVersion;
+  }
+
+  private isCurrentAiConfigRequest(version: number): boolean {
+    return this._aiConfigRequestVersion === version;
+  }
+
+  private normalizeAiConfig(config: AIConfigOverview): AIConfigOverview {
+    return {
+      ...config,
+      configured_providers:
+        config.configured_providers?.filter((provider) => provider.name !== "onestop") ?? [],
+    };
+  }
 
   connectedCallback() {
     super.connectedCallback();
@@ -234,12 +269,15 @@ export class CustomProvidersView extends LitElement {
     super.disconnectedCallback();
     this._loadAbort?.abort();
     this._loadAbort = null;
+    this._aiConfigRequestVersion += 1;
+    this.loading = false;
   }
 
   async loadData() {
     this._loadAbort?.abort();
     this._loadAbort = new AbortController();
     const signal = this._loadAbort.signal;
+    let configRequestVersion: number | null = null;
 
     this.loading = true;
     if (signal.aborted) {
@@ -251,56 +289,70 @@ export class CustomProvidersView extends LitElement {
     this.loadingStatus = "初始化中...";
 
     try {
-      this.officialProviders = await invoke<OfficialProvider[]>("get_official_providers");
       if (signal.aborted) {
-        this.loading = false;
         return;
       }
-
-      this.aiConfig = await invoke<AIConfigOverview>("get_ai_config");
-      if (signal.aborted) {
-        this.loading = false;
+      const officialProviders = await invoke<OfficialProvider[]>("get_official_providers");
+      if (signal.aborted || this._loadAbort?.signal !== signal) {
         return;
       }
+      this.officialProviders = officialProviders;
 
-      // 过滤掉一站式接入的 provider，避免在自定义接入页面显示
-      if (this.aiConfig?.configured_providers) {
-        this.aiConfig.configured_providers = this.aiConfig.configured_providers.filter(
-          (p) => p.name !== "onestop",
-        );
+      configRequestVersion = this.nextAiConfigRequestVersion();
+      const aiConfig = await invoke<AIConfigOverview>("get_ai_config");
+      if (
+        signal.aborted ||
+        this._loadAbort?.signal !== signal ||
+        !this.isCurrentAiConfigRequest(configRequestVersion)
+      ) {
+        return;
       }
+      this.aiConfig = this.normalizeAiConfig(aiConfig);
 
       // this.addLog("配置加载完成");
     } catch (e: unknown) {
+      if (
+        signal.aborted ||
+        this._loadAbort?.signal !== signal ||
+        (configRequestVersion !== null && !this.isCurrentAiConfigRequest(configRequestVersion))
+      ) {
+        return;
+      }
       console.error("Load Data Error:", e);
       const errMsg = e instanceof Error ? e.message : String(e);
       this.error = errMsg;
       // this.addLog(`ERROR: ${errMsg}`);
     } finally {
-      this.loading = false;
+      if (this._loadAbort?.signal === signal) {
+        this.loading = false;
+      }
       // this.addLog("加载流程结束");
     }
   }
 
   /** Lightweight config refresh — only re-fetches AI config, no loading spinner. */
-  async refreshConfig() {
+  async refreshConfig(): Promise<boolean> {
+    const configRequestVersion = this.nextAiConfigRequestVersion();
     try {
       const config = await invoke<AIConfigOverview>("get_ai_config");
-      if (config?.configured_providers) {
-        config.configured_providers = config.configured_providers.filter(
-          (p) => p.name !== "onestop",
-        );
+      if (!this.isCurrentAiConfigRequest(configRequestVersion) || !this.isConnected) {
+        return false;
       }
-      this.aiConfig = config;
+      this.aiConfig = this.normalizeAiConfig(config);
+      return true;
     } catch (e) {
+      if (!this.isCurrentAiConfigRequest(configRequestVersion) || !this.isConnected) {
+        return false;
+      }
       console.error("refreshConfig error:", e);
+      return false;
     }
   }
 
   async handleSwitchModel(modelId: string) {
     try {
       await invoke<string>("switch_model", { modelId: modelId });
-      await this.refreshConfig();
+      const refreshed = await this.refreshConfig();
       // Notify parent components
       this.dispatchEvent(
         new CustomEvent("primary-model-changed", {
@@ -309,7 +361,9 @@ export class CustomProvidersView extends LitElement {
           composed: true,
         }),
       );
-      this.error = `✓ 已切换模型，请在聊天中发送 /new 开启新会话`;
+      this.error = refreshed
+        ? "✓ 已切换模型，请在聊天中发送 /new 开启新会话"
+        : "模型已切换，但刷新配置失败，请手动刷新";
       // 5 秒后自动清除成功提示
       setTimeout(() => {
         if (this.error?.startsWith("✓")) {
@@ -390,7 +444,10 @@ export class CustomProvidersView extends LitElement {
 
     // API 类型优先级：模型配置 > 官方 provider > 默认值
     this.formApiType =
-      provider.models[0]?.api_type || this.selectedOfficial?.api_type || "openai-completions";
+      provider.api_type ||
+      provider.models[0]?.api_type ||
+      this.selectedOfficial?.api_type ||
+      "openai-completions";
   }
 
   selectOfficialProvider(provider: OfficialProvider) {
@@ -425,8 +482,10 @@ export class CustomProvidersView extends LitElement {
   }
 
   addCustomModel() {
-    if (this.formCustomModelId && !this.formSelectedModels.includes(this.formCustomModelId)) {
-      this.formSelectedModels = [...this.formSelectedModels, this.formCustomModelId];
+    const normalizedModelId = this.formCustomModelId.trim();
+    const normalizedExistingIds = new Set(this.formSelectedModels.map((modelId) => modelId.trim()));
+    if (normalizedModelId && !normalizedExistingIds.has(normalizedModelId)) {
+      this.formSelectedModels = [...this.formSelectedModels, normalizedModelId];
       this.formCustomModelId = "";
       this.formError = null;
     }
@@ -434,8 +493,18 @@ export class CustomProvidersView extends LitElement {
 
   async handleSaveProvider() {
     this.formError = null;
+    const normalizedProviderName = this.formProviderName.trim();
+    const normalizedBaseUrl = this.formBaseUrl.trim();
+    const normalizedApiKey = this.formApiKey.trim();
+    const normalizedModels = Array.from(
+      new Set(
+        this.formSelectedModels
+          .map((modelId) => modelId.trim())
+          .filter((modelId) => modelId.length > 0),
+      ),
+    );
 
-    if (!this.formProviderName || !this.formBaseUrl || this.formSelectedModels.length === 0) {
+    if (!normalizedProviderName || !normalizedBaseUrl || normalizedModels.length === 0) {
       this.formError = "请填写完整的供应商信息并至少选择一个模型";
       return;
     }
@@ -443,31 +512,53 @@ export class CustomProvidersView extends LitElement {
     this.formSaving = true;
 
     try {
-      const models = this.formSelectedModels.map((modelId) => {
+      const primaryBefore = this.aiConfig?.primary_model ?? null;
+      const editingProviderApiType = this.editingProvider?.api_type ?? null;
+      const inferredProviderApiType =
+        editingProviderApiType ?? this.editingProvider?.models[0]?.api_type ?? null;
+      const models = normalizedModels.map((modelId) => {
         const suggested = this.selectedOfficial?.suggested_models.find((m) => m.id === modelId);
         const existingModel = this.editingProvider?.models.find((m) => m.id === modelId);
+        const nextModelApi =
+          existingModel?.api_type && existingModel.api_type !== inferredProviderApiType
+            ? existingModel.api_type
+            : existingModel?.api_type && this.formApiType !== inferredProviderApiType
+              ? this.formApiType
+              : existingModel?.api_type;
         return {
           id: modelId,
-          name: suggested?.name || existingModel?.name || modelId,
-          api: this.formApiType,
-          input: ["text", "image"],
-          contextWindow: suggested?.context_window ?? existingModel?.context_window ?? 200000,
-          maxTokens: suggested?.max_tokens ?? existingModel?.max_tokens ?? 8192,
-          reasoning: false,
-          cost: null,
+          name: existingModel?.name || suggested?.name || modelId,
+          ...(nextModelApi ? { api: nextModelApi } : {}),
+          contextWindow: existingModel?.context_window ?? suggested?.context_window ?? 200000,
+          maxTokens: existingModel?.max_tokens ?? suggested?.max_tokens ?? 8192,
+          ...(existingModel?.input?.length ? { input: existingModel.input } : {}),
+          ...(existingModel?.reasoning !== null && existingModel?.reasoning !== undefined
+            ? { reasoning: existingModel.reasoning }
+            : {}),
+          ...(existingModel?.cost ? { cost: existingModel.cost } : {}),
         };
       });
 
       await invoke("save_provider", {
-        providerName: this.formProviderName,
-        baseUrl: this.formBaseUrl,
-        apiKey: this.formApiKey || null,
+        providerName: normalizedProviderName,
+        baseUrl: normalizedBaseUrl,
+        apiKey: normalizedApiKey || null,
         apiType: this.formApiType,
         models,
       });
 
       this.resetForm();
       await this.loadData();
+      const primaryAfter = this.aiConfig?.primary_model ?? null;
+      if (primaryBefore !== primaryAfter) {
+        this.dispatchEvent(
+          new CustomEvent("primary-model-changed", {
+            detail: { modelId: primaryAfter },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      }
     } catch (e) {
       this.formError = "保存失败: " + String(e);
       this.formSaving = false;
@@ -487,17 +578,16 @@ export class CustomProvidersView extends LitElement {
                 <span class="onestop-custom-provider-option__icon">${provider.icon}</span>
                 <div class="onestop-custom-provider-option__info">
                   <span class="onestop-custom-provider-option__name">${provider.name}</span>
-                  <span class="onestop-custom-provider-option__count">${provider.suggested_models.length} 个模型</span>
+                  <span class="onestop-custom-provider-option__count"
+                    >${provider.suggested_models.length} 个模型</span
+                  >
                 </div>
                 <span class="onestop-custom-provider-option__arrow">${icons.chevronRight}</span>
               </button>
             `,
           )}
         </div>
-        <button
-          class="onestop-custom-provider-custom"
-          @click=${() => this.selectCustomProvider()}
-        >
+        <button class="onestop-custom-provider-custom" @click=${() => this.selectCustomProvider()}>
           <span class="onestop-custom-provider-custom__icon">${icons.settings}</span>
           <span>自定义供应商 (兼容 OpenAI/Anthropic API)</span>
         </button>
@@ -507,6 +597,16 @@ export class CustomProvidersView extends LitElement {
 
   renderConfigureForm() {
     const isEditing = !!this.editingProvider;
+    const apiTypeOptions = Array.from(
+      new Set(
+        [
+          ...BUILTIN_API_TYPE_OPTIONS,
+          this.formApiType,
+          this.editingProvider?.api_type,
+          ...(this.editingProvider?.models.map((model) => model.api_type) ?? []),
+        ].filter((value): value is string => Boolean(value)),
+      ),
+    );
 
     return html`
       <div class="onestop-custom-form">
@@ -548,31 +648,23 @@ export class CustomProvidersView extends LitElement {
         <div class="onestop-custom-field">
           <label class="onestop-custom-label">
             API Key
-            ${
-              !this.selectedOfficial?.requires_api_key
-                ? html`
-                    <span class="onestop-custom-label__hint">(可选)</span>
-                  `
-                : nothing
-            }
+            ${!this.selectedOfficial?.requires_api_key
+              ? html` <span class="onestop-custom-label__hint">(可选)</span> `
+              : nothing}
           </label>
-          ${
-            isEditing && this.editingProvider?.has_api_key
-              ? html`<div class="onestop-custom-apikey-current">
+          ${isEditing && this.editingProvider?.has_api_key
+            ? html`<div class="onestop-custom-apikey-current">
                 <span class="onestop-custom-label__hint">当前:</span>
                 <code class="onestop-custom-code">${this.editingProvider.api_key_masked}</code>
               </div>`
-              : nothing
-          }
+            : nothing}
           <div class="onestop-apikey__field">
             <input
               type=${this.formShowApiKey ? "text" : "password"}
               class="onestop-apikey__input"
-              placeholder=${
-                isEditing && this.editingProvider?.has_api_key
-                  ? "留空保持原有 Key，或输入新的 Key"
-                  : "sk-..."
-              }
+              placeholder=${isEditing && this.editingProvider?.has_api_key
+                ? "留空保持原有 Key，或输入新的 Key"
+                : "sk-..."}
               .value=${this.formApiKey}
               @input=${(e: Event) => {
                 this.formApiKey = (e.target as HTMLInputElement).value;
@@ -598,8 +690,17 @@ export class CustomProvidersView extends LitElement {
               this.formApiType = (e.target as HTMLSelectElement).value;
             }}
           >
-            <option value="openai-completions">OpenAI 兼容 (openai-completions)</option>
-            <option value="anthropic-messages">Anthropic 兼容 (anthropic-messages)</option>
+            ${apiTypeOptions.map((apiType) => {
+              const label =
+                apiType === "openai-completions"
+                  ? "OpenAI 兼容 (openai-completions)"
+                  : apiType === "openai-responses"
+                    ? "OpenAI Responses (openai-responses)"
+                    : apiType === "anthropic-messages"
+                      ? "Anthropic 兼容 (anthropic-messages)"
+                      : `保留现有类型 (${apiType})`;
+              return html`<option value=${apiType}>${label}</option>`;
+            })}
           </select>
         </div>
 
@@ -607,48 +708,48 @@ export class CustomProvidersView extends LitElement {
         <div class="onestop-custom-field">
           <label class="onestop-custom-label">
             选择模型
-            <span class="onestop-custom-label__hint">(已选 ${this.formSelectedModels.length} 个)</span>
+            <span class="onestop-custom-label__hint"
+              >(已选 ${this.formSelectedModels.length} 个)</span
+            >
           </label>
 
-          ${
-            this.selectedOfficial
-              ? html`
+          ${this.selectedOfficial
+            ? html`
                 <div class="onestop-custom-model-list">
                   ${this.selectedOfficial.suggested_models.map(
                     (model) => html`
                       <button
-                        class="onestop-custom-model-item ${this.formSelectedModels.includes(model.id) ? "selected" : ""}"
+                        class="onestop-custom-model-item ${this.formSelectedModels.includes(
+                          model.id,
+                        )
+                          ? "selected"
+                          : ""}"
                         @click=${() => this.toggleModel(model.id)}
                       >
                         <div class="onestop-custom-model-item__info">
                           <span class="onestop-custom-model-item__name">
                             ${model.name}
-                            ${
-                              model.recommended
-                                ? html`
-                                    <span class="onestop-custom-model-item__badge">推荐</span>
-                                  `
-                                : nothing
-                            }
+                            ${model.recommended
+                              ? html` <span class="onestop-custom-model-item__badge">推荐</span> `
+                              : nothing}
                           </span>
-                          ${
-                            model.description
-                              ? html`<span class="onestop-custom-model-item__desc">${model.description}</span>`
-                              : nothing
-                          }
+                          ${model.description
+                            ? html`<span class="onestop-custom-model-item__desc"
+                                >${model.description}</span
+                              >`
+                            : nothing}
                         </div>
-                        ${
-                          this.formSelectedModels.includes(model.id)
-                            ? html`<span class="onestop-custom-model-item__check">${icons.check}</span>`
-                            : nothing
-                        }
+                        ${this.formSelectedModels.includes(model.id)
+                          ? html`<span class="onestop-custom-model-item__check"
+                              >${icons.check}</span
+                            >`
+                          : nothing}
                       </button>
                     `,
                   )}
                 </div>
               `
-              : nothing
-          }
+            : nothing}
 
           <!-- 自定义模型输入 -->
           <div class="onestop-custom-model-add">
@@ -676,11 +777,10 @@ export class CustomProvidersView extends LitElement {
           </div>
 
           <!-- 已添加的自定义模型标签 -->
-          ${
-            this.formSelectedModels.filter(
-              (id) => !this.selectedOfficial?.suggested_models.find((m) => m.id === id),
-            ).length > 0
-              ? html`
+          ${this.formSelectedModels.filter(
+            (id) => !this.selectedOfficial?.suggested_models.find((m) => m.id === id),
+          ).length > 0
+            ? html`
                 <div class="onestop-custom-model-tags">
                   ${this.formSelectedModels
                     .filter(
@@ -690,20 +790,23 @@ export class CustomProvidersView extends LitElement {
                       (modelId) => html`
                         <span class="onestop-custom-model-tag">
                           ${modelId}
-                          <button class="onestop-custom-model-tag__remove" @click=${() => this.toggleModel(modelId)}>✕</button>
+                          <button
+                            class="onestop-custom-model-tag__remove"
+                            @click=${() => this.toggleModel(modelId)}
+                          >
+                            ✕
+                          </button>
                         </span>
                       `,
                     )}
                 </div>
               `
-              : nothing
-          }
+            : nothing}
         </div>
 
         <!-- 文档链接 -->
-        ${
-          this.selectedOfficial?.docs_url
-            ? html`
+        ${this.selectedOfficial?.docs_url
+          ? html`
               <a
                 href=${this.selectedOfficial.docs_url}
                 target="_blank"
@@ -714,32 +817,38 @@ export class CustomProvidersView extends LitElement {
                 查看官方文档
               </a>
             `
-            : nothing
-        }
+          : nothing}
 
         <!-- 错误提示 -->
-        ${
-          this.formError ? html`<div class="onestop-custom-error">${this.formError}</div>` : nothing
-        }
+        ${this.formError
+          ? html`<div class="onestop-custom-error">${this.formError}</div>`
+          : nothing}
 
         <!-- 操作按钮 -->
         <div class="onestop-custom-form-actions">
-          ${
-            !isEditing
-              ? html`<button class="onestop-custom-btn-secondary" @click=${() => {
+          ${!isEditing
+            ? html`<button
+                class="onestop-custom-btn-secondary"
+                @click=${() => {
                   this.addStep = "select";
-                }}>${icons.arrowLeft} 返回</button>`
-              : nothing
-          }
+                }}
+              >
+                ${icons.arrowLeft} 返回
+              </button>`
+            : nothing}
           <div class="onestop-custom-form-actions__right">
-            <button class="onestop-custom-btn-secondary" @click=${() => this.resetForm()}>取消</button>
+            <button class="onestop-custom-btn-secondary" @click=${() => this.resetForm()}>
+              取消
+            </button>
             <button
               class="onestop-custom-btn-primary"
-              ?disabled=${this.formSaving || !this.formProviderName || !this.formBaseUrl || this.formSelectedModels.length === 0}
+              ?disabled=${this.formSaving ||
+              !this.formProviderName ||
+              !this.formBaseUrl ||
+              this.formSelectedModels.length === 0}
               @click=${() => this.handleSaveProvider()}
             >
-              ${this.formSaving ? icons.loader : icons.check}
-              ${isEditing ? "更新" : "保存"}
+              ${this.formSaving ? icons.loader : icons.check} ${isEditing ? "更新" : "保存"}
             </button>
           </div>
         </div>
@@ -772,98 +881,97 @@ export class CustomProvidersView extends LitElement {
           <div class="onestop-custom-card__info">
             <div class="onestop-custom-card__name-row">
               <span class="onestop-custom-card__name">${provider.name}</span>
-              ${
-                provider.has_api_key
-                  ? html`
-                      <span class="onestop-custom-tag onestop-custom-tag--ok">已配置</span>
-                    `
-                  : nothing
-              }
+              ${provider.has_api_key
+                ? html` <span class="onestop-custom-tag onestop-custom-tag--ok">已配置</span> `
+                : nothing}
             </div>
             <span class="onestop-custom-card__url">${provider.base_url}</span>
           </div>
           <div class="onestop-custom-card__right">
             <span class="onestop-custom-card__count">${provider.models.length} 模型</span>
-            <span class="onestop-custom-card__chevron ${expanded ? "expanded" : ""}">${icons.chevronDown}</span>
+            <span class="onestop-custom-card__chevron ${expanded ? "expanded" : ""}"
+              >${icons.chevronDown}</span
+            >
           </div>
         </div>
 
         <!-- 展开内容 -->
-        ${
-          expanded
-            ? html`
+        ${expanded
+          ? html`
               <div class="onestop-custom-card__body">
-                ${
-                  provider.api_key_masked
-                    ? html`
+                ${provider.api_key_masked
+                  ? html`
                       <div class="onestop-custom-card__detail">
                         <span class="onestop-custom-label__hint">API Key:</span>
                         <code class="onestop-custom-code">${provider.api_key_masked}</code>
                       </div>
                     `
-                    : nothing
-                }
+                  : nothing}
 
                 <!-- 模型列表 (当前模型置顶) -->
-              <div class="onestop-custom-card__models">
-                ${[...provider.models]
-                  .toSorted((a, b) => (a.is_primary === b.is_primary ? 0 : a.is_primary ? -1 : 1))
-                  .map(
-                    (model) => html`
-                      <div class="onestop-custom-model-row ${model.is_primary ? "primary" : ""}">
-                        <div class="onestop-custom-model-row__left">
-                          <span class="onestop-custom-model-row__icon">${icons.cpu}</span>
-                          <div>
-                            <span class="onestop-custom-model-row__name">
-                              ${model.name}
-                              ${
-                                model.is_primary
-                                  ? html`<span class="onestop-custom-model-row__star">${icons.star} 主模型</span>`
-                                  : nothing
-                              }
-                            </span>
-                            <span class="onestop-custom-model-row__id">${model.full_id}</span>
+                <div class="onestop-custom-card__models">
+                  ${[...provider.models]
+                    .toSorted((a, b) => (a.is_primary === b.is_primary ? 0 : a.is_primary ? -1 : 1))
+                    .map(
+                      (model) => html`
+                        <div class="onestop-custom-model-row ${model.is_primary ? "primary" : ""}">
+                          <div class="onestop-custom-model-row__left">
+                            <span class="onestop-custom-model-row__icon">${icons.cpu}</span>
+                            <div>
+                              <span class="onestop-custom-model-row__name">
+                                ${model.name}
+                                ${model.is_primary
+                                  ? html`<span class="onestop-custom-model-row__star"
+                                      >${icons.star} 主模型</span
+                                    >`
+                                  : nothing}
+                              </span>
+                              <span class="onestop-custom-model-row__id">${model.full_id}</span>
+                            </div>
+                          </div>
+                          <div class="onestop-custom-model-row__actions">
+                            <button
+                              class="onestop-custom-btn-text onestop-custom-btn-text--switch"
+                              title="切换后请发送 /new 开启新会话"
+                              ?disabled=${model.is_primary}
+                              @click=${(e: Event) => {
+                                e.stopPropagation();
+                                void this.handleSwitchModel(model.full_id);
+                              }}
+                            >
+                              ${model.is_primary ? "✓ 当前" : "切换"}
+                            </button>
                           </div>
                         </div>
-                      <div class="onestop-custom-model-row__actions">
-                        <button
-                          class="onestop-custom-btn-text onestop-custom-btn-text--switch"
-                          title="切换后请发送 /new 开启新会话"
-                          ?disabled=${model.is_primary}
-                          @click=${(e: Event) => {
-                            e.stopPropagation();
-                            void this.handleSwitchModel(model.full_id);
-                          }}
-                        >${model.is_primary ? "✓ 当前" : "切换"}</button>
-                      </div>
-                      </div>
-                    `,
-                  )}
+                      `,
+                    )}
                 </div>
 
                 <!-- 删除确认 -->
-                ${
-                  isDeleting
-                    ? html`
+                ${isDeleting
+                  ? html`
                       <div class="onestop-custom-delete-confirm">
-                        <p>⚠️ 确定要删除供应商 "${provider.name}" 吗？这将同时删除其下所有模型配置。</p>
+                        <p>
+                          ⚠️ 确定要删除供应商 "${provider.name}" 吗？这将同时删除其下所有模型配置。
+                        </p>
                         <div class="onestop-custom-delete-confirm__actions">
                           <button
                             class="onestop-custom-btn-danger"
                             ?disabled=${this.deleting}
                             @click=${() => this.handleDeleteProvider(provider.name)}
                           >
-                            ${this.deleting ? icons.loader : icons.trash}
-                            确认删除
+                            ${this.deleting ? icons.loader : icons.trash} 确认删除
                           </button>
                           <button
                             class="onestop-custom-btn-secondary"
                             @click=${() => (this.deleteConfirmProvider = null)}
-                          >取消</button>
+                          >
+                            取消
+                          </button>
                         </div>
                       </div>
                     `
-                    : html`
+                  : html`
                       <div class="onestop-custom-card__actions">
                         <button
                           class="onestop-custom-btn-text"
@@ -871,21 +979,23 @@ export class CustomProvidersView extends LitElement {
                             e.stopPropagation();
                             this.openEditForm(provider);
                           }}
-                        >${icons.edit} 编辑供应商</button>
+                        >
+                          ${icons.edit} 编辑供应商
+                        </button>
                         <button
                           class="onestop-custom-btn-text onestop-custom-btn-text--danger"
                           @click=${(e: Event) => {
                             e.stopPropagation();
                             this.deleteConfirmProvider = provider.name;
                           }}
-                        >${icons.trash} 删除供应商</button>
+                        >
+                          ${icons.trash} 删除供应商
+                        </button>
                       </div>
-                    `
-                }
+                    `}
               </div>
             `
-            : nothing
-        }
+          : nothing}
       </div>
     `;
   }
@@ -899,13 +1009,18 @@ export class CustomProvidersView extends LitElement {
               <h3 class="onestop-section__title">自定义接入</h3>
               <p class="onestop-section__desc">${this.loadingStatus}</p>
             </div>
-            <button class="onestop-custom-btn-secondary" @click=${() => {
-              this.loading = false;
-              this.aiConfig = null;
-              this.error = null;
+            <button
+              class="onestop-custom-btn-secondary"
+              @click=${() => {
+                this.loading = false;
+                this.aiConfig = null;
+                this.error = null;
 
-              void this.loadData();
-            }}>强制刷新</button>
+                void this.loadData();
+              }}
+            >
+              强制刷新
+            </button>
           </div>
           <div class="onestop-custom-loading">
             <span class="onestop-loading__spinner">${icons.loader}</span>
@@ -944,7 +1059,6 @@ export class CustomProvidersView extends LitElement {
         </div>
 
         <div class="onestop-section__body">
-
           <!-- 概览 -->
           <div class="onestop-custom-overview">
             <div class="onestop-custom-overview__info">
@@ -971,43 +1085,47 @@ export class CustomProvidersView extends LitElement {
           </div>
 
           <!-- 添加/编辑供应商表单 -->
-          ${
-            this.showAddForm
-              ? html`
+          ${this.showAddForm
+            ? html`
                 <div class="onestop-custom-add-section">
                   <div class="onestop-custom-add-section__header">
                     <span class="onestop-custom-add-section__title">
-                      ${
-                        this.editingProvider
-                          ? `编辑供应商: ${this.editingProvider.name}`
-                          : this.addStep === "select"
-                            ? "添加 AI 供应商"
-                            : `配置 ${this.selectedOfficial?.name || "自定义供应商"}`
-                      }
+                      ${this.editingProvider
+                        ? `编辑供应商: ${this.editingProvider.name}`
+                        : this.addStep === "select"
+                          ? "添加 AI 供应商"
+                          : `配置 ${this.selectedOfficial?.name || "自定义供应商"}`}
                     </span>
-                    <button class="onestop-custom-btn-icon" @click=${() => {
-                      this.resetForm();
-                    }}>${icons.close}</button>
+                    <button
+                      class="onestop-custom-btn-icon"
+                      @click=${() => {
+                        this.resetForm();
+                      }}
+                    >
+                      ${icons.close}
+                    </button>
                   </div>
-                  ${this.addStep === "select" ? this.renderProviderSelect() : this.renderConfigureForm()}
+                  ${this.addStep === "select"
+                    ? this.renderProviderSelect()
+                    : this.renderConfigureForm()}
                 </div>
               `
-              : nothing
-          }
+            : nothing}
 
           <!-- 已配置的供应商列表 -->
-          ${
-            this.aiConfig && this.aiConfig.configured_providers.length > 0
-              ? html`
+          ${this.aiConfig && this.aiConfig.configured_providers.length > 0
+            ? html`
                 <div class="onestop-custom-providers-list">
                   <h4 class="onestop-custom-providers-list__title">
                     ${icons.server} 已配置的供应商
                   </h4>
-                  ${this.aiConfig.configured_providers.map((provider) => this.renderProviderCard(provider))}
+                  ${this.aiConfig.configured_providers.map((provider) =>
+                    this.renderProviderCard(provider),
+                  )}
                 </div>
               `
-              : !this.showAddForm
-                ? html`
+            : !this.showAddForm
+              ? html`
                   <div class="onestop-custom-empty">
                     <span class="onestop-custom-empty__icon">${icons.plus}</span>
                     <p>还没有配置任何自定义 AI 供应商</p>
@@ -1016,15 +1134,12 @@ export class CustomProvidersView extends LitElement {
                     </button>
                   </div>
                 `
-                : nothing
-          }
+              : nothing}
 
           <!-- 错误提示 -->
-          ${
-            this.error && this.aiConfig
-              ? html`<div class="onestop-custom-error">${this.error}</div>`
-              : nothing
-          }
+          ${this.error && this.aiConfig
+            ? html`<div class="onestop-custom-error">${this.error}</div>`
+            : nothing}
         </div>
       </div>
     `;
@@ -1036,7 +1151,5 @@ export type CustomProvidersProps = {
 };
 
 export function renderCustomProviders(_props: CustomProvidersProps) {
-  return html`
-    <openclaw-custom-providers></openclaw-custom-providers>
-  `;
+  return html` <openclaw-custom-providers></openclaw-custom-providers> `;
 }

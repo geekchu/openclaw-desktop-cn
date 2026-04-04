@@ -33,6 +33,7 @@ function createState(): ConfigState {
     connected: false,
     lastError: null,
     onestopSelectedModel: "",
+    currentPrimaryModel: "",
   };
 }
 
@@ -106,6 +107,52 @@ describe("applyConfigSnapshot", () => {
     // Original values should be preserved when dirty
     expect(state.configRawOriginal).toBe('{ "original": true }');
     expect(state.configFormOriginal).toEqual({ original: true });
+  });
+
+  it("updates onestopSelectedModel when snapshot primary switches to another onestop model", () => {
+    const state = createState();
+    state.onestopSelectedModel = "qwen-plus";
+
+    applyConfigSnapshot(state, {
+      config: {
+        agents: {
+          defaults: {
+            model: {
+              primary: "onestop/deepseek-chat",
+            },
+          },
+        },
+      },
+      valid: true,
+      issues: [],
+      raw: "{}",
+    });
+
+    expect(state.currentPrimaryModel).toBe("onestop/deepseek-chat");
+    expect(state.onestopSelectedModel).toBe("deepseek-chat");
+  });
+
+  it("clears onestopSelectedModel when snapshot primary switches away from onestop", () => {
+    const state = createState();
+    state.onestopSelectedModel = "deepseek-chat";
+
+    applyConfigSnapshot(state, {
+      config: {
+        agents: {
+          defaults: {
+            model: {
+              primary: "custom-provider/foo-large",
+            },
+          },
+        },
+      },
+      valid: true,
+      issues: [],
+      raw: "{}",
+    });
+
+    expect(state.currentPrimaryModel).toBe("custom-provider/foo-large");
+    expect(state.onestopSelectedModel).toBe("");
   });
 });
 

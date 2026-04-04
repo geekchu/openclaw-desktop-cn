@@ -79,6 +79,10 @@ apps/ios/fastlane/.env
 apps/ios/*.ipa
 apps/ios/*.dSYM.zip
 
+# Linux packaging artifacts (local)
+*.AppImage
+*.AppImage.sig
+
 # provisioning profiles (local)
 apps/ios/*.mobileprovision
 

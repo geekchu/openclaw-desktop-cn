@@ -74,6 +74,7 @@ function createSaveState(): {
       configActiveSubsection: null,
       lastError: null,
       onestopSelectedModel: "",
+      currentPrimaryModel: "",
     },
     request,
   };

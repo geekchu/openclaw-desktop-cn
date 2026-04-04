@@ -19,8 +19,8 @@ type OnestopConfig = {
   models?: {
     providers?: Record<
       string,
-      {
-        apiKey?: string;
+      Record<string, unknown> & {
+        apiKey?: unknown;
         baseUrl?: string;
         models?: Array<Record<string, unknown>>;
       }
@@ -38,6 +38,40 @@ type OnestopConfig = {
     lastTouchedAt?: string;
   };
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeOnestopProviderModel(
+  existingModel: Record<string, unknown> | undefined,
+  model: OnestopModel,
+): Record<string, unknown> {
+  const existingCost = isRecord(existingModel?.cost) ? existingModel.cost : null;
+
+  return {
+    ...existingModel,
+    id: model.id,
+    name: typeof existingModel?.name === "string" ? existingModel.name : model.name,
+    api: typeof existingModel?.api === "string" ? existingModel.api : "openai-completions",
+    input:
+      Array.isArray(existingModel?.input) && existingModel.input.length > 0
+        ? existingModel.input
+        : ["text", "image"],
+    contextWindow:
+      typeof existingModel?.contextWindow === "number" ? existingModel.contextWindow : 200000,
+    maxTokens: typeof existingModel?.maxTokens === "number" ? existingModel.maxTokens : 8192,
+    reasoning: typeof existingModel?.reasoning === "boolean" ? existingModel.reasoning : false,
+    cost:
+      existingCost ??
+      ({
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+      } satisfies Record<string, number>),
+  };
+}
 
 function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const t = (window as typeof window & { __TAURI__?: TauriBridge }).__TAURI__;
@@ -126,18 +160,21 @@ function stopEndpointHealthCheck(): void {
  * Uses a single get_config → modify → save_config cycle to minimize file writes.
  */
 export async function saveOnestopConfig(apiKey: string, selectedModel: string): Promise<void> {
+  const normalizedApiKey = apiKey.trim();
+  const normalizedSelectedModel = selectedModel.trim();
+
   // 只保存选中的模型到配置，不保存全部缓存模型（避免配置膨胀）
   let modelsToSave: OnestopModel[] = [];
-  if (selectedModel) {
-    const found = _cachedModels.find((m) => m.id === selectedModel);
+  if (normalizedSelectedModel) {
+    const found = _cachedModels.find((m) => m.id === normalizedSelectedModel);
     modelsToSave = found
       ? [found]
       : [
           {
-            id: selectedModel,
-            name: formatModelName(selectedModel),
-            provider: inferProvider(selectedModel).name,
-            providerKey: inferProvider(selectedModel).key,
+            id: normalizedSelectedModel,
+            name: formatModelName(normalizedSelectedModel),
+            provider: inferProvider(normalizedSelectedModel).name,
+            providerKey: inferProvider(normalizedSelectedModel).key,
           },
         ];
   }
@@ -153,20 +190,32 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
   if (!cfg.models.providers) {
     cfg.models.providers = {};
   }
+  const existingProvider = isRecord(cfg.models.providers?.[ONESTOP_PROVIDER_NAME])
+    ? cfg.models.providers[ONESTOP_PROVIDER_NAME]
+    : {};
+  const existingProviderModels = Array.isArray(existingProvider.models)
+    ? existingProvider.models
+    : [];
+  const providerModelsToSave =
+    modelsToSave.length > 0
+      ? modelsToSave.map((m) =>
+          mergeOnestopProviderModel(
+            existingProviderModels.find(
+              (existingModel): existingModel is Record<string, unknown> =>
+                isRecord(existingModel) && existingModel.id === m.id,
+            ),
+            m,
+          ),
+        )
+      : existingProviderModels;
+  const existingApiKey = existingProvider.apiKey;
+  const nextApiKey = normalizedApiKey || existingApiKey || "";
   cfg.models.providers[ONESTOP_PROVIDER_NAME] = {
+    ...existingProvider,
     baseUrl: getBaseUrl(),
     // 如果用户未输入新 Key，保留配置文件中已有的 Key
-    apiKey: apiKey || cfg.models.providers?.[ONESTOP_PROVIDER_NAME]?.apiKey || "",
-    models: modelsToSave.map((m) => ({
-      id: m.id,
-      name: m.name,
-      api: "openai-completions",
-      input: ["text", "image"],
-      contextWindow: 200000,
-      maxTokens: 8192,
-      reasoning: false,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    })),
+    apiKey: nextApiKey,
+    models: providerModelsToSave,
   };
 
   // 2. 注册模型到 agents.defaults.models
@@ -181,20 +230,28 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
   }
 
   // 先清理该 provider 下的旧模型
-  const prefix = `${ONESTOP_PROVIDER_NAME}/`;
-  for (const key of Object.keys(cfg.agents.defaults.models)) {
-    if (key.startsWith(prefix)) {
-      delete cfg.agents.defaults.models[key];
+  if (normalizedSelectedModel) {
+    const prefix = `${ONESTOP_PROVIDER_NAME}/`;
+    const desiredFullIds = new Set(
+      modelsToSave.map((model) => `${ONESTOP_PROVIDER_NAME}/${model.id}`),
+    );
+    const existingDefaultsModels = cfg.agents.defaults.models;
+    for (const key of Object.keys(cfg.agents.defaults.models)) {
+      if (key.startsWith(prefix) && !desiredFullIds.has(key)) {
+        delete cfg.agents.defaults.models[key];
+      }
     }
-  }
-  // 添加当前选中的模型
-  for (const m of modelsToSave) {
-    cfg.agents.defaults.models[`${ONESTOP_PROVIDER_NAME}/${m.id}`] = {};
+
+    // 添加当前选中的模型
+    for (const m of modelsToSave) {
+      const fullId = `${ONESTOP_PROVIDER_NAME}/${m.id}`;
+      cfg.agents.defaults.models[fullId] = existingDefaultsModels[fullId] ?? {};
+    }
   }
 
   // 3. 设置主模型
-  if (selectedModel) {
-    const fullId = `${ONESTOP_PROVIDER_NAME}/${selectedModel}`;
+  if (normalizedSelectedModel) {
+    const fullId = `${ONESTOP_PROVIDER_NAME}/${normalizedSelectedModel}`;
     if (!cfg.agents.defaults.model) {
       cfg.agents.defaults.model = {};
     }
@@ -209,6 +266,7 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
 
   // 单次写入
   await invoke("save_config", { config: cfg });
+  syncExistingApiKeyState(nextApiKey);
 }
 
 // ─── 测试连接 ─────────────────────────────────────────────────
@@ -278,11 +336,30 @@ let _activeTab: "onestop" | "custom" = "onestop";
 let _customPrimaryModel: string | null = null;
 let _customPrimaryListenerAdded = false;
 let _latestRequestUpdate: (() => void) | null = null;
+let _lastSnapshotPrimaryModel = "";
 
 // 已保存的 API Key 脱敏显示
 let _existingMaskedKey: string | null = null;
 let _existingKeyLoaded = false;
 let _existingKeyLoadPromise: Promise<void> | null = null;
+
+function maskExistingApiKey(value: unknown): string | null {
+  if (typeof value === "string" && value.length > 0) {
+    if (value.length > 8) {
+      return `${value.slice(0, 4)}${"•".repeat(Math.min(value.length - 8, 20))}${value.slice(-4)}`;
+    }
+    return "•".repeat(value.length);
+  }
+  if (value && typeof value === "object") {
+    return "已配置引用";
+  }
+  return null;
+}
+
+function syncExistingApiKeyState(value: unknown): void {
+  _existingMaskedKey = maskExistingApiKey(value);
+  _existingKeyLoaded = true;
+}
 
 /** 从配置文件加载已有的 onestop API Key 并脱敏 */
 function loadExistingApiKey(requestUpdate: () => void): void {
@@ -290,21 +367,15 @@ function loadExistingApiKey(requestUpdate: () => void): void {
     return;
   }
   _existingKeyLoadPromise = (async () => {
+    let loaded = false;
     try {
       const cfg = await invoke<OnestopConfig>("get_config");
-      const apiKey = cfg?.models?.providers?.onestop?.apiKey;
-      if (typeof apiKey === "string" && apiKey.length > 0) {
-        // 脱敏显示：前4后4，中间用 • 填充
-        if (apiKey.length > 8) {
-          _existingMaskedKey = `${apiKey.slice(0, 4)}${"•".repeat(Math.min(apiKey.length - 8, 20))}${apiKey.slice(-4)}`;
-        } else {
-          _existingMaskedKey = "•".repeat(apiKey.length);
-        }
-      }
+      syncExistingApiKeyState(cfg?.models?.providers?.onestop?.apiKey);
+      loaded = true;
     } catch {
       // 配置不可用时忽略
     } finally {
-      _existingKeyLoaded = true;
+      _existingKeyLoaded = loaded;
       _existingKeyLoadPromise = null;
       requestUpdate();
     }
@@ -670,6 +741,7 @@ const providerColors: Record<string, string> = {
 export type OnestopProps = {
   apiKey: string;
   selectedModel: string;
+  currentPrimaryModel: string;
   showApiKey: boolean;
   activeCategory: string; // 现在用作 provider 筛选
   saving: boolean;
@@ -772,14 +844,31 @@ export function renderOnestop(props: OnestopProps) {
     }) as EventListener);
   }
 
+  const snapshotPrimary = props.currentPrimaryModel.trim();
+  if (snapshotPrimary !== _lastSnapshotPrimaryModel) {
+    _lastSnapshotPrimaryModel = snapshotPrimary;
+    _customPrimaryModel =
+      snapshotPrimary && !snapshotPrimary.startsWith(`${ONESTOP_PROVIDER_NAME}/`)
+        ? snapshotPrimary
+        : null;
+  }
+
   const hasApiKey = Boolean(props.apiKey?.trim()) || Boolean(_existingMaskedKey);
   const selectedModelInfo = _cachedModels.find((m) => m.id === props.selectedModel);
+  const fallbackOnestopModelInfo = props.selectedModel
+    ? {
+        provider: inferProvider(props.selectedModel).name,
+        name: formatModelName(props.selectedModel),
+        id: props.selectedModel,
+      }
+    : null;
+  const currentOnestopModelInfo = selectedModelInfo ?? fallbackOnestopModelInfo;
 
   // 判断当前显示的模型信息
   // _customPrimaryModel 仅在用户通过自定义接入切换模型时设置，
   // 此时应优先显示（反映用户最近的选择）
   const showCustomModel = Boolean(_customPrimaryModel);
-  const showOnestopModel = !showCustomModel && hasApiKey && selectedModelInfo;
+  const showOnestopModel = !showCustomModel && hasApiKey && currentOnestopModelInfo;
 
   let onestopContent;
   if (_activeTab === "onestop") {
@@ -792,64 +881,75 @@ export function renderOnestop(props: OnestopProps) {
   return html`
     <div class="onestop">
       <!-- 全局状态栏：始终显示当前接入的模型 -->
-      ${
-        showOnestopModel
+      ${showOnestopModel
+        ? html`
+            <div class="onestop-status-bar">
+              <div class="onestop-status-bar__info">
+                <span class="onestop-status-bar__dot"></span>
+                <span>当前模型:</span>
+                <span class="onestop-status-bar__model"
+                  >${currentOnestopModelInfo.provider} / ${currentOnestopModelInfo.name}</span
+                >
+                <span class="onestop-status-bar__id">(${currentOnestopModelInfo.id})</span>
+              </div>
+              <div class="onestop-status-bar__actions">
+                <button
+                  class="onestop-status-bar__test"
+                  ?disabled=${_testing}
+                  @click=${() => testOnestopConnection(props.requestUpdate)}
+                >
+                  ${_testing ? "测试中…" : "测试连接"}
+                </button>
+              </div>
+            </div>
+            ${_testResult
+              ? html`<div
+                  class="onestop-result ${_testResult.success
+                    ? "onestop-result--ok"
+                    : "onestop-result--err"}"
+                >
+                  ${_testResult.message}
+                </div>`
+              : nothing}
+          `
+        : showCustomModel
           ? html`
-          <div class="onestop-status-bar">
-            <div class="onestop-status-bar__info">
-              <span class="onestop-status-bar__dot"></span>
-              <span>当前模型:</span>
-              <span class="onestop-status-bar__model">${selectedModelInfo.provider} / ${selectedModelInfo.name}</span>
-              <span class="onestop-status-bar__id">(${selectedModelInfo.id})</span>
-            </div>
-            <div class="onestop-status-bar__actions">
-              <button
-                class="onestop-status-bar__test"
-                ?disabled=${_testing}
-                @click=${() => testOnestopConnection(props.requestUpdate)}
-              >
-                ${_testing ? "测试中…" : "测试连接"}
-              </button>
-            </div>
-          </div>
-          ${
-            _testResult
-              ? html`<div class="onestop-result ${_testResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_testResult.message}</div>`
-              : nothing
-          }
-        `
-          : showCustomModel
-            ? html`
-          <div class="onestop-status-bar">
-            <div class="onestop-status-bar__info">
-              <span class="onestop-status-bar__dot"></span>
-              <span>当前模型:</span>
-              <span class="onestop-status-bar__model">${_customPrimaryModel}</span>
-            </div>
-            <div class="onestop-status-bar__actions">
-              <button
-                class="onestop-status-bar__test"
-                ?disabled=${_testing}
-                @click=${() => testOnestopConnection(props.requestUpdate)}
-              >
-                ${_testing ? "测试中…" : "测试连接"}
-              </button>
-            </div>
-          </div>
-          ${
-            _testResult
-              ? html`<div class="onestop-result ${_testResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_testResult.message}</div>`
-              : nothing
-          }
-        `
-            : nothing
-      }
-
-      ${
-        _saveResult
-          ? html`<div class="onestop-result ${_saveResult.success ? "onestop-result--ok" : "onestop-result--err"}">${_saveResult.message}</div>`
-          : nothing
-      }
+              <div class="onestop-status-bar">
+                <div class="onestop-status-bar__info">
+                  <span class="onestop-status-bar__dot"></span>
+                  <span>当前模型:</span>
+                  <span class="onestop-status-bar__model">${_customPrimaryModel}</span>
+                </div>
+                <div class="onestop-status-bar__actions">
+                  <button
+                    class="onestop-status-bar__test"
+                    ?disabled=${_testing}
+                    @click=${() => testOnestopConnection(props.requestUpdate)}
+                  >
+                    ${_testing ? "测试中…" : "测试连接"}
+                  </button>
+                </div>
+              </div>
+              ${_testResult
+                ? html`<div
+                    class="onestop-result ${_testResult.success
+                      ? "onestop-result--ok"
+                      : "onestop-result--err"}"
+                  >
+                    ${_testResult.message}
+                  </div>`
+                : nothing}
+            `
+          : nothing}
+      ${_saveResult
+        ? html`<div
+            class="onestop-result ${_saveResult.success
+              ? "onestop-result--ok"
+              : "onestop-result--err"}"
+          >
+            ${_saveResult.message}
+          </div>`
+        : nothing}
 
       <!-- Tab Navigation — 分段控制器 -->
       <div class="onestop-switcher">
@@ -861,8 +961,16 @@ export function renderOnestop(props: OnestopProps) {
           }}
         >
           <div class="onestop-switcher__main">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="onestop-switcher__icon">
-              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              class="onestop-switcher__icon"
+            >
+              <path
+                d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"
+              ></path>
             </svg>
             <span>一站式接入</span>
             <span class="onestop-switcher__badge">推荐</span>
@@ -877,8 +985,16 @@ export function renderOnestop(props: OnestopProps) {
           }}
         >
           <div class="onestop-switcher__main">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="onestop-switcher__icon">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              class="onestop-switcher__icon"
+            >
+              <path
+                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+              ></path>
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
             <span>自定义接入</span>
@@ -1020,9 +1136,7 @@ function renderOnestopContent(props: OnestopProps) {
           </div>
           ${
             _existingMaskedKey && !props.apiKey?.trim()
-              ? html`
-                  <div class="onestop-apikey__hint">✓ API Key 已配置，输入新 Key 可更换</div>
-                `
+              ? html` <div class="onestop-apikey__hint">✓ API Key 已配置，输入新 Key 可更换</div> `
               : nothing
           }
         </div>
@@ -1061,80 +1175,89 @@ function renderOnestopContent(props: OnestopProps) {
               `
             : _modelsError
               ? html`
-            <div class="onestop-error">
-              <span>获取模型列表失败: ${_modelsError}</span>
-              <button class="onestop-error__retry" @click=${() => refetchModels(props.requestUpdate)}>重试</button>
-            </div>
-          `
-              : html`
-            <!-- Provider filter -->
-            <div class="onestop-categories">
-              <button
-                class="onestop-categories__item ${activeFilter === "all" ? "active" : ""}"
-                @click=${() => props.onCategoryChange("all")}
-              >
-                全部 (${_cachedModels.length})
-              </button>
-              ${allProviders.map(
-                (pk) => html`
-                  <button
-                    class="onestop-categories__item ${activeFilter === pk ? "active" : ""}"
-                    @click=${() => props.onCategoryChange(pk)}
-                  >
-                    ${providerNames[pk] ?? pk}
-                    (${_cachedModels.filter((m) => m.providerKey === pk).length})
-                  </button>
-                `,
-              )}
-            </div>
-
-            <!-- Model Grid (当前模型置顶) -->
-            <div class="onestop-models">
-              ${[...filteredModels]
-                .toSorted((a, b) =>
-                  !_customPrimaryModel && a.id === props.selectedModel
-                    ? -1
-                    : !_customPrimaryModel && b.id === props.selectedModel
-                      ? 1
-                      : 0,
-                )
-                .map((model) => {
-                  const isCurrent = !_customPrimaryModel && props.selectedModel === model.id;
-                  return html`
-                  <div
-                    class="onestop-model-card ${isCurrent ? "selected" : ""} ${_testing ? "locked" : ""}"
-                  >
-                    <div class="onestop-model-card__logo">
-                      ${providerLogos[model.providerKey] ?? providerLogos.other}
-                    </div>
-                    <div class="onestop-model-card__body">
-                      <div class="onestop-model-card__header">
-                        <span
-                          class="onestop-model-card__provider"
-                          style="color: ${providerColors[model.providerKey] ?? "#888"}"
-                        >
-                          ${model.provider}
-                        </span>
-                        ${
-                          isCurrent
-                            ? html`<span class="onestop-model-card__check">${icons.check}</span>`
-                            : nothing
-                        }
-                      </div>
-                      <div class="onestop-model-card__name">${model.name}</div>
-                      <div class="onestop-model-card__id">${model.id}</div>
-                    </div>
+                  <div class="onestop-error">
+                    <span>获取模型列表失败: ${_modelsError}</span>
                     <button
-                      class="onestop-model-card__switch-btn"
-                      ?disabled=${_testing || !hasApiKey || isCurrent}
-                      @click=${() => handleSwitchModel(model.id)}
-                      title="切换后请发送 /new 开启新会话"
-                    >${isCurrent ? "✓ 当前" : "切换"}</button>
+                      class="onestop-error__retry"
+                      @click=${() => refetchModels(props.requestUpdate)}
+                    >
+                      重试
+                    </button>
                   </div>
-                `;
-                })}
-            </div>
-          `
+                `
+              : html`
+                  <!-- Provider filter -->
+                  <div class="onestop-categories">
+                    <button
+                      class="onestop-categories__item ${activeFilter === "all" ? "active" : ""}"
+                      @click=${() => props.onCategoryChange("all")}
+                    >
+                      全部 (${_cachedModels.length})
+                    </button>
+                    ${allProviders.map(
+                      (pk) => html`
+                        <button
+                          class="onestop-categories__item ${activeFilter === pk ? "active" : ""}"
+                          @click=${() => props.onCategoryChange(pk)}
+                        >
+                          ${providerNames[pk] ?? pk}
+                          (${_cachedModels.filter((m) => m.providerKey === pk).length})
+                        </button>
+                      `,
+                    )}
+                  </div>
+
+                  <!-- Model Grid (当前模型置顶) -->
+                  <div class="onestop-models">
+                    ${[...filteredModels]
+                      .toSorted((a, b) =>
+                        !_customPrimaryModel && a.id === props.selectedModel
+                          ? -1
+                          : !_customPrimaryModel && b.id === props.selectedModel
+                            ? 1
+                            : 0,
+                      )
+                      .map((model) => {
+                        const isCurrent = !_customPrimaryModel && props.selectedModel === model.id;
+                        return html`
+                          <div
+                            class="onestop-model-card ${isCurrent ? "selected" : ""} ${_testing
+                              ? "locked"
+                              : ""}"
+                          >
+                            <div class="onestop-model-card__logo">
+                              ${providerLogos[model.providerKey] ?? providerLogos.other}
+                            </div>
+                            <div class="onestop-model-card__body">
+                              <div class="onestop-model-card__header">
+                                <span
+                                  class="onestop-model-card__provider"
+                                  style="color: ${providerColors[model.providerKey] ?? "#888"}"
+                                >
+                                  ${model.provider}
+                                </span>
+                                ${isCurrent
+                                  ? html`<span class="onestop-model-card__check"
+                                      >${icons.check}</span
+                                    >`
+                                  : nothing}
+                              </div>
+                              <div class="onestop-model-card__name">${model.name}</div>
+                              <div class="onestop-model-card__id">${model.id}</div>
+                            </div>
+                            <button
+                              class="onestop-model-card__switch-btn"
+                              ?disabled=${_testing || !hasApiKey || isCurrent}
+                              @click=${() => handleSwitchModel(model.id)}
+                              title="切换后请发送 /new 开启新会话"
+                            >
+                              ${isCurrent ? "✓ 当前" : "切换"}
+                            </button>
+                          </div>
+                        `;
+                      })}
+                  </div>
+                `
         }
       </div>
     </div>

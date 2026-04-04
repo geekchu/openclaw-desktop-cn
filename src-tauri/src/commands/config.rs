@@ -1,6 +1,6 @@
 use crate::models::{
     AIConfigOverview, ChannelConfig, ConfiguredModel, ConfiguredProvider, ModelConfig,
-    OfficialProvider, SuggestedModel,
+    ModelCostConfig, OfficialProvider, SuggestedModel,
 };
 use crate::utils::{file, platform, shell};
 use log::{debug, error, info, warn};
@@ -236,6 +236,194 @@ fn save_openclaw_config(config: &Value) -> Result<(), String> {
         serde_json::to_string_pretty(config).map_err(|e| format!("序列化配置失败: {}", e))?;
 
     file::write_file(&config_path, &content).map_err(|e| format!("写入配置文件失败: {}", e))
+}
+
+fn summarize_provider_api_key(api_key_value: Option<&Value>) -> (Option<String>, bool) {
+    match api_key_value {
+        Some(Value::String(key)) if !key.trim().is_empty() => {
+            let masked = if key.len() > 8 {
+                format!("{}...{}", &key[..4], &key[key.len() - 4..])
+            } else {
+                "****".to_string()
+            };
+            (Some(masked), true)
+        }
+        Some(Value::Object(map)) if !map.is_empty() => (Some("已配置引用".to_string()), true),
+        _ => (None, false),
+    }
+}
+
+fn merge_model_config(existing_model: Option<&Value>, model: &ModelConfig) -> Value {
+    let mut model_obj = existing_model.cloned().unwrap_or_else(|| json!({}));
+    if !model_obj.is_object() {
+        model_obj = json!({});
+    }
+
+    model_obj["id"] = json!(model.id);
+    model_obj["name"] = json!(model.name);
+
+    if let Some(api) = &model.api {
+        model_obj["api"] = json!(api);
+    }
+
+    if !model.input.is_empty() {
+        model_obj["input"] = json!(model.input);
+    }
+
+    if let Some(cw) = model.context_window {
+        model_obj["contextWindow"] = json!(cw);
+    }
+    if let Some(mt) = model.max_tokens {
+        model_obj["maxTokens"] = json!(mt);
+    }
+    if let Some(reasoning) = model.reasoning {
+        model_obj["reasoning"] = json!(reasoning);
+    }
+    if let Some(cost) = &model.cost {
+        model_obj["cost"] = json!({
+            "input": cost.input,
+            "output": cost.output,
+            "cacheRead": cost.cache_read,
+            "cacheWrite": cost.cache_write,
+        });
+    }
+
+    model_obj
+}
+
+fn build_merged_provider_config(
+    existing_provider: Option<&Value>,
+    base_url: &str,
+    api_key: Option<String>,
+    api_type: &str,
+    models: &[ModelConfig],
+) -> Value {
+    let mut provider_config = existing_provider.cloned().unwrap_or_else(|| json!({}));
+    if !provider_config.is_object() {
+        provider_config = json!({});
+    }
+
+    let existing_models = existing_provider
+        .and_then(|provider| provider.get("models"))
+        .and_then(|value| value.as_array());
+
+    let models_json: Vec<Value> = models
+        .iter()
+        .map(|model| {
+            let existing_model = existing_models.and_then(|items| {
+                items.iter().find(|item| {
+                    item.get("id")
+                        .and_then(|value| value.as_str())
+                        .is_some_and(|id| id == model.id)
+                })
+            });
+            merge_model_config(existing_model, model)
+        })
+        .collect();
+
+    provider_config["baseUrl"] = json!(base_url);
+    provider_config["api"] = json!(api_type);
+    provider_config["models"] = json!(models_json);
+
+    if let Some(key) = api_key {
+        if !key.trim().is_empty() {
+            provider_config["apiKey"] = json!(key);
+        } else if let Some(existing_key) =
+            existing_provider.and_then(|provider| provider.get("apiKey"))
+        {
+            provider_config["apiKey"] = existing_key.clone();
+        } else if let Some(provider_obj) = provider_config.as_object_mut() {
+            provider_obj.remove("apiKey");
+        }
+    } else if let Some(existing_key) = existing_provider.and_then(|provider| provider.get("apiKey"))
+    {
+        provider_config["apiKey"] = existing_key.clone();
+    } else if let Some(provider_obj) = provider_config.as_object_mut() {
+        provider_obj.remove("apiKey");
+    }
+
+    provider_config
+}
+
+fn sync_provider_default_model_entries(
+    config: &mut Value,
+    provider_name: &str,
+    models: &[ModelConfig],
+) {
+    let Some(defaults_models) = config["agents"]["defaults"]["models"].as_object_mut() else {
+        return;
+    };
+
+    let prefix = format!("{}/", provider_name);
+    let desired_keys: std::collections::HashSet<String> = models
+        .iter()
+        .map(|model| format!("{}/{}", provider_name, model.id))
+        .collect();
+
+    let old_keys: Vec<String> = defaults_models
+        .keys()
+        .filter(|key| key.starts_with(&prefix) && !desired_keys.contains(*key))
+        .cloned()
+        .collect();
+    for key in old_keys {
+        defaults_models.remove(&key);
+    }
+
+    for full_id in desired_keys {
+        defaults_models.entry(full_id).or_insert_with(|| json!({}));
+    }
+}
+
+fn clear_primary_model_if_removed(config: &mut Value, provider_name: &str, models: &[ModelConfig]) {
+    let Some(primary_model) = config
+        .pointer("/agents/defaults/model/primary")
+        .and_then(|value| value.as_str())
+    else {
+        return;
+    };
+
+    let desired_keys: std::collections::HashSet<String> = models
+        .iter()
+        .map(|model| format!("{}/{}", provider_name, model.id))
+        .collect();
+    if !primary_model.starts_with(&format!("{}/", provider_name))
+        || desired_keys.contains(primary_model)
+    {
+        return;
+    }
+
+    if let Some(model_obj) = config
+        .pointer_mut("/agents/defaults/model")
+        .and_then(|value| value.as_object_mut())
+    {
+        model_obj.remove("primary");
+    }
+}
+
+fn touch_config_meta(config: &mut Value) {
+    if config.get("meta").is_none() {
+        config["meta"] = json!({});
+    }
+    config["meta"]["lastTouchedAt"] = json!(chrono::Utc::now().to_rfc3339());
+}
+
+fn parse_model_cost_config(cost_value: Option<&Value>) -> Option<ModelCostConfig> {
+    let cost = cost_value?.as_object()?;
+    let input = cost.get("input").and_then(|value| value.as_f64());
+    let output = cost.get("output").and_then(|value| value.as_f64());
+    let cache_read = cost.get("cacheRead").and_then(|value| value.as_f64());
+    let cache_write = cost.get("cacheWrite").and_then(|value| value.as_f64());
+
+    if input.is_none() && output.is_none() && cache_read.is_none() && cache_write.is_none() {
+        return None;
+    }
+
+    Some(ModelCostConfig {
+        input: input.unwrap_or(0.0),
+        output: output.unwrap_or(0.0),
+        cache_read: cache_read.unwrap_or(0.0),
+        cache_write: cache_write.unwrap_or(0.0),
+    })
 }
 
 /// 获取完整配置
@@ -759,18 +947,12 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
                 .unwrap_or("")
                 .to_string();
 
-            let api_key = provider_config
-                .get("apiKey")
+            let provider_api_type = provider_config
+                .get("api")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
-
-            let api_key_masked = api_key.as_ref().map(|key| {
-                if key.len() > 8 {
-                    format!("{}...{}", &key[..4], &key[key.len() - 4..])
-                } else {
-                    "****".to_string()
-                }
-            });
+            let (api_key_masked, has_api_key) =
+                summarize_provider_api_key(provider_config.get("apiKey"));
 
             // 解析模型列表
             let models_array = provider_config.get("models").and_then(|v| v.as_array());
@@ -806,6 +988,16 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
                                     .get("api")
                                     .and_then(|v| v.as_str())
                                     .map(|s| s.to_string()),
+                                input: m
+                                    .get("input")
+                                    .and_then(|v| v.as_array())
+                                    .map(|items| {
+                                        items
+                                            .iter()
+                                            .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                                            .collect()
+                                    })
+                                    .unwrap_or_default(),
                                 context_window: m
                                     .get("contextWindow")
                                     .and_then(|v| v.as_u64())
@@ -814,6 +1006,8 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
                                     .get("maxTokens")
                                     .and_then(|v| v.as_u64())
                                     .map(|n| n as u32),
+                                reasoning: m.get("reasoning").and_then(|v| v.as_bool()),
+                                cost: parse_model_cost_config(m.get("cost")),
                                 is_primary,
                             })
                         })
@@ -830,8 +1024,9 @@ pub async fn get_ai_config() -> Result<AIConfigOverview, String> {
             configured_providers.push(ConfiguredProvider {
                 name: provider_name.clone(),
                 base_url,
+                api_type: provider_api_type,
                 api_key_masked,
-                has_api_key: api_key.is_some(),
+                has_api_key,
                 models,
             });
         }
@@ -887,107 +1082,22 @@ pub async fn save_provider(
         config["agents"]["defaults"]["models"] = json!({});
     }
 
-    // 构建模型配置
-    let models_json: Vec<Value> = models
-        .iter()
-        .map(|m| {
-            let mut model_obj = json!({
-                "id": m.id,
-                "name": m.name,
-                "api": m.api.clone().unwrap_or(api_type.clone()),
-                "input": if m.input.is_empty() { vec!["text".to_string()] } else { m.input.clone() },
-            });
-
-            if let Some(cw) = m.context_window {
-                model_obj["contextWindow"] = json!(cw);
-            }
-            if let Some(mt) = m.max_tokens {
-                model_obj["maxTokens"] = json!(mt);
-            }
-            if let Some(r) = m.reasoning {
-                model_obj["reasoning"] = json!(r);
-            }
-            if let Some(cost) = &m.cost {
-                model_obj["cost"] = json!({
-                    "input": cost.input,
-                    "output": cost.output,
-                    "cacheRead": cost.cache_read,
-                    "cacheWrite": cost.cache_write,
-                });
-            } else {
-                model_obj["cost"] = json!({
-                    "input": 0,
-                    "output": 0,
-                    "cacheRead": 0,
-                    "cacheWrite": 0,
-                });
-            }
-
-            model_obj
-        })
-        .collect();
-
-    // 构建 Provider 配置
-    let mut provider_config = json!({
-        "baseUrl": base_url,
-        "models": models_json,
-    });
-
-    // 处理 API Key：如果传入了新的非空 key，使用新的；否则保留原有的
-    if let Some(key) = api_key {
-        if !key.is_empty() {
-            // 使用新传入的 API Key
-            provider_config["apiKey"] = json!(key);
-            info!("[保存 Provider] 使用新的 API Key");
-        } else {
-            // 空字符串表示不更改，尝试保留原有的 API Key
-            if let Some(existing_key) = config
-                .pointer(&format!("/models/providers/{}/apiKey", provider_name))
-                .and_then(|v| v.as_str())
-            {
-                provider_config["apiKey"] = json!(existing_key);
-                info!("[保存 Provider] 保留原有的 API Key");
-            }
-        }
-    } else {
-        // None 表示不更改，尝试保留原有的 API Key
-        if let Some(existing_key) = config
-            .pointer(&format!("/models/providers/{}/apiKey", provider_name))
-            .and_then(|v| v.as_str())
-        {
-            provider_config["apiKey"] = json!(existing_key);
-            info!("[保存 Provider] 保留原有的 API Key");
-        }
-    }
+    let existing_provider = config
+        .get("models")
+        .and_then(|models_config| models_config.get("providers"))
+        .and_then(|providers| providers.get(&provider_name));
+    let provider_config =
+        build_merged_provider_config(existing_provider, &base_url, api_key, &api_type, &models);
 
     // 保存 Provider 配置
     config["models"]["providers"][&provider_name] = provider_config;
 
-    // 清理旧模型条目：删除该 provider 下所有旧的 full_id，防止编辑时移除模型后僵尸条目残留
-    if let Some(defaults_models) = config["agents"]["defaults"]["models"].as_object_mut() {
-        let prefix = format!("{}/", provider_name);
-        let old_keys: Vec<String> = defaults_models
-            .keys()
-            .filter(|k| k.starts_with(&prefix))
-            .cloned()
-            .collect();
-        for key in old_keys {
-            defaults_models.remove(&key);
-        }
-    }
-
-    // 将当前选中的模型添加到 agents.defaults.models
-    for model in &models {
-        let full_id = format!("{}/{}", provider_name, model.id);
-        config["agents"]["defaults"]["models"][&full_id] = json!({});
-    }
+    // 仅删除已移除的模型条目，并保留现有模型下的 params/alias 等扩展配置。
+    sync_provider_default_model_entries(&mut config, &provider_name, &models);
+    clear_primary_model_if_removed(&mut config, &provider_name, &models);
 
     // 更新元数据
-    let now = chrono::Utc::now().to_rfc3339();
-    if config.get("meta").is_none() {
-        config["meta"] = json!({});
-    }
-    config["meta"]["lastTouchedAt"] = json!(now);
+    touch_config_meta(&mut config);
 
     save_openclaw_config(&config)?;
     info!("[保存 Provider] ✓ Provider {} 保存成功", provider_name);
@@ -1041,6 +1151,8 @@ pub async fn delete_provider(provider_name: String) -> Result<String, String> {
             }
         }
     }
+
+    touch_config_meta(&mut config);
 
     save_openclaw_config(&config)?;
     info!("[删除 Provider] ✓ Provider {} 已删除", provider_name);
@@ -1608,57 +1720,77 @@ pub async fn autostart_disable(app: tauri::AppHandle) -> Result<(), String> {
 
 use crate::models::status::{PairingApproveResult, PairingRequest};
 
-/// 获取指定渠道的待审批配对请求列表
-#[command]
-pub async fn list_pairing_requests(channel: String) -> Result<Vec<PairingRequest>, String> {
-    info!("[配对请求] 获取 {} 的配对请求列表...", channel);
-
-    match shell::run_openclaw(&["pairing", "list", "--channel", &channel, "--json"]) {
-        Ok(output) => {
-            let trimmed = output.trim();
-            if trimmed.is_empty() || trimmed == "[]" || trimmed == "{}" {
-                info!("[配对请求] {} 无待审批请求", channel);
-                return Ok(vec![]);
-            }
-            // CLI outputs { "channel": "...", "requests": [...] }
-            if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                if let Some(requests_val) = wrapper.get("requests") {
-                    match serde_json::from_value::<Vec<PairingRequest>>(requests_val.clone()) {
-                        Ok(requests) => {
-                            info!(
-                                "[配对请求] ✓ {} 有 {} 个待审批请求",
-                                channel,
-                                requests.len()
-                            );
-                            return Ok(requests);
-                        }
-                        Err(e) => {
-                            warn!("[配对请求] requests 数组解析失败: {}", e);
-                        }
-                    }
-                }
-                // Fallback: try parsing as direct array
-                if let Ok(requests) = serde_json::from_value::<Vec<PairingRequest>>(wrapper) {
+fn parse_pairing_requests_output(
+    channel: &str,
+    output: &str,
+) -> Result<Vec<PairingRequest>, String> {
+    let trimmed = output.trim();
+    if trimmed.is_empty() {
+        let message = format!("pairing list returned empty JSON output for {}", channel);
+        warn!("[配对请求] {}", message);
+        return Err(message);
+    }
+    if trimmed == "[]" {
+        info!("[配对请求] {} 无待审批请求", channel);
+        return Ok(vec![]);
+    }
+    // CLI outputs { "channel": "...", "requests": [...] }
+    if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        if let Some(requests_val) = wrapper.get("requests") {
+            match serde_json::from_value::<Vec<PairingRequest>>(requests_val.clone()) {
+                Ok(requests) => {
                     info!(
-                        "[配对请求] ✓ {} 有 {} 个待审批请求（直接数组）",
+                        "[配对请求] ✓ {} 有 {} 个待审批请求",
                         channel,
                         requests.len()
                     );
                     return Ok(requests);
                 }
+                Err(e) => {
+                    warn!("[配对请求] requests 数组解析失败: {}", e);
+                }
             }
-            warn!(
-                "[配对请求] JSON 解析失败，输出: {}",
-                &trimmed[..trimmed.len().min(200)]
-            );
-            Ok(vec![])
         }
-        Err(e) => {
-            // 命令不存在或无数据时不算错误，返回空列表
-            warn!("[配对请求] 获取失败（可能无数据）: {}", e);
-            Ok(vec![])
+        // Fallback: try parsing as direct array
+        if let Ok(requests) = serde_json::from_value::<Vec<PairingRequest>>(wrapper) {
+            info!(
+                "[配对请求] ✓ {} 有 {} 个待审批请求（直接数组）",
+                channel,
+                requests.len()
+            );
+            return Ok(requests);
         }
     }
+    let snippet = &trimmed[..trimmed.len().min(200)];
+    let message = format!(
+        "failed to parse pairing list JSON for {}: {}",
+        channel, snippet
+    );
+    warn!("[配对请求] {}", message);
+    Err(message)
+}
+
+fn map_list_pairing_requests_result(
+    channel: &str,
+    result: Result<String, String>,
+) -> Result<Vec<PairingRequest>, String> {
+    match result {
+        Ok(output) => parse_pairing_requests_output(channel, &output),
+        Err(e) => {
+            warn!("[配对请求] 获取失败: {}", e);
+            Err(e)
+        }
+    }
+}
+
+/// 获取指定渠道的待审批配对请求列表
+#[command]
+pub async fn list_pairing_requests(channel: String) -> Result<Vec<PairingRequest>, String> {
+    info!("[配对请求] 获取 {} 的配对请求列表...", channel);
+    map_list_pairing_requests_result(
+        &channel,
+        shell::run_openclaw(&["pairing", "list", "--channel", &channel, "--json"]),
+    )
 }
 
 /// 审批配对码
@@ -1712,9 +1844,12 @@ pub async fn approve_pairing_code(
 #[cfg(test)]
 mod tests {
     use super::{
-        channel_has_persisted_config, has_meaningful_channel_value,
-        repair_invalid_desktop_channel_configs,
+        build_merged_provider_config, channel_has_persisted_config, clear_primary_model_if_removed,
+        has_meaningful_channel_value, map_list_pairing_requests_result, parse_model_cost_config,
+        parse_pairing_requests_output, repair_invalid_desktop_channel_configs,
+        summarize_provider_api_key, sync_provider_default_model_entries, touch_config_meta,
     };
+    use crate::models::{ModelConfig, ModelCostConfig};
     use serde_json::json;
 
     #[test]
@@ -1744,6 +1879,51 @@ mod tests {
         assert!(channel_has_persisted_config(Some(
             &json!({ "botToken": "123:abc" })
         )));
+    }
+
+    #[test]
+    fn parse_pairing_requests_output_reads_wrapped_json_requests() {
+        let parsed = parse_pairing_requests_output(
+            "discord",
+            r#"{"channel":"discord","requests":[{"code":"ABC123","id":"user-1","createdAt":"2026-04-04T00:00:00Z"}]}"#,
+        )
+        .expect("wrapped requests should parse");
+
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].code, "ABC123");
+        assert_eq!(parsed[0].id.as_deref(), Some("user-1"));
+        assert_eq!(
+            parsed[0].created_at.as_deref(),
+            Some("2026-04-04T00:00:00Z")
+        );
+    }
+
+    #[test]
+    fn parse_pairing_requests_output_rejects_invalid_json() {
+        let err = parse_pairing_requests_output("discord", "{not-json}")
+            .expect_err("invalid json should surface as an error");
+        assert!(err.contains("failed to parse pairing list JSON for discord"));
+    }
+
+    #[test]
+    fn parse_pairing_requests_output_rejects_empty_output() {
+        let err = parse_pairing_requests_output("discord", "   ")
+            .expect_err("empty output should surface as an error");
+        assert!(err.contains("pairing list returned empty JSON output for discord"));
+    }
+
+    #[test]
+    fn parse_pairing_requests_output_rejects_empty_object_output() {
+        let err = parse_pairing_requests_output("discord", "{}")
+            .expect_err("empty object should not masquerade as an empty request list");
+        assert!(err.contains("failed to parse pairing list JSON for discord"));
+    }
+
+    #[test]
+    fn list_pairing_requests_propagates_shell_failures() {
+        let err = map_list_pairing_requests_result("discord", Err("cli failed".to_string()))
+            .expect_err("shell errors should reach the frontend");
+        assert_eq!(err, "cli failed");
     }
 
     #[test]
@@ -1932,5 +2112,377 @@ mod tests {
             Some(&json!(true))
         );
         assert!(config.pointer("/channels/whatsapp/allowFrom").is_none());
+    }
+
+    #[test]
+    fn summarize_provider_api_key_treats_secret_ref_as_present() {
+        let (masked, has_api_key) = summarize_provider_api_key(Some(&json!({
+            "source": "env",
+            "provider": "default",
+            "id": "CUSTOM_PROVIDER_API_KEY"
+        })));
+
+        assert_eq!(masked.as_deref(), Some("已配置引用"));
+        assert!(has_api_key);
+    }
+
+    #[test]
+    fn build_merged_provider_config_preserves_secret_ref_and_advanced_provider_fields() {
+        let existing_provider = json!({
+            "baseUrl": "https://azure.example.com/openai/v1",
+            "api": "openai-responses",
+            "authHeader": false,
+            "headers": {
+                "api-key": "secretref-env:AZURE_OPENAI_API_KEY"
+            },
+            "apiKey": {
+                "source": "env",
+                "provider": "default",
+                "id": "AZURE_OPENAI_API_KEY"
+            },
+            "models": [
+                {
+                    "id": "o4-mini",
+                    "name": "O4 Mini",
+                    "api": "openai-responses",
+                    "input": ["text", "image"],
+                    "reasoning": true,
+                    "contextWindow": 200000,
+                    "maxTokens": 8192,
+                    "cost": {
+                        "input": 1,
+                        "output": 2,
+                        "cacheRead": 3,
+                        "cacheWrite": 4
+                    },
+                    "headers": {
+                        "X-Trace": "enabled"
+                    },
+                    "compat": {
+                        "supportsStore": false
+                    }
+                }
+            ]
+        });
+        let models = vec![ModelConfig {
+            id: "o4-mini".to_string(),
+            name: "O4 Mini".to_string(),
+            api: Some("openai-responses".to_string()),
+            input: vec!["text".to_string(), "image".to_string()],
+            context_window: Some(200000),
+            max_tokens: Some(8192),
+            reasoning: Some(true),
+            cost: Some(ModelCostConfig {
+                input: 1.0,
+                output: 2.0,
+                cache_read: 3.0,
+                cache_write: 4.0,
+            }),
+        }];
+
+        let merged = build_merged_provider_config(
+            Some(&existing_provider),
+            "https://azure.example.com/openai/v1",
+            None,
+            "openai-responses",
+            &models,
+        );
+
+        assert_eq!(
+            merged.pointer("/apiKey"),
+            Some(&json!({
+                "source": "env",
+                "provider": "default",
+                "id": "AZURE_OPENAI_API_KEY"
+            }))
+        );
+        assert_eq!(merged.pointer("/api"), Some(&json!("openai-responses")));
+        assert_eq!(merged.pointer("/authHeader"), Some(&json!(false)));
+        assert_eq!(
+            merged.pointer("/headers/api-key"),
+            Some(&json!("secretref-env:AZURE_OPENAI_API_KEY"))
+        );
+        assert_eq!(
+            merged.pointer("/models/0/headers/X-Trace"),
+            Some(&json!("enabled"))
+        );
+        assert_eq!(
+            merged.pointer("/models/0/compat/supportsStore"),
+            Some(&json!(false))
+        );
+    }
+
+    #[test]
+    fn build_merged_provider_config_keeps_existing_model_fields_when_payload_omits_them() {
+        let existing_provider = json!({
+            "baseUrl": "https://llm.example.com/v1",
+            "api": "openai-completions",
+            "models": [
+                {
+                    "id": "foo-large",
+                    "name": "Foo Large",
+                    "api": "openai-completions",
+                    "input": ["text", "image"],
+                    "reasoning": true,
+                    "contextWindow": 131072,
+                    "maxTokens": 16384,
+                    "cost": {
+                        "input": 5,
+                        "output": 6,
+                        "cacheRead": 7,
+                        "cacheWrite": 8
+                    },
+                    "compat": {
+                        "supportsStore": false
+                    }
+                }
+            ]
+        });
+        let models = vec![ModelConfig {
+            id: "foo-large".to_string(),
+            name: "Foo Large".to_string(),
+            api: Some("openai-completions".to_string()),
+            input: Vec::new(),
+            context_window: Some(131072),
+            max_tokens: Some(16384),
+            reasoning: None,
+            cost: None,
+        }];
+
+        let merged = build_merged_provider_config(
+            Some(&existing_provider),
+            "https://llm.example.com/v1",
+            None,
+            "openai-completions",
+            &models,
+        );
+
+        assert_eq!(
+            merged.pointer("/models/0/input"),
+            Some(&json!(["text", "image"]))
+        );
+        assert_eq!(merged.pointer("/models/0/reasoning"), Some(&json!(true)));
+        assert_eq!(merged.pointer("/models/0/cost/cacheWrite"), Some(&json!(8)));
+        assert_eq!(
+            merged.pointer("/models/0/compat/supportsStore"),
+            Some(&json!(false))
+        );
+    }
+
+    #[test]
+    fn build_merged_provider_config_keeps_new_model_optional_fields_unset_when_payload_omits_them()
+    {
+        let existing_provider = json!({
+            "baseUrl": "https://llm.example.com/v1",
+            "api": "openai-completions",
+            "models": []
+        });
+        let models = vec![ModelConfig {
+            id: "new-model".to_string(),
+            name: "New Model".to_string(),
+            api: None,
+            input: Vec::new(),
+            context_window: Some(200000),
+            max_tokens: Some(8192),
+            reasoning: None,
+            cost: None,
+        }];
+
+        let merged = build_merged_provider_config(
+            Some(&existing_provider),
+            "https://llm.example.com/v1",
+            None,
+            "openai-completions",
+            &models,
+        );
+
+        assert_eq!(merged.pointer("/api"), Some(&json!("openai-completions")));
+        assert!(merged.pointer("/models/0/api").is_none());
+        assert!(merged.pointer("/models/0/input").is_none());
+        assert!(merged.pointer("/models/0/reasoning").is_none());
+        assert!(merged.pointer("/models/0/cost").is_none());
+        assert_eq!(
+            merged.pointer("/models/0/contextWindow"),
+            Some(&json!(200000))
+        );
+        assert_eq!(merged.pointer("/models/0/maxTokens"), Some(&json!(8192)));
+    }
+
+    #[test]
+    fn sync_provider_default_model_entries_preserves_existing_model_params_and_aliases() {
+        let mut config = json!({
+            "agents": {
+                "defaults": {
+                    "models": {
+                        "custom/foo": {
+                            "params": { "thinking": "high" }
+                        },
+                        "custom/bar": {
+                            "alias": "fast"
+                        },
+                        "custom/removed": {
+                            "params": { "thinking": "low" }
+                        },
+                        "other/model": {
+                            "alias": "keep"
+                        }
+                    }
+                }
+            }
+        });
+        let models = vec![
+            ModelConfig {
+                id: "foo".to_string(),
+                name: "Foo".to_string(),
+                api: None,
+                input: Vec::new(),
+                context_window: None,
+                max_tokens: None,
+                reasoning: None,
+                cost: None,
+            },
+            ModelConfig {
+                id: "bar".to_string(),
+                name: "Bar".to_string(),
+                api: None,
+                input: Vec::new(),
+                context_window: None,
+                max_tokens: None,
+                reasoning: None,
+                cost: None,
+            },
+            ModelConfig {
+                id: "new".to_string(),
+                name: "New".to_string(),
+                api: None,
+                input: Vec::new(),
+                context_window: None,
+                max_tokens: None,
+                reasoning: None,
+                cost: None,
+            },
+        ];
+
+        sync_provider_default_model_entries(&mut config, "custom", &models);
+
+        let defaults_models = config["agents"]["defaults"]["models"]
+            .as_object()
+            .expect("defaults models should exist");
+        assert_eq!(
+            defaults_models
+                .get("custom/foo")
+                .and_then(|value| value.get("params"))
+                .and_then(|value| value.get("thinking")),
+            Some(&json!("high"))
+        );
+        assert_eq!(
+            defaults_models
+                .get("custom/bar")
+                .and_then(|value| value.get("alias")),
+            Some(&json!("fast"))
+        );
+        assert_eq!(defaults_models.get("custom/new"), Some(&json!({})));
+        assert!(!defaults_models.contains_key("custom/removed"));
+        assert_eq!(
+            defaults_models
+                .get("other/model")
+                .and_then(|value| value.get("alias")),
+            Some(&json!("keep"))
+        );
+    }
+
+    #[test]
+    fn clear_primary_model_if_removed_clears_stale_primary_entry() {
+        let mut config = json!({
+            "agents": {
+                "defaults": {
+                    "model": {
+                        "primary": "custom/removed"
+                    }
+                }
+            }
+        });
+        let models = vec![ModelConfig {
+            id: "kept".to_string(),
+            name: "Kept".to_string(),
+            api: None,
+            input: Vec::new(),
+            context_window: None,
+            max_tokens: None,
+            reasoning: None,
+            cost: None,
+        }];
+
+        clear_primary_model_if_removed(&mut config, "custom", &models);
+
+        assert!(config.pointer("/agents/defaults/model/primary").is_none());
+    }
+
+    #[test]
+    fn clear_primary_model_if_removed_keeps_primary_when_still_present() {
+        let mut config = json!({
+            "agents": {
+                "defaults": {
+                    "model": {
+                        "primary": "custom/kept"
+                    }
+                }
+            }
+        });
+        let models = vec![ModelConfig {
+            id: "kept".to_string(),
+            name: "Kept".to_string(),
+            api: None,
+            input: Vec::new(),
+            context_window: None,
+            max_tokens: None,
+            reasoning: None,
+            cost: None,
+        }];
+
+        clear_primary_model_if_removed(&mut config, "custom", &models);
+
+        assert_eq!(
+            config.pointer("/agents/defaults/model/primary"),
+            Some(&json!("custom/kept"))
+        );
+    }
+
+    #[test]
+    fn parse_model_cost_config_ignores_malformed_or_empty_values() {
+        assert!(parse_model_cost_config(Some(&json!("broken"))).is_none());
+        assert!(parse_model_cost_config(Some(&json!({}))).is_none());
+        assert!(parse_model_cost_config(Some(&json!({
+            "input": "0.5",
+            "output": "1.0"
+        })))
+        .is_none());
+    }
+
+    #[test]
+    fn parse_model_cost_config_accepts_partial_numeric_costs() {
+        let cost = parse_model_cost_config(Some(&json!({
+            "input": 0.5,
+            "cacheWrite": 1.25
+        })))
+        .expect("partial numeric cost should parse");
+
+        assert_eq!(cost.input, 0.5);
+        assert_eq!(cost.output, 0.0);
+        assert_eq!(cost.cache_read, 0.0);
+        assert_eq!(cost.cache_write, 1.25);
+    }
+
+    #[test]
+    fn touch_config_meta_sets_last_touched_at() {
+        let mut config = json!({});
+
+        touch_config_meta(&mut config);
+
+        let timestamp = config
+            .pointer("/meta/lastTouchedAt")
+            .and_then(|value| value.as_str())
+            .expect("timestamp should be set");
+        assert!(chrono::DateTime::parse_from_rfc3339(timestamp).is_ok());
     }
 }

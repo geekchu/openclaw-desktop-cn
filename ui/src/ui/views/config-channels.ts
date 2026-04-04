@@ -2,14 +2,23 @@ import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 /* ── tiny Tauri invoke helper ─────────────────────────────── */
-const tauri = (
-  window as unknown as {
-    __TAURI__?: {
-      core?: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
-    };
+function getTauriBridge() {
+  if (typeof window === "undefined") {
+    return null;
   }
-).__TAURI__;
+  return (
+    (
+      window as unknown as {
+        __TAURI__?: {
+          core?: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
+        };
+      }
+    ).__TAURI__ ?? null
+  );
+}
+
 async function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const tauri = getTauriBridge();
   if (tauri?.core?.invoke) {
     return tauri.core.invoke(cmd, args) as Promise<T>;
   }
@@ -1358,6 +1367,15 @@ export class OpenClawConfigChannels extends LitElement {
       font-size: 13px;
       padding: 20px 0;
     }
+    .pairing-error {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(255, 92, 92, 0.1);
+      border: 1px solid rgba(255, 92, 92, 0.2);
+      color: var(--accent, #ff5c5c);
+      font-size: 13px;
+    }
     .pairing-input-row {
       display: flex;
       gap: 8px;
@@ -1384,6 +1402,7 @@ export class OpenClawConfigChannels extends LitElement {
 
   @state() private pairingRequests: PairingRequest[] = [];
   @state() private pairingLoading = false;
+  @state() private pairingError: string | null = null;
   @state() private approveCode = "";
   @state() private approveLoading = false;
   @state() private approveResult: { success: boolean; message: string } | null = null;
@@ -1391,6 +1410,8 @@ export class OpenClawConfigChannels extends LitElement {
   private _whatsappPollTimer: ReturnType<typeof setInterval> | null = null;
   private _whatsappTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private _pairingPollTimer: ReturnType<typeof setInterval> | null = null;
+  private _pairingRequestSeq = 0;
+  private _approveRequestSeq = 0;
   // AbortController：每次 connectedCallback 创建新实例，disconnectedCallback 时取消，
   // 防止组件离开 DOM 后旧的 init() 异步完成时污染状态（导致偶发的"一直加载中"竞态）。
   private _loadAbort: AbortController | null = null;
@@ -1417,6 +1438,7 @@ export class OpenClawConfigChannels extends LitElement {
       this._whatsappTimeoutTimer = null;
     }
     this._stopPairingPoll();
+    this._invalidateApproveState();
   }
 
   private _stopPairingPoll() {
@@ -1424,6 +1446,7 @@ export class OpenClawConfigChannels extends LitElement {
       clearInterval(this._pairingPollTimer);
       this._pairingPollTimer = null;
     }
+    this._invalidatePairingRequests();
   }
 
   private _startPairingPoll(channelId: string) {
@@ -1434,50 +1457,106 @@ export class OpenClawConfigChannels extends LitElement {
     }, 30000);
   }
 
+  private _invalidatePairingRequests() {
+    this._pairingRequestSeq += 1;
+    this.pairingLoading = false;
+    this.pairingError = null;
+  }
+
+  private _isCurrentPairingRequest(channelId: string, requestSeq: number) {
+    return this.selectedChannel === channelId && this._pairingRequestSeq === requestSeq;
+  }
+
+  private _canFetchPairingRequests(channelId: string) {
+    if (!this.isConnected || this.selectedChannel !== channelId) {
+      return false;
+    }
+    const channel = this.channels.find((candidate) => candidate.id === channelId);
+    if (!channel) {
+      return false;
+    }
+    return this.shouldShowPairing(channel.channel_type, this.configForm.dmPolicy);
+  }
+
+  private _invalidateApproveState() {
+    this._approveRequestSeq += 1;
+    this.approveLoading = false;
+    this.approveResult = null;
+  }
+
+  private _isCurrentApproveRequest(channelId: string, requestSeq: number) {
+    return this.selectedChannel === channelId && this._approveRequestSeq === requestSeq;
+  }
+
   private async _fetchPairingRequests(channelId: string) {
+    if (!this._canFetchPairingRequests(channelId)) {
+      return;
+    }
+    const requestSeq = ++this._pairingRequestSeq;
     this.pairingLoading = true;
+    this.pairingError = null;
     try {
       const result: PairingRequest[] = await invoke("list_pairing_requests", {
         channel: channelId,
       });
-      // Guard against stale responses from a previously selected channel
-      if (this.selectedChannel !== channelId) {
+      // Drop stale responses from previous channels and earlier overlapping refreshes.
+      if (!this._isCurrentPairingRequest(channelId, requestSeq)) {
         return;
       }
       this.pairingRequests = result;
+      this.pairingError = null;
     } catch (e) {
-      if (this.selectedChannel !== channelId) {
+      if (!this._isCurrentPairingRequest(channelId, requestSeq)) {
         return;
       }
       console.error("获取配对请求失败:", e);
-      this.pairingRequests = [];
+      this.pairingError = "刷新失败，请稍后重试";
     } finally {
-      if (this.selectedChannel === channelId) {
+      if (this._isCurrentPairingRequest(channelId, requestSeq)) {
         this.pairingLoading = false;
       }
     }
   }
 
   private async _handleApproveCode(channelId: string, code: string) {
-    if (!code.trim()) {
+    if (this.approveLoading) {
       return;
     }
+    const submittedCode = code.trim();
+    if (!submittedCode) {
+      return;
+    }
+    const normalizedSubmittedCode = submittedCode.toUpperCase();
+    const requestSeq = ++this._approveRequestSeq;
     this.approveLoading = true;
     this.approveResult = null;
     try {
       const result: { success: boolean; message: string } = await invoke("approve_pairing_code", {
         channel: channelId,
-        code: code.trim(),
+        code: normalizedSubmittedCode,
       });
+      if (!this._isCurrentApproveRequest(channelId, requestSeq)) {
+        return;
+      }
       this.approveResult = result;
       if (result.success) {
-        this.approveCode = "";
+        this.pairingRequests = this.pairingRequests.filter(
+          (request) => request.code.trim().toUpperCase() !== normalizedSubmittedCode,
+        );
+        if (this.approveCode.trim().toUpperCase() === normalizedSubmittedCode) {
+          this.approveCode = "";
+        }
         void this._fetchPairingRequests(channelId);
       }
     } catch (e) {
+      if (!this._isCurrentApproveRequest(channelId, requestSeq)) {
+        return;
+      }
       this.approveResult = { success: false, message: String(e) };
     } finally {
-      this.approveLoading = false;
+      if (this._isCurrentApproveRequest(channelId, requestSeq)) {
+        this.approveLoading = false;
+      }
     }
   }
 
@@ -1809,8 +1888,8 @@ export class OpenClawConfigChannels extends LitElement {
   private handleChannelSelect(channelId: string, channelList?: ChannelConfig[]) {
     this.selectedChannel = channelId;
     this.testResult = null;
-    this.approveResult = null;
     this.approveCode = "";
+    this._invalidateApproveState();
     this.pairingRequests = [];
     this._stopPairingPoll();
 
@@ -2045,8 +2124,8 @@ export class OpenClawConfigChannels extends LitElement {
         this._startPairingPoll(this.selectedChannel);
       } else {
         this._stopPairingPoll();
+        this._invalidateApproveState();
         this.pairingRequests = [];
-        this.approveResult = null;
       }
     }
   }
@@ -2082,19 +2161,11 @@ export class OpenClawConfigChannels extends LitElement {
                 class="channel-item ${isSelected ? "active" : ""}"
                 @click=${() => this.handleChannelSelect(channel.id)}
               >
-                <div class="channel-item-icon">
-                  ${info.icon}
-                </div>
+                <div class="channel-item-icon">${info.icon}</div>
                 <div class="channel-item-info">
                   <div class="channel-item-name">${info.name || channel.channel_type}</div>
                   <div class="channel-item-status ${isConfigured ? "status-ok" : "status-none"}">
-                    ${
-                      isConfigured
-                        ? html`${iconCheck} 已配置`
-                        : html`
-                            未配置
-                          `
-                    }
+                    ${isConfigured ? html`${iconCheck} 已配置` : html` 未配置 `}
                   </div>
                 </div>
               </button>
@@ -2106,262 +2177,325 @@ export class OpenClawConfigChannels extends LitElement {
       <!-- Main Config Panel -->
       <div class="content">
         <div class="content-inner">
-          ${
-            currentChannel && currentInfo
-              ? html`
-            <div class="card">
-              <div class="card-title">
-                <div class="card-title-icon ${currentInfo.theme || "gray"}">
-                  ${currentInfo.icon}
-                </div>
-                <div>
-                  <div class="title-text">${currentInfo.name} 配置</div>
-                  ${currentInfo.helpText ? html`<div class="title-sub">${currentInfo.helpText}</div>` : nothing}
-                </div>
-              </div>
-
-              <!-- Config form fields -->
-              <div class="fields-container">
-                ${currentInfo.fields?.map(
-                  (field: ChannelField) => html`
-                  <div class="field">
-                    <label class="field-label">
-                      ${field.label}
-                      ${
-                        field.required
-                          ? html`
-                              <span class="label-req">*</span>
-                            `
-                          : nothing
-                      }
-                      ${this.configForm[field.key] ? html`<span class="label-ok" style="margin-left: auto;">${iconCheck}</span>` : nothing}
-                    </label>
-                    
-                    ${
-                      field.type === "select"
-                        ? html`
-                      <select
-                        @change=${(e: Event) => this.handleSelectChange(e, field.key)}
-                        class="input-base"
-                      >
-                        <option value="" ?selected=${!this.configForm[field.key]}>请选择...</option>
-                        ${field.options?.map((opt) => html`<option value="${opt.value}" ?selected=${this.configForm[field.key] === opt.value}>${opt.label}</option>`)}
-                      </select>
-                    `
-                        : field.type === "password"
-                          ? html`
-                      <div class="input-wrapper">
-                        <input
-                          type=${this.visiblePasswords.has(field.key) ? "text" : "password"}
-                          .value=${this.configForm[field.key] || ""}
-                          @input=${(e: Event) => this.handleTextInput(e, field.key)}
-                          placeholder="${field.placeholder || ""}"
-                          class="input-base"
-                          style="padding-right: 36px;"
-                        />
-                        <button
-                          type="button"
-                          @click=${() => this.togglePasswordVisibility(field.key)}
-                          class="input-icon-btn"
-                          title="${this.visiblePasswords.has(field.key) ? "隐藏" : "显示"}"
-                        >
-                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            ${
-                              this.visiblePasswords.has(field.key)
-                                ? html`
-                                    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path
-                                      d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"
-                                    /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line
-                                      x1="2"
-                                      x2="22"
-                                      y1="2"
-                                      y2="22"
-                                    />
-                                  `
-                                : html`
-                                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
-                                  `
-                            }
-                          </svg>
-                        </button>
-                      </div>
-                    `
-                          : html`
-                      <input
-                        type="${field.type}"
-                        .value=${this.configForm[field.key] || ""}
-                        @input=${(e: Event) => this.handleTextInput(e, field.key)}
-                        placeholder="${field.placeholder || ""}"
-                        class="input-base"
-                      />
-                    `
-                    }
-                  </div>
-                `,
-                )}
-              </div>
-
-              <!-- WhatsApp specific actions -->
-              ${
-                currentChannel.channel_type === "whatsapp"
-                  ? html`
-                <div class="notice">
-                  <div class="notice-icon">
-                    ${iconQrCode}
-                  </div>
-                  <div style="flex: 1;">
-                    <div class="notice-title">WhatsApp 扫码登录</div>
-                    <div class="notice-desc">登录时会弹出控制台二维码。连接终端或者运行 CLI \`openclaw channels login --channel whatsapp\`</div>
-                    <div class="btn-group" style="margin-top: 12px; display: flex; gap: 8px;">
-                      <button class="btn btn-secondary btn-sm" @click=${() => void this.handleWhatsAppLogin()} ?disabled=${this.loginLoading}>
-                        ${this.loginLoading ? iconLoader2 : iconQrCode} 启动扫码
-                      </button>
+          ${currentChannel && currentInfo
+            ? html`
+                <div class="card">
+                  <div class="card-title">
+                    <div class="card-title-icon ${currentInfo.theme || "gray"}">
+                      ${currentInfo.icon}
+                    </div>
+                    <div>
+                      <div class="title-text">${currentInfo.name} 配置</div>
+                      ${currentInfo.helpText
+                        ? html`<div class="title-sub">${currentInfo.helpText}</div>`
+                        : nothing}
                     </div>
                   </div>
-                </div>
-              `
-                  : nothing
-              }
 
-              <!-- Pairing requests block (when dmPolicy is 'pairing' or default) -->
-              ${
-                this.shouldShowPairing(currentChannel.channel_type, this.configForm.dmPolicy)
-                  ? html`
-                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border, #27272a);">
-                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-                    ${iconUserCheck}
-                    <span style="font-size: 15px; font-weight: 600; color: var(--text-strong, #fafafa);">配对请求</span>
-                    <button class="btn btn-secondary btn-sm" style="margin-left: auto;" @click=${() => void this._fetchPairingRequests(currentChannel.id)} ?disabled=${this.pairingLoading}>
-                      ${this.pairingLoading ? iconLoader2 : iconRefresh} 刷新
-                    </button>
-                  </div>
+                  <!-- Config form fields -->
+                  <div class="fields-container">
+                    ${currentInfo.fields?.map(
+                      (field: ChannelField) => html`
+                        <div class="field">
+                          <label class="field-label">
+                            ${field.label}
+                            ${field.required ? html` <span class="label-req">*</span> ` : nothing}
+                            ${this.configForm[field.key]
+                              ? html`<span class="label-ok" style="margin-left: auto;"
+                                  >${iconCheck}</span
+                                >`
+                              : nothing}
+                          </label>
 
-                  ${
-                    this.pairingRequests.length > 0
-                      ? html`
-                    <div class="pairing-list">
-                      ${this.pairingRequests.map(
-                        (req) => html`
-                        <div class="pairing-item">
-                          <span class="pairing-code">${req.code}</span>
-                          <span class="pairing-meta">
-                            ${req.id || "未知用户"}
-                            ${req.createdAt ? html` · ${req.createdAt}` : nothing}
-                          </span>
-                          <button class="btn btn-primary btn-sm" @click=${() => this._handleApproveCode(currentChannel.id, req.code)} ?disabled=${this.approveLoading}>
-                            ${iconCheck} 通过
-                          </button>
+                          ${field.type === "select"
+                            ? html`
+                                <select
+                                  @change=${(e: Event) => this.handleSelectChange(e, field.key)}
+                                  class="input-base"
+                                >
+                                  <option value="" ?selected=${!this.configForm[field.key]}>
+                                    请选择...
+                                  </option>
+                                  ${field.options?.map(
+                                    (opt) =>
+                                      html`<option
+                                        value="${opt.value}"
+                                        ?selected=${this.configForm[field.key] === opt.value}
+                                      >
+                                        ${opt.label}
+                                      </option>`,
+                                  )}
+                                </select>
+                              `
+                            : field.type === "password"
+                              ? html`
+                                  <div class="input-wrapper">
+                                    <input
+                                      type=${this.visiblePasswords.has(field.key)
+                                        ? "text"
+                                        : "password"}
+                                      .value=${this.configForm[field.key] || ""}
+                                      @input=${(e: Event) => this.handleTextInput(e, field.key)}
+                                      placeholder="${field.placeholder || ""}"
+                                      class="input-base"
+                                      style="padding-right: 36px;"
+                                    />
+                                    <button
+                                      type="button"
+                                      @click=${() => this.togglePasswordVisibility(field.key)}
+                                      class="input-icon-btn"
+                                      title="${this.visiblePasswords.has(field.key)
+                                        ? "隐藏"
+                                        : "显示"}"
+                                    >
+                                      <svg
+                                        viewBox="0 0 24 24"
+                                        width="16"
+                                        height="16"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                      >
+                                        ${this.visiblePasswords.has(field.key)
+                                          ? html`
+                                              <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path
+                                                d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"
+                                              /><path
+                                                d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"
+                                              /><line x1="2" x2="22" y1="2" y2="22" />
+                                            `
+                                          : html`
+                                              <path
+                                                d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"
+                                              /><circle cx="12" cy="12" r="3" />
+                                            `}
+                                      </svg>
+                                    </button>
+                                  </div>
+                                `
+                              : html`
+                                  <input
+                                    type="${field.type}"
+                                    .value=${this.configForm[field.key] || ""}
+                                    @input=${(e: Event) => this.handleTextInput(e, field.key)}
+                                    placeholder="${field.placeholder || ""}"
+                                    class="input-base"
+                                  />
+                                `}
                         </div>
                       `,
-                      )}
-                    </div>
-                  `
-                      : html`
-                    <div class="pairing-empty">${this.pairingLoading ? "加载中..." : "暂无待审批的配对请求"}</div>
-                  `
-                  }
-
-                  <div class="pairing-input-row">
-                    <input
-                      type="text"
-                      class="input-base"
-                      placeholder="输入配对码（如 L2ZNDN2D）"
-                      .value=${this.approveCode}
-                      @input=${(e: Event) => {
-                        this.approveCode = (e.target as HTMLInputElement).value;
-                      }}
-                      @keydown=${(e: KeyboardEvent) => {
-                        if (e.key === "Enter") {
-                          void this._handleApproveCode(currentChannel.id, this.approveCode);
-                        }
-                      }}
-                    />
-                    <button class="btn btn-primary btn-sm" @click=${() => void this._handleApproveCode(currentChannel.id, this.approveCode)} ?disabled=${this.approveLoading || !this.approveCode.trim()}>
-                      ${this.approveLoading ? iconLoader2 : iconCheck} 通过
-                    </button>
+                    )}
                   </div>
 
-                  ${
-                    this.approveResult
-                      ? html`
-                    <div class="test-result ${this.approveResult.success ? "ok" : "err"}" style="margin-top: 12px;">
-                      <div>${this.approveResult.success ? iconCheckCircle : iconXCircle}</div>
-                      <div style="flex: 1">
-                        <div class="test-result-title">${this.approveResult.message}</div>
-                      </div>
-                    </div>
-                  `
-                      : nothing
-                  }
-                </div>
-              `
-                  : nothing
-              }
-
-              <!-- Form Actions Bar -->
-              <div class="actions-bar">
-                <button
-                  class="btn btn-primary"
-                  @click=${() => void this.handleSave()}
-                  ?disabled=${this.saving}
-                >
-                  ${this.saving ? iconLoader2 : iconCheck}
-                  保存设置
-                </button>
-                
-                <button
-                  class="btn btn-secondary"
-                  @click=${() => void this.handleQuickTest()}
-                  ?disabled=${this.testing}
-                >
-                  ${this.testing ? iconLoader2 : iconPlay}
-                  快速测试
-                </button>
-                
-                <div style="flex:1;"></div>
-
-                ${
-                  !this.showClearConfirm
+                  <!-- WhatsApp specific actions -->
+                  ${currentChannel.channel_type === "whatsapp"
                     ? html`
-                  <button
-                    class="btn btn-danger"
-                    @click=${() => this.handleShowClearConfirm()}
-                    ?disabled=${this.clearing}
-                  >
-                    ${this.clearing ? iconLoader2 : iconTrash2} 清空配置
-                  </button>
-                `
-                    : html`
-                  <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-                    <span style="color: var(--accent, #ff5c5c);">确定清空？</span>
-                    <button class="btn btn-danger btn-sm" style="background: rgba(255, 92, 92, 0.2);" @click=${() => void this.handleClearConfig()}>确定</button>
-                    <button class="btn btn-secondary btn-sm" @click=${() => (this.showClearConfirm = false)}>取消</button>
-                  </div>
-                `
-                }
-              </div>
+                        <div class="notice">
+                          <div class="notice-icon">${iconQrCode}</div>
+                          <div style="flex: 1;">
+                            <div class="notice-title">WhatsApp 扫码登录</div>
+                            <div class="notice-desc">
+                              登录时会弹出控制台二维码。连接终端或者运行 CLI \`openclaw channels
+                              login --channel whatsapp\`
+                            </div>
+                            <div
+                              class="btn-group"
+                              style="margin-top: 12px; display: flex; gap: 8px;"
+                            >
+                              <button
+                                class="btn btn-secondary btn-sm"
+                                @click=${() => void this.handleWhatsAppLogin()}
+                                ?disabled=${this.loginLoading}
+                              >
+                                ${this.loginLoading ? iconLoader2 : iconQrCode} 启动扫码
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      `
+                    : nothing}
 
-              <!-- Test / Action Result block -->
-              ${
-                this.testResult
-                  ? html`
-                <div class="test-result ${this.testResult.success ? "ok" : "err"}">
-                  <div>${this.testResult.success ? iconCheckCircle : iconXCircle}</div>
-                  <div style="flex: 1">
-                    <div class="test-result-title">${this.testResult.message}</div>
-                    ${this.testResult.error ? html`<div class="test-result-err">${this.testResult.error}</div>` : nothing}
+                  <!-- Pairing requests block (when dmPolicy is 'pairing' or default) -->
+                  ${this.shouldShowPairing(currentChannel.channel_type, this.configForm.dmPolicy)
+                    ? html`
+                        <div
+                          style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border, #27272a);"
+                        >
+                          <div
+                            style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;"
+                          >
+                            ${iconUserCheck}
+                            <span
+                              style="font-size: 15px; font-weight: 600; color: var(--text-strong, #fafafa);"
+                              >配对请求</span
+                            >
+                            <button
+                              class="btn btn-secondary btn-sm"
+                              style="margin-left: auto;"
+                              @click=${() => void this._fetchPairingRequests(currentChannel.id)}
+                              ?disabled=${this.pairingLoading}
+                            >
+                              ${this.pairingLoading ? iconLoader2 : iconRefresh} 刷新
+                            </button>
+                          </div>
+
+                          ${this.pairingError
+                            ? html`
+                                <div class="pairing-error">
+                                  ${iconXCircle}
+                                  <span style="margin-left: 8px;">${this.pairingError}</span>
+                                </div>
+                              `
+                            : nothing}
+                          ${this.pairingRequests.length > 0
+                            ? html`
+                                <div class="pairing-list">
+                                  ${this.pairingRequests.map(
+                                    (req) => html`
+                                      <div class="pairing-item">
+                                        <span class="pairing-code">${req.code}</span>
+                                        <span class="pairing-meta">
+                                          ${req.id || "未知用户"}
+                                          ${req.createdAt ? html` · ${req.createdAt}` : nothing}
+                                        </span>
+                                        <button
+                                          class="btn btn-primary btn-sm"
+                                          @click=${() =>
+                                            this._handleApproveCode(currentChannel.id, req.code)}
+                                          ?disabled=${this.approveLoading}
+                                        >
+                                          ${iconCheck} 通过
+                                        </button>
+                                      </div>
+                                    `,
+                                  )}
+                                </div>
+                              `
+                            : this.pairingError
+                              ? nothing
+                              : html`
+                                  <div class="pairing-empty">
+                                    ${this.pairingLoading ? "加载中..." : "暂无待审批的配对请求"}
+                                  </div>
+                                `}
+
+                          <div class="pairing-input-row">
+                            <input
+                              type="text"
+                              class="input-base"
+                              placeholder="输入配对码（如 L2ZNDN2D）"
+                              .value=${this.approveCode}
+                              @input=${(e: Event) => {
+                                this.approveCode = (e.target as HTMLInputElement).value;
+                              }}
+                              @keydown=${(e: KeyboardEvent) => {
+                                if (e.key === "Enter") {
+                                  void this._handleApproveCode(currentChannel.id, this.approveCode);
+                                }
+                              }}
+                            />
+                            <button
+                              class="btn btn-primary btn-sm"
+                              @click=${() =>
+                                void this._handleApproveCode(currentChannel.id, this.approveCode)}
+                              ?disabled=${this.approveLoading || !this.approveCode.trim()}
+                            >
+                              ${this.approveLoading ? iconLoader2 : iconCheck} 通过
+                            </button>
+                          </div>
+
+                          ${this.approveResult
+                            ? html`
+                                <div
+                                  class="test-result ${this.approveResult.success ? "ok" : "err"}"
+                                  style="margin-top: 12px;"
+                                >
+                                  <div>
+                                    ${this.approveResult.success ? iconCheckCircle : iconXCircle}
+                                  </div>
+                                  <div style="flex: 1">
+                                    <div class="test-result-title">
+                                      ${this.approveResult.message}
+                                    </div>
+                                  </div>
+                                </div>
+                              `
+                            : nothing}
+                        </div>
+                      `
+                    : nothing}
+
+                  <!-- Form Actions Bar -->
+                  <div class="actions-bar">
+                    <button
+                      class="btn btn-primary"
+                      @click=${() => void this.handleSave()}
+                      ?disabled=${this.saving}
+                    >
+                      ${this.saving ? iconLoader2 : iconCheck} 保存设置
+                    </button>
+
+                    <button
+                      class="btn btn-secondary"
+                      @click=${() => void this.handleQuickTest()}
+                      ?disabled=${this.testing}
+                    >
+                      ${this.testing ? iconLoader2 : iconPlay} 快速测试
+                    </button>
+
+                    <div style="flex:1;"></div>
+
+                    ${!this.showClearConfirm
+                      ? html`
+                          <button
+                            class="btn btn-danger"
+                            @click=${() => this.handleShowClearConfirm()}
+                            ?disabled=${this.clearing}
+                          >
+                            ${this.clearing ? iconLoader2 : iconTrash2} 清空配置
+                          </button>
+                        `
+                      : html`
+                          <div
+                            style="display: flex; align-items: center; gap: 8px; font-size: 13px;"
+                          >
+                            <span style="color: var(--accent, #ff5c5c);">确定清空？</span>
+                            <button
+                              class="btn btn-danger btn-sm"
+                              style="background: rgba(255, 92, 92, 0.2);"
+                              @click=${() => void this.handleClearConfig()}
+                            >
+                              确定
+                            </button>
+                            <button
+                              class="btn btn-secondary btn-sm"
+                              @click=${() => (this.showClearConfirm = false)}
+                            >
+                              取消
+                            </button>
+                          </div>
+                        `}
                   </div>
+
+                  <!-- Test / Action Result block -->
+                  ${this.testResult
+                    ? html`
+                        <div class="test-result ${this.testResult.success ? "ok" : "err"}">
+                          <div>${this.testResult.success ? iconCheckCircle : iconXCircle}</div>
+                          <div style="flex: 1">
+                            <div class="test-result-title">${this.testResult.message}</div>
+                            ${this.testResult.error
+                              ? html`<div class="test-result-err">${this.testResult.error}</div>`
+                              : nothing}
+                          </div>
+                        </div>
+                      `
+                    : nothing}
                 </div>
               `
-                  : nothing
-              }
-
-            </div>
-          `
-              : html`
-                  <div class="empty-state">请选择平台频道进行配置</div>
-                `
-          }
+            : html` <div class="empty-state">请选择平台频道进行配置</div> `}
         </div>
       </div>
     `;

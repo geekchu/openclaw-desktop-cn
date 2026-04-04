@@ -218,6 +218,7 @@ export class OpenClawApp extends LitElement {
   @state() configFormDirty = false;
   @state() onestopApiKey = "";
   @state() onestopSelectedModel = "";
+  @state() currentPrimaryModel = "";
   @state() onestopShowApiKey = false;
   @state() onestopActiveCategory = "all";
   @state() onestopSaving = false;

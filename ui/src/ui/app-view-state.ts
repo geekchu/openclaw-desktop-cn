@@ -156,6 +156,7 @@ export type AppViewState = {
   nostrProfileAccountId: string | null;
   configFormDirty: boolean;
   onestopSelectedModel: string;
+  currentPrimaryModel: string;
   presenceLoading: boolean;
   presenceEntries: PresenceEntry[];
   presenceError: string | null;

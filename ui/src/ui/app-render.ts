@@ -98,8 +98,8 @@ import {
 } from "./views/agents-utils.ts";
 import { renderChat } from "./views/chat.ts";
 import { renderCommandPalette } from "./views/command-palette.ts";
-import { renderConfig } from "./views/config.ts";
 import { renderOnestop, saveOnestopConfig } from "./views/config-onestop.ts";
+import { renderConfig } from "./views/config.ts";
 import "./views/config-system-settings.js";
 import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
@@ -1905,6 +1905,7 @@ export function renderApp(state: AppViewState) {
           ? renderOnestop({
               apiKey: onestopState.onestopApiKey ?? "",
               selectedModel: state.onestopSelectedModel,
+              currentPrimaryModel: state.currentPrimaryModel,
               showApiKey: onestopState.onestopShowApiKey ?? false,
               activeCategory: onestopState.onestopActiveCategory ?? "all",
               saving: onestopState.onestopSaving ?? false,
@@ -1924,10 +1925,8 @@ export function renderApp(state: AppViewState) {
               onSave: async () => {
                 onestopState.onestopSaving = true;
                 try {
-                  await saveOnestopConfig(
-                    onestopState.onestopApiKey ?? "",
-                    state.onestopSelectedModel,
-                  );
+                  // “保存配置”只更新 API Key，不应隐式切换当前主模型。
+                  await saveOnestopConfig(onestopState.onestopApiKey ?? "", "");
                   void loadConfig(state);
                 } catch (error) {
                   console.error("一站式保存失败:", error);
