@@ -297,6 +297,116 @@ Function StopLegacyProcesses
   Sleep 1000
 FunctionEnd
 
+Function AbortRuntimeCleanupFailure
+  Exch $0
+  DetailPrint $0
+
+  ; Passive updater runs the NSIS installer with /P, which still allows modal
+  ; dialogs. Avoid blocking background upgrades on a MessageBox that no one
+  ; may be watching.
+  ClearErrors
+  ${GetOptions} $CMDLINE "/P" $1
+  ${IfNot} ${Errors}
+    Abort
+  ${EndIf}
+
+  IfSilent 0 +2
+    Abort
+
+  MessageBox MB_OK|MB_ICONSTOP "$0"
+  Abort
+FunctionEnd
+
+Function CleanupCurrentInstallRuntime
+  DetailPrint "Cleaning existing runtime bundle directories..."
+
+  FileOpen $0 "$TEMP\openclaw-clean-runtime.ps1" w
+  FileWrite $0 "param([string]$$InstallDir)$\r$\n"
+  FileWrite $0 "$$ErrorActionPreference = 'Stop'$\r$\n"
+  FileWrite $0 "if ([string]::IsNullOrWhiteSpace($$InstallDir)) { exit 0 }$\r$\n"
+  FileWrite $0 "if (-not (Test-Path -LiteralPath $$InstallDir)) { exit 0 }$\r$\n"
+  FileWrite $0 "$$targets = @($\r$\n"
+  FileWrite $0 "  (Join-Path $$InstallDir 'gateway-bundle'),$\r$\n"
+  FileWrite $0 "  (Join-Path $$InstallDir 'node-runtime')$\r$\n"
+  FileWrite $0 ") | Where-Object { Test-Path -LiteralPath $$_ }$\r$\n"
+  FileWrite $0 "$$needle = ([System.IO.Path]::GetFullPath($$InstallDir)).TrimEnd('\').ToLowerInvariant()$\r$\n"
+  FileWrite $0 "$$currentPid = $$PID$\r$\n"
+  FileWrite $0 "$$processes = @()$\r$\n"
+  FileWrite $0 "function Test-InstallDirPath([string]$$pathValue) {$\r$\n"
+  FileWrite $0 "  if ([string]::IsNullOrWhiteSpace($$pathValue)) { return $$false }$\r$\n"
+  FileWrite $0 "  $$candidate = $$pathValue.Trim()$\r$\n"
+  FileWrite $0 "  if ([string]::IsNullOrWhiteSpace($$candidate)) { return $$false }$\r$\n"
+  FileWrite $0 "  try {$\r$\n"
+  FileWrite $0 "    $$normalized = ([System.IO.Path]::GetFullPath($$candidate)).TrimEnd('\').ToLowerInvariant()$\r$\n"
+  FileWrite $0 "  } catch {$\r$\n"
+  FileWrite $0 "    return $$false$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  return $$normalized -eq $$needle -or $$normalized.StartsWith($$needle + '\')$\r$\n"
+  FileWrite $0 "}$\r$\n"
+  FileWrite $0 "try {$\r$\n"
+  FileWrite $0 "  $$processes = @(Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId, Name, ExecutablePath, CommandLine)$\r$\n"
+  FileWrite $0 "} catch {$\r$\n"
+  FileWrite $0 "  try {$\r$\n"
+  FileWrite $0 "    $$processes = @(Get-WmiObject Win32_Process -ErrorAction Stop | Select-Object ProcessId, Name, ExecutablePath, CommandLine)$\r$\n"
+  FileWrite $0 "  } catch {$\r$\n"
+  FileWrite $0 "    [Console]::Error.WriteLine('warning: process enumeration unavailable, continuing with direct cleanup')$\r$\n"
+  FileWrite $0 "    $$processes = @()$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "}$\r$\n"
+  FileWrite $0 "$$killIds = New-Object 'System.Collections.Generic.HashSet[int]'$\r$\n"
+  FileWrite $0 "foreach ($$proc in $$processes) {$\r$\n"
+  FileWrite $0 "  if ([int]$$proc.ProcessId -eq [int]$$currentPid) { continue }$\r$\n"
+  FileWrite $0 "  $$exe = if ($$proc.ExecutablePath) { $$proc.ExecutablePath } else { '' }$\r$\n"
+  FileWrite $0 "  if (Test-InstallDirPath $$exe) {$\r$\n"
+  FileWrite $0 "    [void]$$killIds.Add([int]$$proc.ProcessId)$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "} $\r$\n"
+  FileWrite $0 "if ($$killIds.Count -gt 0) {$\r$\n"
+  FileWrite $0 "  Stop-Process -Id (@($$killIds)) -Force -ErrorAction SilentlyContinue$\r$\n"
+  FileWrite $0 "  Start-Sleep -Milliseconds 1200$\r$\n"
+  FileWrite $0 "} $\r$\n"
+  FileWrite $0 "$$failed = @()$\r$\n"
+  FileWrite $0 "foreach ($$target in $$targets) {$\r$\n"
+  FileWrite $0 "  $$removed = $$false$\r$\n"
+  FileWrite $0 "  for ($$i = 0; $$i -lt 5 -and -not $$removed; $$i++) {$\r$\n"
+  FileWrite $0 "    try {$\r$\n"
+  FileWrite $0 "      Get-ChildItem -LiteralPath $$target -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {$\r$\n"
+  FileWrite $0 "        try { $$_.Attributes = 'Normal' } catch {}$\r$\n"
+  FileWrite $0 "      }$\r$\n"
+  FileWrite $0 "      Remove-Item -LiteralPath $$target -Recurse -Force -ErrorAction Stop$\r$\n"
+  FileWrite $0 "      $$removed = $$true$\r$\n"
+  FileWrite $0 "    } catch {$\r$\n"
+  FileWrite $0 "      Start-Sleep -Milliseconds (500 * ($$i + 1))$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  if ((Test-Path -LiteralPath $$target) -and -not $$removed) {$\r$\n"
+  FileWrite $0 "    $$failed += $$target$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "} $\r$\n"
+  FileWrite $0 "if ($$failed.Count -gt 0) {$\r$\n"
+  FileWrite $0 "  [Console]::Error.WriteLine(($$failed -join [Environment]::NewLine))$\r$\n"
+  FileWrite $0 "  exit 1$\r$\n"
+  FileWrite $0 "} $\r$\n"
+  FileWrite $0 "exit 0$\r$\n"
+  FileClose $0
+
+  ClearErrors
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$TEMP\openclaw-clean-runtime.ps1" "$INSTDIR"'
+  Pop $1
+  Delete "$TEMP\openclaw-clean-runtime.ps1"
+
+  ${If} $1 == "error"
+    Push "安装前清理旧版本运行时目录失败。请完全退出 OpenClaw 和相关 node 进程后重试。"
+    Call AbortRuntimeCleanupFailure
+  ${ElseIf} $1 == "timeout"
+    Push "安装前清理旧版本运行时目录超时。请完全退出 OpenClaw 后重试。"
+    Call AbortRuntimeCleanupFailure
+  ${ElseIf} $1 != 0
+    Push "旧版本的 gateway-bundle 或 node-runtime 仍被占用，无法安全升级。请完全退出 OpenClaw 后重试。"
+    Call AbortRuntimeCleanupFailure
+  ${EndIf}
+FunctionEnd
+
 !macro KillGatewayStatus
   ; 1. 强杀客户端主进程，防止主进程的健康检查在我们杀掉 Gateway 后又将其复活
   nsExec::ExecToLog 'taskkill /F /IM $\"${MAINBINARYNAME}.exe$\" /T'
@@ -417,8 +527,13 @@ FunctionEnd
 
   !insertmacro KillGatewayStatus
 
+  ; 升级前强制清理当前安装目录下的 runtime 资源，避免新增 bundle 文件时
+  ; 触发成批 "Error opening file for writing" 覆盖安装弹窗。
+  Call CleanupCurrentInstallRuntime
+
   ; 3. 清理旧版本的 gateway-bundle 目录，防止残留文件导致插件加载警告
   RMDir /r "$INSTDIR\gateway-bundle"
+  RMDir /r "$INSTDIR\node-runtime"
 
   ; 4. 自动清理旧版本 (OpenClaw桌面版) - 不询问用户，避免端口冲突
   !insertmacro CleanupOldVersion
