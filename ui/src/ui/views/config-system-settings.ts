@@ -500,20 +500,6 @@ export class SystemSettingsView extends LitElement {
     }
   }
 
-  private async _resumeGatewayAfterFailedUpdateRestart(
-    invokeFn: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>,
-    wasRunning: boolean,
-  ) {
-    if (!wasRunning) {
-      return;
-    }
-    try {
-      await invokeFn("start_service");
-    } catch (resumeErr) {
-      console.error("恢复 Gateway 失败", resumeErr);
-    }
-  }
-
   /* ── proxy settings ── */
   private _handleProxyEnabledChange(enabled: boolean) {
     this.proxyEnabled = enabled;
@@ -1086,7 +1072,6 @@ export class SystemSettingsView extends LitElement {
       color: var(--danger, #f85149);
       margin-top: 6px;
     }
-
   `;
 
   /* ── SVG icons ── */
@@ -1141,90 +1126,106 @@ export class SystemSettingsView extends LitElement {
     return html`
       ${this._renderHeader()}
       <div class="content">
-        ${this._renderSecurityCard()}
-        ${this._renderProxyCard()}
-        ${this._renderIdentityCard()}
-        ${this._renderAdvancedCard()}
-        ${this._renderUpdateCard()}
+        ${this._renderSecurityCard()} ${this._renderProxyCard()} ${this._renderIdentityCard()}
+        ${this._renderAdvancedCard()} ${this._renderUpdateCard()}
       </div>
     `;
   }
 
   private _renderHeader() {
-    return html`
-      <div class="header">
-        <div class="header-icon">${this._settingsIcon}</div>
-        <div>
-          <div class="header-title">系统设置</div>
-          <div class="header-sub">配置身份、安全和系统选项</div>
-        </div>
-      </div>`;
+    return html` <div class="header">
+      <div class="header-icon">${this._settingsIcon}</div>
+      <div>
+        <div class="header-title">系统设置</div>
+        <div class="header-sub">配置身份、安全和系统选项</div>
+      </div>
+    </div>`;
   }
 
   private _renderSecurityCard() {
-    return html`
-      <div class="card">
-        <div class="card-title">
-          <div class="card-title-icon amber">${this._shieldIcon}</div>
-          <div>
-            <div class="title-text">安全设置</div>
-            <div class="title-sub">AI 代理权限与工具访问控制</div>
-          </div>
+    return html` <div class="card">
+      <div class="card-title">
+        <div class="card-title-icon amber">${this._shieldIcon}</div>
+        <div>
+          <div class="title-text">安全设置</div>
+          <div class="title-sub">AI 代理权限与工具访问控制</div>
         </div>
+      </div>
 
-        <div class="section">
-          <label class="section-label">
-            执行安全模式
-            <span class="section-hint">&nbsp;— 控制 AI 执行命令的权限级别</span>
-          </label>
-          <div class="btn-group g3">
-            <button class="opt ${this.execSecurity === "deny" ? "on-red" : ""}" @click=${() => this._handleSecurityChange("deny")}>
-              <div>禁止执行</div><div class="opt-sub">deny</div>
-            </button>
-            <button class="opt ${this.execSecurity === "allowlist" ? "on-amber" : ""}" @click=${() => this._handleSecurityChange("allowlist")}>
-              <div>白名单</div><div class="opt-sub">allowlist</div>
-            </button>
-            <button class="opt ${this.execSecurity === "full" ? "on-green" : ""}" @click=${() => this._handleSecurityChange("full")}>
-              <div>完全放开</div><div class="opt-sub">full</div>
-            </button>
-          </div>
+      <div class="section">
+        <label class="section-label">
+          执行安全模式
+          <span class="section-hint">&nbsp;— 控制 AI 执行命令的权限级别</span>
+        </label>
+        <div class="btn-group g3">
+          <button
+            class="opt ${this.execSecurity === "deny" ? "on-red" : ""}"
+            @click=${() => this._handleSecurityChange("deny")}
+          >
+            <div>禁止执行</div>
+            <div class="opt-sub">deny</div>
+          </button>
+          <button
+            class="opt ${this.execSecurity === "allowlist" ? "on-amber" : ""}"
+            @click=${() => this._handleSecurityChange("allowlist")}
+          >
+            <div>白名单</div>
+            <div class="opt-sub">allowlist</div>
+          </button>
+          <button
+            class="opt ${this.execSecurity === "full" ? "on-green" : ""}"
+            @click=${() => this._handleSecurityChange("full")}
+          >
+            <div>完全放开</div>
+            <div class="opt-sub">full</div>
+          </button>
         </div>
+      </div>
 
-        ${
-          this.execSecurity === "allowlist"
-            ? html`
-          <div class="section">
-            <label class="section-label">
-              命令审批
-              <span class="section-hint">&nbsp;— 未知命令的处理方式</span>
-            </label>
-            <div class="btn-group g3">
-              <button class="opt ${this.execAsk === "always" ? "on-red" : ""}" @click=${() => this._handleAskChange("always")}>
-                <div>每次确认</div><div class="opt-sub">always</div>
-              </button>
-              <button class="opt ${this.execAsk === "on-miss" ? "on-amber" : ""}" @click=${() => this._handleAskChange("on-miss")}>
-                <div>未知时确认</div><div class="opt-sub">on-miss</div>
-              </button>
-              <button class="opt ${this.execAsk === "off" ? "on-green" : ""}" @click=${() => this._handleAskChange("off")}>
-                <div>无需确认</div><div class="opt-sub">off</div>
-              </button>
+      ${this.execSecurity === "allowlist"
+        ? html`
+            <div class="section">
+              <label class="section-label">
+                命令审批
+                <span class="section-hint">&nbsp;— 未知命令的处理方式</span>
+              </label>
+              <div class="btn-group g3">
+                <button
+                  class="opt ${this.execAsk === "always" ? "on-red" : ""}"
+                  @click=${() => this._handleAskChange("always")}
+                >
+                  <div>每次确认</div>
+                  <div class="opt-sub">always</div>
+                </button>
+                <button
+                  class="opt ${this.execAsk === "on-miss" ? "on-amber" : ""}"
+                  @click=${() => this._handleAskChange("on-miss")}
+                >
+                  <div>未知时确认</div>
+                  <div class="opt-sub">on-miss</div>
+                </button>
+                <button
+                  class="opt ${this.execAsk === "off" ? "on-green" : ""}"
+                  @click=${() => this._handleAskChange("off")}
+                >
+                  <div>无需确认</div>
+                  <div class="opt-sub">off</div>
+                </button>
+              </div>
             </div>
-          </div>
-        `
-            : nothing
-        }
-
-        ${
-          this.execSecurity === "allowlist"
-            ? html`
-          <div class="section">
-            <label class="section-label">
-              命令白名单
-              <span class="section-hint">&nbsp;— 已批准的可执行程序路径</span>
-            </label>
-            <div style="margin-top: 4px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px; max-height: 300px; overflow-y: auto;">
-              ${
-                this.allowlistEntries.length === 0
+          `
+        : nothing}
+      ${this.execSecurity === "allowlist"
+        ? html`
+            <div class="section">
+              <label class="section-label">
+                命令白名单
+                <span class="section-hint">&nbsp;— 已批准的可执行程序路径</span>
+              </label>
+              <div
+                style="margin-top: 4px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px; max-height: 300px; overflow-y: auto;"
+              >
+                ${this.allowlistEntries.length === 0
                   ? html`
                       <div
                         style="
@@ -1241,27 +1242,41 @@ export class SystemSettingsView extends LitElement {
                       </div>
                     `
                   : html`
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; max-width: 960px;">
-                  ${this.allowlistEntries.map((entry, idx) => {
-                    // Show the executable name as primary, full path as tooltip
-                    const parts = entry.pattern.replace(/\\/g, "/").split("/");
-                    const exeName = parts[parts.length - 1] || entry.pattern;
-                    return html`
-                      <div style="
+                      <div
+                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; max-width: 960px;"
+                      >
+                        ${this.allowlistEntries.map((entry, idx) => {
+                          // Show the executable name as primary, full path as tooltip
+                          const parts = entry.pattern.replace(/\\/g, "/").split("/");
+                          const exeName = parts[parts.length - 1] || entry.pattern;
+                          return html`
+                            <div
+                              style="
                         display: flex; align-items: center; gap: 8px;
                         padding: 6px 10px;
                         background: var(--card, #181b22);
                         border: 1px solid var(--border, #27272a);
                         border-radius: 8px; font-size: 12px;
                         color: var(--text, #e4e4e7);
-                      " title=${entry.pattern}>
-                        <span style="flex-shrink: 0; font-size: 13px;">⚙️</span>
-                        <div style="flex: 1; min-width: 0; overflow: hidden;">
-                          <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${exeName}</div>
-                          <div style="font-size: 11px; color: var(--muted, #71717a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">${entry.pattern}</div>
-                        </div>
-                        <button @click=${() => this._handleRemoveAllowlistEntry(idx)}
-                          style="
+                      "
+                              title=${entry.pattern}
+                            >
+                              <span style="flex-shrink: 0; font-size: 13px;">⚙️</span>
+                              <div style="flex: 1; min-width: 0; overflow: hidden;">
+                                <div
+                                  style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                >
+                                  ${exeName}
+                                </div>
+                                <div
+                                  style="font-size: 11px; color: var(--muted, #71717a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;"
+                                >
+                                  ${entry.pattern}
+                                </div>
+                              </div>
+                              <button
+                                @click=${() => this._handleRemoveAllowlistEntry(idx)}
+                                style="
                             display: inline-flex; align-items: center; justify-content: center;
                             width: 22px; height: 22px; border-radius: 50%;
                             background: transparent; border: 1px solid var(--border, #27272a);
@@ -1269,81 +1284,113 @@ export class SystemSettingsView extends LitElement {
                             font-size: 11px; line-height: 1; padding: 0;
                             flex-shrink: 0; transition: all 0.15s ease;
                           "
-                          @mouseover=${(e: Event) => {
-                            (e.target as HTMLElement).style.background = "rgba(239,68,68,0.15)";
-                            (e.target as HTMLElement).style.color = "#ef4444";
-                            (e.target as HTMLElement).style.borderColor = "#ef4444";
-                          }}
-                          @mouseout=${(e: Event) => {
-                            (e.target as HTMLElement).style.background = "transparent";
-                            (e.target as HTMLElement).style.color = "var(--muted, #71717a)";
-                            (e.target as HTMLElement).style.borderColor = "var(--border, #27272a)";
-                          }}
-                          title="移除此白名单条目"
-                        >✕</button>
+                                @mouseover=${(e: Event) => {
+                                  (e.target as HTMLElement).style.background =
+                                    "rgba(239,68,68,0.15)";
+                                  (e.target as HTMLElement).style.color = "#ef4444";
+                                  (e.target as HTMLElement).style.borderColor = "#ef4444";
+                                }}
+                                @mouseout=${(e: Event) => {
+                                  (e.target as HTMLElement).style.background = "transparent";
+                                  (e.target as HTMLElement).style.color = "var(--muted, #71717a)";
+                                  (e.target as HTMLElement).style.borderColor =
+                                    "var(--border, #27272a)";
+                                }}
+                                title="移除此白名单条目"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          `;
+                        })}
                       </div>
-                    `;
-                  })}
-                </div>
-              `
-              }
+                    `}
+              </div>
+            </div>
+          `
+        : nothing}
+
+      <div class="section">
+        <label class="section-label">
+          工具预设
+          <span class="section-hint">&nbsp;— 控制 AI 可使用的工具范围</span>
+        </label>
+        <div class="btn-group g4">
+          <button
+            class="opt ${this.toolProfile === "minimal" ? "on-red" : ""}"
+            @click=${() => this._handleProfileChange("minimal")}
+          >
+            <div>最小</div>
+            <div class="opt-sub">minimal</div>
+          </button>
+          <button
+            class="opt ${this.toolProfile === "coding" ? "on-blue" : ""}"
+            @click=${() => this._handleProfileChange("coding")}
+          >
+            <div>编程</div>
+            <div class="opt-sub">coding</div>
+          </button>
+          <button
+            class="opt ${this.toolProfile === "messaging" ? "on-amber" : ""}"
+            @click=${() => this._handleProfileChange("messaging")}
+          >
+            <div>消息</div>
+            <div class="opt-sub">messaging</div>
+          </button>
+          <button
+            class="opt ${this.toolProfile === "full" ? "on-green" : ""}"
+            @click=${() => this._handleProfileChange("full")}
+          >
+            <div>全部</div>
+            <div class="opt-sub">full</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="section">
+        <label class="section-label">
+          文件访问控制
+          <span class="section-hint">&nbsp;— 限制 AI 可访问的文件目录范围</span>
+        </label>
+
+        <div class="toggle-row">
+          <div class="toggle-row-info">
+            <div class="toggle-row-icon">📁</div>
+            <div>
+              <div class="toggle-text-primary">限制文件访问</div>
+              <div class="toggle-text-secondary">开启后 AI 仅能访问工作区及下方指定的目录</div>
             </div>
           </div>
-        `
-            : nothing
-        }
-
-        <div class="section">
-          <label class="section-label">
-            工具预设
-            <span class="section-hint">&nbsp;— 控制 AI 可使用的工具范围</span>
+          <label class="switch">
+            <input
+              type="checkbox"
+              .checked=${this.fsWorkspaceOnly}
+              @change=${(e: Event) => this._handleFsChange((e.target as HTMLInputElement).checked)}
+            />
+            <span class="switch-track"></span>
           </label>
-          <div class="btn-group g4">
-            <button class="opt ${this.toolProfile === "minimal" ? "on-red" : ""}" @click=${() => this._handleProfileChange("minimal")}>
-              <div>最小</div><div class="opt-sub">minimal</div>
-            </button>
-            <button class="opt ${this.toolProfile === "coding" ? "on-blue" : ""}" @click=${() => this._handleProfileChange("coding")}>
-              <div>编程</div><div class="opt-sub">coding</div>
-            </button>
-            <button class="opt ${this.toolProfile === "messaging" ? "on-amber" : ""}" @click=${() => this._handleProfileChange("messaging")}>
-              <div>消息</div><div class="opt-sub">messaging</div>
-            </button>
-            <button class="opt ${this.toolProfile === "full" ? "on-green" : ""}" @click=${() => this._handleProfileChange("full")}>
-              <div>全部</div><div class="opt-sub">full</div>
-            </button>
-          </div>
         </div>
 
-        <div class="section">
-          <label class="section-label">
-            文件访问控制
-            <span class="section-hint">&nbsp;— 限制 AI 可访问的文件目录范围</span>
-          </label>
-
-          <div class="toggle-row">
-            <div class="toggle-row-info">
-              <div class="toggle-row-icon">📁</div>
-              <div>
-                <div class="toggle-text-primary">限制文件访问</div>
-                <div class="toggle-text-secondary">开启后 AI 仅能访问工作区及下方指定的目录</div>
-              </div>
-            </div>
-            <label class="switch">
-              <input type="checkbox" .checked=${this.fsWorkspaceOnly} @change=${(e: Event) => this._handleFsChange((e.target as HTMLInputElement).checked)} />
-              <span class="switch-track"></span>
-            </label>
-          </div>
-
-          ${
-            this.fsWorkspaceOnly
-              ? html`
-            <div style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div style="font-size: 12px; color: var(--muted, #71717a); font-weight: 500;">允许访问的额外目录</div>
-                <button class="opt" style="padding: 4px 10px; font-size: 11px; white-space: nowrap; border-radius: 12px;" @click=${() => this._handleAddAllowedDir()}>+ 添加目录</button>
-              </div>
-              ${
-                this.fsAllowedDirs.length === 0
+        ${this.fsWorkspaceOnly
+          ? html`
+              <div
+                style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;"
+              >
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"
+                >
+                  <div style="font-size: 12px; color: var(--muted, #71717a); font-weight: 500;">
+                    允许访问的额外目录
+                  </div>
+                  <button
+                    class="opt"
+                    style="padding: 4px 10px; font-size: 11px; white-space: nowrap; border-radius: 12px;"
+                    @click=${() => this._handleAddAllowedDir()}
+                  >
+                    + 添加目录
+                  </button>
+                </div>
+                ${this.fsAllowedDirs.length === 0
                   ? html`
                       <div
                         style="
@@ -1360,10 +1407,11 @@ export class SystemSettingsView extends LitElement {
                       </div>
                     `
                   : html`
-                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                  ${this.fsAllowedDirs.map(
-                    (dir, idx) => html`
-                    <span style="
+                      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        ${this.fsAllowedDirs.map(
+                          (dir, idx) => html`
+                            <span
+                              style="
                       display: inline-flex; align-items: center; gap: 5px;
                       padding: 5px 8px 5px 10px;
                       background: var(--card, #181b22);
@@ -1371,10 +1419,16 @@ export class SystemSettingsView extends LitElement {
                       border-radius: 20px; font-size: 12px;
                       color: var(--text, #e4e4e7);
                       max-width: 300px; cursor: default;
-                    " title=${dir}>
-                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85;">📂 ${dir}</span>
-                      <button @click=${() => this._handleRemoveAllowedDir(idx)}
-                        style="
+                    "
+                              title=${dir}
+                            >
+                              <span
+                                style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85;"
+                                >📂 ${dir}</span
+                              >
+                              <button
+                                @click=${() => this._handleRemoveAllowedDir(idx)}
+                                style="
                           display: inline-flex; align-items: center; justify-content: center;
                           width: 16px; height: 16px; border-radius: 50%;
                           background: transparent; border: none;
@@ -1382,55 +1436,70 @@ export class SystemSettingsView extends LitElement {
                           font-size: 10px; line-height: 1; padding: 0;
                           flex-shrink: 0;
                         "
-                        title="移除目录"
-                      >✕</button>
-                    </span>
-                  `,
-                  )}
-                </div>
-              `
-              }
-            </div>
-          `
-              : nothing
-          }
-        </div>
+                                title="移除目录"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          `,
+                        )}
+                      </div>
+                    `}
+              </div>
+            `
+          : nothing}
+      </div>
 
-        <div class="section">
-          <label class="section-label">
-            网络访问
-            <span class="section-hint">&nbsp;— 控制 Gateway 服务的网络监听范围</span>
-          </label>
+      <div class="section">
+        <label class="section-label">
+          网络访问
+          <span class="section-hint">&nbsp;— 控制 Gateway 服务的网络监听范围</span>
+        </label>
 
-          <div class="toggle-row">
-            <div class="toggle-row-info">
-              <div class="toggle-row-icon">🌐</div>
-              <div>
-                <div class="toggle-text-primary">开放局域网访问</div>
-                <div class="toggle-text-secondary">允许局域网内其他设备连接 Gateway（需重启生效）</div>
+        <div class="toggle-row">
+          <div class="toggle-row-info">
+            <div class="toggle-row-icon">🌐</div>
+            <div>
+              <div class="toggle-text-primary">开放局域网访问</div>
+              <div class="toggle-text-secondary">
+                允许局域网内其他设备连接 Gateway（需重启生效）
               </div>
             </div>
-            <label class="switch">
-              <input type="checkbox" .checked=${this.lanAccess} ?disabled=${this.lanAccessBusy} @change=${() => this._toggleLanAccess()} />
-              <span class="switch-track"></span>
-            </label>
           </div>
+          <label class="switch">
+            <input
+              type="checkbox"
+              .checked=${this.lanAccess}
+              ?disabled=${this.lanAccessBusy}
+              @change=${() => this._toggleLanAccess()}
+            />
+            <span class="switch-track"></span>
+          </label>
+        </div>
 
-          ${
-            this.lanAccess
-              ? html`
-            <div style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                <div style="flex: 1; min-width: 0;">
-                  <div style="font-size: 12px; color: var(--muted, #71717a); margin-bottom: 4px;">Gateway Token（其他设备连接时需要）</div>
-                  <div style="font-family: monospace; font-size: 13px; color: var(--text, #e4e4e7); word-break: break-all;">${this.gatewayToken || "（未配置，请在配置文件中设置 gateway.auth.token）"}</div>
-                </div>
-                ${
-                  this.gatewayToken
+        ${this.lanAccess
+          ? html`
+              <div
+                style="margin-top: 10px; padding: 12px 14px; background: var(--bg-elevated, #1a1d25); border: 1px solid var(--border, #27272a); border-radius: 10px;"
+              >
+                <div
+                  style="display: flex; align-items: center; justify-content: space-between; gap: 12px;"
+                >
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 12px; color: var(--muted, #71717a); margin-bottom: 4px;">
+                      Gateway Token（其他设备连接时需要）
+                    </div>
+                    <div
+                      style="font-family: monospace; font-size: 13px; color: var(--text, #e4e4e7); word-break: break-all;"
+                    >
+                      ${this.gatewayToken || "（未配置，请在配置文件中设置 gateway.auth.token）"}
+                    </div>
+                  </div>
+                  ${this.gatewayToken
                     ? html`
-                  <button
-                    class="copy-token-btn"
-                    style="
+                        <button
+                          class="copy-token-btn"
+                          style="
                       padding: 6px 12px;
                       border-radius: 8px;
                       border: 1px solid var(--border, #27272a);
@@ -1441,46 +1510,52 @@ export class SystemSettingsView extends LitElement {
                       white-space: nowrap;
                       transition: all 0.15s ease;
                     "
-                    @click=${() => this._copyGatewayToken()}
-                    @mouseover=${(e: Event) => {
-                      (e.target as HTMLElement).style.background = "var(--bg-hover, #262a35)";
-                      (e.target as HTMLElement).style.borderColor = "var(--border-strong, #3f3f46)";
-                    }}
-                    @mouseout=${(e: Event) => {
-                      (e.target as HTMLElement).style.background = "var(--card, #181b22)";
-                      (e.target as HTMLElement).style.borderColor = "var(--border, #27272a)";
-                    }}
-                  >复制</button>
-                `
-                    : nothing
-                }
+                          @click=${() => this._copyGatewayToken()}
+                          @mouseover=${(e: Event) => {
+                            (e.target as HTMLElement).style.background = "var(--bg-hover, #262a35)";
+                            (e.target as HTMLElement).style.borderColor =
+                              "var(--border-strong, #3f3f46)";
+                          }}
+                          @mouseout=${(e: Event) => {
+                            (e.target as HTMLElement).style.background = "var(--card, #181b22)";
+                            (e.target as HTMLElement).style.borderColor = "var(--border, #27272a)";
+                          }}
+                        >
+                          复制
+                        </button>
+                      `
+                    : nothing}
+                </div>
               </div>
-            </div>
-          `
-              : nothing
-          }
-
-          ${
-            this.lanNeedsRestart
-              ? html`
-            <div class="restart-banner">
-              <span class="restart-banner-text">设置已保存，重启后生效</span>
-              <button class="btn-primary" style="padding:6px 14px;font-size:13px" @click=${() => {
-                this.lanNeedsRestart = false;
-                this._doRestart();
-              }}>
-                立即重启
-              </button>
-              <button class="restart-banner-dismiss" @click=${() => {
-                this.lanNeedsRestart = false;
-              }}>稍后</button>
-            </div>
-          `
-              : nothing
-          }
-        </div>
-
-      </div>`;
+            `
+          : nothing}
+        ${this.lanNeedsRestart
+          ? html`
+              <div class="restart-banner">
+                <span class="restart-banner-text">设置已保存，重启后生效</span>
+                <button
+                  class="btn-primary"
+                  style="padding:6px 14px;font-size:13px"
+                  @click=${() => {
+                    this.lanNeedsRestart = false;
+                    this._doRestart();
+                  }}
+                >
+                  立即重启
+                </button>
+                <button
+                  class="restart-banner-dismiss"
+                  @click=${() => {
+                    this.lanNeedsRestart = false;
+                  }}
+                >
+                  稍后
+                </button>
+              </div>
+            `
+          : nothing}
+      </div>
+    </div>`;
   }
 
   private _proxyIcon = html`
@@ -1494,209 +1569,260 @@ export class SystemSettingsView extends LitElement {
   `;
 
   private _renderProxyCard() {
-    return html`
-      <div class="card">
-        <div class="card-title">
-          <div class="card-title-icon blue">${this._proxyIcon}</div>
-          <div style="flex:1">
-            <div class="title-text">代理设置</div>
-            <div class="title-sub">配置网络代理，所有网络请求将通过代理服务器</div>
-          </div>
-          <span class="proxy-status-badge ${this.proxyEnabled ? "on" : "off"}">
-            <span class="proxy-status-dot"></span>
-            ${this.proxyEnabled ? "已启用" : "已禁用"}
-          </span>
+    return html` <div class="card">
+      <div class="card-title">
+        <div class="card-title-icon blue">${this._proxyIcon}</div>
+        <div style="flex:1">
+          <div class="title-text">代理设置</div>
+          <div class="title-sub">配置网络代理，所有网络请求将通过代理服务器</div>
         </div>
+        <span class="proxy-status-badge ${this.proxyEnabled ? "on" : "off"}">
+          <span class="proxy-status-dot"></span>
+          ${this.proxyEnabled ? "已启用" : "已禁用"}
+        </span>
+      </div>
 
-        <div class="toggle-row" style="margin-bottom:0">
-          <div class="toggle-row-info">
-            <div class="toggle-row-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-              </svg>
-            </div>
-            <div>
-              <div class="toggle-text-primary">启用代理</div>
-              <div class="toggle-text-secondary">开启后所有网络请求将通过代理服务器（需重启生效）</div>
+      <div class="toggle-row" style="margin-bottom:0">
+        <div class="toggle-row-info">
+          <div class="toggle-row-icon">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              width="18"
+              height="18"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path
+                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              ></path>
+            </svg>
+          </div>
+          <div>
+            <div class="toggle-text-primary">启用代理</div>
+            <div class="toggle-text-secondary">
+              开启后所有网络请求将通过代理服务器（需重启生效）
             </div>
           </div>
-          <label class="switch">
-            <input type="checkbox" .checked=${this.proxyEnabled} @change=${(e: Event) => this._handleProxyEnabledChange((e.target as HTMLInputElement).checked)} />
-            <span class="switch-track"></span>
-          </label>
         </div>
+        <label class="switch">
+          <input
+            type="checkbox"
+            .checked=${this.proxyEnabled}
+            @change=${(e: Event) =>
+              this._handleProxyEnabledChange((e.target as HTMLInputElement).checked)}
+          />
+          <span class="switch-track"></span>
+        </label>
+      </div>
 
-        ${
-          this.proxyEnabled
-            ? html`
-          <div class="proxy-fields">
-            <div class="proxy-grid">
-              <div class="field">
-                <label class="field-label">HTTP 代理</label>
-                <input class="input-base" type="text" .value=${this.proxyHttp}
-                  @input=${(e: Event) => this._handleProxyHttpChange((e.target as HTMLInputElement).value)}
-                  placeholder="http://127.0.0.1:7890" />
-                <span class="section-hint">HTTP 请求代理地址</span>
+      ${this.proxyEnabled
+        ? html`
+            <div class="proxy-fields">
+              <div class="proxy-grid">
+                <div class="field">
+                  <label class="field-label">HTTP 代理</label>
+                  <input
+                    class="input-base"
+                    type="text"
+                    .value=${this.proxyHttp}
+                    @input=${(e: Event) =>
+                      this._handleProxyHttpChange((e.target as HTMLInputElement).value)}
+                    placeholder="http://127.0.0.1:7890"
+                  />
+                  <span class="section-hint">HTTP 请求代理地址</span>
+                </div>
+                <div class="field">
+                  <label class="field-label"
+                    >HTTPS 代理 <span class="proxy-optional">可选</span></label
+                  >
+                  <input
+                    class="input-base"
+                    type="text"
+                    .value=${this.proxyHttps}
+                    @input=${(e: Event) =>
+                      this._handleProxyHttpsChange((e.target as HTMLInputElement).value)}
+                    placeholder="留空则回退到 HTTP 代理"
+                  />
+                  <span class="section-hint">留空时自动使用 HTTP 代理地址</span>
+                </div>
               </div>
-              <div class="field">
-                <label class="field-label">HTTPS 代理 <span class="proxy-optional">可选</span></label>
-                <input class="input-base" type="text" .value=${this.proxyHttps}
-                  @input=${(e: Event) => this._handleProxyHttpsChange((e.target as HTMLInputElement).value)}
-                  placeholder="留空则回退到 HTTP 代理" />
-                <span class="section-hint">留空时自动使用 HTTP 代理地址</span>
+              <div class="field" style="margin-bottom:0">
+                <label class="field-label">排除地址 <span class="proxy-optional">可选</span></label>
+                <input
+                  class="input-base"
+                  type="text"
+                  .value=${this.proxyNoProxy}
+                  @input=${(e: Event) =>
+                    this._handleProxyNoProxyChange((e.target as HTMLInputElement).value)}
+                  placeholder="localhost,127.0.0.1,*.local"
+                />
+                <span class="section-hint">不走代理的主机列表，多个地址用英文逗号分隔</span>
               </div>
-            </div>
-            <div class="field" style="margin-bottom:0">
-              <label class="field-label">排除地址 <span class="proxy-optional">可选</span></label>
-              <input class="input-base" type="text" .value=${this.proxyNoProxy}
-                @input=${(e: Event) => this._handleProxyNoProxyChange((e.target as HTMLInputElement).value)}
-                placeholder="localhost,127.0.0.1,*.local" />
-              <span class="section-hint">不走代理的主机列表，多个地址用英文逗号分隔</span>
-            </div>
 
-            <div class="action-bar">
-              <button class="btn-primary" ?disabled=${this.proxySaving} @click=${() => this._saveProxyConfig()}>
-                ${this.proxySaving ? "保存中…" : "保存"}
-              </button>
-              ${
-                this.proxySaveStatus === "success"
-                  ? html`
-                      <span class="save-msg ok">✓ 代理配置已保存</span>
-                    `
+              <div class="action-bar">
+                <button
+                  class="btn-primary"
+                  ?disabled=${this.proxySaving}
+                  @click=${() => this._saveProxyConfig()}
+                >
+                  ${this.proxySaving ? "保存中…" : "保存"}
+                </button>
+                ${this.proxySaveStatus === "success"
+                  ? html` <span class="save-msg ok">✓ 代理配置已保存</span> `
                   : this.proxySaveStatus === "error"
-                    ? html`
-                        <span class="save-msg err">保存失败，请重试</span>
-                      `
-                    : nothing
-              }
+                    ? html` <span class="save-msg err">保存失败，请重试</span> `
+                    : nothing}
+              </div>
             </div>
-          </div>
-        `
-            : nothing
-        }
-
-        ${
-          this.proxyNeedsRestart
-            ? html`
-          <div class="restart-banner">
-            <span class="restart-banner-text">代理设置已保存，重启后生效</span>
-            <button class="btn-primary" style="padding:6px 14px;font-size:13px" @click=${() => {
-              this.proxyNeedsRestart = false;
-              this._doRestart();
-            }}>
-              立即重启
-            </button>
-            <button class="restart-banner-dismiss" @click=${() => {
-              this.proxyNeedsRestart = false;
-            }}>稍后</button>
-          </div>
-        `
-            : nothing
-        }
-      </div>`;
+          `
+        : nothing}
+      ${this.proxyNeedsRestart
+        ? html`
+            <div class="restart-banner">
+              <span class="restart-banner-text">代理设置已保存，重启后生效</span>
+              <button
+                class="btn-primary"
+                style="padding:6px 14px;font-size:13px"
+                @click=${() => {
+                  this.proxyNeedsRestart = false;
+                  this._doRestart();
+                }}
+              >
+                立即重启
+              </button>
+              <button
+                class="restart-banner-dismiss"
+                @click=${() => {
+                  this.proxyNeedsRestart = false;
+                }}
+              >
+                稍后
+              </button>
+            </div>
+          `
+        : nothing}
+    </div>`;
   }
 
   private _renderIdentityCard() {
-    return html`
-      <div class="card">
-        <div class="card-title">
-          <div class="card-title-icon blue">${this._userIcon}</div>
-          <div>
-            <div class="title-text">身份配置</div>
-            <div class="title-sub">设置 AI 助手名称和用户称呼</div>
-          </div>
+    return html` <div class="card">
+      <div class="card-title">
+        <div class="card-title-icon blue">${this._userIcon}</div>
+        <div>
+          <div class="title-text">身份配置</div>
+          <div class="title-sub">设置 AI 助手名称和用户称呼</div>
         </div>
+      </div>
 
-        <div class="field">
-          <label class="field-label">AI 助手名称</label>
-          <input class="input-base" type="text" .value=${this.botName}
-            @input=${(e: Event) => (this.botName = (e.target as HTMLInputElement).value)}
-            placeholder="Clawd" />
-        </div>
-        <div class="field">
-          <label class="field-label">你的称呼</label>
-          <input class="input-base" type="text" .value=${this.userName}
-            @input=${(e: Event) => (this.userName = (e.target as HTMLInputElement).value)}
-            placeholder="主人" />
-        </div>
-        <div class="field">
-          <label class="field-label">时区</label>
-          <select class="input-base" .value=${this.timezone}
-            @change=${(e: Event) => (this.timezone = (e.target as HTMLSelectElement).value)}>
-            <option value="Asia/Shanghai" ?selected=${this.timezone === "Asia/Shanghai"}>Asia/Shanghai (北京时间)</option>
-            <option value="Asia/Hong_Kong" ?selected=${this.timezone === "Asia/Hong_Kong"}>Asia/Hong_Kong (香港时间)</option>
-            <option value="Asia/Tokyo" ?selected=${this.timezone === "Asia/Tokyo"}>Asia/Tokyo (东京时间)</option>
-            <option value="America/New_York" ?selected=${this.timezone === "America/New_York"}>America/New_York (纽约时间)</option>
-            <option value="America/Los_Angeles" ?selected=${this.timezone === "America/Los_Angeles"}>America/Los_Angeles (洛杉矶时间)</option>
-            <option value="Europe/London" ?selected=${this.timezone === "Europe/London"}>Europe/London (伦敦时间)</option>
-            <option value="UTC" ?selected=${this.timezone === "UTC"}>UTC</option>
-          </select>
-        </div>
+      <div class="field">
+        <label class="field-label">AI 助手名称</label>
+        <input
+          class="input-base"
+          type="text"
+          .value=${this.botName}
+          @input=${(e: Event) => (this.botName = (e.target as HTMLInputElement).value)}
+          placeholder="Clawd"
+        />
+      </div>
+      <div class="field">
+        <label class="field-label">你的称呼</label>
+        <input
+          class="input-base"
+          type="text"
+          .value=${this.userName}
+          @input=${(e: Event) => (this.userName = (e.target as HTMLInputElement).value)}
+          placeholder="主人"
+        />
+      </div>
+      <div class="field">
+        <label class="field-label">时区</label>
+        <select
+          class="input-base"
+          .value=${this.timezone}
+          @change=${(e: Event) => (this.timezone = (e.target as HTMLSelectElement).value)}
+        >
+          <option value="Asia/Shanghai" ?selected=${this.timezone === "Asia/Shanghai"}>
+            Asia/Shanghai (北京时间)
+          </option>
+          <option value="Asia/Hong_Kong" ?selected=${this.timezone === "Asia/Hong_Kong"}>
+            Asia/Hong_Kong (香港时间)
+          </option>
+          <option value="Asia/Tokyo" ?selected=${this.timezone === "Asia/Tokyo"}>
+            Asia/Tokyo (东京时间)
+          </option>
+          <option value="America/New_York" ?selected=${this.timezone === "America/New_York"}>
+            America/New_York (纽约时间)
+          </option>
+          <option value="America/Los_Angeles" ?selected=${this.timezone === "America/Los_Angeles"}>
+            America/Los_Angeles (洛杉矶时间)
+          </option>
+          <option value="Europe/London" ?selected=${this.timezone === "Europe/London"}>
+            Europe/London (伦敦时间)
+          </option>
+          <option value="UTC" ?selected=${this.timezone === "UTC"}>UTC</option>
+        </select>
+      </div>
 
-        <div class="action-bar">
-          <button class="btn-primary" ?disabled=${this.saving} @click=${() => this._handleSaveIdentity()}>
-            ${
-              this.saving
-                ? html`
-                    <span class="spinner spinner-sm"></span>
-                  `
-                : nothing
-            }
-            保存配置
-          </button>
-          ${
-            this.saveStatus === "success"
-              ? html`
-                  <span class="save-msg ok">✓ 已保存</span>
-                `
-              : this.saveStatus === "error"
-                ? html`
-                    <span class="save-msg err">保存失败</span>
-                  `
-                : nothing
-          }
-        </div>
-      </div>`;
+      <div class="action-bar">
+        <button
+          class="btn-primary"
+          ?disabled=${this.saving}
+          @click=${() => this._handleSaveIdentity()}
+        >
+          ${this.saving ? html` <span class="spinner spinner-sm"></span> ` : nothing} 保存配置
+        </button>
+        ${this.saveStatus === "success"
+          ? html` <span class="save-msg ok">✓ 已保存</span> `
+          : this.saveStatus === "error"
+            ? html` <span class="save-msg err">保存失败</span> `
+            : nothing}
+      </div>
+    </div>`;
   }
 
   private _renderAdvancedCard() {
-    return html`
-      <div class="card">
-        <div class="card-title">
-          <div class="card-title-icon gray">${this._cpuIcon}</div>
+    return html` <div class="card">
+      <div class="card-title">
+        <div class="card-title-icon gray">${this._cpuIcon}</div>
+        <div>
+          <div class="title-text">高级设置</div>
+          <div class="title-sub">系统行为与配置文件管理</div>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-row-info">
+          <div class="toggle-row-icon">⚡</div>
           <div>
-            <div class="title-text">高级设置</div>
-            <div class="title-sub">系统行为与配置文件管理</div>
+            <div class="toggle-text-primary">开机自启动</div>
+            <div class="toggle-text-secondary">登录系统时自动启动 OpenClaw</div>
           </div>
         </div>
+        <label class="switch">
+          <input
+            type="checkbox"
+            .checked=${this.autoStart}
+            ?disabled=${this.autoStartBusy}
+            @change=${() => this._toggleAutoStart()}
+          />
+          <span class="switch-track"></span>
+        </label>
+      </div>
 
-        <div class="toggle-row">
-          <div class="toggle-row-info">
-            <div class="toggle-row-icon">⚡</div>
-            <div>
-              <div class="toggle-text-primary">开机自启动</div>
-              <div class="toggle-text-secondary">登录系统时自动启动 OpenClaw</div>
-            </div>
+      <button class="click-row" @click=${() => this._openConfigDir()}>
+        <div class="toggle-row-info">
+          <div class="toggle-row-icon">📁</div>
+          <div>
+            <div class="toggle-text-primary">打开配置目录</div>
+            <div class="toggle-text-secondary">在文件管理器中查看 ~/.openclawcn</div>
           </div>
-          <label class="switch">
-            <input type="checkbox" .checked=${this.autoStart} ?disabled=${this.autoStartBusy} @change=${() => this._toggleAutoStart()} />
-            <span class="switch-track"></span>
-          </label>
         </div>
-
-        <button class="click-row" @click=${() => this._openConfigDir()}>
-          <div class="toggle-row-info">
-            <div class="toggle-row-icon">📁</div>
-            <div>
-              <div class="toggle-text-primary">打开配置目录</div>
-              <div class="toggle-text-secondary">在文件管理器中查看 ~/.openclawcn</div>
-            </div>
-          </div>
-          <span class="chevron">${this._chevronRight}</span>
-        </button>
-      </div>`;
+        <span class="chevron">${this._chevronRight}</span>
+      </button>
+    </div>`;
   }
 
   /* ── Update card ── */
@@ -1772,21 +1898,6 @@ export class SystemSettingsView extends LitElement {
 
     this.updateRestarting = true;
     this.updateError = "";
-    let gatewayWasRunning = false;
-
-    try {
-      const status = (await t.core.invoke("get_service_status")) as { running?: boolean } | null;
-      gatewayWasRunning = status?.running === true;
-    } catch {
-      gatewayWasRunning = false;
-    }
-
-    // 先彻底关闭 Gateway 子进程，释放文件锁，防止安装更新时冲突
-    try {
-      await t.core.invoke("stop_gateway");
-    } catch {
-      /* best-effort */
-    }
 
     if (this._updateRid != null && this._downloadedBytesRid != null) {
       try {
@@ -1799,14 +1910,12 @@ export class SystemSettingsView extends LitElement {
         } catch (restartErr) {
           // 重启失败，提示用户手动重启
           console.error("重启失败", restartErr);
-          await this._resumeGatewayAfterFailedUpdateRestart(t.core.invoke, gatewayWasRunning);
           this.updateError = "更新已安装，但自动重启失败。请手动关闭并重新打开应用。";
           this.updateRestarting = false;
         }
         return;
       } catch (e: unknown) {
         console.error("更新安装失败", e);
-        await this._resumeGatewayAfterFailedUpdateRestart(t.core.invoke, gatewayWasRunning);
         this.updateError = `更新安装失败: ${e instanceof Error ? e.message : String(e)}`;
         this.updateRestarting = false;
         return;
@@ -1833,76 +1942,83 @@ export class SystemSettingsView extends LitElement {
           </div>
         </div>
 
-        ${
-          this.updateInstalled
-            ? html`
-          <div class="update-row">
-            <div class="update-info">
-              <div class="toggle-text-primary">✅ 更新已下载完成，重启后生效</div>
-              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
-            </div>
-            <button class="btn-primary" ?disabled=${this.updateRestarting} @click=${() => this._handleRestart()}>
-              ${
-                this.updateRestarting
-                  ? html`
-                      <span class="spinner spinner-sm"></span> 重启中…
-                    `
-                  : "重启应用"
-              }
-            </button>
-          </div>
-        `
-            : this.updateDownloading
-              ? html`
-          <div class="update-row">
-            <div class="update-info">
-              <div class="toggle-text-primary">正在下载 v${this.updateVersion}...</div>
-              <div class="update-progress-wrap">
-                <div class="update-progress-bar">
-                  <div class="update-progress-fill" style="width:${this.updateProgress}%"></div>
+        ${this.updateInstalled
+          ? html`
+              <div class="update-row">
+                <div class="update-info">
+                  <div class="toggle-text-primary">✅ 更新已下载完成，重启后生效</div>
+                  ${this.updateError
+                    ? html`<div class="update-error">❌ ${this.updateError}</div>`
+                    : nothing}
                 </div>
-                <span class="update-progress-pct">${this.updateProgress}%</span>
+                <button
+                  class="btn-primary"
+                  ?disabled=${this.updateRestarting}
+                  @click=${() => this._handleRestart()}
+                >
+                  ${this.updateRestarting
+                    ? html` <span class="spinner spinner-sm"></span> 重启中… `
+                    : "重启应用"}
+                </button>
               </div>
-            </div>
-          </div>
-        `
-              : this.updateAvailable
-                ? html`
-          <div class="update-row">
-            <div class="update-info">
-              <div class="toggle-text-primary">🎉 发现新版本 v${this.updateVersion}</div>
-              ${this.updateNotes ? html`<div class="toggle-text-secondary">${this.updateNotes}</div>` : nothing}
-              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
-            </div>
-            <button class="btn-primary" @click=${() => this._handleDownloadUpdate()}>下载并安装</button>
-          </div>
-        `
-                : html`
-          <div class="update-row">
-            <div class="update-info">
-              ${
-                this.updateDone
-                  ? html`
-                      <div class="toggle-text-primary">✅ 当前已是最新版本</div>
-                    `
-                  : html`
-                      <div class="toggle-text-primary">点击按钮检查是否有新版本可用</div>
-                    `
-              }
-              ${this.updateError ? html`<div class="update-error">❌ ${this.updateError}</div>` : nothing}
-            </div>
-            <button class="btn-primary" ?disabled=${this.updateChecking} @click=${() => this._handleCheckUpdate()}>
-              ${
-                this.updateChecking
-                  ? html`
-                      <span class="spinner spinner-sm"></span> 检查中…
-                    `
-                  : "检查更新"
-              }
-            </button>
-          </div>
-        `
-        }
+            `
+          : this.updateDownloading
+            ? html`
+                <div class="update-row">
+                  <div class="update-info">
+                    <div class="toggle-text-primary">正在下载 v${this.updateVersion}...</div>
+                    <div class="update-progress-wrap">
+                      <div class="update-progress-bar">
+                        <div
+                          class="update-progress-fill"
+                          style="width:${this.updateProgress}%"
+                        ></div>
+                      </div>
+                      <span class="update-progress-pct">${this.updateProgress}%</span>
+                    </div>
+                  </div>
+                </div>
+              `
+            : this.updateAvailable
+              ? html`
+                  <div class="update-row">
+                    <div class="update-info">
+                      <div class="toggle-text-primary">🎉 发现新版本 v${this.updateVersion}</div>
+                      ${this.updateNotes
+                        ? html`<div class="toggle-text-secondary">${this.updateNotes}</div>`
+                        : nothing}
+                      ${this.updateError
+                        ? html`<div class="update-error">❌ ${this.updateError}</div>`
+                        : nothing}
+                    </div>
+                    <button class="btn-primary" @click=${() => this._handleDownloadUpdate()}>
+                      下载并安装
+                    </button>
+                  </div>
+                `
+              : html`
+                  <div class="update-row">
+                    <div class="update-info">
+                      ${this.updateDone
+                        ? html` <div class="toggle-text-primary">✅ 当前已是最新版本</div> `
+                        : html`
+                            <div class="toggle-text-primary">点击按钮检查是否有新版本可用</div>
+                          `}
+                      ${this.updateError
+                        ? html`<div class="update-error">❌ ${this.updateError}</div>`
+                        : nothing}
+                    </div>
+                    <button
+                      class="btn-primary"
+                      ?disabled=${this.updateChecking}
+                      @click=${() => this._handleCheckUpdate()}
+                    >
+                      ${this.updateChecking
+                        ? html` <span class="spinner spinner-sm"></span> 检查中… `
+                        : "检查更新"}
+                    </button>
+                  </div>
+                `}
       </div>
     `;
   }

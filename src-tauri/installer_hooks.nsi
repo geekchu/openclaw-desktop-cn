@@ -527,9 +527,18 @@ FunctionEnd
 
   !insertmacro KillGatewayStatus
 
-  ; 升级前强制清理当前安装目录下的 runtime 资源，避免新增 bundle 文件时
-  ; 触发成批 "Error opening file for writing" 覆盖安装弹窗。
-  Call CleanupCurrentInstallRuntime
+  ; Tauri updater 的 Windows passive 模式会用 /P 静默拉起安装器。
+  ; 对这条路径做激进的预清理时，一旦删除失败就会直接 Abort，
+  ; 用户侧只能看到“应用退出/回来”，却看不到真正的失败原因。
+  ; 自动更新保留更稳妥的旧行为：先杀主进程/Gateway，再交给后续安装流程覆盖。
+  ClearErrors
+  ${GetOptions} $CMDLINE "/P" $0
+  ${If} ${Errors}
+    ; 手动运行安装器时保留更强的预清理，尽量避免覆盖写入弹窗。
+    Call CleanupCurrentInstallRuntime
+  ${Else}
+    DetailPrint "Passive updater mode detected; skipping pre-clean runtime sweep."
+  ${EndIf}
 
   ; 3. 清理旧版本的 gateway-bundle 目录，防止残留文件导致插件加载警告
   RMDir /r "$INSTDIR\gateway-bundle"
