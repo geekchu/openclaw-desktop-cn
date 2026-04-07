@@ -301,9 +301,15 @@ Function AbortRuntimeCleanupFailure
   Exch $0
   DetailPrint $0
 
-  ; Passive updater runs the NSIS installer with /P, which still allows modal
-  ; dialogs. Avoid blocking background upgrades on a MessageBox that no one
-  ; may be watching.
+  ; Tauri updater launches the NSIS installer with /UPDATE on all updater flows.
+  ; Older passive-mode paths may also include /P. Avoid blocking updater-driven
+  ; installs on a MessageBox that no one may be watching.
+  ClearErrors
+  ${GetOptions} $CMDLINE "/UPDATE" $1
+  ${IfNot} ${Errors}
+    Abort
+  ${EndIf}
+
   ClearErrors
   ${GetOptions} $CMDLINE "/P" $1
   ${IfNot} ${Errors}
@@ -527,17 +533,23 @@ FunctionEnd
 
   !insertmacro KillGatewayStatus
 
-  ; Tauri updater 的 Windows passive 模式会用 /P 静默拉起安装器。
-  ; 对这条路径做激进的预清理时，一旦删除失败就会直接 Abort，
+  ; Tauri updater 会在自动更新安装时带上 /UPDATE；旧版 passive 路径还会追加 /P。
+  ; 对 updater 路径做激进的预清理时，一旦删除失败就会直接 Abort，
   ; 用户侧只能看到“应用退出/回来”，却看不到真正的失败原因。
   ; 自动更新保留更稳妥的旧行为：先杀主进程/Gateway，再交给后续安装流程覆盖。
   ClearErrors
-  ${GetOptions} $CMDLINE "/P" $0
-  ${If} ${Errors}
-    ; 手动运行安装器时保留更强的预清理，尽量避免覆盖写入弹窗。
-    Call CleanupCurrentInstallRuntime
+  ${GetOptions} $CMDLINE "/UPDATE" $0
+  ${IfNot} ${Errors}
+    DetailPrint "Updater mode detected; skipping pre-clean runtime sweep."
   ${Else}
-    DetailPrint "Passive updater mode detected; skipping pre-clean runtime sweep."
+    ClearErrors
+    ${GetOptions} $CMDLINE "/P" $0
+    ${If} ${Errors}
+      ; 手动运行安装器时保留更强的预清理，尽量避免覆盖写入弹窗。
+      Call CleanupCurrentInstallRuntime
+    ${Else}
+      DetailPrint "Updater passive mode detected; skipping pre-clean runtime sweep."
+    ${EndIf}
   ${EndIf}
 
   ; 3. 清理旧版本的 gateway-bundle 目录，防止残留文件导致插件加载警告

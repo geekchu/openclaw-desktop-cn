@@ -176,6 +176,24 @@ ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 
 按目标平台修改对应配置文件中的版本号：
 
+**桌面 Rust 包：`src-tauri/Cargo.toml`**
+
+```toml
+version = "0.3.0"
+```
+
+**跨平台基础配置：`src-tauri/tauri.conf.json`**
+
+```json
+"version": "0.3.0"
+```
+
+> Windows 可执行文件的 VersionInfo / 资源版本会读取 `src-tauri/Cargo.toml`。
+> 如果只改 `src-tauri/tauri.windows.conf.json` 而漏掉 `src-tauri/Cargo.toml`，
+> 就会出现 updater 元数据和安装器写的是新版本，但实际装进去的 EXE 版本仍是旧版本的问题。
+> 如果本次改了 `src-tauri/Cargo.toml`，首次 `cargo tauri build` 后还要检查 `src-tauri/Cargo.lock`
+> 是否被刷新到新版本；若有变化，也必须纳入同一个 release commit/tag。
+
 **macOS：`src-tauri/tauri.macos.conf.json`**
 
 ```json
@@ -208,7 +226,7 @@ ssh root@openclawcn.net 'bash -s' < scripts/deploy-cdn-nginx.sh
 例如只发 macOS：
 
 ```bash
-git add src-tauri/tauri.macos.conf.json
+git add src-tauri/Cargo.toml src-tauri/tauri.conf.json src-tauri/tauri.macos.conf.json
 git commit -m "release: macOS v0.3.0"
 git tag v0.3.0-macos
 git push && git push --tags
@@ -217,7 +235,7 @@ git push && git push --tags
 例如只发 Windows：
 
 ```bash
-git add src-tauri/tauri.windows.conf.json
+git add src-tauri/Cargo.toml src-tauri/tauri.conf.json src-tauri/tauri.windows.conf.json
 git commit -m "release: Windows v0.3.0"
 git tag v0.3.0-windows
 git push && git push --tags
@@ -226,7 +244,7 @@ git push && git push --tags
 例如只发 Linux：
 
 ```bash
-git add src-tauri/tauri.linux.conf.json
+git add src-tauri/Cargo.toml src-tauri/tauri.conf.json src-tauri/tauri.linux.conf.json
 git commit -m "release: Linux v0.3.0"
 git tag v0.3.0-linux
 git push && git push --tags
@@ -236,6 +254,8 @@ git push && git push --tags
 
 > ⚠️ 桌面版分平台发版后，不要再创建无平台后缀的桌面 release tag（例如 `v0.3.0`）。
 > 桌面版 tag 必须始终带平台后缀，避免把 macOS / Windows 的独立版本号混成一个公共发布标记。
+> ⚠️ 如果第一次构建后 `src-tauri/Cargo.lock` 跟着 `src-tauri/Cargo.toml` 刷新了 package 版本，
+> 需要把 `src-tauri/Cargo.lock` 一起补进同一个 release commit/tag。
 > ⚠️ 如果构建过程中需要修改配置并 `git commit --amend`，之后推送时需加 `--force`：
 >
 > ```bash
@@ -603,7 +623,8 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 1. 安装**旧版 Windows 版本**（当前已发布的版本）
 2. 启动应用，等待 15 秒后应出现更新横幅；或进入「系统设置 → 软件更新」手动检查
 3. 点击"立即更新"，确认下载进度条正常
-4. 下载完成后点击"立即重启"，确认更新后版本号正确
+4. 下载完成后点击"立即重启"，确认会弹出可见的 Windows 安装器界面
+5. 完成安装后确认应用版本号正确
 
 ---
 
@@ -826,8 +847,14 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_amd
             [重启应用]
                  │
                  ▼
-            重启应用，更新完成
+            启动安装器，完成更新
 ```
+
+### Windows 安装器可见性
+
+- 当前 Windows 自动更新使用 `src-tauri/tauri.conf.json` 中的 `plugins.updater.windows.installMode = "basicUi"`
+- 这意味着用户每次点击"立即重启"后，都应该看到可见的 NSIS 安装器界面
+- 如果改成 `passive` 或 `quiet`，安装过程可能不会显示给用户
 
 ### 更新安全机制
 
@@ -1144,6 +1171,10 @@ export NOTARYTOOL_PROFILE="openclaw-notary"
   密钥对不匹配或 `.sig` 内容损坏；重新构建并确保使用正确的私钥
 - 更新横幅不出现：
   用户之前点了关闭；去「系统设置 → 软件更新」手动检查
+- Windows 下载完成后没看到安装器：
+  先检查 `src-tauri/tauri.conf.json` 中 `plugins.updater.windows.installMode` 是否仍为 `basicUi`
+- Windows 安装完成后版本号仍没变：
+  先检查 `src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`src-tauri/tauri.windows.conf.json` 是否同时更新到目标版本，并验证生成的 `openclaw-desktop.exe` `FileVersion` / `ProductVersion`
 
 ### 安装后 Gateway 启动相关
 

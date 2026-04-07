@@ -1873,7 +1873,7 @@ export class SystemSettingsView extends LitElement {
       this._downloadedBytesRid = await downloadUpdate(this._updateRid, (percent) => {
         this.updateProgress = percent;
       });
-      // 下载完成，显示重启按钮
+      // 下载完成后，等待用户确认重启并安装更新
       this.updateInstalled = true;
       this.updateDownloading = false;
     } catch (e: unknown) {
@@ -1938,7 +1938,7 @@ export class SystemSettingsView extends LitElement {
           <div class="card-title-icon blue">${this._updateIcon}</div>
           <div>
             <div class="title-text">软件更新</div>
-            <div class="title-sub">检查并安装最新版本</div>
+            <div class="title-sub">检查、下载，并在重启时安装最新版本</div>
           </div>
         </div>
 
@@ -1992,7 +1992,7 @@ export class SystemSettingsView extends LitElement {
                         : nothing}
                     </div>
                     <button class="btn-primary" @click=${() => this._handleDownloadUpdate()}>
-                      下载并安装
+                      下载更新
                     </button>
                   </div>
                 `
