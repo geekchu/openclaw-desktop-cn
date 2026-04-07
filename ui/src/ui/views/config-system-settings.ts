@@ -1899,6 +1899,14 @@ export class SystemSettingsView extends LitElement {
     this.updateRestarting = true;
     this.updateError = "";
 
+    // 先彻底关闭 Gateway 子进程，释放文件锁，防止安装更新时 NSIS 因文件占用而静默失败
+    try {
+      console.log("[Update] 停止 Gateway 子进程以释放文件锁");
+      await t.core.invoke("stop_gateway");
+    } catch {
+      /* best-effort */
+    }
+
     if (this._updateRid != null && this._downloadedBytesRid != null) {
       try {
         console.log(
