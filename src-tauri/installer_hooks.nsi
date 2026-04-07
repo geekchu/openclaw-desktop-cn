@@ -1,7 +1,6 @@
-; Tauri's NSIS template auto-checks the "Run app" checkbox on the finish page.
-; Leave it unchecked so install completion does not immediately launch the app
-; and start background processes while the installer is still exiting.
-!define MUI_FINISHPAGE_RUN_NOTCHECKED
+; Keep the finish-page "Run app" action checked by default.
+; In basicUi updater mode this gives users a visible overwrite/install flow and
+; then reopens the new version when they finish the installer.
 
 Var LegacyInstallDir
 Var LegacyMainBinary
