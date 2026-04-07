@@ -807,7 +807,6 @@ const channelInfo: Record<
         type: "select",
         options: [
           { value: "open", label: "开放" },
-          { value: "pairing", label: "配对" },
           { value: "allowlist", label: "白名单" },
         ],
       },
@@ -863,7 +862,6 @@ const channelInfo: Record<
         type: "select",
         options: [
           { value: "open", label: "开放" },
-          { value: "pairing", label: "配对" },
           { value: "allowlist", label: "白名单" },
         ],
       },
@@ -1624,7 +1622,19 @@ export class OpenClawConfigChannels extends LitElement {
 
   private shouldShowPairing(channelType: string, dmPolicy?: string | null) {
     const effectivePolicy = dmPolicy?.trim() || this.getDefaultDmPolicy(channelType);
-    return effectivePolicy === "pairing";
+    if (effectivePolicy !== "pairing") {
+      return false;
+    }
+    // Only show pairing if the channel's field definition includes "pairing" as
+    // a valid dmPolicy option. This prevents stale saved configs (e.g. a user
+    // who previously set dmPolicy:"pairing" for a channel that no longer
+    // supports it) from triggering CLI calls that will fail.
+    const info = channelInfo[channelType] ?? channelInfo.default;
+    const dmField = info.fields.find((f) => f.key === "dmPolicy");
+    if (!dmField?.options?.some((o) => o.value === "pairing")) {
+      return false;
+    }
+    return true;
   }
 
   private parseAllowlist(raw: unknown): string[] {

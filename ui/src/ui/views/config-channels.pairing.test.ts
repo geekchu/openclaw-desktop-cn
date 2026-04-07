@@ -173,7 +173,7 @@ describe("config-channels pairing refreshes", () => {
       invokeMock.mockReset();
     }
 
-    for (const channelId of ["dingtalk", "qqbot"]) {
+    for (const channelId of ["dingtalk", "qqbot", "wecom"]) {
       const element = await mountPairingElement([channelId], channelId);
       element.handleChannelSelect(channelId, [createChannel(channelId)]);
       await Promise.resolve();
@@ -181,24 +181,16 @@ describe("config-channels pairing refreshes", () => {
       expect(invokeMock).not.toHaveBeenCalled();
       expect(element.renderRoot.textContent).not.toContain("配对请求");
 
-      invokeMock.mockResolvedValueOnce([]);
+      // Even with a stale dmPolicy:"pairing" saved in config, pairing must not trigger.
       element.handleChannelSelect(channelId, [createChannel(channelId, { dmPolicy: "pairing" })]);
       await Promise.resolve();
 
-      expect(invokeMock).toHaveBeenCalledTimes(1);
-      expect(invokeMock).toHaveBeenLastCalledWith("list_pairing_requests", { channel: channelId });
-      expect(element.renderRoot.textContent).toContain("配对请求");
+      expect(invokeMock).not.toHaveBeenCalled();
+      expect(element.renderRoot.textContent).not.toContain("配对请求");
 
       document.body.innerHTML = "";
       invokeMock.mockReset();
     }
-
-    const wecom = await mountPairingElement(["wecom"], "wecom");
-    wecom.handleChannelSelect("wecom", [createChannel("wecom")]);
-    await Promise.resolve();
-
-    expect(invokeMock).not.toHaveBeenCalled();
-    expect(wecom.renderRoot.textContent).not.toContain("配对请求");
   });
 
   it("keeps the newest same-channel pairing response when refreshes overlap", async () => {

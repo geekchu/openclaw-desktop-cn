@@ -1899,15 +1899,15 @@ export class SystemSettingsView extends LitElement {
     this.updateRestarting = true;
     this.updateError = "";
 
-    // 先彻底关闭 Gateway 子进程，释放文件锁，防止安装更新时 NSIS 因文件占用而静默失败
-    try {
-      console.log("[Update] 停止 Gateway 子进程以释放文件锁");
-      await t.core.invoke("stop_gateway");
-    } catch {
-      /* best-effort */
-    }
-
     if (this._updateRid != null && this._downloadedBytesRid != null) {
+      // 先彻底关闭 Gateway 子进程，释放文件锁，防止安装更新时 NSIS 因文件占用而静默失败
+      try {
+        console.log("[Update] 停止 Gateway 子进程以释放文件锁");
+        await t.core.invoke("stop_gateway");
+      } catch {
+        /* best-effort */
+      }
+
       try {
         console.log(
           "[Update] 开始安装更新，updateRid:",
@@ -1928,12 +1928,24 @@ export class SystemSettingsView extends LitElement {
           console.error("[Update] 重启失败", restartErr);
           this.updateError = "更新已安装，但自动重启失败。请手动关闭并重新打开应用。";
           this.updateRestarting = false;
+          // stop_gateway 已设 suppress_restart=true，重启服务以恢复 Gateway
+          try {
+            await t.core.invoke("start_service");
+          } catch {
+            /* best-effort */
+          }
         }
         return;
       } catch (e: unknown) {
         console.error("[Update] 更新安装失败", e);
         this.updateError = `更新安装失败: ${e instanceof Error ? e.message : String(e)}`;
         this.updateRestarting = false;
+        // stop_gateway 已设 suppress_restart=true，重启服务以恢复 Gateway
+        try {
+          await t.core.invoke("start_service");
+        } catch {
+          /* best-effort */
+        }
         return;
       }
     }
