@@ -1901,21 +1901,29 @@ export class SystemSettingsView extends LitElement {
 
     if (this._updateRid != null && this._downloadedBytesRid != null) {
       try {
+        console.log(
+          "[Update] 开始安装更新，updateRid:",
+          this._updateRid,
+          "bytesRid:",
+          this._downloadedBytesRid,
+        );
         await installUpdate(this._updateRid, this._downloadedBytesRid);
         // Windows NSIS 默认会在此步骤抛弃 Promise 直接强杀重启，代码执行不到这里。
         // 而在 macOS/Linux 设备上，该过程只在后台提取替换文件，随后秒返回成功。
         // 我们必须主动触发 Tauri 重启以使新版本生效。
+        console.log("[Update] installUpdate 返回（仅在 macOS/Linux 会执行到此）");
         try {
+          console.log("[Update] 触发 plugin:process|restart");
           await t.core.invoke("plugin:process|restart");
         } catch (restartErr) {
           // 重启失败，提示用户手动重启
-          console.error("重启失败", restartErr);
+          console.error("[Update] 重启失败", restartErr);
           this.updateError = "更新已安装，但自动重启失败。请手动关闭并重新打开应用。";
           this.updateRestarting = false;
         }
         return;
       } catch (e: unknown) {
-        console.error("更新安装失败", e);
+        console.error("[Update] 更新安装失败", e);
         this.updateError = `更新安装失败: ${e instanceof Error ? e.message : String(e)}`;
         this.updateRestarting = false;
         return;
@@ -1924,6 +1932,7 @@ export class SystemSettingsView extends LitElement {
 
     // 普通用户手动重启（无更新包的情况）
     try {
+      console.log("[Update] 无更新包，直接重启应用");
       await t.core.invoke("plugin:process|restart");
     } catch {
       this.updateError = "重启失败，请手动关闭并重新打开应用";
