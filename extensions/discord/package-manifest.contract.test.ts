@@ -2,6 +2,6 @@ import { describePackageManifestContract } from "../../test/helpers/extensions/p
 
 describePackageManifestContract({
   pluginId: "discord",
-  runtimeDeps: ["@buape/carbon", "https-proxy-agent"],
+  runtimeDeps: ["@buape/carbon", "https-proxy-agent", "opusscript"],
   minHostVersionBaseline: "2026.3.22",
 });
