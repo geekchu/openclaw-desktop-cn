@@ -29,7 +29,9 @@ export default defineConfig(() => {
     },
     build: {
       outDir: path.resolve(here, "../dist/control-ui"),
-      emptyOutDir: false,
+      // Keep the packaged control UI deterministic so desktop builds never
+      // keep serving stale hashed assets from a previous message-settings build.
+      emptyOutDir: true,
       sourcemap: true,
       minify: true,
       // Keep CI/onboard logs clean; current control UI chunking is intentionally above 500 kB.

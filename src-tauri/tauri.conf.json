@@ -4,7 +4,7 @@
   "version": "0.3.1",
   "identifier": "com.openclaw.desktop",
   "build": {
-    "beforeDevCommand": "",
+    "beforeDevCommand": "node scripts/prepare-control-ui-dev-bundle.js",
     "beforeBuildCommand": "node scripts/prepare-gateway-bundle.js",
     "frontendDist": "./gateway-bundle/dist/control-ui"
   },
