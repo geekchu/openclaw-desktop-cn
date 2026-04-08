@@ -75,7 +75,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4NDBBNDQ3QzgyOUExQUQKUldTdG9TbklSNlJBYUVWMjU4d0k2RGFmZ3N3YzlUME5aRHZNdkhRNjFzUFZ4aWVuUG0rd3dFZnEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkyMEMxMzI2RjZDMzMxRDkKUldUWk1jUDJKaE1Na2hPK2lONFlza2ZqSEs3QVN3Sk5zSnRmSVd2cjNYVURIY3hzK090SVFYeWgK",
       "endpoints": ["https://openclawcn.net/update/latest.json"],
       "windows": {
         "installMode": "passive"
