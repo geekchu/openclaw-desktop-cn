@@ -44,13 +44,6 @@ type TalkConfigPayload = {
   };
 };
 type TalkConfig = NonNullable<NonNullable<TalkConfigPayload["config"]>["talk"]>;
-type TalkSpeakPayload = {
-  audioBase64?: string;
-  provider?: string;
-  outputFormat?: string;
-  mimeType?: string;
-  fileExtension?: string;
-};
 const TALK_CONFIG_DEVICE_PATH = path.join(
   os.tmpdir(),
   `openclaw-talk-config-device-${process.pid}.json`,
@@ -106,7 +99,7 @@ async function fetchTalkConfig(
 }
 
 async function fetchTalkSpeak(ws: GatewaySocket, params: Record<string, unknown>) {
-  return rpcReq<TalkSpeakPayload>(ws, "talk.speak", params);
+  return rpcReq(ws, "talk.speak", params);
 }
 
 function expectElevenLabsTalkConfig(
