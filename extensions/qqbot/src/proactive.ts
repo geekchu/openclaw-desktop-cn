@@ -64,7 +64,8 @@ import {
   sendC2CImageMessage,
   sendGroupImageMessage,
 } from "./api.js";
-import { resolveQQBotAccount } from "./config.js";
+import { resolveDefaultQQBotAccountId, resolveQQBotAccount } from "./config.js";
+import { getQQBotDataDir } from "./utils/platform.js";
 
 // ============ 用户存储管理 ============
 
@@ -72,8 +73,13 @@ import { resolveQQBotAccount } from "./config.js";
  * 已知用户存储
  * 使用简单的 JSON 文件存储，保存在 .openclawcn/qqbot 目录下
  */
-const STORAGE_DIR = path.join(process.env.HOME || "/home/ubuntu", ".openclawcn", "qqbot", "data");
-const KNOWN_USERS_FILE = path.join(STORAGE_DIR, "known-users.json");
+function getStorageDir(): string {
+  return getQQBotDataDir("data");
+}
+
+function getKnownUsersFile(): string {
+  return path.join(getStorageDir(), "known-users.json");
+}
 
 // 内存缓存
 let knownUsersCache: Map<string, KnownUser> | null = null;
@@ -83,8 +89,9 @@ let cacheLastModified = 0;
  * 确保存储目录存在
  */
 function ensureStorageDir(): void {
-  if (!fs.existsSync(STORAGE_DIR)) {
-    fs.mkdirSync(STORAGE_DIR, { recursive: true });
+  const dir = getStorageDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -102,7 +109,7 @@ function loadKnownUsers(): Map<string, KnownUser> {
   if (knownUsersCache !== null) {
     // 检查文件是否被修改
     try {
-      const stat = fs.statSync(KNOWN_USERS_FILE);
+      const stat = fs.statSync(getKnownUsersFile());
       if (stat.mtimeMs <= cacheLastModified) {
         return knownUsersCache;
       }
@@ -115,14 +122,14 @@ function loadKnownUsers(): Map<string, KnownUser> {
   const users = new Map<string, KnownUser>();
 
   try {
-    if (fs.existsSync(KNOWN_USERS_FILE)) {
-      const data = fs.readFileSync(KNOWN_USERS_FILE, "utf-8");
+    if (fs.existsSync(getKnownUsersFile())) {
+      const data = fs.readFileSync(getKnownUsersFile(), "utf-8");
       const parsed = JSON.parse(data) as KnownUser[];
       for (const user of parsed) {
         const key = getUserKey(user.type, user.openid, user.accountId);
         users.set(key, user);
       }
-      cacheLastModified = fs.statSync(KNOWN_USERS_FILE).mtimeMs;
+      cacheLastModified = fs.statSync(getKnownUsersFile()).mtimeMs;
     }
   } catch (err) {
     console.error(`[qqbot:proactive] Failed to load known users: ${err}`);
@@ -139,7 +146,7 @@ function saveKnownUsers(users: Map<string, KnownUser>): void {
   try {
     ensureStorageDir();
     const data = Array.from(users.values());
-    fs.writeFileSync(KNOWN_USERS_FILE, JSON.stringify(data, null, 2), "utf-8");
+    fs.writeFileSync(getKnownUsersFile(), JSON.stringify(data, null, 2), "utf-8");
     cacheLastModified = Date.now();
     knownUsersCache = users;
   } catch (err) {
@@ -303,7 +310,8 @@ export async function sendProactive(
   options: ProactiveSendOptions,
   cfg: OpenClawConfig,
 ): Promise<ProactiveSendResult> {
-  const { to, text, type = "c2c", imageUrl, accountId = "default" } = options;
+  const { to, text, type = "c2c", imageUrl } = options;
+  const accountId = options.accountId?.trim() || resolveDefaultQQBotAccountId(cfg);
 
   // 解析账户配置
   const account = resolveQQBotAccount(cfg, accountId);
@@ -386,7 +394,7 @@ export async function sendBulkProactiveMessage(
   text: string,
   type: "c2c" | "group",
   cfg: OpenClawConfig,
-  accountId = "default",
+  accountId?: string,
 ): Promise<Array<{ to: string; result: ProactiveSendResult }>> {
   const results: Array<{ to: string; result: ProactiveSendResult }> = [];
 

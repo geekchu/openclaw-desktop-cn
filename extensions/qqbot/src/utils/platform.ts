@@ -56,11 +56,19 @@ export function getHomeDir(): string {
   return os.tmpdir();
 }
 
+export function getQQBotStateRoot(): string {
+  const stateDir = process.env.OPENCLAW_STATE_DIR?.trim();
+  if (stateDir) {
+    return expandTilde(stateDir);
+  }
+  return path.join(getHomeDir(), ".openclawcn");
+}
+
 /**
  * Return a path under `~/.openclawcn/qqbot`, creating it on demand.
  */
 export function getQQBotDataDir(...subPaths: string[]): string {
-  const dir = path.join(getHomeDir(), ".openclawcn", "qqbot", ...subPaths);
+  const dir = path.join(getQQBotStateRoot(), "qqbot", ...subPaths);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -74,7 +82,7 @@ export function getQQBotDataDir(...subPaths: string[]): string {
  * downloaded images and audio can be accessed by framework media tooling.
  */
 export function getQQBotMediaDir(...subPaths: string[]): string {
-  const dir = path.join(getHomeDir(), ".openclawcn", "media", "qqbot", ...subPaths);
+  const dir = path.join(getQQBotStateRoot(), "media", "qqbot", ...subPaths);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -140,10 +148,11 @@ export function resolveQQBotLocalMediaPath(p: string): string {
     return normalized;
   }
 
+  const stateRoot = getQQBotStateRoot();
   const homeDir = getHomeDir();
   const mediaRoot = getQQBotMediaDir();
   const dataRoot = getQQBotDataDir();
-  const workspaceRoot = path.join(homeDir, ".openclawcn", "workspace", "qqbot");
+  const workspaceRoot = path.join(stateRoot, "workspace", "qqbot");
   const legacyWorkspaceRoot = path.join(homeDir, ".openclaw", "workspace", "qqbot");
   const legacyDataRoot = path.join(homeDir, ".openclaw", "qqbot");
   const legacyMediaRoot = path.join(homeDir, ".openclaw", "media", "qqbot");

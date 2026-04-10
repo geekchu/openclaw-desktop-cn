@@ -6,6 +6,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { getQQBotDataDir } from "./utils/platform.js";
 
 // 已知用户信息接口
 export interface KnownUser {
@@ -28,9 +29,13 @@ export interface KnownUser {
 }
 
 // 存储文件路径
-const KNOWN_USERS_DIR = path.join(process.env.HOME || "/tmp", ".openclawcn", "qqbot", "data");
+function getKnownUsersDir(): string {
+  return getQQBotDataDir("data");
+}
 
-const KNOWN_USERS_FILE = path.join(KNOWN_USERS_DIR, "known-users.json");
+function getKnownUsersFile(): string {
+  return path.join(getKnownUsersDir(), "known-users.json");
+}
 
 // 内存缓存
 let usersCache: Map<string, KnownUser> | null = null;
@@ -44,8 +49,9 @@ let isDirty = false;
  * 确保目录存在
  */
 function ensureDir(): void {
-  if (!fs.existsSync(KNOWN_USERS_DIR)) {
-    fs.mkdirSync(KNOWN_USERS_DIR, { recursive: true });
+  const dir = getKnownUsersDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -60,8 +66,8 @@ function loadUsersFromFile(): Map<string, KnownUser> {
   usersCache = new Map();
 
   try {
-    if (fs.existsSync(KNOWN_USERS_FILE)) {
-      const data = fs.readFileSync(KNOWN_USERS_FILE, "utf-8");
+    if (fs.existsSync(getKnownUsersFile())) {
+      const data = fs.readFileSync(getKnownUsersFile(), "utf-8");
       const users = JSON.parse(data) as KnownUser[];
 
       for (const user of users) {
@@ -84,7 +90,7 @@ function loadUsersFromFile(): Map<string, KnownUser> {
  * 保存用户数据到文件（节流版本）
  */
 function saveUsersToFile(): void {
-  if (!isDirty) return;
+  if (!isDirty) {return;}
 
   if (saveTimer) {
     return; // 已有定时器在等待
@@ -100,12 +106,12 @@ function saveUsersToFile(): void {
  * 实际执行保存
  */
 function doSaveUsersToFile(): void {
-  if (!usersCache || !isDirty) return;
+  if (!usersCache || !isDirty) {return;}
 
   try {
     ensureDir();
     const users = Array.from(usersCache.values());
-    fs.writeFileSync(KNOWN_USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+    fs.writeFileSync(getKnownUsersFile(), JSON.stringify(users, null, 2), "utf-8");
     isDirty = false;
     console.log(`[known-users] Saved ${users.length} users to file`);
   } catch (err) {

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getHomeDir,
   resolveQQBotLocalMediaPath,
@@ -10,6 +10,10 @@ import {
 
 describe("qqbot local media path remapping", () => {
   const createdPaths: string[] = [];
+
+  beforeEach(() => {
+    vi.stubEnv("OPENCLAW_STATE_DIR", "");
+  });
 
   function createOpenClawTestRoot() {
     const actualHome = getHomeDir();
@@ -39,6 +43,7 @@ describe("qqbot local media path remapping", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     for (const target of createdPaths.splice(0)) {
       fs.rmSync(target, { recursive: true, force: true });
     }
@@ -145,4 +150,5 @@ describe("qqbot local media path remapping", () => {
 
     expect(resolveQQBotLocalMediaPath(missingLegacyWorkspacePath)).toBe(mediaFile);
   });
+
 });

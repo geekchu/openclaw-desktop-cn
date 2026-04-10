@@ -6,6 +6,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { getQQBotDataDir } from "./utils/platform.js";
 
 // Session 状态接口
 export interface SessionState {
@@ -24,7 +25,9 @@ export interface SessionState {
 }
 
 // Session 文件目录
-const SESSION_DIR = path.join(process.env.HOME || "/tmp", ".openclawcn", "qqbot", "sessions");
+function getSessionDir(): string {
+  return getQQBotDataDir("sessions");
+}
 
 // Session 过期时间（5分钟）- Resume 要求在断开后一定时间内恢复
 const SESSION_EXPIRE_TIME = 5 * 60 * 1000;
@@ -46,8 +49,9 @@ const throttleState = new Map<
  * 确保目录存在
  */
 function ensureDir(): void {
-  if (!fs.existsSync(SESSION_DIR)) {
-    fs.mkdirSync(SESSION_DIR, { recursive: true });
+  const dir = getSessionDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -57,7 +61,7 @@ function ensureDir(): void {
 function getSessionPath(accountId: string): string {
   // 清理 accountId 中的特殊字符
   const safeId = accountId.replace(/[^a-zA-Z0-9_-]/g, "_");
-  return path.join(SESSION_DIR, `session-${safeId}.json`);
+  return path.join(getSessionDir(), `session-${safeId}.json`);
 }
 
 /**
@@ -234,11 +238,11 @@ export function getAllSessions(): SessionState[] {
 
   try {
     ensureDir();
-    const files = fs.readdirSync(SESSION_DIR);
+    const files = fs.readdirSync(getSessionDir());
 
     for (const file of files) {
       if (file.startsWith("session-") && file.endsWith(".json")) {
-        const filePath = path.join(SESSION_DIR, file);
+        const filePath = path.join(getSessionDir(), file);
         try {
           const data = fs.readFileSync(filePath, "utf-8");
           const state = JSON.parse(data) as SessionState;
@@ -263,12 +267,12 @@ export function cleanupExpiredSessions(): number {
 
   try {
     ensureDir();
-    const files = fs.readdirSync(SESSION_DIR);
+    const files = fs.readdirSync(getSessionDir());
     const now = Date.now();
 
     for (const file of files) {
       if (file.startsWith("session-") && file.endsWith(".json")) {
-        const filePath = path.join(SESSION_DIR, file);
+        const filePath = path.join(getSessionDir(), file);
         try {
           const data = fs.readFileSync(filePath, "utf-8");
           const state = JSON.parse(data) as SessionState;

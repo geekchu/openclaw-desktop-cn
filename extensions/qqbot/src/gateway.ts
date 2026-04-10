@@ -46,6 +46,7 @@ import {
   type CronReminderPayload,
   type MediaPayload,
 } from "./utils/payload.js";
+import { getQQBotDataDir } from "./utils/platform.js";
 
 // QQ Bot intents - 按权限级别分组
 const INTENTS = {
@@ -90,9 +91,7 @@ const QUICK_DISCONNECT_THRESHOLD = 5000; // 5秒内断开视为快速断开
 // 图床服务器配置（可通过环境变量覆盖）
 const IMAGE_SERVER_PORT = parseInt(process.env.QQBOT_IMAGE_SERVER_PORT || "18765", 10);
 // 使用绝对路径，确保文件保存和读取使用同一目录
-const IMAGE_SERVER_DIR =
-  process.env.QQBOT_IMAGE_SERVER_DIR ||
-  path.join(process.env.HOME || "/home/ubuntu", ".openclawcn", "qqbot", "images");
+const IMAGE_SERVER_DIR = process.env.QQBOT_IMAGE_SERVER_DIR || getQQBotDataDir("images");
 
 // 消息队列配置（异步处理，防止阻塞心跳）
 const MESSAGE_QUEUE_SIZE = 1000; // 最大队列长度
@@ -171,7 +170,7 @@ function recordMessageReply(messageId: string): void {
  * ext 字段为 Base64 编码的 JSON，格式如 {"text":"呲牙"}
  */
 function parseFaceTags(text: string): string {
-  if (!text) return text;
+  if (!text) {return text;}
 
   // 匹配 <faceType=...,faceId="...",ext="..."> 格式的表情标签
   return text.replace(/<faceType=\d+,faceId="[^"]*",ext="([^"]*)">/g, (_match, ext: string) => {
@@ -193,7 +192,7 @@ function parseFaceTags(text: string): string {
  * 这些标记可能被 AI 错误地学习并输出，需要在发送前移除
  */
 function filterInternalMarkers(text: string): string {
-  if (!text) return text;
+  if (!text) {return text;}
 
   // 过滤 [[xxx: yyy]] 格式的内部标记
   // 例如: [[reply_to: ROBOT1.0_kbc...]]
@@ -353,7 +352,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
    * 启动消息处理循环（独立于 WS 消息循环）
    */
   const startMessageProcessor = (handleMessageFn: (msg: QueuedMessage) => Promise<void>): void => {
-    if (messageProcessorRunning) return;
+    if (messageProcessorRunning) {return;}
     messageProcessorRunning = true;
 
     const processLoop = async () => {
@@ -548,12 +547,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
         const imageUrls: string[] = [];
         const imageMediaTypes: string[] = [];
         // 存到 .openclawcn/qqbot 目录下的 downloads 文件夹
-        const downloadDir = path.join(
-          process.env.HOME || "/home/ubuntu",
-          ".openclawcn",
-          "qqbot",
-          "downloads",
-        );
+        const downloadDir = getQQBotDataDir("downloads");
 
         if (event.attachments?.length) {
           // ============ 接收附件描述生成（图片 / 语音 / 其他） ============
@@ -1340,7 +1334,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
                    * ⚠️ 本地文件路径必须使用 QQBOT_PAYLOAD JSON 格式发送
                    */
                   const collectImageUrl = (url: string | undefined | null): boolean => {
-                    if (!url) return false;
+                    if (!url) {return false;}
 
                     const isHttpUrl = url.startsWith("http://") || url.startsWith("https://");
                     const isDataUrl = url.startsWith("data:image/");
@@ -1411,7 +1405,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
 
                   // 提取裸 URL 图片（公网 URL）
                   const bareUrlRegex =
-                    /(?<![(\["'])(https?:\/\/[^\s)"'<>]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s"'<>]*)?)/gi;
+                    /(?<![(["'])(https?:\/\/[^\s)"'<>]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s"'<>]*)?)/gi;
                   const bareUrlMatches = [...replyText.matchAll(bareUrlRegex)];
                   for (const match of bareUrlMatches) {
                     const url = match[1];
@@ -1824,7 +1818,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
 
               // 启动心跳
               const interval = (d as { heartbeat_interval: number }).heartbeat_interval;
-              if (heartbeatInterval) clearInterval(heartbeatInterval);
+              if (heartbeatInterval) {clearInterval(heartbeatInterval);}
               heartbeatInterval = setInterval(() => {
                 if (ws.readyState === WebSocket.OPEN) {
                   ws.send(JSON.stringify({ op: 1, d: lastSeq }));

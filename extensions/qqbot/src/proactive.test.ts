@@ -53,7 +53,6 @@ describe("qqbot proactive sends", () => {
 
     expect(apiMocks.getAccessToken).toHaveBeenCalledWith("654321", "secret-value");
     expect(apiMocks.sendProactiveC2CMessage).toHaveBeenCalledWith(
-      "654321",
       "access-token",
       "openid-1",
       "hello",
