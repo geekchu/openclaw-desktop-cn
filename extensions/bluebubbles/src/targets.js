@@ -1,5 +1,6 @@
 import { isAllowedParsedChatSender } from "openclaw/plugin-sdk/allow-from";
-import { parseChatAllowTargetPrefixes, parseChatTargetPrefixesOrThrow, resolveServicePrefixedAllowTarget, resolveServicePrefixedTarget, } from "openclaw/plugin-sdk/imessage-core";
+import { parseChatAllowTargetPrefixes, parseChatTargetPrefixesOrThrow, resolveServicePrefixedAllowTarget, resolveServicePrefixedTarget, } from "openclaw/plugin-sdk/channel-targets";
+import { normalizeLowercaseStringOrEmpty, normalizeOptionalString, } from "openclaw/plugin-sdk/text-runtime";
 const CHAT_ID_PREFIXES = ["chat_id:", "chatid:", "chat:"];
 const CHAT_GUID_PREFIXES = ["chat_guid:", "chatguid:", "guid:"];
 const CHAT_IDENTIFIER_PREFIXES = ["chat_identifier:", "chatidentifier:", "chatident:"];
@@ -11,7 +12,7 @@ const SERVICE_PREFIXES = [
 const CHAT_IDENTIFIER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CHAT_IDENTIFIER_HEX_RE = /^[0-9a-f]{24,64}$/i;
 function parseRawChatGuid(value) {
-    const trimmed = value.trim();
+    const trimmed = normalizeOptionalString(value);
     if (!trimmed) {
         return null;
     }
@@ -19,9 +20,9 @@ function parseRawChatGuid(value) {
     if (parts.length !== 3) {
         return null;
     }
-    const service = parts[0]?.trim();
-    const separator = parts[1]?.trim();
-    const identifier = parts[2]?.trim();
+    const service = normalizeOptionalString(parts[0]);
+    const separator = normalizeOptionalString(parts[1]);
+    const identifier = normalizeOptionalString(parts[2]);
     if (!service || !identifier) {
         return null;
     }
@@ -34,17 +35,17 @@ function stripPrefix(value, prefix) {
     return value.slice(prefix.length).trim();
 }
 function stripBlueBubblesPrefix(value) {
-    const trimmed = value.trim();
+    const trimmed = normalizeOptionalString(value) ?? "";
     if (!trimmed) {
         return "";
     }
-    if (!trimmed.toLowerCase().startsWith("bluebubbles:")) {
+    if (!normalizeLowercaseStringOrEmpty(trimmed).startsWith("bluebubbles:")) {
         return trimmed;
     }
     return trimmed.slice("bluebubbles:".length).trim();
 }
 function looksLikeRawChatIdentifier(value) {
-    const trimmed = value.trim();
+    const trimmed = normalizeOptionalString(value);
     if (!trimmed) {
         return false;
     }
@@ -84,7 +85,7 @@ export function normalizeBlueBubblesHandle(raw) {
     if (!trimmed) {
         return "";
     }
-    const lowered = trimmed.toLowerCase();
+    const lowered = normalizeLowercaseStringOrEmpty(trimmed);
     if (lowered.startsWith("imessage:")) {
         return normalizeBlueBubblesHandle(trimmed.slice(9));
     }
@@ -95,7 +96,7 @@ export function normalizeBlueBubblesHandle(raw) {
         return normalizeBlueBubblesHandle(trimmed.slice(5));
     }
     if (trimmed.includes("@")) {
-        return trimmed.toLowerCase();
+        return normalizeLowercaseStringOrEmpty(trimmed);
     }
     return trimmed.replace(/\s+/g, "");
 }
@@ -108,7 +109,7 @@ export function extractHandleFromChatGuid(chatGuid) {
     const parts = chatGuid.split(";");
     // DM format: service;-;handle (3 parts, middle is "-")
     if (parts.length === 3 && parts[1] === "-") {
-        const handle = parts[2]?.trim();
+        const handle = normalizeOptionalString(parts[2]);
         if (handle) {
             return normalizeBlueBubblesHandle(handle);
         }
@@ -164,7 +165,7 @@ export function looksLikeBlueBubblesTargetId(raw, normalized) {
     if (parseRawChatGuid(candidate)) {
         return true;
     }
-    const lowered = candidate.toLowerCase();
+    const lowered = normalizeLowercaseStringOrEmpty(candidate);
     if (/^(imessage|sms|auto):/.test(lowered)) {
         return true;
     }
@@ -190,7 +191,7 @@ export function looksLikeBlueBubblesTargetId(raw, normalized) {
         if (!normalizedTrimmed) {
             return false;
         }
-        const normalizedLower = normalizedTrimmed.toLowerCase();
+        const normalizedLower = normalizeLowercaseStringOrEmpty(normalizedTrimmed);
         if (/^(imessage|sms|auto):/.test(normalizedLower) ||
             /^(chat_id|chat_guid|chat_identifier):/.test(normalizedLower)) {
             return true;
@@ -207,7 +208,7 @@ export function looksLikeBlueBubblesExplicitTargetId(raw, normalized) {
     if (!candidate) {
         return false;
     }
-    const lowered = candidate.toLowerCase();
+    const lowered = normalizeLowercaseStringOrEmpty(candidate);
     if (/^(imessage|sms|auto):/.test(lowered)) {
         return true;
     }
@@ -222,7 +223,7 @@ export function looksLikeBlueBubblesExplicitTargetId(raw, normalized) {
         if (!normalizedTrimmed) {
             return false;
         }
-        const normalizedLower = normalizedTrimmed.toLowerCase();
+        const normalizedLower = normalizeLowercaseStringOrEmpty(normalizedTrimmed);
         if (/^(imessage|sms|auto):/.test(normalizedLower) ||
             /^(chat_id|chat_guid|chat_identifier):/.test(normalizedLower)) {
             return true;
@@ -253,7 +254,7 @@ export function parseBlueBubblesTarget(raw) {
     if (!trimmed) {
         throw new Error("BlueBubbles target is required");
     }
-    const lower = trimmed.toLowerCase();
+    const lower = normalizeLowercaseStringOrEmpty(trimmed);
     const servicePrefixed = resolveServicePrefixedTarget({
         trimmed,
         lower,
@@ -292,11 +293,11 @@ export function parseBlueBubblesTarget(raw) {
     return { kind: "handle", to: trimmed, service: "auto" };
 }
 export function parseBlueBubblesAllowTarget(raw) {
-    const trimmed = raw.trim();
+    const trimmed = normalizeOptionalString(raw) ?? "";
     if (!trimmed) {
         return { kind: "handle", handle: "" };
     }
-    const lower = trimmed.toLowerCase();
+    const lower = normalizeLowercaseStringOrEmpty(trimmed);
     const servicePrefixed = resolveServicePrefixedAllowTarget({
         trimmed,
         lower,
@@ -341,11 +342,11 @@ export function formatBlueBubblesChatTarget(params) {
     if (params.chatId && Number.isFinite(params.chatId)) {
         return `chat_id:${params.chatId}`;
     }
-    const guid = params.chatGuid?.trim();
+    const guid = normalizeOptionalString(params.chatGuid);
     if (guid) {
         return `chat_guid:${guid}`;
     }
-    const identifier = params.chatIdentifier?.trim();
+    const identifier = normalizeOptionalString(params.chatIdentifier);
     if (identifier) {
         return `chat_identifier:${identifier}`;
     }

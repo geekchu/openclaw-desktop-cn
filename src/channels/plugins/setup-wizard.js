@@ -1,20 +1,25 @@
 import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
+import { normalizeOptionalString } from "../../shared/string-coerce.js";
 import { configureChannelAccessWithAllowlist } from "./setup-group-access-configure.js";
 import { promptResolvedAllowFrom, resolveAccountIdForConfigure, runSingleChannelSecretStep, splitSetupEntries, } from "./setup-wizard-helpers.js";
 async function buildStatus(plugin, wizard, ctx) {
-    const configured = await wizard.status.resolveConfigured({ cfg: ctx.cfg });
+    const accountId = ctx.accountOverrides[plugin.id];
+    const configured = await wizard.status.resolveConfigured({ cfg: ctx.cfg, accountId });
     const statusLines = (await wizard.status.resolveStatusLines?.({
         cfg: ctx.cfg,
+        accountId,
         configured,
     })) ?? [
         `${plugin.meta.label}: ${configured ? wizard.status.configuredLabel : wizard.status.unconfiguredLabel}`,
     ];
     const selectionHint = (await wizard.status.resolveSelectionHint?.({
         cfg: ctx.cfg,
+        accountId,
         configured,
     })) ?? (configured ? wizard.status.configuredHint : wizard.status.unconfiguredHint);
     const quickstartScore = (await wizard.status.resolveQuickstartScore?.({
         cfg: ctx.cfg,
+        accountId,
         configured,
     })) ?? (configured ? wizard.status.configuredScore : wizard.status.unconfiguredScore);
     return {
@@ -61,8 +66,7 @@ function applySetupInput(params) {
     };
 }
 function trimResolvedValue(value) {
-    const trimmed = value?.trim();
-    return trimmed ? trimmed : undefined;
+    return normalizeOptionalString(value);
 }
 function collectCredentialValues(params) {
     const values = {};
@@ -341,7 +345,7 @@ export function buildChannelSetupWizardAdapterFromSetupWizard(params) {
                         initialValue,
                         placeholder: textInput.placeholder,
                         validate: (value) => {
-                            const trimmed = String(value ?? "").trim();
+                            const trimmed = normalizeOptionalString(value) ?? "";
                             if (!trimmed && textInput.required !== false) {
                                 return "Required";
                             }

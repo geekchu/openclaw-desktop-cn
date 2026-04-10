@@ -1,10 +1,17 @@
 import fs from "node:fs";
 import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import { normalizeOptionalAccountId } from "openclaw/plugin-sdk/account-id";
+import {
+  hasConfiguredSecretInput,
+  normalizeResolvedSecretInputString,
+  normalizeSecretInputString,
+} from "openclaw/plugin-sdk/secret-input";
 import type { ResolvedQQBotAccount, QQBotAccountConfig } from "./types.js";
 
 export const DEFAULT_ACCOUNT_ID = "default";
 
 interface QQBotChannelConfig extends QQBotAccountConfig {
+  defaultAccount?: string;
   accounts?: Record<string, QQBotAccountConfig>;
 }
 
@@ -47,13 +54,32 @@ export function listQQBotAccountIds(cfg: OpenClawConfig): string[] {
  */
 export function resolveDefaultQQBotAccountId(cfg: OpenClawConfig): string {
   const qqbot = cfg.channels?.qqbot as QQBotChannelConfig | undefined;
+  const preferredAccountId = normalizeOptionalAccountId(qqbot?.defaultAccount);
+  if (preferredAccountId) {
+    const accountIds = new Set(
+      listQQBotAccountIds(cfg).map((accountId) => normalizeOptionalAccountId(accountId) ?? accountId),
+    );
+    if (accountIds.has(preferredAccountId)) {
+      return preferredAccountId;
+    }
+  }
+
   // Prefer a fully configured top-level account. A partial top-level draft
   // should not hide a working named account from status/diagnostic flows.
-  if (qqbot?.appId && (qqbot.clientSecret || qqbot.clientSecretFile)) {
+  if (
+    qqbot?.appId &&
+    (hasConfiguredSecretInput(qqbot.clientSecret) ||
+      Boolean(qqbot.clientSecretFile?.trim()) ||
+      Boolean(process.env.QQBOT_CLIENT_SECRET?.trim()))
+  ) {
     return DEFAULT_ACCOUNT_ID;
   }
   const configuredNamedAccountId = Object.entries(qqbot?.accounts ?? {}).find(
-    ([, account]) => Boolean(account?.appId && (account.clientSecret || account.clientSecretFile)),
+    ([, account]) =>
+      Boolean(
+        account?.appId &&
+        (hasConfiguredSecretInput(account.clientSecret) || Boolean(account.clientSecretFile?.trim())),
+      ),
   )?.[0];
   if (configuredNamedAccountId) {
     return configuredNamedAccountId;
@@ -75,6 +101,9 @@ export function resolveDefaultQQBotAccountId(cfg: OpenClawConfig): string {
 export function resolveQQBotAccount(
   cfg: OpenClawConfig,
   accountId?: string | null,
+  options?: {
+    allowUnresolvedSecretRef?: boolean;
+  },
 ): ResolvedQQBotAccount {
   const resolvedAccountId = accountId ?? DEFAULT_ACCOUNT_ID;
   const qqbot = cfg.channels?.qqbot as QQBotChannelConfig | undefined;
@@ -108,8 +137,21 @@ export function resolveQQBotAccount(
   }
 
   // 解析 clientSecret
-  if (accountConfig.clientSecret) {
-    clientSecret = accountConfig.clientSecret;
+  const clientSecretPath =
+    resolvedAccountId === DEFAULT_ACCOUNT_ID
+      ? "channels.qqbot.clientSecret"
+      : `channels.qqbot.accounts.${resolvedAccountId}.clientSecret`;
+  const inlineClientSecret = normalizeSecretInputString(accountConfig.clientSecret);
+  if (inlineClientSecret) {
+    clientSecret = inlineClientSecret;
+    secretSource = "config";
+  } else if (hasConfiguredSecretInput(accountConfig.clientSecret)) {
+    clientSecret = options?.allowUnresolvedSecretRef
+      ? ""
+      : (normalizeResolvedSecretInputString({
+          value: accountConfig.clientSecret,
+          path: clientSecretPath,
+        }) ?? "");
     secretSource = "config";
   } else if (accountConfig.clientSecretFile) {
     clientSecret = readQQBotSecretFile(accountConfig.clientSecretFile);
@@ -187,9 +229,9 @@ export function applyQQBotAccountConfig(
         ...((next.channels?.qqbot as Record<string, unknown>) || {}),
         enabled: true,
         accounts: {
-          ...((next.channels?.qqbot as QQBotChannelConfig)?.accounts || {}),
+          ...(next.channels?.qqbot as QQBotChannelConfig)?.accounts,
           [accountId]: {
-            ...((next.channels?.qqbot as QQBotChannelConfig)?.accounts?.[accountId] || {}),
+            ...(next.channels?.qqbot as QQBotChannelConfig)?.accounts?.[accountId],
             enabled: true,
             allowFrom,
             ...(input.appId ? { appId: input.appId } : {}),

@@ -1,12 +1,19 @@
-import HOST_ENV_SECURITY_POLICY_JSON from "./host-env-security-policy.json" with { type: "json" };
+import { HOST_ENV_SECURITY_POLICY } from "./host-env-security-policy.js";
 import { markOpenClawExecEnv } from "./openclaw-exec-env.js";
 const PORTABLE_ENV_VAR_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const WINDOWS_COMPAT_OVERRIDE_ENV_VAR_KEY = /^[A-Za-z_][A-Za-z0-9_()]*$/;
-const HOST_ENV_SECURITY_POLICY = HOST_ENV_SECURITY_POLICY_JSON;
-export const HOST_DANGEROUS_ENV_KEY_VALUES = Object.freeze(HOST_ENV_SECURITY_POLICY.blockedKeys.map((key) => key.toUpperCase()));
-export const HOST_DANGEROUS_ENV_PREFIXES = Object.freeze(HOST_ENV_SECURITY_POLICY.blockedPrefixes.map((prefix) => prefix.toUpperCase()));
-export const HOST_DANGEROUS_OVERRIDE_ENV_KEY_VALUES = Object.freeze((HOST_ENV_SECURITY_POLICY.blockedOverrideKeys ?? []).map((key) => key.toUpperCase()));
-export const HOST_DANGEROUS_OVERRIDE_ENV_PREFIXES = Object.freeze((HOST_ENV_SECURITY_POLICY.blockedOverridePrefixes ?? []).map((prefix) => prefix.toUpperCase()));
+export const HOST_DANGEROUS_ENV_KEY_VALUES = Object.freeze([
+    ...HOST_ENV_SECURITY_POLICY.blockedKeys,
+]);
+export const HOST_DANGEROUS_ENV_PREFIXES = Object.freeze([
+    ...HOST_ENV_SECURITY_POLICY.blockedPrefixes,
+]);
+export const HOST_DANGEROUS_OVERRIDE_ENV_KEY_VALUES = Object.freeze([
+    ...HOST_ENV_SECURITY_POLICY.blockedOverrideKeys,
+]);
+export const HOST_DANGEROUS_OVERRIDE_ENV_PREFIXES = Object.freeze([
+    ...HOST_ENV_SECURITY_POLICY.blockedOverridePrefixes,
+]);
 export const HOST_SHELL_WRAPPER_ALLOWED_OVERRIDE_ENV_KEY_VALUES = Object.freeze([
     "TERM",
     "LANG",

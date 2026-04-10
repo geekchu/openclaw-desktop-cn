@@ -1,10 +1,13 @@
+import type { SecretInput } from "openclaw/plugin-sdk/secret-input";
+
 /**
  * QQ Bot 配置类型
  */
 export interface QQBotConfig {
   appId: string;
-  clientSecret?: string;
+  clientSecret?: SecretInput;
   clientSecretFile?: string;
+  defaultAccount?: string;
 }
 
 /**
@@ -33,7 +36,7 @@ export interface QQBotAccountConfig {
   enabled?: boolean;
   name?: string;
   appId?: string;
-  clientSecret?: string;
+  clientSecret?: SecretInput;
   clientSecretFile?: string;
   dmPolicy?: "open" | "pairing" | "allowlist";
   allowFrom?: string[];

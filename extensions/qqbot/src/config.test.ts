@@ -73,6 +73,27 @@ describe("resolveQQBotAccount", () => {
     expect(account.secretSource).toBe("env");
   });
 
+  it("treats SecretRef-backed clientSecret as configured in setup mode", () => {
+    const cfg = {
+      channels: {
+        qqbot: {
+          appId: "app-from-config",
+          clientSecret: {
+            source: "env",
+            provider: "default",
+            id: "QQBOT_CLIENT_SECRET",
+          },
+        },
+      },
+    } as OpenClawConfig;
+
+    const account = resolveQQBotAccount(cfg, "default", { allowUnresolvedSecretRef: true });
+
+    expect(account.appId).toBe("app-from-config");
+    expect(account.clientSecret).toBe("");
+    expect(account.secretSource).toBe("config");
+  });
+
   it("prefers a configured named account over a partial top-level draft", () => {
     const cfg = {
       channels: {
@@ -82,6 +103,24 @@ describe("resolveQQBotAccount", () => {
             ops: {
               appId: "ops-app",
               clientSecretFile: createSecretFile("ops-secret"),
+            },
+          },
+        },
+      },
+    } as OpenClawConfig;
+
+    expect(resolveDefaultQQBotAccountId(cfg)).toBe("ops");
+  });
+
+  it("uses configured defaultAccount when present", () => {
+    const cfg = {
+      channels: {
+        qqbot: {
+          defaultAccount: "Ops",
+          appId: "draft-top-level",
+          accounts: {
+            ops: {
+              appId: "ops-app",
             },
           },
         },

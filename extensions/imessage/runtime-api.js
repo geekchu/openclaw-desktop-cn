@@ -1,5 +1,26 @@
-export { DEFAULT_ACCOUNT_ID, PAIRING_APPROVED_MESSAGE, buildComputedAccountStatusSnapshot, buildChannelConfigSchema, chunkTextForOutbound, collectStatusIssuesFromLastError, formatTrimmedAllowFromEntries, getChatChannelMeta, looksLikeIMessageTargetId, normalizeIMessageMessagingTarget, resolveChannelMediaMaxBytes, resolveIMessageConfigAllowFrom, resolveIMessageConfigDefaultTo, IMessageConfigSchema, } from "openclaw/plugin-sdk/imessage";
-export { resolveIMessageGroupRequireMention, resolveIMessageGroupToolPolicy, } from "./src/group-policy.js";
+export {
+  DEFAULT_ACCOUNT_ID,
+  getChatChannelMeta,
+} from "openclaw/plugin-sdk/core";
+export { buildChannelConfigSchema, IMessageConfigSchema } from "./config-api.js";
+export { PAIRING_APPROVED_MESSAGE } from "openclaw/plugin-sdk/channel-status";
+export {
+  buildComputedAccountStatusSnapshot,
+  collectStatusIssuesFromLastError,
+} from "openclaw/plugin-sdk/status-helpers";
+export { formatTrimmedAllowFromEntries } from "openclaw/plugin-sdk/channel-config-helpers";
+export {
+  resolveIMessageConfigAllowFrom,
+  resolveIMessageConfigDefaultTo,
+} from "./src/config-accessors.js";
+export { looksLikeIMessageTargetId, normalizeIMessageMessagingTarget } from "./src/normalize.js";
+export { resolveChannelMediaMaxBytes } from "openclaw/plugin-sdk/media-runtime";
+export {
+  resolveIMessageGroupRequireMention,
+  resolveIMessageGroupToolPolicy,
+} from "./src/group-policy.js";
 export { monitorIMessageProvider } from "./src/monitor.js";
 export { probeIMessage } from "./src/probe.js";
 export { sendMessageIMessage } from "./src/send.js";
+export { setIMessageRuntime } from "./src/runtime.js";
+export { chunkTextForOutbound } from "./src/channel-api.js";

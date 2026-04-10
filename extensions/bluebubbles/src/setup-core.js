@@ -1,11 +1,23 @@
-import { createSetupInputPresenceValidator, createTopLevelChannelDmPolicySetter, normalizeAccountId, patchScopedAccountConfig, prepareScopedSetupConfig, } from "openclaw/plugin-sdk/setup";
+import { addWildcardAllowFrom, createSetupInputPresenceValidator, normalizeAccountId, patchScopedAccountConfig, prepareScopedSetupConfig, } from "openclaw/plugin-sdk/setup";
 import { applyBlueBubblesConnectionConfig } from "./config-apply.js";
 const channel = "bluebubbles";
-const setBlueBubblesTopLevelDmPolicy = createTopLevelChannelDmPolicySetter({
-    channel,
-});
-export function setBlueBubblesDmPolicy(cfg, dmPolicy) {
-    return setBlueBubblesTopLevelDmPolicy(cfg, dmPolicy);
+export function setBlueBubblesDmPolicy(cfg, accountId, dmPolicy) {
+    const resolvedAccountId = normalizeAccountId(accountId);
+    const existingAllowFrom = resolvedAccountId === "default"
+        ? cfg.channels?.bluebubbles?.allowFrom
+        : (cfg.channels?.bluebubbles?.accounts?.[resolvedAccountId]?.allowFrom ??
+            cfg.channels?.bluebubbles?.allowFrom);
+    return patchScopedAccountConfig({
+        cfg,
+        channelKey: channel,
+        accountId: resolvedAccountId,
+        patch: {
+            dmPolicy,
+            ...(dmPolicy === "open" ? { allowFrom: addWildcardAllowFrom(existingAllowFrom) } : {}),
+        },
+        ensureChannelEnabled: false,
+        ensureAccountEnabled: false,
+    });
 }
 export function setBlueBubblesAllowFrom(cfg, accountId, allowFrom) {
     return patchScopedAccountConfig({
