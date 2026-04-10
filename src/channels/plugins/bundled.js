@@ -25,7 +25,24 @@ function resolveChannelPluginModuleEntry(moduleExport) {
     }
     const record = resolved;
     if (record.kind !== "bundled-channel-entry") {
-        return null;
+        if (typeof record.id !== "string" ||
+            typeof record.name !== "string" ||
+            typeof record.description !== "string" ||
+            typeof record.register !== "function" ||
+            !("channelPlugin" in record)) {
+            return null;
+        }
+        return {
+            kind: "bundled-channel-entry",
+            id: record.id,
+            name: record.name,
+            description: record.description,
+            register: record.register,
+            loadChannelPlugin: () => record.channelPlugin,
+            ...(typeof record.setChannelRuntime === "function"
+                ? { setChannelRuntime: record.setChannelRuntime }
+                : {}),
+        };
     }
     if (typeof record.id !== "string" ||
         typeof record.name !== "string" ||
@@ -47,7 +64,13 @@ function resolveChannelSetupModuleEntry(moduleExport) {
     }
     const record = resolved;
     if (record.kind !== "bundled-channel-setup-entry") {
-        return null;
+        if (!("plugin" in record)) {
+            return null;
+        }
+        return {
+            kind: "bundled-channel-setup-entry",
+            loadSetupPlugin: () => record.plugin,
+        };
     }
     if (typeof record.loadSetupPlugin !== "function") {
         return null;
@@ -285,3 +308,21 @@ export function setBundledChannelRuntime(id, runtime) {
     }
     setter(runtime);
 }
+function createBundledPluginListProxy(loader) {
+    return new Proxy([], {
+        get(_target, prop, receiver) {
+            return Reflect.get(loader(), prop, receiver);
+        },
+        getOwnPropertyDescriptor(_target, prop) {
+            return Object.getOwnPropertyDescriptor(loader(), prop);
+        },
+        has(_target, prop) {
+            return prop in loader();
+        },
+        ownKeys() {
+            return Reflect.ownKeys(loader());
+        },
+    });
+}
+export const bundledChannelPlugins = createBundledPluginListProxy(() => listBundledChannelPlugins());
+export const bundledChannelSetupPlugins = createBundledPluginListProxy(() => listBundledChannelSetupPlugins());

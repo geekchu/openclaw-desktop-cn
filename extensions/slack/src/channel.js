@@ -9,14 +9,16 @@ import { buildPassiveProbedChannelStatusSummary } from "openclaw/plugin-sdk/exte
 import { resolveOutboundSendDep, } from "openclaw/plugin-sdk/outbound-runtime";
 import { buildOutboundBaseSessionKey, normalizeOutboundThreadId, resolveThreadSessionKeys, } from "openclaw/plugin-sdk/routing";
 import { createComputedAccountStatusAdapter, createDefaultChannelRuntimeState, } from "openclaw/plugin-sdk/status-helpers";
+import { normalizeOptionalString } from "openclaw/plugin-sdk/text-runtime";
 import { resolveSlackAccount, resolveSlackReplyToMode, } from "./accounts.js";
 import { resolveSlackAutoThreadId } from "./action-threading.js";
+import { buildSlackInteractiveBlocks } from "./blocks-render.js";
 import { parseSlackBlocksInput } from "./blocks-input.js";
 import { createSlackActions } from "./channel-actions.js";
 import { resolveSlackChannelType } from "./channel-type.js";
 import { listSlackDirectoryGroupsFromConfig, listSlackDirectoryPeersFromConfig, } from "./directory-config.js";
 import { resolveSlackGroupRequireMention, resolveSlackGroupToolPolicy } from "./group-policy.js";
-import { isSlackInteractiveRepliesEnabled } from "./interactive-replies.js";
+import { compileSlackInteractiveReplies, isSlackInteractiveRepliesEnabled } from "./interactive-replies.js";
 import { SLACK_TEXT_LIMIT } from "./limits.js";
 import { slackOutbound } from "./outbound-adapter.js";
 import { probeSlack } from "./probe.js";
@@ -50,10 +52,18 @@ function resolveSlackProbe() {
         throw error;
     }
 }
+let slackSendRuntimePromise;
+async function loadSlackSendRuntime() {
+    slackSendRuntimePromise ??= import("./send.runtime.js");
+    return await slackSendRuntimePromise;
+}
+function shouldTreatSlackDeliveredTextAsVisible(params) {
+    return (params.kind === "block" && typeof params.text === "string" && params.text.trim().length > 0);
+}
 // Select the appropriate Slack token for read/write operations.
 function getTokenForOperation(account, operation) {
-    const userToken = account.config.userToken?.trim() || undefined;
-    const botToken = account.botToken?.trim();
+    const userToken = normalizeOptionalString(account.config.userToken);
+    const botToken = normalizeOptionalString(account.botToken);
     const allowUserWrites = account.config.userTokenReadOnly === false;
     if (operation === "read") {
         return userToken ?? botToken;
@@ -199,14 +209,18 @@ export const slackPlugin = createChatChannelPlugin({
             parseExplicitTarget: ({ raw }) => parseSlackExplicitTarget(raw),
             inferTargetChatType: ({ to }) => parseSlackExplicitTarget(to)?.chatType,
             resolveOutboundSessionRoute: async (params) => await resolveSlackOutboundSessionRoute(params),
+            transformReplyPayload: ({ payload, cfg, accountId }) => isSlackInteractiveRepliesEnabled({ cfg, accountId })
+                ? compileSlackInteractiveReplies(payload)
+                : payload,
             enableInteractiveReplies: ({ cfg, accountId }) => isSlackInteractiveRepliesEnabled({ cfg, accountId }),
             hasStructuredReplyPayload: ({ payload }) => {
-                const slackData = payload.channelData?.slack;
-                if (!slackData || typeof slackData !== "object" || Array.isArray(slackData)) {
-                    return false;
-                }
                 try {
-                    return Boolean(parseSlackBlocksInput(slackData.blocks)?.length);
+                    const slackData = payload.channelData?.slack;
+                    const channelBlocks = slackData && typeof slackData === "object" && !Array.isArray(slackData)
+                        ? parseSlackBlocksInput(slackData.blocks) ?? []
+                        : [];
+                    const interactiveBlocks = buildSlackInteractiveBlocks(payload.interactive);
+                    return Boolean(channelBlocks.length || interactiveBlocks.length);
                 }
                 catch {
                     return false;
@@ -368,18 +382,19 @@ export const slackPlugin = createChatChannelPlugin({
                 const cfg = getSlackRuntime().config.loadConfig();
                 const account = resolveSlackAccount({
                     cfg,
-                    accountId: DEFAULT_ACCOUNT_ID,
+                    accountId: cfg.channels?.slack?.defaultAccount,
                 });
                 const token = getTokenForOperation(account, "write");
                 const botToken = account.botToken?.trim();
                 const tokenOverride = token && token !== botToken ? token : undefined;
+                const { sendMessageSlack } = await loadSlackSendRuntime();
                 if (tokenOverride) {
-                    await getSlackRuntime().channel.slack.sendMessageSlack(`user:${id}`, message, {
+                    await sendMessageSlack(`user:${id}`, message, {
                         token: tokenOverride,
                     });
                 }
                 else {
-                    await getSlackRuntime().channel.slack.sendMessageSlack(`user:${id}`, message);
+                    await sendMessageSlack(`user:${id}`, message);
                 }
             },
         },
@@ -411,6 +426,7 @@ export const slackPlugin = createChatChannelPlugin({
             deliveryMode: "direct",
             chunker: null,
             textChunkLimit: SLACK_TEXT_LIMIT,
+            shouldTreatDeliveredTextAsVisible: shouldTreatSlackDeliveredTextAsVisible,
             sendPayload: async (ctx) => {
                 const { send, tokenOverride } = resolveSlackSendContext({
                     cfg: ctx.cfg,
@@ -422,7 +438,7 @@ export const slackPlugin = createChatChannelPlugin({
                 return await slackOutbound.sendPayload({
                     ...ctx,
                     deps: {
-                        ...(ctx.deps ?? {}),
+                        ...ctx.deps,
                         slack: async (to, text, opts) => await send(to, text, {
                             ...opts,
                             ...(tokenOverride ? { token: tokenOverride } : {}),

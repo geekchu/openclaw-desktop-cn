@@ -6,13 +6,13 @@ import { extractSlackToolSend, listSlackMessageActions } from "./message-actions
 import { createSlackMessageToolBlocksSchema } from "./message-tool-schema.js";
 import { resolveSlackChannelId } from "./targets.js";
 export function createSlackActions(providerId, options) {
-    function describeMessageTool({ cfg, }) {
-        const actions = listSlackMessageActions(cfg);
+    function describeMessageTool({ cfg, accountId, }) {
+        const actions = listSlackMessageActions(cfg, accountId);
         const capabilities = new Set();
         if (actions.includes("send")) {
             capabilities.add("blocks");
         }
-        if (isSlackInteractiveRepliesEnabled({ cfg })) {
+        if (isSlackInteractiveRepliesEnabled({ cfg, accountId })) {
             capabilities.add("interactive");
         }
         return {
@@ -41,6 +41,7 @@ export function createSlackActions(providerId, options) {
                     : handleSlackAction(action, cfg, {
                         ...toolContext,
                         mediaLocalRoots: ctx.mediaLocalRoots,
+                        mediaReadFile: ctx.mediaReadFile,
                     })),
             });
         },

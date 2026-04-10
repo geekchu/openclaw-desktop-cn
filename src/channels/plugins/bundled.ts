@@ -368,3 +368,25 @@ export function setBundledChannelRuntime(id: ChannelId, runtime: PluginRuntime):
   }
   setter(runtime);
 }
+
+function createBundledPluginListProxy(loader: () => readonly ChannelPlugin[]): ChannelPlugin[] {
+  return new Proxy([] as ChannelPlugin[], {
+    get(_target, prop, receiver) {
+      return Reflect.get(loader(), prop, receiver);
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+      return Object.getOwnPropertyDescriptor(loader(), prop);
+    },
+    has(_target, prop) {
+      return prop in loader();
+    },
+    ownKeys() {
+      return Reflect.ownKeys(loader());
+    },
+  });
+}
+
+export const bundledChannelPlugins = createBundledPluginListProxy(() => listBundledChannelPlugins());
+export const bundledChannelSetupPlugins = createBundledPluginListProxy(() =>
+  listBundledChannelSetupPlugins(),
+);

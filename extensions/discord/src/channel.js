@@ -9,7 +9,9 @@ import { createChatChannelPlugin } from "openclaw/plugin-sdk/core";
 import { createChannelDirectoryAdapter, createRuntimeDirectoryLiveAdapter, } from "openclaw/plugin-sdk/directory-runtime";
 import { resolveOutboundSendDep, } from "openclaw/plugin-sdk/outbound-runtime";
 import { normalizeMessageChannel } from "openclaw/plugin-sdk/routing";
+import { sleepWithAbort } from "openclaw/plugin-sdk/runtime-env";
 import { createComputedAccountStatusAdapter, createDefaultChannelRuntimeState, } from "openclaw/plugin-sdk/status-helpers";
+import { normalizeLowercaseStringOrEmpty, normalizeOptionalString, normalizeOptionalStringifiedId, } from "openclaw/plugin-sdk/text-runtime";
 import { listDiscordAccountIds, resolveDiscordAccount, } from "./accounts.js";
 import { auditDiscordChannelPermissions, collectDiscordAuditChannelIds } from "./audit.js";
 import { listDiscordDirectoryGroupsFromConfig, listDiscordDirectoryPeersFromConfig, } from "./directory-config.js";
@@ -28,6 +30,7 @@ import { parseDiscordTarget } from "./targets.js";
 import { DiscordUiContainer } from "./ui.js";
 let discordProviderRuntimePromise;
 let discordProbeRuntimePromise;
+let discordSendModulePromise;
 async function loadDiscordProviderRuntime() {
     discordProviderRuntimePromise ??= import("./monitor/provider.runtime.js");
     return await discordProviderRuntimePromise;
@@ -36,9 +39,39 @@ async function loadDiscordProbeRuntime() {
     discordProbeRuntimePromise ??= import("./probe.runtime.js");
     return await discordProbeRuntimePromise;
 }
+async function loadDiscordSendModule() {
+    discordSendModulePromise ??= import("./send.js");
+    return await discordSendModulePromise;
+}
 const meta = getChatChannelMeta("discord");
 const REQUIRED_DISCORD_PERMISSIONS = ["ViewChannel", "SendMessages"];
 const DISCORD_EXEC_APPROVAL_KEY = "execapproval";
+const DISCORD_ACCOUNT_STARTUP_STAGGER_MS = 10000;
+function resolveDiscordAttachedOutboundTarget(params) {
+    if (params.threadId == null) {
+        return params.to;
+    }
+    const threadId = normalizeOptionalStringifiedId(params.threadId) ?? "";
+    return threadId ? `channel:${threadId}` : params.to;
+}
+function shouldTreatDiscordDeliveredTextAsVisible(params) {
+    return (params.kind === "block" && typeof params.text === "string" && params.text.trim().length > 0);
+}
+async function resolveDiscordSend(deps) {
+    return (resolveOutboundSendDep(deps, "discord") ??
+        getDiscordRuntime().channel.discord.sendMessageDiscord ??
+        (await loadDiscordSendModule()).sendMessageDiscord);
+}
+function resolveDiscordStartupDelayMs(cfg, accountId) {
+    const startupAccountIds = listDiscordAccountIds(cfg).filter((candidateId) => {
+        const candidate = resolveDiscordAccount({ cfg, accountId: candidateId });
+        return (candidate.enabled &&
+            (resolveConfiguredFromCredentialStatuses(candidate) ??
+                Boolean(normalizeOptionalString(candidate.token))));
+    });
+    const startupIndex = startupAccountIds.findIndex((candidateId) => candidateId === accountId);
+    return startupIndex <= 0 ? 0 : startupIndex * DISCORD_ACCOUNT_STARTUP_STAGGER_MS;
+}
 const resolveDiscordDmPolicy = createScopedDmSecurityResolver({
     channelKey: "discord",
     resolvePolicy: (account) => account.config.dm?.policy,
@@ -287,6 +320,28 @@ function resolveDiscordConversationIdFromTargets(targets) {
     }
     return undefined;
 }
+function normalizeDiscordTarget(raw, defaultKind) {
+    const trimmed = normalizeOptionalString(raw);
+    if (!trimmed) {
+        return undefined;
+    }
+    return parseDiscordTarget(trimmed, { defaultKind })?.normalized;
+}
+function resolveDiscordCurrentConversationIdentity(params) {
+    if (normalizeLowercaseStringOrEmpty(params.chatType) === "direct") {
+        const senderTarget = normalizeDiscordTarget(params.from, "user");
+        if (senderTarget?.startsWith("user:")) {
+            return senderTarget;
+        }
+    }
+    for (const candidate of [params.originatingTo, params.commandTo, params.fallbackTo]) {
+        const target = normalizeDiscordTarget(candidate, "channel");
+        if (target) {
+            return target;
+        }
+    }
+    return undefined;
+}
 function parseDiscordParentChannelFromSessionKey(raw) {
     const sessionKey = typeof raw === "string" ? raw.trim().toLowerCase() : "";
     if (!sessionKey) {
@@ -298,7 +353,7 @@ function parseDiscordParentChannelFromSessionKey(raw) {
 function resolveDiscordCommandConversation(params) {
     const targets = [params.originatingTo, params.commandTo, params.fallbackTo];
     if (params.threadId) {
-        const parentConversationId = normalizeDiscordMessagingTarget(params.threadParentId?.trim() ?? "") ||
+        const parentConversationId = normalizeDiscordMessagingTarget(normalizeOptionalString(params.threadParentId) ?? "") ||
             parseDiscordParentChannelFromSessionKey(params.parentSessionKey) ||
             resolveDiscordConversationIdFromTargets(targets);
         return {
@@ -308,8 +363,37 @@ function resolveDiscordCommandConversation(params) {
                 : {}),
         };
     }
-    const conversationId = resolveDiscordConversationIdFromTargets(targets);
+    const conversationId = resolveDiscordCurrentConversationIdentity({
+        from: params.from,
+        chatType: params.chatType,
+        originatingTo: params.originatingTo,
+        commandTo: params.commandTo,
+        fallbackTo: params.fallbackTo,
+    });
     return conversationId ? { conversationId } : null;
+}
+function resolveDiscordInboundConversation(params) {
+    const conversationId = resolveDiscordCurrentConversationIdentity({
+        from: params.from,
+        chatType: params.isGroup ? "group" : "direct",
+        originatingTo: params.to,
+        fallbackTo: params.conversationId,
+    });
+    return conversationId ? { conversationId } : null;
+}
+function isLikelyDiscordVideoMedia(mediaUrl) {
+    const trimmed = normalizeOptionalString(mediaUrl) ?? "";
+    if (!trimmed) {
+        return false;
+    }
+    let normalized = trimmed.toLowerCase();
+    try {
+        normalized = new URL(trimmed).pathname.toLowerCase();
+    }
+    catch {
+        normalized = normalized.split("#", 1)[0]?.split("?", 1)[0] ?? normalized;
+    }
+    return [".avi", ".m4v", ".mkv", ".mov", ".mp4", ".webm"].some((ext) => normalized.endsWith(ext));
 }
 function parseDiscordExplicitTarget(raw) {
     try {
@@ -355,11 +439,12 @@ export const discordPlugin = createChatChannelPlugin({
                 "- Forms: add `components.modal` (title, fields). OpenClaw adds a trigger button and routes submissions as new messages.",
             ],
         },
-        messaging: {
-            normalizeTarget: normalizeDiscordMessagingTarget,
-            resolveSessionTarget: ({ id }) => normalizeDiscordMessagingTarget(`channel:${id}`),
-            parseExplicitTarget: ({ raw }) => parseDiscordExplicitTarget(raw),
-            inferTargetChatType: ({ to }) => parseDiscordExplicitTarget(to)?.chatType,
+      messaging: {
+        normalizeTarget: normalizeDiscordMessagingTarget,
+        resolveInboundConversation: ({ from, to, conversationId, isGroup }) => resolveDiscordInboundConversation({ from, to, conversationId, isGroup }),
+        resolveSessionTarget: ({ id }) => normalizeDiscordMessagingTarget(`channel:${id}`),
+        parseExplicitTarget: ({ raw }) => parseDiscordExplicitTarget(raw),
+        inferTargetChatType: ({ to }) => parseDiscordExplicitTarget(to)?.chatType,
             buildCrossContextComponents: buildDiscordCrossContextComponents,
             resolveOutboundSessionRoute: (params) => resolveDiscordOutboundSessionRoute(params),
             targetResolver: {
@@ -480,10 +565,12 @@ export const discordPlugin = createChatChannelPlugin({
                 conversationId,
                 parentConversationId,
             }),
-            resolveCommandConversation: ({ threadId, threadParentId, parentSessionKey, originatingTo, commandTo, fallbackTo, }) => resolveDiscordCommandConversation({
+            resolveCommandConversation: ({ threadId, threadParentId, parentSessionKey, from, chatType, originatingTo, commandTo, fallbackTo, }) => resolveDiscordCommandConversation({
                 threadId,
                 threadParentId,
                 parentSessionKey,
+                from,
+                chatType,
                 originatingTo,
                 commandTo,
                 fallbackTo,
@@ -640,6 +727,16 @@ export const discordPlugin = createChatChannelPlugin({
         gateway: {
             startAccount: async (ctx) => {
                 const account = ctx.account;
+                const startupDelayMs = resolveDiscordStartupDelayMs(ctx.cfg, account.accountId);
+                if (startupDelayMs > 0) {
+                    ctx.log?.info(`[${account.accountId}] delaying provider startup ${Math.round(startupDelayMs / 1000)}s to reduce Discord startup rate limits`);
+                    try {
+                        await sleepWithAbort(startupDelayMs, ctx.abortSignal);
+                    }
+                    catch {
+                        return;
+                    }
+                }
                 const token = account.token.trim();
                 let discordBotLabel = "";
                 try {
@@ -674,6 +771,7 @@ export const discordPlugin = createChatChannelPlugin({
                     accountId: account.accountId,
                     config: ctx.cfg,
                     runtime: ctx.runtime,
+                    channelRuntime: ctx.channelRuntime,
                     abortSignal: ctx.abortSignal,
                     mediaMaxMb: account.config.mediaMaxMb,
                     historyLimit: account.config.historyLimit,
@@ -697,7 +795,11 @@ export const discordPlugin = createChatChannelPlugin({
         collectWarnings: collectDiscordSecurityWarnings,
     },
     threading: {
-        topLevelReplyToMode: "discord",
+        scopedAccountReplyToMode: {
+            resolveAccount: (cfg, accountId) => resolveDiscordAccount({ cfg, accountId }),
+            resolveReplyToMode: (account) => account.config.replyToMode,
+            fallback: "off",
+        },
     },
     outbound: {
         base: {
@@ -705,14 +807,19 @@ export const discordPlugin = createChatChannelPlugin({
             chunker: null,
             textChunkLimit: 2000,
             pollMaxOptions: 10,
+            shouldTreatDeliveredTextAsVisible: shouldTreatDiscordDeliveredTextAsVisible,
+            shouldSuppressLocalPayloadPrompt: ({ cfg, accountId, payload }) => shouldSuppressLocalDiscordExecApprovalPrompt({
+                cfg,
+                accountId,
+                payload,
+            }),
             resolveTarget: ({ to }) => normalizeDiscordOutboundTarget(to),
         },
         attachedResults: {
             channel: "discord",
-            sendText: async ({ cfg, to, text, accountId, deps, replyToId, silent }) => {
-                const send = resolveOutboundSendDep(deps, "discord") ??
-                    getDiscordRuntime().channel.discord.sendMessageDiscord;
-                return await send(to, text, {
+            sendText: async ({ cfg, to, text, accountId, deps, replyToId, threadId, silent }) => {
+                const send = await resolveDiscordSend(deps);
+                return await send(resolveDiscordAttachedOutboundTarget({ to, threadId }), text, {
                     verbose: false,
                     cfg,
                     replyTo: replyToId ?? undefined,
@@ -720,20 +827,39 @@ export const discordPlugin = createChatChannelPlugin({
                     silent: silent ?? undefined,
                 });
             },
-            sendMedia: async ({ cfg, to, text, mediaUrl, mediaLocalRoots, accountId, deps, replyToId, silent, }) => {
-                const send = resolveOutboundSendDep(deps, "discord") ??
-                    getDiscordRuntime().channel.discord.sendMessageDiscord;
-                return await send(to, text, {
+            sendMedia: async ({ cfg, to, text, mediaUrl, mediaLocalRoots, mediaReadFile, accountId, deps, replyToId, threadId, silent, }) => {
+                const send = await resolveDiscordSend(deps);
+                const target = resolveDiscordAttachedOutboundTarget({ to, threadId });
+                if (text.trim() && mediaUrl && isLikelyDiscordVideoMedia(mediaUrl)) {
+                    await send(target, text, {
+                        verbose: false,
+                        cfg,
+                        replyTo: replyToId ?? undefined,
+                        accountId: accountId ?? undefined,
+                        silent: silent ?? undefined,
+                    });
+                    return await send(target, "", {
+                        verbose: false,
+                        cfg,
+                        mediaUrl,
+                        mediaLocalRoots,
+                        mediaReadFile,
+                        accountId: accountId ?? undefined,
+                        silent: silent ?? undefined,
+                    });
+                }
+                return await send(target, text, {
                     verbose: false,
                     cfg,
                     mediaUrl,
                     mediaLocalRoots,
+                    mediaReadFile,
                     replyTo: replyToId ?? undefined,
                     accountId: accountId ?? undefined,
                     silent: silent ?? undefined,
                 });
             },
-            sendPoll: async ({ cfg, to, poll, accountId, silent }) => await getDiscordRuntime().channel.discord.sendPollDiscord(to, poll, {
+            sendPoll: async ({ cfg, to, poll, accountId, threadId, silent }) => await (await loadDiscordSendModule()).sendPollDiscord(resolveDiscordAttachedOutboundTarget({ to, threadId }), poll, {
                 cfg,
                 accountId: accountId ?? undefined,
                 silent: silent ?? undefined,

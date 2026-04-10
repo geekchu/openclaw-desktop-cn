@@ -1,7 +1,8 @@
-import { createActionGate } from "openclaw/plugin-sdk/agent-runtime";
-import { listEnabledSlackAccounts } from "./accounts.js";
-export function listSlackMessageActions(cfg) {
-    const accounts = listEnabledSlackAccounts(cfg).filter((account) => account.botTokenSource !== "none");
+import { createActionGate } from "openclaw/plugin-sdk/channel-actions";
+import { extractToolSend } from "openclaw/plugin-sdk/tool-send";
+import { listEnabledSlackAccounts, resolveSlackAccount } from "./accounts.js";
+export function listSlackMessageActions(cfg, accountId) {
+    const accounts = (accountId ? [resolveSlackAccount({ cfg, accountId })] : listEnabledSlackAccounts(cfg)).filter((account) => account.enabled && account.botTokenSource !== "none");
     if (accounts.length === 0) {
         return [];
     }
@@ -40,14 +41,5 @@ export function listSlackMessageActions(cfg) {
     return Array.from(actions);
 }
 export function extractSlackToolSend(args) {
-    const action = typeof args.action === "string" ? args.action.trim() : "";
-    if (action !== "sendMessage") {
-        return null;
-    }
-    const to = typeof args.to === "string" ? args.to : undefined;
-    if (!to) {
-        return null;
-    }
-    const accountId = typeof args.accountId === "string" ? args.accountId.trim() : undefined;
-    return { to, accountId };
+    return extractToolSend(args, "sendMessage");
 }
