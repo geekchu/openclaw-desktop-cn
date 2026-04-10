@@ -89,6 +89,21 @@ export function truncateText(
   };
 }
 
+export function formatUnknownText(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    const json = JSON.stringify(value);
+    if (typeof json === "string") {
+      return json;
+    }
+  } catch {
+    // Fall through to generic string coercion for circular or special values.
+  }
+  return String(value);
+}
+
 export function toNumber(value: string, fallback: number): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;

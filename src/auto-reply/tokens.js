@@ -3,13 +3,14 @@ export const HEARTBEAT_TOKEN = "HEARTBEAT_OK";
 export const SILENT_REPLY_TOKEN = "NO_REPLY";
 const silentExactRegexByToken = new Map();
 const silentTrailingRegexByToken = new Map();
+const silentLeadingAttachedRegexByToken = new Map();
 function getSilentExactRegex(token) {
     const cached = silentExactRegexByToken.get(token);
     if (cached) {
         return cached;
     }
     const escaped = escapeRegExp(token);
-    const regex = new RegExp(`^\\s*${escaped}\\s*$`);
+    const regex = new RegExp(`^\\s*${escaped}\\s*$`, "i");
     silentExactRegexByToken.set(token, regex);
     return regex;
 }
@@ -64,6 +65,50 @@ export function isSilentReplyPayloadText(text, token = SILENT_REPLY_TOKEN) {
  */
 export function stripSilentToken(text, token = SILENT_REPLY_TOKEN) {
     return text.replace(getSilentTrailingRegex(token), "").trim();
+}
+const silentLeadingRegexByToken = new Map();
+function getSilentLeadingAttachedRegex(token) {
+    const cached = silentLeadingAttachedRegexByToken.get(token);
+    if (cached) {
+        return cached;
+    }
+    const escaped = escapeRegExp(token);
+    // Match one or more leading occurrences of the token where the final token
+    // is glued directly to visible word-start content (for example
+    // `NO_REPLYhello`), without treating punctuation-start text like
+    // `NO_REPLY: explanation` as a silent prefix.
+    const regex = new RegExp(`^\\s*(?:${escaped}\\s+)*${escaped}(?=[\\p{L}\\p{N}])`, "iu");
+    silentLeadingAttachedRegexByToken.set(token, regex);
+    return regex;
+}
+function getSilentLeadingRegex(token) {
+    const cached = silentLeadingRegexByToken.get(token);
+    if (cached) {
+        return cached;
+    }
+    const escaped = escapeRegExp(token);
+    // Match one or more leading occurrences of the token, each optionally followed by whitespace
+    const regex = new RegExp(`^(?:\\s*${escaped})+\\s*`, "i");
+    silentLeadingRegexByToken.set(token, regex);
+    return regex;
+}
+/**
+ * Strip leading silent reply tokens from text.
+ * Handles cases like "NO_REPLYThe user is saying..." where the token
+ * is not separated from the following text.
+ */
+export function stripLeadingSilentToken(text, token = SILENT_REPLY_TOKEN) {
+    return text.replace(getSilentLeadingRegex(token), "").trim();
+}
+/**
+ * Check whether text starts with one or more leading silent reply tokens where
+ * the final token is glued directly to visible content.
+ */
+export function startsWithSilentToken(text, token = SILENT_REPLY_TOKEN) {
+    if (!text) {
+        return false;
+    }
+    return getSilentLeadingAttachedRegex(token).test(text);
 }
 export function isSilentReplyPrefixText(text, token = SILENT_REPLY_TOKEN) {
     if (!text) {

@@ -7,8 +7,10 @@ export function replaceSensitiveValuesInRaw(params: {
   redactedSentinel: string;
 }): string {
   const sentinel = params.redactedSentinel;
-  const values = [...params.sensitiveValues]
-    .filter((v) => v.length > 0)
+  // Empty string is not a valid replacement token here: replaceAll("", x)
+  // matches every character boundary and corrupts the whole raw snapshot.
+  const values = [...new Set(params.sensitiveValues)]
+    .filter((value) => value !== "")
     // Skip values that are substrings of the sentinel — replacing them would
     // expand sentinels already inserted by earlier iterations, causing
     // exponential string growth (RangeError: Invalid string length).

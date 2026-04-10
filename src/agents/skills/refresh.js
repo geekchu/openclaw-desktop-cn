@@ -1,14 +1,17 @@
 import os from "node:os";
 import path from "node:path";
-import chokidar from "chokidar";
+import chokidar, {} from "chokidar";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
+import { normalizeOptionalString } from "../../shared/string-coerce.js";
 import { CONFIG_DIR, resolveUserPath } from "../../utils.js";
 import { resolvePluginSkillDirs } from "./plugin-skills.js";
+import { bumpSkillsSnapshotVersion, getSkillsSnapshotVersion, registerSkillsChangeListener, resetSkillsRefreshStateForTest, setSkillsChangeListenerErrorHandler, shouldRefreshSnapshotForVersion, } from "./refresh-state.js";
+export { bumpSkillsSnapshotVersion, getSkillsSnapshotVersion, registerSkillsChangeListener, shouldRefreshSnapshotForVersion, } from "./refresh-state.js";
 const log = createSubsystemLogger("gateway/skills");
-const listeners = new Set();
-const workspaceVersions = new Map();
 const watchers = new Map();
-let globalVersion = 0;
+setSkillsChangeListenerErrorHandler((err) => {
+    log.warn(`skills change listener failed: ${String(err)}`);
+});
 export const DEFAULT_SKILLS_WATCH_IGNORED = [
     /(^|[\\/])\.git([\\/]|$)/,
     /(^|[\\/])node_modules([\\/]|$)/,
@@ -23,20 +26,6 @@ export const DEFAULT_SKILLS_WATCH_IGNORED = [
     /(^|[\\/])build([\\/]|$)/,
     /(^|[\\/])\.cache([\\/]|$)/,
 ];
-function bumpVersion(current) {
-    const now = Date.now();
-    return now <= current ? current + 1 : now;
-}
-function emit(event) {
-    for (const listener of listeners) {
-        try {
-            listener(event);
-        }
-        catch (err) {
-            log.warn(`skills change listener failed: ${String(err)}`);
-        }
-    }
-}
 function resolveWatchPaths(workspaceDir, config) {
     const paths = [];
     if (workspaceDir.trim()) {
@@ -47,7 +36,7 @@ function resolveWatchPaths(workspaceDir, config) {
     paths.push(path.join(os.homedir(), ".agents", "skills"));
     const extraDirsRaw = config?.skills?.load?.extraDirs ?? [];
     const extraDirs = extraDirsRaw
-        .map((d) => (typeof d === "string" ? d.trim() : ""))
+        .map((d) => normalizeOptionalString(d) ?? "")
         .filter(Boolean)
         .map((dir) => resolveUserPath(dir));
     paths.push(...extraDirs);
@@ -72,33 +61,6 @@ function resolveWatchTargets(workspaceDir, config) {
         targets.add(`${globRoot}/*/SKILL.md`);
     }
     return Array.from(targets).toSorted();
-}
-export function registerSkillsChangeListener(listener) {
-    listeners.add(listener);
-    return () => {
-        listeners.delete(listener);
-    };
-}
-export function bumpSkillsSnapshotVersion(params) {
-    const reason = params?.reason ?? "manual";
-    const changedPath = params?.changedPath;
-    if (params?.workspaceDir) {
-        const current = workspaceVersions.get(params.workspaceDir) ?? 0;
-        const next = bumpVersion(current);
-        workspaceVersions.set(params.workspaceDir, next);
-        emit({ workspaceDir: params.workspaceDir, reason, changedPath });
-        return next;
-    }
-    globalVersion = bumpVersion(globalVersion);
-    emit({ reason, changedPath });
-    return globalVersion;
-}
-export function getSkillsSnapshotVersion(workspaceDir) {
-    if (!workspaceDir) {
-        return globalVersion;
-    }
-    const local = workspaceVersions.get(workspaceDir) ?? 0;
-    return Math.max(globalVersion, local);
 }
 export function ensureSkillsWatcher(params) {
     const workspaceDir = params.workspaceDir.trim();
@@ -169,9 +131,7 @@ export function ensureSkillsWatcher(params) {
     watchers.set(workspaceDir, state);
 }
 export async function resetSkillsRefreshForTest() {
-    listeners.clear();
-    workspaceVersions.clear();
-    globalVersion = 0;
+    resetSkillsRefreshStateForTest();
     const active = Array.from(watchers.values());
     watchers.clear();
     await Promise.all(active.map(async (state) => {

@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { normalizeAccountId } from "openclaw/plugin-sdk/account-id";
 import { requiresExplicitMatrixDefaultAccount, resolveMatrixDefaultOrOnlyAccountId, } from "../../account-selection.js";
-import { maybeCreateMatrixMigrationSnapshot, normalizeAccountId } from "../../runtime-api.js";
 import { getMatrixRuntime } from "../../runtime.js";
 import { resolveMatrixAccountStorageRoot, resolveMatrixLegacyFlatStoragePaths, } from "../../storage-paths.js";
 export const DEFAULT_ACCOUNT_KEY = "default";
@@ -83,6 +83,12 @@ function readStoredRootMetadata(rootDir) {
         if (typeof parsed.deviceId === "string" && parsed.deviceId.trim()) {
             metadata.deviceId = parsed.deviceId.trim();
         }
+        if (parsed.currentTokenStateClaimed === true) {
+            metadata.currentTokenStateClaimed = true;
+        }
+        if (typeof parsed.createdAt === "string" && parsed.createdAt.trim()) {
+            metadata.createdAt = parsed.createdAt.trim();
+        }
     }
     catch {
         // ignore missing or malformed storage metadata
@@ -132,6 +138,23 @@ function resolvePreferredMatrixStorageRoot(params) {
         score: bestCurrentScore,
         mtimeMs: resolveStorageRootMtimeMs(params.canonicalRootDir),
     };
+    // Without a confirmed device identity, reusing a populated sibling root after
+    // token rotation can silently bind this run to the wrong Matrix device state.
+    if (!params.deviceId?.trim()) {
+        return {
+            rootDir: best.rootDir,
+            tokenHash: best.tokenHash,
+        };
+    }
+    const canonicalMetadata = readStoredRootMetadata(params.canonicalRootDir);
+    if (canonicalMetadata.accessTokenHash === params.canonicalTokenHash &&
+        canonicalMetadata.deviceId?.trim() === params.deviceId.trim() &&
+        canonicalMetadata.currentTokenStateClaimed === true) {
+        return {
+            rootDir: best.rootDir,
+            tokenHash: best.tokenHash,
+        };
+    }
     let siblingEntries = [];
     try {
         siblingEntries = fs.readdirSync(parentDir, { withFileTypes: true });
@@ -244,6 +267,7 @@ export async function maybeMigrateLegacyStorage(params) {
         accountKey: params.storagePaths.accountKey,
     });
     const logger = getMatrixRuntime().logging.getChildLogger({ module: "matrix-storage" });
+    const { maybeCreateMatrixMigrationSnapshot } = await import("./migration-snapshot.runtime.js");
     await maybeCreateMatrixMigrationSnapshot({
         trigger: "matrix-client-fallback",
         env: params.env,
@@ -280,7 +304,7 @@ export async function maybeMigrateLegacyStorage(params) {
         const rollbackError = rollbackLegacyMoves(moved);
         throw new Error(rollbackError
             ? `Failed migrating legacy Matrix client storage: ${String(err)}. Rollback also failed: ${rollbackError}`
-            : `Failed migrating legacy Matrix client storage: ${String(err)}`);
+            : `Failed migrating legacy Matrix client storage: ${String(err)}`, { cause: err });
     }
     if (moved.length > 0) {
         logger.info(`matrix: migrated legacy client storage into ${params.storagePaths.rootDir}\n${moved
@@ -319,20 +343,57 @@ function rollbackLegacyMoves(moved) {
     }
     return null;
 }
-export function writeStorageMeta(params) {
+function writeStoredRootMetadata(metaPath, payload) {
     try {
-        const payload = {
-            homeserver: params.homeserver,
-            userId: params.userId,
-            accountId: params.accountId ?? DEFAULT_ACCOUNT_KEY,
-            accessTokenHash: params.storagePaths.tokenHash,
-            deviceId: params.deviceId ?? null,
-            createdAt: new Date().toISOString(),
-        };
-        fs.mkdirSync(params.storagePaths.rootDir, { recursive: true });
-        fs.writeFileSync(params.storagePaths.metaPath, JSON.stringify(payload, null, 2), "utf-8");
+        fs.mkdirSync(path.dirname(metaPath), { recursive: true });
+        fs.writeFileSync(metaPath, JSON.stringify(payload, null, 2), "utf-8");
+        return true;
     }
     catch {
-        // ignore meta write failures
+        return false;
     }
+}
+export function writeStorageMeta(params) {
+    const existing = readStoredRootMetadata(params.storagePaths.rootDir);
+    return writeStoredRootMetadata(params.storagePaths.metaPath, {
+        homeserver: params.homeserver,
+        userId: params.userId,
+        accountId: params.accountId ?? DEFAULT_ACCOUNT_KEY,
+        accessTokenHash: params.storagePaths.tokenHash,
+        deviceId: params.deviceId ?? null,
+        currentTokenStateClaimed: params.currentTokenStateClaimed ?? existing.currentTokenStateClaimed === true,
+        createdAt: existing.createdAt ?? new Date().toISOString(),
+    });
+}
+export function claimCurrentTokenStorageState(params) {
+    const metadata = readStoredRootMetadata(params.rootDir);
+    if (!metadata.accessTokenHash?.trim()) {
+        return false;
+    }
+    return writeStoredRootMetadata(path.join(params.rootDir, STORAGE_META_FILENAME), {
+        homeserver: metadata.homeserver,
+        userId: metadata.userId,
+        accountId: metadata.accountId ?? DEFAULT_ACCOUNT_KEY,
+        accessTokenHash: metadata.accessTokenHash,
+        deviceId: metadata.deviceId ?? null,
+        currentTokenStateClaimed: true,
+        createdAt: metadata.createdAt ?? new Date().toISOString(),
+    });
+}
+export function repairCurrentTokenStorageMetaDeviceId(params) {
+    const storagePaths = resolveMatrixStoragePaths({
+        homeserver: params.homeserver,
+        userId: params.userId,
+        accessToken: params.accessToken,
+        accountId: params.accountId,
+        env: params.env,
+        stateDir: params.stateDir,
+    });
+    return writeStorageMeta({
+        storagePaths,
+        homeserver: params.homeserver,
+        userId: params.userId,
+        accountId: params.accountId,
+        deviceId: params.deviceId,
+    });
 }

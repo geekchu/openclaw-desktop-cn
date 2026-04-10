@@ -1,5 +1,7 @@
 import { normalizeE164 } from "openclaw/plugin-sdk/account-resolution";
+import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/text-runtime";
 const WHATSAPP_USER_JID_RE = /^(\d+)(?::\d+)?@s\.whatsapp\.net$/i;
+const WHATSAPP_LEGACY_USER_JID_RE = /^(\d+)@c\.us$/i;
 const WHATSAPP_LID_RE = /^(\d+)@lid$/i;
 function stripWhatsAppTargetPrefixes(value) {
     let candidate = value.trim();
@@ -13,7 +15,7 @@ function stripWhatsAppTargetPrefixes(value) {
 }
 export function isWhatsAppGroupJid(value) {
     const candidate = stripWhatsAppTargetPrefixes(value);
-    const lower = candidate.toLowerCase();
+    const lower = normalizeLowercaseStringOrEmpty(candidate);
     if (!lower.endsWith("@g.us")) {
         return false;
     }
@@ -25,12 +27,18 @@ export function isWhatsAppGroupJid(value) {
 }
 export function isWhatsAppUserTarget(value) {
     const candidate = stripWhatsAppTargetPrefixes(value);
-    return WHATSAPP_USER_JID_RE.test(candidate) || WHATSAPP_LID_RE.test(candidate);
+    return (WHATSAPP_USER_JID_RE.test(candidate) ||
+        WHATSAPP_LEGACY_USER_JID_RE.test(candidate) ||
+        WHATSAPP_LID_RE.test(candidate));
 }
 function extractUserJidPhone(jid) {
     const userMatch = jid.match(WHATSAPP_USER_JID_RE);
     if (userMatch) {
         return userMatch[1];
+    }
+    const legacyUserMatch = jid.match(WHATSAPP_LEGACY_USER_JID_RE);
+    if (legacyUserMatch) {
+        return legacyUserMatch[1];
     }
     const lidMatch = jid.match(WHATSAPP_LID_RE);
     if (lidMatch) {
@@ -60,4 +68,28 @@ export function normalizeWhatsAppTarget(value) {
     }
     const normalized = normalizeE164(candidate);
     return normalized.length > 1 ? normalized : null;
+}
+export function normalizeWhatsAppMessagingTarget(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+        return undefined;
+    }
+    return normalizeWhatsAppTarget(trimmed) ?? undefined;
+}
+export function normalizeWhatsAppAllowFromEntries(allowFrom) {
+    return allowFrom
+        .map((entry) => String(entry).trim())
+        .filter((entry) => Boolean(entry))
+        .map((entry) => (entry === "*" ? entry : normalizeWhatsAppTarget(entry)))
+        .filter((entry) => Boolean(entry));
+}
+export function looksLikeWhatsAppTargetId(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+        return false;
+    }
+    return (/^whatsapp:/i.test(trimmed) ||
+        isWhatsAppGroupJid(trimmed) ||
+        isWhatsAppUserTarget(trimmed) ||
+        normalizeWhatsAppTarget(trimmed) !== null);
 }

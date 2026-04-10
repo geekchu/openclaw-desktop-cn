@@ -1,10 +1,11 @@
-import { mapStreamingModeToSlackLegacyDraftStreamMode, resolveSlackNativeStreaming, resolveSlackStreamingMode, } from "openclaw/plugin-sdk/config-runtime";
+import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/text-runtime";
+import { mapStreamingModeToSlackLegacyDraftStreamMode, resolveSlackNativeStreaming, resolveSlackStreamingMode, } from "./streaming-compat.js";
 const DEFAULT_STREAM_MODE = "replace";
 export function resolveSlackStreamMode(raw) {
     if (typeof raw !== "string") {
         return DEFAULT_STREAM_MODE;
     }
-    const normalized = raw.trim().toLowerCase();
+    const normalized = normalizeLowercaseStringOrEmpty(raw);
     if (normalized === "replace" || normalized === "status_final" || normalized === "append") {
         return normalized;
     }

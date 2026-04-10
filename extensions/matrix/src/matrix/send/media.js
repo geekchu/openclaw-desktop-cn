@@ -1,6 +1,6 @@
 import { parseBuffer } from "music-metadata";
 import { getMatrixRuntime } from "../../runtime.js";
-import { applyMatrixFormatting } from "./formatting.js";
+import {} from "./types.js";
 const getCore = () => getMatrixRuntime();
 export function buildMatrixMediaInfo(params) {
     const base = {};
@@ -68,7 +68,6 @@ export function buildMediaContent(params) {
     if (params.relation) {
         base["m.relates_to"] = params.relation;
     }
-    applyMatrixFormatting(base, params.body);
     return base;
 }
 const THUMBNAIL_MAX_SIDE = 800;

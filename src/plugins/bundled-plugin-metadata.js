@@ -1,36 +1,187 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { collectBundledChannelConfigs } from "./bundled-channel-config-metadata.js";
+import { collectBundledPluginPublicSurfaceArtifacts, collectBundledPluginRuntimeSidecarArtifacts, deriveBundledPluginIdHint, normalizeBundledPluginStringList, rewriteBundledPluginEntryToBuiltPath, resolveBundledPluginScanDir, trimBundledPluginString, } from "./bundled-plugin-scan.js";
+import { getPackageManifestMetadata, loadPluginManifest, } from "./manifest.js";
+import { resolveLoaderPackageRoot } from "./sdk-alias.js";
 import { GENERATED_BUNDLED_PLUGIN_METADATA } from "./bundled-plugin-metadata.generated.js";
-const PUBLIC_SURFACE_SOURCE_EXTENSIONS = [".ts", ".mts", ".js", ".mjs", ".cts", ".cjs"];
+const OPENCLAW_PACKAGE_ROOT = resolveLoaderPackageRoot({
+    modulePath: fileURLToPath(import.meta.url),
+    moduleUrl: import.meta.url,
+}) ?? fileURLToPath(new URL("../..", import.meta.url));
+const CURRENT_MODULE_PATH = fileURLToPath(import.meta.url);
+const RUNNING_FROM_BUILT_ARTIFACT = CURRENT_MODULE_PATH.includes(`${path.sep}dist${path.sep}`) ||
+    CURRENT_MODULE_PATH.includes(`${path.sep}dist-runtime${path.sep}`);
+// Keep the generated metadata constant available for runtime mirrors and tests
+// that still import the historical static snapshot export.
 export const BUNDLED_PLUGIN_METADATA = GENERATED_BUNDLED_PLUGIN_METADATA;
-export function resolveBundledPluginGeneratedPath(rootDir, entry) {
+const bundledPluginMetadataCache = new Map();
+export function clearBundledPluginMetadataCache() {
+    bundledPluginMetadataCache.clear();
+}
+function readPackageManifest(pluginDir) {
+    const packagePath = path.join(pluginDir, "package.json");
+    if (!fs.existsSync(packagePath)) {
+        return undefined;
+    }
+    try {
+        return JSON.parse(fs.readFileSync(packagePath, "utf-8"));
+    }
+    catch {
+        return undefined;
+    }
+}
+function collectBundledPluginMetadataForPackageRoot(packageRoot, includeChannelConfigs, includeSyntheticChannelConfigs) {
+    const scanDir = resolveBundledPluginScanDir({
+        packageRoot,
+        runningFromBuiltArtifact: RUNNING_FROM_BUILT_ARTIFACT,
+    });
+    if (!scanDir || !fs.existsSync(scanDir)) {
+        return [];
+    }
+    const entries = [];
+    for (const dirName of fs
+        .readdirSync(scanDir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .toSorted((left, right) => left.localeCompare(right))) {
+        const pluginDir = path.join(scanDir, dirName);
+        const manifestResult = loadPluginManifest(pluginDir, false);
+        if (!manifestResult.ok) {
+            continue;
+        }
+        const packageJson = readPackageManifest(pluginDir);
+        const packageManifest = getPackageManifestMetadata(packageJson);
+        const extensions = normalizeBundledPluginStringList(packageManifest?.extensions);
+        if (extensions.length === 0) {
+            continue;
+        }
+        const sourceEntry = trimBundledPluginString(extensions[0]);
+        const builtEntry = rewriteBundledPluginEntryToBuiltPath(sourceEntry);
+        if (!sourceEntry || !builtEntry) {
+            continue;
+        }
+        const setupSourcePath = trimBundledPluginString(packageManifest?.setupEntry);
+        const setupSource = setupSourcePath && rewriteBundledPluginEntryToBuiltPath(setupSourcePath)
+            ? {
+                source: setupSourcePath,
+                built: rewriteBundledPluginEntryToBuiltPath(setupSourcePath),
+            }
+            : undefined;
+        const publicSurfaceArtifacts = collectBundledPluginPublicSurfaceArtifacts({
+            pluginDir,
+            sourceEntry,
+            ...(setupSourcePath ? { setupEntry: setupSourcePath } : {}),
+        });
+        const runtimeSidecarArtifacts = collectBundledPluginRuntimeSidecarArtifacts(publicSurfaceArtifacts);
+        const channelConfigs = includeChannelConfigs && includeSyntheticChannelConfigs
+            ? collectBundledChannelConfigs({
+                pluginDir,
+                manifest: manifestResult.manifest,
+                packageManifest,
+            })
+            : manifestResult.manifest.channelConfigs;
+        entries.push({
+            dirName,
+            idHint: deriveBundledPluginIdHint({
+                entryPath: sourceEntry,
+                manifestId: manifestResult.manifest.id,
+                packageName: trimBundledPluginString(packageJson?.name),
+                hasMultipleExtensions: extensions.length > 1,
+            }),
+            source: {
+                source: sourceEntry,
+                built: builtEntry,
+            },
+            ...(setupSource ? { setupSource } : {}),
+            ...(publicSurfaceArtifacts ? { publicSurfaceArtifacts } : {}),
+            ...(runtimeSidecarArtifacts ? { runtimeSidecarArtifacts } : {}),
+            ...(trimBundledPluginString(packageJson?.name)
+                ? { packageName: trimBundledPluginString(packageJson?.name) }
+                : {}),
+            ...(trimBundledPluginString(packageJson?.version)
+                ? { packageVersion: trimBundledPluginString(packageJson?.version) }
+                : {}),
+            ...(trimBundledPluginString(packageJson?.description)
+                ? { packageDescription: trimBundledPluginString(packageJson?.description) }
+                : {}),
+            ...(packageManifest ? { packageManifest } : {}),
+            manifest: {
+                ...manifestResult.manifest,
+                ...(channelConfigs ? { channelConfigs } : {}),
+            },
+        });
+    }
+    return entries;
+}
+export function listBundledPluginMetadata(params) {
+    const rootDir = path.resolve(params?.rootDir ?? OPENCLAW_PACKAGE_ROOT);
+    const includeChannelConfigs = params?.includeChannelConfigs ?? !RUNNING_FROM_BUILT_ARTIFACT;
+    const includeSyntheticChannelConfigs = params?.includeSyntheticChannelConfigs ?? includeChannelConfigs;
+    const cacheKey = JSON.stringify({
+        rootDir,
+        includeChannelConfigs,
+        includeSyntheticChannelConfigs,
+    });
+    const cached = bundledPluginMetadataCache.get(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    const entries = Object.freeze(collectBundledPluginMetadataForPackageRoot(rootDir, includeChannelConfigs, includeSyntheticChannelConfigs));
+    bundledPluginMetadataCache.set(cacheKey, entries);
+    return entries;
+}
+export function findBundledPluginMetadataById(pluginId, params) {
+    return listBundledPluginMetadata(params).find((entry) => entry.manifest.id === pluginId);
+}
+export function resolveBundledPluginWorkspaceSourcePath(params) {
+    const metadata = findBundledPluginMetadataById(params.pluginId, { rootDir: params.rootDir });
+    if (!metadata) {
+        return null;
+    }
+    return path.resolve(params.rootDir, "extensions", metadata.dirName);
+}
+export function resolveBundledPluginGeneratedPath(rootDir, entry, pluginDirName) {
     if (!entry) {
         return null;
     }
-    const candidates = [entry.built, entry.source]
-        .filter((candidate) => typeof candidate === "string" && candidate.length > 0)
-        .map((candidate) => path.resolve(rootDir, candidate));
-    for (const candidate of candidates) {
-        if (fs.existsSync(candidate)) {
-            return candidate;
+    const entryOrder = [entry.built, entry.source].filter((candidate) => typeof candidate === "string" && candidate.length > 0);
+    const baseDirs = [
+        path.resolve(rootDir, "dist", "extensions", pluginDirName ?? ""),
+        path.resolve(rootDir, "extensions", pluginDirName ?? ""),
+    ];
+    for (const baseDir of baseDirs) {
+        for (const entryPath of entryOrder) {
+            const candidate = path.resolve(baseDir, normalizeRelativePluginEntryPath(entryPath));
+            if (fs.existsSync(candidate)) {
+                return candidate;
+            }
         }
     }
     return null;
 }
-export function resolveBundledPluginPublicSurfacePath(params) {
-    const artifactBasename = params.artifactBasename.replace(/^\.\//u, "");
-    if (!artifactBasename) {
+function normalizeRelativePluginEntryPath(entryPath) {
+    return entryPath.replace(/^\.\//u, "");
+}
+export function resolveBundledPluginRepoEntryPath(params) {
+    const metadata = findBundledPluginMetadataById(params.pluginId, { rootDir: params.rootDir });
+    if (!metadata) {
         return null;
     }
-    const builtCandidate = path.resolve(params.rootDir, "dist", "extensions", params.dirName, artifactBasename);
-    if (fs.existsSync(builtCandidate)) {
-        return builtCandidate;
-    }
-    const sourceBaseName = artifactBasename.replace(/\.js$/u, "");
-    for (const ext of PUBLIC_SURFACE_SOURCE_EXTENSIONS) {
-        const sourceCandidate = path.resolve(params.rootDir, "extensions", params.dirName, `${sourceBaseName}${ext}`);
-        if (fs.existsSync(sourceCandidate)) {
-            return sourceCandidate;
+    const entryOrder = params.preferBuilt
+        ? [metadata.source.built, metadata.source.source]
+        : [metadata.source.source, metadata.source.built];
+    const baseDirs = [
+        path.resolve(params.rootDir, "dist", "extensions", metadata.dirName),
+        path.resolve(params.rootDir, "extensions", metadata.dirName),
+    ];
+    for (const baseDir of baseDirs) {
+        for (const entryPath of entryOrder) {
+            const candidate = path.resolve(baseDir, normalizeRelativePluginEntryPath(entryPath));
+            if (fs.existsSync(candidate)) {
+                return candidate;
+            }
         }
     }
     return null;

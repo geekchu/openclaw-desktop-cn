@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { formatSessionArchiveTimestamp, parseSessionArchiveTimestamp, resolveSessionFilePath, resolveSessionTranscriptPath, resolveSessionTranscriptPathInDir, } from "../config/sessions.js";
+import { formatSessionArchiveTimestamp, parseSessionArchiveTimestamp, } from "../config/sessions/artifacts.js";
+import { resolveSessionFilePath, resolveSessionTranscriptPath, resolveSessionTranscriptPathInDir, } from "../config/sessions/paths.js";
 import { resolveRequiredHomeDir } from "../infra/home-dir.js";
 function classifySessionTranscriptCandidate(sessionId, sessionFile) {
     const transcriptSessionId = extractGeneratedTranscriptSessionId(sessionFile);
@@ -95,6 +96,9 @@ export function archiveFileOnDisk(filePath, reason) {
     return archived;
 }
 export function archiveSessionTranscripts(opts) {
+    return archiveSessionTranscriptsDetailed(opts).map((entry) => entry.archivedPath);
+}
+export function archiveSessionTranscriptsDetailed(opts) {
     const archived = [];
     const storeDir = opts.restrictToStoreDir && opts.storePath
         ? canonicalizePathForComparison(path.dirname(opts.storePath))
@@ -111,13 +115,38 @@ export function archiveSessionTranscripts(opts) {
             continue;
         }
         try {
-            archived.push(archiveFileOnDisk(candidatePath, opts.reason));
+            archived.push({
+                sourcePath: candidatePath,
+                archivedPath: archiveFileOnDisk(candidatePath, opts.reason),
+            });
         }
         catch {
             // Best-effort.
         }
     }
     return archived;
+}
+export function resolveStableSessionEndTranscript(params) {
+    const archivedTranscripts = params.archivedTranscripts ?? [];
+    if (archivedTranscripts.length > 0) {
+        const preferredPath = params.sessionFile?.trim()
+            ? canonicalizePathForComparison(params.sessionFile)
+            : undefined;
+        const archivedMatch = preferredPath == null
+            ? undefined
+            : archivedTranscripts.find((entry) => canonicalizePathForComparison(entry.sourcePath) === preferredPath);
+        const archivedPath = archivedMatch?.archivedPath ?? archivedTranscripts[0]?.archivedPath;
+        if (archivedPath) {
+            return { sessionFile: archivedPath, transcriptArchived: true };
+        }
+    }
+    for (const candidate of resolveSessionTranscriptCandidates(params.sessionId, params.storePath, params.sessionFile, params.agentId)) {
+        const candidatePath = canonicalizePathForComparison(candidate);
+        if (fs.existsSync(candidatePath)) {
+            return { sessionFile: candidatePath, transcriptArchived: false };
+        }
+    }
+    return {};
 }
 export async function cleanupArchivedSessionTranscripts(opts) {
     if (!Number.isFinite(opts.olderThanMs) || opts.olderThanMs < 0) {

@@ -1,5 +1,5 @@
-import { recordChannelActivity } from "openclaw/plugin-sdk/channel-runtime";
-import { toWhatsappJid } from "openclaw/plugin-sdk/text-runtime";
+import { recordChannelActivity } from "openclaw/plugin-sdk/infra-runtime";
+import { toWhatsappJid } from "../text-runtime.js";
 function recordWhatsAppOutbound(accountId) {
     recordChannelActivity({
         channel: "whatsapp",
@@ -17,6 +17,9 @@ export function createWebSendApi(params) {
         sendMessage: async (to, text, mediaBuffer, mediaType, sendOptions) => {
             const jid = toWhatsappJid(to);
             let payload;
+            if (mediaBuffer) {
+                mediaType ??= "application/octet-stream";
+            }
             if (mediaBuffer && mediaType) {
                 if (mediaType.startsWith("image/")) {
                     payload = {

@@ -1,9 +1,15 @@
+import { normalizeOptionalString, normalizeOptionalTrimmedStringList, } from "openclaw/plugin-sdk/text-runtime";
+import {} from "../config/config.js";
 import { resolveGatewayPort } from "../config/paths.js";
-import { deriveDefaultBrowserCdpPortRange, deriveDefaultBrowserControlPort, DEFAULT_BROWSER_CONTROL_PORT, } from "../config/port-defaults.js";
-import { isLoopbackHost } from "../gateway/net.js";
+import { DEFAULT_BROWSER_CONTROL_PORT, deriveDefaultBrowserCdpPortRange, deriveDefaultBrowserControlPort, } from "../config/port-defaults.js";
 import { resolveUserPath } from "../utils.js";
-import { DEFAULT_OPENCLAW_BROWSER_COLOR, DEFAULT_OPENCLAW_BROWSER_ENABLED, DEFAULT_BROWSER_EVALUATE_ENABLED, DEFAULT_BROWSER_DEFAULT_PROFILE_NAME, DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME, } from "./constants.js";
-import { CDP_PORT_RANGE_START } from "./profiles.js";
+import { parseBrowserHttpUrl, redactCdpUrl, isLoopbackHost } from "./cdp.helpers.js";
+import { DEFAULT_AI_SNAPSHOT_MAX_CHARS, DEFAULT_BROWSER_DEFAULT_PROFILE_NAME, DEFAULT_BROWSER_EVALUATE_ENABLED, DEFAULT_OPENCLAW_BROWSER_COLOR, DEFAULT_OPENCLAW_BROWSER_ENABLED, DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME, } from "./constants.js";
+import { resolveBrowserControlAuth } from "./control-auth.js";
+import { DEFAULT_UPLOAD_DIR } from "./paths.js";
+export { DEFAULT_AI_SNAPSHOT_MAX_CHARS, DEFAULT_BROWSER_DEFAULT_PROFILE_NAME, DEFAULT_BROWSER_EVALUATE_ENABLED, DEFAULT_OPENCLAW_BROWSER_COLOR, DEFAULT_OPENCLAW_BROWSER_ENABLED, DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME, DEFAULT_UPLOAD_DIR, parseBrowserHttpUrl, redactCdpUrl, resolveBrowserControlAuth, };
+export { parseBrowserHttpUrl as parseHttpUrl };
+const DEFAULT_BROWSER_CDP_PORT_RANGE_START = 18800;
 function normalizeHexColor(raw) {
     const value = (raw ?? "").trim();
     if (!value) {
@@ -32,22 +38,14 @@ function resolveCdpPortRangeStart(rawStart, fallbackStart, rangeSpan) {
     }
     return start;
 }
-function normalizeStringList(raw) {
-    if (!Array.isArray(raw) || raw.length === 0) {
-        return undefined;
-    }
-    const values = raw
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0);
-    return values.length > 0 ? values : undefined;
-}
+const normalizeStringList = normalizeOptionalTrimmedStringList;
 function resolveBrowserSsrFPolicy(cfg) {
-    const allowPrivateNetwork = cfg?.ssrfPolicy?.allowPrivateNetwork;
-    const dangerouslyAllowPrivateNetwork = cfg?.ssrfPolicy?.dangerouslyAllowPrivateNetwork;
-    const allowedHostnames = normalizeStringList(cfg?.ssrfPolicy?.allowedHostnames);
-    const hostnameAllowlist = normalizeStringList(cfg?.ssrfPolicy?.hostnameAllowlist);
+    const rawPolicy = cfg?.ssrfPolicy;
+    const allowPrivateNetwork = rawPolicy?.allowPrivateNetwork;
+    const dangerouslyAllowPrivateNetwork = rawPolicy?.dangerouslyAllowPrivateNetwork;
+    const allowedHostnames = normalizeStringList(rawPolicy?.allowedHostnames);
+    const hostnameAllowlist = normalizeStringList(rawPolicy?.hostnameAllowlist);
     const hasExplicitPrivateSetting = allowPrivateNetwork !== undefined || dangerouslyAllowPrivateNetwork !== undefined;
-    // Browser defaults to trusted-network mode unless explicitly disabled by policy.
     const resolvedAllowPrivateNetwork = dangerouslyAllowPrivateNetwork === true ||
         allowPrivateNetwork === true ||
         !hasExplicitPrivateSetting;
@@ -63,49 +61,17 @@ function resolveBrowserSsrFPolicy(cfg) {
         ...(hostnameAllowlist ? { hostnameAllowlist } : {}),
     };
 }
-export function parseHttpUrl(raw, label) {
-    const trimmed = raw.trim();
-    const parsed = new URL(trimmed);
-    const allowed = ["http:", "https:", "ws:", "wss:"];
-    if (!allowed.includes(parsed.protocol)) {
-        throw new Error(`${label} must be http(s) or ws(s), got: ${parsed.protocol.replace(":", "")}`);
-    }
-    const isSecure = parsed.protocol === "https:" || parsed.protocol === "wss:";
-    const port = parsed.port && Number.parseInt(parsed.port, 10) > 0
-        ? Number.parseInt(parsed.port, 10)
-        : isSecure
-            ? 443
-            : 80;
-    if (Number.isNaN(port) || port <= 0 || port > 65535) {
-        throw new Error(`${label} has invalid port: ${parsed.port}`);
-    }
-    return {
-        parsed,
-        port,
-        normalized: parsed.toString().replace(/\/$/, ""),
-    };
-}
-/**
- * Ensure the default "openclaw" profile exists in the profiles map.
- * Auto-creates it with the legacy CDP port (from browser.cdpUrl) or first port if missing.
- */
 function ensureDefaultProfile(profiles, defaultColor, legacyCdpPort, derivedDefaultCdpPort, legacyCdpUrl) {
     const result = { ...profiles };
     if (!result[DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME]) {
         result[DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME] = {
-            cdpPort: legacyCdpPort ?? derivedDefaultCdpPort ?? CDP_PORT_RANGE_START,
+            cdpPort: legacyCdpPort ?? derivedDefaultCdpPort ?? DEFAULT_BROWSER_CDP_PORT_RANGE_START,
             color: defaultColor,
-            // Preserve the full cdpUrl for ws/wss endpoints so resolveProfile()
-            // doesn't reconstruct from cdpProtocol/cdpHost/cdpPort (which drops
-            // the WebSocket protocol and query params like API keys).
             ...(legacyCdpUrl ? { cdpUrl: legacyCdpUrl } : {}),
         };
     }
     return result;
 }
-/**
- * Ensure a built-in "user" profile exists for Chrome's existing-session attach flow.
- */
 function ensureDefaultUserBrowserProfile(profiles) {
     const result = { ...profiles };
     if (result.user) {
@@ -133,7 +99,7 @@ export function resolveBrowserConfig(cfg, rootConfig) {
     const rawCdpUrl = (cfg?.cdpUrl ?? "").trim();
     let cdpInfo;
     if (rawCdpUrl) {
-        cdpInfo = parseHttpUrl(rawCdpUrl, "browser.cdpUrl");
+        cdpInfo = parseBrowserHttpUrl(rawCdpUrl, "browser.cdpUrl");
     }
     else {
         const derivedPort = controlPort + 1;
@@ -150,9 +116,8 @@ export function resolveBrowserConfig(cfg, rootConfig) {
     const headless = cfg?.headless === true;
     const noSandbox = cfg?.noSandbox === true;
     const attachOnly = cfg?.attachOnly === true;
-    const executablePath = cfg?.executablePath?.trim() || undefined;
-    const defaultProfileFromConfig = cfg?.defaultProfile?.trim() || undefined;
-    // Use legacy cdpUrl port for backward compatibility when no profiles configured
+    const executablePath = normalizeOptionalString(cfg?.executablePath);
+    const defaultProfileFromConfig = normalizeOptionalString(cfg?.defaultProfile);
     const legacyCdpPort = rawCdpUrl ? cdpInfo.port : undefined;
     const isWsUrl = cdpInfo.parsed.protocol === "ws:" || cdpInfo.parsed.protocol === "wss:";
     const legacyCdpUrl = rawCdpUrl && isWsUrl ? cdpInfo.normalized : undefined;
@@ -165,9 +130,8 @@ export function resolveBrowserConfig(cfg, rootConfig) {
                 ? DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME
                 : "user");
     const extraArgs = Array.isArray(cfg?.extraArgs)
-        ? cfg.extraArgs.filter((a) => typeof a === "string" && a.trim().length > 0)
+        ? cfg.extraArgs.filter((value) => typeof value === "string" && value.trim().length > 0)
         : [];
-    const ssrfPolicy = resolveBrowserSsrFPolicy(cfg);
     return {
         enabled,
         evaluateEnabled,
@@ -186,14 +150,10 @@ export function resolveBrowserConfig(cfg, rootConfig) {
         attachOnly,
         defaultProfile,
         profiles,
-        ssrfPolicy,
+        ssrfPolicy: resolveBrowserSsrFPolicy(cfg),
         extraArgs,
     };
 }
-/**
- * Resolve a profile by name from the config.
- * Returns null if the profile doesn't exist.
- */
 export function resolveProfile(resolved, profileName) {
     const profile = resolved.profiles[profileName];
     if (!profile) {
@@ -205,7 +165,6 @@ export function resolveProfile(resolved, profileName) {
     let cdpUrl = "";
     const driver = profile.driver === "existing-session" ? "existing-session" : "openclaw";
     if (driver === "existing-session") {
-        // existing-session uses Chrome MCP auto-connect; no CDP port/URL needed
         return {
             name: profileName,
             cdpPort: 0,
@@ -218,8 +177,17 @@ export function resolveProfile(resolved, profileName) {
             attachOnly: true,
         };
     }
-    if (rawProfileUrl) {
-        const parsed = parseHttpUrl(rawProfileUrl, `browser.profiles.${profileName}.cdpUrl`);
+    const hasStaleWsPath = rawProfileUrl !== "" &&
+        cdpPort > 0 &&
+        /^wss?:\/\//i.test(rawProfileUrl) &&
+        /\/devtools\/browser\//i.test(rawProfileUrl);
+    if (hasStaleWsPath) {
+        const parsed = new URL(rawProfileUrl);
+        cdpHost = parsed.hostname;
+        cdpUrl = `${resolved.cdpProtocol}://${cdpHost}:${cdpPort}`;
+    }
+    else if (rawProfileUrl) {
+        const parsed = parseBrowserHttpUrl(rawProfileUrl, `browser.profiles.${profileName}.cdpUrl`);
         cdpHost = parsed.parsed.hostname;
         cdpPort = parsed.port;
         cdpUrl = parsed.normalized;

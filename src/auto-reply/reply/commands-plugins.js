@@ -8,8 +8,9 @@ import { parseClawHubPluginSpec } from "../../infra/clawhub.js";
 import { installPluginFromClawHub } from "../../plugins/clawhub.js";
 import { installPluginFromNpmSpec, installPluginFromPath } from "../../plugins/install.js";
 import { clearPluginManifestRegistryCache } from "../../plugins/manifest-registry.js";
-import { buildAllPluginInspectReports, buildPluginInspectReport, buildPluginStatusReport, formatPluginCompatibilityNotice, } from "../../plugins/status.js";
+import { buildAllPluginInspectReports, buildPluginDiagnosticsReport, buildPluginInspectReport, buildPluginSnapshotReport, formatPluginCompatibilityNotice, } from "../../plugins/status.js";
 import { setPluginEnabledInConfig } from "../../plugins/toggle-config.js";
+import { normalizeOptionalLowercaseString } from "../../shared/string-coerce.js";
 import { resolveUserPath } from "../../utils.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { rejectNonOwnerCommand, rejectUnauthorizedCommand, requireCommandFlagEnabled, requireGatewayClientScopeForInternalChannel, } from "./command-gates.js";
@@ -73,11 +74,12 @@ function formatPluginsList(report) {
     return lines.join("\n");
 }
 function findPlugin(report, rawName) {
-    const target = rawName.trim().toLowerCase();
+    const target = normalizeOptionalLowercaseString(rawName);
     if (!target) {
         return undefined;
     }
-    return report.plugins.find((plugin) => plugin.id.toLowerCase() === target || plugin.name.toLowerCase() === target);
+    return report.plugins.find((plugin) => normalizeOptionalLowercaseString(plugin.id) === target ||
+        normalizeOptionalLowercaseString(plugin.name) === target);
 }
 function looksLikeLocalPluginInstallSpec(raw) {
     return (raw.startsWith(".") ||
@@ -203,7 +205,7 @@ async function installPluginFromPluginsCommand(params) {
     });
     return { ok: true, pluginId: result.pluginId };
 }
-async function loadPluginCommandState(workspaceDir) {
+async function loadPluginCommandState(workspaceDir, options) {
     const snapshot = await readConfigFileSnapshot();
     if (!snapshot.valid) {
         return {
@@ -217,7 +219,24 @@ async function loadPluginCommandState(workspaceDir) {
         ok: true,
         path: snapshot.path,
         config,
-        report: buildPluginStatusReport({ config, workspaceDir }),
+        report: options?.loadModules === true
+            ? buildPluginDiagnosticsReport({ config, workspaceDir })
+            : buildPluginSnapshotReport({ config, workspaceDir }),
+    };
+}
+async function loadPluginCommandConfig() {
+    const snapshot = await readConfigFileSnapshot();
+    if (!snapshot.valid) {
+        return {
+            ok: false,
+            path: snapshot.path,
+            error: "Config file is invalid; fix it before using /plugins.",
+        };
+    }
+    return {
+        ok: true,
+        path: snapshot.path,
+        config: structuredClone(snapshot.resolved),
     };
 }
 export const handlePluginsCommand = async (params, allowTextCommands) => {
@@ -251,7 +270,42 @@ export const handlePluginsCommand = async (params, allowTextCommands) => {
             reply: { text: `⚠️ ${pluginsCommand.message}` },
         };
     }
-    const loaded = await loadPluginCommandState(params.workspaceDir);
+    const missingAdminScope = requireGatewayClientScopeForInternalChannel(params, {
+        label: "/plugins write",
+        allowedScopes: ["operator.admin"],
+        missingText: "❌ /plugins install|enable|disable requires operator.admin for gateway clients.",
+    });
+    if (missingAdminScope) {
+        return missingAdminScope;
+    }
+    if (pluginsCommand.action === "install") {
+        const loadedConfig = await loadPluginCommandConfig();
+        if (!loadedConfig.ok) {
+            return {
+                shouldContinue: false,
+                reply: { text: `⚠️ ${loadedConfig.error}` },
+            };
+        }
+        const installed = await installPluginFromPluginsCommand({
+            raw: pluginsCommand.spec,
+            config: loadedConfig.config,
+        });
+        if (!installed.ok) {
+            return {
+                shouldContinue: false,
+                reply: { text: `⚠️ ${installed.error}` },
+            };
+        }
+        return {
+            shouldContinue: false,
+            reply: {
+                text: `🔌 Installed plugin "${installed.pluginId}". Restart the gateway to load plugins.`,
+            },
+        };
+    }
+    const loaded = await loadPluginCommandState(params.workspaceDir, {
+        loadModules: pluginsCommand.action !== "list",
+    });
     if (!loaded.ok) {
         return {
             shouldContinue: false,
@@ -271,7 +325,7 @@ export const handlePluginsCommand = async (params, allowTextCommands) => {
                 reply: { text: formatPluginsList(loaded.report) },
             };
         }
-        if (pluginsCommand.name.toLowerCase() === "all") {
+        if (normalizeOptionalLowercaseString(pluginsCommand.name) === "all") {
             return {
                 shouldContinue: false,
                 reply: {
@@ -298,32 +352,6 @@ export const handlePluginsCommand = async (params, allowTextCommands) => {
                     compatibilityWarnings: payload.compatibilityWarnings,
                     install: payload.install,
                 }),
-            },
-        };
-    }
-    const missingAdminScope = requireGatewayClientScopeForInternalChannel(params, {
-        label: "/plugins write",
-        allowedScopes: ["operator.admin"],
-        missingText: "❌ /plugins install|enable|disable requires operator.admin for gateway clients.",
-    });
-    if (missingAdminScope) {
-        return missingAdminScope;
-    }
-    if (pluginsCommand.action === "install") {
-        const installed = await installPluginFromPluginsCommand({
-            raw: pluginsCommand.spec,
-            config: structuredClone(loaded.config),
-        });
-        if (!installed.ok) {
-            return {
-                shouldContinue: false,
-                reply: { text: `⚠️ ${installed.error}` },
-            };
-        }
-        return {
-            shouldContinue: false,
-            reply: {
-                text: `🔌 Installed plugin "${installed.pluginId}". Restart the gateway to load plugins.`,
             },
         };
     }

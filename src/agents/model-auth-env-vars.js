@@ -1,5 +1,8 @@
-import { PROVIDER_AUTH_ENV_VAR_CANDIDATES, listKnownProviderAuthEnvVarNames, } from "../secrets/provider-env-vars.js";
-export const PROVIDER_ENV_API_KEY_CANDIDATES = PROVIDER_AUTH_ENV_VAR_CANDIDATES;
+import { listKnownProviderAuthEnvVarNames, resolveProviderAuthEnvVarCandidates, } from "../secrets/provider-env-vars.js";
+export function resolveProviderEnvApiKeyCandidates(params) {
+    return resolveProviderAuthEnvVarCandidates(params);
+}
+export const PROVIDER_ENV_API_KEY_CANDIDATES = resolveProviderEnvApiKeyCandidates();
 export function listKnownProviderEnvApiKeyNames() {
     return listKnownProviderAuthEnvVarNames();
 }

@@ -1,6 +1,6 @@
 import { buildMentionRegexes, normalizeMentionText } from "openclaw/plugin-sdk/channel-inbound";
-import { isSelfChatMode, normalizeE164 } from "openclaw/plugin-sdk/text-runtime";
 import { getComparableIdentityValues, getMentionIdentities, getSelfIdentity, identitiesOverlap, } from "../identity.js";
+import { isSelfChatMode, normalizeE164 } from "../text-runtime.js";
 export function buildMentionConfig(cfg, agentId) {
     const mentionRegexes = buildMentionRegexes(cfg, agentId);
     return { mentionRegexes, allowFrom: cfg.channels?.whatsapp?.allowFrom };

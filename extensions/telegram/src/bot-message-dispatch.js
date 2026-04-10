@@ -1,19 +1,16 @@
-import { resolveAgentDir } from "openclaw/plugin-sdk/agent-runtime";
-import { findModelInCatalog, loadModelCatalog, modelSupportsVision, } from "openclaw/plugin-sdk/agent-runtime";
-import { resolveDefaultModelForAgent } from "openclaw/plugin-sdk/agent-runtime";
 import { logAckFailure, logTypingFailure, removeAckReactionAfterReply, } from "openclaw/plugin-sdk/channel-feedback";
 import { createChannelReplyPipeline } from "openclaw/plugin-sdk/channel-reply-pipeline";
-import { resolveMarkdownTableMode } from "openclaw/plugin-sdk/config-runtime";
-import { loadSessionStore, resolveSessionStoreEntry, } from "openclaw/plugin-sdk/config-runtime";
-import { getAgentScopedMediaLocalRoots } from "openclaw/plugin-sdk/media-runtime";
+import { resolveChannelStreamingBlockEnabled } from "openclaw/plugin-sdk/channel-streaming";
+import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import { clearHistoryEntriesIfEnabled } from "openclaw/plugin-sdk/reply-history";
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
-import { resolveChunkMode } from "openclaw/plugin-sdk/reply-runtime";
-import { resolveAutoTopicLabelConfig, generateTopicLabel } from "openclaw/plugin-sdk/reply-runtime";
 import { danger, logVerbose } from "openclaw/plugin-sdk/runtime-env";
 import { defaultTelegramBotDeps } from "./bot-deps.js";
+import { findModelInCatalog, loadModelCatalog, modelSupportsVision, resolveAgentDir, resolveDefaultModelForAgent, } from "./bot-message-dispatch.agent.runtime.js";
+import { generateTopicLabel, getAgentScopedMediaLocalRoots, loadSessionStore, resolveAutoTopicLabelConfig, resolveChunkMode, resolveMarkdownTableMode, resolveSessionStoreEntry, } from "./bot-message-dispatch.runtime.js";
 import { deliverReplies, emitInternalMessageSentHook } from "./bot/delivery.js";
 import { createTelegramDraftStream } from "./draft-stream.js";
+import { buildTelegramErrorScopeKey, isSilentErrorPolicy, resolveTelegramErrorPolicy, shouldSuppressTelegramError, } from "./error-policy.js";
 import { shouldSuppressLocalTelegramExecApprovalPrompt } from "./exec-approvals.js";
 import { renderTelegramHtmlText } from "./format.js";
 import { createLaneDeliveryStateTracker, createLaneTextDeliverer, } from "./lane-delivery.js";
@@ -79,7 +76,7 @@ function resolveTelegramReasoningLevel(params) {
     return "off";
 }
 export const dispatchTelegramMessage = async ({ context, bot, cfg, runtime, replyToMode, streamMode, textLimit, telegramCfg, telegramDeps = defaultTelegramBotDeps, opts, }) => {
-    const { ctxPayload, msg, chatId, isGroup, groupConfig, threadSpec, historyKey, historyLimit, groupHistories, route, skillFilter, sendTyping, sendRecordVoice, ackReactionPromise, reactionApi, removeAckAfterReply, statusReactionController, } = context;
+    const { ctxPayload, msg, chatId, isGroup, groupConfig, topicConfig, threadSpec, historyKey, historyLimit, groupHistories, route, skillFilter, sendTyping, sendRecordVoice, ackReactionPromise, reactionApi, removeAckAfterReply, statusReactionController, } = context;
     const draftMaxChars = Math.min(textLimit, 4096);
     const tableMode = resolveMarkdownTableMode({
         cfg,
@@ -90,9 +87,8 @@ export const dispatchTelegramMessage = async ({ context, bot, cfg, runtime, repl
         text: renderTelegramHtmlText(text, { tableMode }),
         parseMode: "HTML",
     });
-    const accountBlockStreamingEnabled = typeof telegramCfg.blockStreaming === "boolean"
-        ? telegramCfg.blockStreaming
-        : cfg.agents?.defaults?.blockStreamingDefault === "on";
+    const accountBlockStreamingEnabled = resolveChannelStreamingBlockEnabled(telegramCfg) ??
+        cfg.agents?.defaults?.blockStreamingDefault === "on";
     const resolvedReasoningLevel = resolveTelegramReasoningLevel({
         cfg,
         sessionKey: ctxPayload.SessionKey,
@@ -103,7 +99,7 @@ export const dispatchTelegramMessage = async ({ context, bot, cfg, runtime, repl
     const streamReasoningDraft = resolvedReasoningLevel === "stream";
     const previewStreamingEnabled = streamMode !== "off";
     const canStreamAnswerDraft = previewStreamingEnabled && !accountBlockStreamingEnabled && !forceBlockStreamingForReasoning;
-    const canStreamReasoningDraft = canStreamAnswerDraft || streamReasoningDraft;
+    const canStreamReasoningDraft = streamReasoningDraft;
     const draftReplyToMessageId = replyToMode !== "off" && typeof msg.message_id === "number" ? msg.message_id : undefined;
     const draftMinInitialChars = DRAFT_MIN_INITIAL_CHARS;
     // Keep DM preview lanes on real message transport. Native draft previews still
@@ -266,12 +262,13 @@ export const dispatchTelegramMessage = async ({ context, bot, cfg, runtime, repl
         }
         await lane.stream.flush();
     };
+    const resolvedBlockStreamingEnabled = resolveChannelStreamingBlockEnabled(telegramCfg);
     const disableBlockStreaming = !previewStreamingEnabled
         ? true
         : forceBlockStreamingForReasoning
             ? false
-            : typeof telegramCfg.blockStreaming === "boolean"
-                ? !telegramCfg.blockStreaming
+            : typeof resolvedBlockStreamingEnabled === "boolean"
+                ? !resolvedBlockStreamingEnabled
                 : canStreamAnswerDraft
                     ? true
                     : undefined;
@@ -439,13 +436,13 @@ export const dispatchTelegramMessage = async ({ context, bot, cfg, runtime, repl
             }
         }
         catch (err) {
-            logVerbose(`auto-topic-label: session store error: ${err instanceof Error ? err.message : String(err)}`);
+            logVerbose(`auto-topic-label: session store error: ${formatErrorMessage(err)}`);
         }
     }
     if (statusReactionController) {
         void statusReactionController.setThinking();
     }
-    const { onModelSelected, ...replyPipeline } = createChannelReplyPipeline({
+    const { onModelSelected, ...replyPipeline } = (telegramDeps.createChannelReplyPipeline ?? createChannelReplyPipeline)({
         cfg,
         agentId: route.agentId,
         channel: "telegram",
@@ -490,7 +487,7 @@ export const dispatchTelegramMessage = async ({ context, bot, cfg, runtime, repl
                     const split = splitTextIntoLaneSegments(payload.text);
                     const segments = split.segments;
                     const reply = resolveSendableOutboundReplyParts(payload);
-                    const hasMedia = reply.hasMedia;
+                    const _hasMedia = reply.hasMedia;
                     const flushBufferedFinalAnswer = async () => {
                         const buffered = reasoningStepState.takeBufferedFinalAnswer();
                         if (!buffered) {
@@ -584,6 +581,26 @@ export const dispatchTelegramMessage = async ({ context, bot, cfg, runtime, repl
                     }
                 },
                 onError: (err, info) => {
+                    const errorPolicy = resolveTelegramErrorPolicy({
+                        accountConfig: telegramCfg,
+                        groupConfig,
+                        topicConfig,
+                    });
+                    if (isSilentErrorPolicy(errorPolicy.policy)) {
+                        return;
+                    }
+                    if (errorPolicy.policy === "once" &&
+                        shouldSuppressTelegramError({
+                            scopeKey: buildTelegramErrorScopeKey({
+                                accountId: route.accountId,
+                                chatId,
+                                threadId: threadSpec.id,
+                            }),
+                            cooldownMs: errorPolicy.cooldownMs,
+                            errorMessage: String(err),
+                        })) {
+                        return;
+                    }
                     deliveryState.markNonSilentFailure();
                     runtime.error?.(danger(`telegram ${info.kind} reply failed: ${String(err)}`));
                 },
@@ -765,7 +782,7 @@ export const dispatchTelegramMessage = async ({ context, bot, cfg, runtime, repl
                         logVerbose(`auto-topic-label: renamed topic ${chatId}/${topicThreadId}`);
                     }
                     catch (err) {
-                        logVerbose(`auto-topic-label: failed: ${err instanceof Error ? err.message : String(err)}`);
+                        logVerbose(`auto-topic-label: failed: ${formatErrorMessage(err)}`);
                     }
                 })();
             }

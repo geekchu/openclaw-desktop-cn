@@ -1,55 +1,16 @@
-import { SUBAGENT_ENDED_REASON_KILLED } from "./subagent-lifecycle-events.js";
 import { subagentRuns } from "./subagent-registry-memory.js";
-import { listRunsForControllerFromRuns } from "./subagent-registry-queries.js";
+import { countActiveDescendantRunsFromRuns, listDescendantRunsForRequesterFromRuns, listRunsForControllerFromRuns, } from "./subagent-registry-queries.js";
 import { getSubagentRunsSnapshotForRead } from "./subagent-registry-state.js";
-function resolveSubagentSessionStartedAt(entry) {
-    if (typeof entry.sessionStartedAt === "number" && Number.isFinite(entry.sessionStartedAt)) {
-        return entry.sessionStartedAt;
-    }
-    if (typeof entry.startedAt === "number" && Number.isFinite(entry.startedAt)) {
-        return entry.startedAt;
-    }
-    return typeof entry.createdAt === "number" && Number.isFinite(entry.createdAt)
-        ? entry.createdAt
-        : undefined;
-}
-export function getSubagentSessionStartedAt(entry) {
-    return entry ? resolveSubagentSessionStartedAt(entry) : undefined;
-}
-export function getSubagentSessionRuntimeMs(entry, now = Date.now()) {
-    if (!entry) {
-        return undefined;
-    }
-    const accumulatedRuntimeMs = typeof entry.accumulatedRuntimeMs === "number" && Number.isFinite(entry.accumulatedRuntimeMs)
-        ? Math.max(0, entry.accumulatedRuntimeMs)
-        : 0;
-    if (typeof entry.startedAt !== "number" || !Number.isFinite(entry.startedAt)) {
-        return entry.accumulatedRuntimeMs != null ? accumulatedRuntimeMs : undefined;
-    }
-    const currentRunEndedAt = typeof entry.endedAt === "number" && Number.isFinite(entry.endedAt) ? entry.endedAt : now;
-    return Math.max(0, accumulatedRuntimeMs + Math.max(0, currentRunEndedAt - entry.startedAt));
-}
-export function resolveSubagentSessionStatus(entry) {
-    if (!entry) {
-        return undefined;
-    }
-    if (!entry.endedAt) {
-        return "running";
-    }
-    if (entry.endedReason === SUBAGENT_ENDED_REASON_KILLED) {
-        return "killed";
-    }
-    const status = entry.outcome?.status;
-    if (status === "error") {
-        return "failed";
-    }
-    if (status === "timeout") {
-        return "timeout";
-    }
-    return "done";
-}
+import { getSubagentSessionRuntimeMs, getSubagentSessionStartedAt, resolveSubagentSessionStatus, } from "./subagent-session-metrics.js";
+export { getSubagentSessionRuntimeMs, getSubagentSessionStartedAt, resolveSubagentSessionStatus, } from "./subagent-session-metrics.js";
 export function listSubagentRunsForController(controllerSessionKey) {
     return listRunsForControllerFromRuns(getSubagentRunsSnapshotForRead(subagentRuns), controllerSessionKey);
+}
+export function countActiveDescendantRuns(rootSessionKey) {
+    return countActiveDescendantRunsFromRuns(getSubagentRunsSnapshotForRead(subagentRuns), rootSessionKey);
+}
+export function listDescendantRunsForRequester(rootSessionKey) {
+    return listDescendantRunsForRequesterFromRuns(getSubagentRunsSnapshotForRead(subagentRuns), rootSessionKey);
 }
 export function getSubagentRunByChildSessionKey(childSessionKey) {
     const key = childSessionKey.trim();
@@ -73,6 +34,36 @@ export function getSubagentRunByChildSessionKey(childSessionKey) {
         }
     }
     return latestActive ?? latestEnded;
+}
+export function getSessionDisplaySubagentRunByChildSessionKey(childSessionKey) {
+    const key = childSessionKey.trim();
+    if (!key) {
+        return null;
+    }
+    let latestInMemoryActive = null;
+    let latestInMemoryEnded = null;
+    for (const entry of subagentRuns.values()) {
+        if (entry.childSessionKey !== key) {
+            continue;
+        }
+        if (typeof entry.endedAt === "number") {
+            if (!latestInMemoryEnded || entry.createdAt > latestInMemoryEnded.createdAt) {
+                latestInMemoryEnded = entry;
+            }
+            continue;
+        }
+        if (!latestInMemoryActive || entry.createdAt > latestInMemoryActive.createdAt) {
+            latestInMemoryActive = entry;
+        }
+    }
+    if (latestInMemoryEnded || latestInMemoryActive) {
+        if (latestInMemoryEnded &&
+            (!latestInMemoryActive || latestInMemoryEnded.createdAt > latestInMemoryActive.createdAt)) {
+            return latestInMemoryEnded;
+        }
+        return latestInMemoryActive ?? latestInMemoryEnded;
+    }
+    return getSubagentRunByChildSessionKey(key);
 }
 export function getLatestSubagentRunByChildSessionKey(childSessionKey) {
     const key = childSessionKey.trim();

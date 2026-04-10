@@ -66,5 +66,5 @@ export async function handlePortError(err, port, context, runtime = defaultRunti
     throw new Error("unreachable");
 }
 export { PortInUseError };
-export { buildPortHints, classifyPortListener, formatPortDiagnostics } from "./ports-format.js";
+export { buildPortHints, classifyPortListener, formatPortDiagnostics, isDualStackLoopbackGatewayListeners, } from "./ports-format.js";
 export { inspectPortUsage } from "./ports-inspect.js";

@@ -1,5 +1,6 @@
 import MarkdownIt from "markdown-it";
-import { isAutoLinkedFileRef } from "openclaw/plugin-sdk/text-runtime";
+import { isAutoLinkedFileRef, normalizeLowercaseStringOrEmpty, } from "openclaw/plugin-sdk/text-runtime";
+import { isMatrixQualifiedUserId } from "./target-ids.js";
 const md = new MarkdownIt({
     html: false,
     linkify: true,
@@ -8,6 +9,10 @@ const md = new MarkdownIt({
 });
 md.enable("strikethrough");
 const { escapeHtml } = md.utils;
+const ESCAPED_MENTION_SENTINEL = "\uE000";
+const MENTION_PATTERN = /@[A-Za-z0-9._=+\-/:[\]]+/g;
+const MATRIX_MENTION_USER_ID_PATTERN = /^@[A-Za-z0-9._=+\-/]+:(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::\d+)?$/;
+const TRIMMABLE_MENTION_SUFFIX = /[),.!?:;\]]/;
 function shouldSuppressAutoLink(tokens, idx) {
     const token = tokens[idx];
     if (token?.type !== "link_open" || token.info !== "auto") {
@@ -28,7 +33,296 @@ md.renderer.rules.link_close = (tokens, idx, _options, _env, self) => {
     }
     return self.renderToken(tokens, idx, _options);
 };
+function maskEscapedMentions(markdown) {
+    let masked = "";
+    let idx = 0;
+    let codeFenceLength = 0;
+    while (idx < markdown.length) {
+        if (markdown[idx] === "`" && !isMarkdownEscaped(markdown, idx)) {
+            let runLength = 1;
+            while (markdown[idx + runLength] === "`") {
+                runLength += 1;
+            }
+            if (codeFenceLength === 0) {
+                codeFenceLength = runLength;
+            }
+            else if (runLength === codeFenceLength) {
+                codeFenceLength = 0;
+            }
+            masked += markdown.slice(idx, idx + runLength);
+            idx += runLength;
+            continue;
+        }
+        if (codeFenceLength === 0 && markdown[idx] === "\\" && markdown[idx + 1] === "@") {
+            masked += ESCAPED_MENTION_SENTINEL;
+            idx += 2;
+            continue;
+        }
+        masked += markdown[idx] ?? "";
+        idx += 1;
+    }
+    return masked;
+}
+function isMarkdownEscaped(markdown, idx) {
+    let slashCount = 0;
+    let cursor = idx - 1;
+    while (cursor >= 0 && markdown[cursor] === "\\") {
+        slashCount += 1;
+        cursor -= 1;
+    }
+    return slashCount % 2 === 1;
+}
+function restoreEscapedMentions(text) {
+    return text.replaceAll(ESCAPED_MENTION_SENTINEL, "@");
+}
+function restoreEscapedMentionsInCode(text) {
+    return text.replaceAll(ESCAPED_MENTION_SENTINEL, "\\@");
+}
+function restoreEscapedMentionsInBlockTokens(tokens) {
+    for (const token of tokens) {
+        if ((token.type === "fence" || token.type === "code_block") && token.content) {
+            token.content = restoreEscapedMentionsInCode(token.content);
+        }
+    }
+}
+function isMentionStartBoundary(charBefore) {
+    return !charBefore || !/[A-Za-z0-9_]/.test(charBefore);
+}
+function trimMentionSuffix(raw, end) {
+    while (raw.length > 1 && TRIMMABLE_MENTION_SUFFIX.test(raw.at(-1) ?? "")) {
+        if (raw.at(-1) === "]" && /\[[0-9A-Fa-f:.]+\](?::\d+)?$/i.test(raw)) {
+            break;
+        }
+        raw = raw.slice(0, -1);
+        end -= 1;
+    }
+    if (!raw.startsWith("@") || raw === "@") {
+        return null;
+    }
+    return { raw, end };
+}
+function isMatrixMentionUserId(raw) {
+    return isMatrixQualifiedUserId(raw) && MATRIX_MENTION_USER_ID_PATTERN.test(raw);
+}
+function buildMentionCandidate(raw, start) {
+    const normalized = trimMentionSuffix(raw, start + raw.length);
+    if (!normalized) {
+        return null;
+    }
+    const kind = normalizeLowercaseStringOrEmpty(normalized.raw) === "@room" ? "room" : "user";
+    const base = {
+        raw: normalized.raw,
+        start,
+        end: normalized.end,
+        kind,
+    };
+    if (kind === "room") {
+        return base;
+    }
+    const userCandidate = isMatrixMentionUserId(normalized.raw)
+        ? { ...base, userId: normalized.raw }
+        : null;
+    if (!userCandidate) {
+        return null;
+    }
+    return userCandidate;
+}
+function collectMentionCandidates(text) {
+    const mentions = [];
+    for (const match of text.matchAll(MENTION_PATTERN)) {
+        const raw = match[0];
+        const start = match.index ?? -1;
+        if (start < 0 || !raw) {
+            continue;
+        }
+        if (!isMentionStartBoundary(text[start - 1])) {
+            continue;
+        }
+        const candidate = buildMentionCandidate(raw, start);
+        if (!candidate) {
+            continue;
+        }
+        mentions.push(candidate);
+    }
+    return mentions;
+}
+function createToken(sample, type, tag, nesting) {
+    const TokenCtor = sample.constructor;
+    return new TokenCtor(type, tag, nesting);
+}
+function createTextToken(sample, content) {
+    const token = createToken(sample, "text", "", 0);
+    token.content = content;
+    return token;
+}
+function createMentionLinkTokens(params) {
+    const open = createToken(params.sample, "link_open", "a", 1);
+    open.attrSet("href", params.href);
+    const text = createTextToken(params.sample, params.label);
+    const close = createToken(params.sample, "link_close", "a", -1);
+    return [open, text, close];
+}
+function resolveMentionUserId(match) {
+    if (match.kind !== "user") {
+        return null;
+    }
+    return match.userId ?? null;
+}
+async function resolveMatrixSelfUserId(client) {
+    const getUserId = client.getUserId;
+    if (typeof getUserId !== "function") {
+        return null;
+    }
+    return await Promise.resolve(getUserId.call(client)).catch(() => null);
+}
+function mutateInlineTokensWithMentions(params) {
+    const nextChildren = [];
+    let roomMentioned = false;
+    let insideLinkDepth = 0;
+    for (const child of params.children) {
+        if (child.type === "link_open") {
+            insideLinkDepth += 1;
+            nextChildren.push(child);
+            continue;
+        }
+        if (child.type === "link_close") {
+            insideLinkDepth = Math.max(0, insideLinkDepth - 1);
+            nextChildren.push(child);
+            continue;
+        }
+        if (child.type !== "text" || !child.content) {
+            nextChildren.push(child);
+            continue;
+        }
+        const visibleContent = restoreEscapedMentions(child.content);
+        if (insideLinkDepth > 0) {
+            nextChildren.push(createTextToken(child, visibleContent));
+            continue;
+        }
+        const matches = collectMentionCandidates(child.content);
+        if (matches.length === 0) {
+            nextChildren.push(createTextToken(child, visibleContent));
+            continue;
+        }
+        let cursor = 0;
+        for (const match of matches) {
+            if (match.start > cursor) {
+                nextChildren.push(createTextToken(child, restoreEscapedMentions(child.content.slice(cursor, match.start))));
+            }
+            cursor = match.end;
+            if (match.kind === "room") {
+                roomMentioned = true;
+                nextChildren.push(createTextToken(child, match.raw));
+                continue;
+            }
+            const resolvedUserId = resolveMentionUserId(match);
+            if (!resolvedUserId || resolvedUserId === params.selfUserId) {
+                nextChildren.push(createTextToken(child, match.raw));
+                continue;
+            }
+            if (!params.seenUserIds.has(resolvedUserId)) {
+                params.seenUserIds.add(resolvedUserId);
+                params.userIds.push(resolvedUserId);
+            }
+            nextChildren.push(...createMentionLinkTokens({
+                sample: child,
+                href: `https://matrix.to/#/${encodeURIComponent(resolvedUserId)}`,
+                label: match.raw,
+            }));
+        }
+        if (cursor < child.content.length) {
+            nextChildren.push(createTextToken(child, restoreEscapedMentions(child.content.slice(cursor))));
+        }
+    }
+    return { children: nextChildren, roomMentioned };
+}
+// Compact loose lists by hiding a list item's single wrapper paragraph,
+// mirroring what markdown-it already does for tight lists. Without this
+// Element renders <p> margins inside <li>, splitting numbers from content.
+//
+// Keep multi-paragraph items visible so separate paragraphs do not collapse
+// together inside the same list item.
+function compactLooseListTokens(tokens) {
+    const listItemStack = [];
+    for (const [index, token] of tokens.entries()) {
+        if (token.type === "list_item_open") {
+            listItemStack.push({
+                level: token.level,
+                immediateParagraphOpenIndexes: [],
+                immediateParagraphCloseIndexes: [],
+            });
+            continue;
+        }
+        if (token.type === "list_item_close") {
+            const item = listItemStack.pop();
+            if (item &&
+                item.immediateParagraphOpenIndexes.length === 1 &&
+                item.immediateParagraphCloseIndexes.length === 1) {
+                tokens[item.immediateParagraphOpenIndexes[0]].hidden = true;
+                tokens[item.immediateParagraphCloseIndexes[0]].hidden = true;
+            }
+            continue;
+        }
+        const currentItem = listItemStack.at(-1);
+        if (!currentItem || token.level !== currentItem.level + 1) {
+            continue;
+        }
+        if (token.type === "paragraph_open") {
+            currentItem.immediateParagraphOpenIndexes.push(index);
+        }
+        else if (token.type === "paragraph_close") {
+            currentItem.immediateParagraphCloseIndexes.push(index);
+        }
+    }
+}
 export function markdownToMatrixHtml(markdown) {
-    const rendered = md.render(markdown ?? "");
-    return rendered.trimEnd();
+    const tokens = md.parse(markdown ?? "", {});
+    compactLooseListTokens(tokens);
+    return md.renderer.render(tokens, md.options, {}).trimEnd();
+}
+async function resolveMarkdownMentionState(params) {
+    const markdown = maskEscapedMentions(params.markdown ?? "");
+    const tokens = md.parse(markdown, {});
+    restoreEscapedMentionsInBlockTokens(tokens);
+    const selfUserId = await resolveMatrixSelfUserId(params.client);
+    const userIds = [];
+    const seenUserIds = new Set();
+    let roomMentioned = false;
+    for (const token of tokens) {
+        if (!token.children?.length) {
+            continue;
+        }
+        const mutated = mutateInlineTokensWithMentions({
+            children: token.children,
+            userIds,
+            seenUserIds,
+            selfUserId,
+        });
+        token.children = mutated.children;
+        roomMentioned ||= mutated.roomMentioned;
+    }
+    const mentions = {};
+    if (userIds.length > 0) {
+        mentions.user_ids = userIds;
+    }
+    if (roomMentioned) {
+        mentions.room = true;
+    }
+    return {
+        tokens,
+        mentions,
+    };
+}
+export async function resolveMatrixMentionsInMarkdown(params) {
+    const state = await resolveMarkdownMentionState(params);
+    return state.mentions;
+}
+export async function renderMarkdownToMatrixHtmlWithMentions(params) {
+    const state = await resolveMarkdownMentionState(params);
+    compactLooseListTokens(state.tokens);
+    const html = md.renderer.render(state.tokens, md.options, {}).trimEnd();
+    return {
+        html: html || undefined,
+        mentions: state.mentions,
+    };
 }

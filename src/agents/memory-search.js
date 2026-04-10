@@ -1,8 +1,8 @@
 import os from "node:os";
 import path from "node:path";
 import { resolveStateDir } from "../config/paths.js";
-import { isMemoryMultimodalEnabled, normalizeMemoryMultimodalSettings, } from "../plugin-sdk/memory-core-host-multimodal.js";
-import { getMemoryEmbeddingProvider } from "../plugins/memory-embedding-providers.js";
+import { isMemoryMultimodalEnabled, normalizeMemoryMultimodalSettings, supportsMemoryMultimodalEmbeddings, } from "../memory-host-sdk/multimodal.js";
+import { getMemoryEmbeddingProvider } from "../plugins/memory-embedding-provider-runtime.js";
 import { clampInt, clampNumber, resolveUserPath } from "../utils.js";
 import { resolveAgentConfig } from "./agent-scope.js";
 const DEFAULT_CHUNK_TOKENS = 400;
@@ -102,35 +102,20 @@ function mergeConfig(defaults, overrides, agentId) {
         enabled: overrides?.store?.vector?.enabled ?? defaults?.store?.vector?.enabled ?? true,
         extensionPath: overrides?.store?.vector?.extensionPath ?? defaults?.store?.vector?.extensionPath,
     };
+    const fts = {
+        tokenizer: overrides?.store?.fts?.tokenizer ?? defaults?.store?.fts?.tokenizer ?? "unicode61",
+    };
     const store = {
         driver: overrides?.store?.driver ?? defaults?.store?.driver ?? "sqlite",
         path: resolveStorePath(agentId, overrides?.store?.path ?? defaults?.store?.path),
+        fts,
         vector,
     };
     const chunking = {
         tokens: overrides?.chunking?.tokens ?? defaults?.chunking?.tokens ?? DEFAULT_CHUNK_TOKENS,
         overlap: overrides?.chunking?.overlap ?? defaults?.chunking?.overlap ?? DEFAULT_CHUNK_OVERLAP,
     };
-    const sync = {
-        onSessionStart: overrides?.sync?.onSessionStart ?? defaults?.sync?.onSessionStart ?? true,
-        onSearch: overrides?.sync?.onSearch ?? defaults?.sync?.onSearch ?? true,
-        watch: overrides?.sync?.watch ?? defaults?.sync?.watch ?? true,
-        watchDebounceMs: overrides?.sync?.watchDebounceMs ??
-            defaults?.sync?.watchDebounceMs ??
-            DEFAULT_WATCH_DEBOUNCE_MS,
-        intervalMinutes: overrides?.sync?.intervalMinutes ?? defaults?.sync?.intervalMinutes ?? 0,
-        sessions: {
-            deltaBytes: overrides?.sync?.sessions?.deltaBytes ??
-                defaults?.sync?.sessions?.deltaBytes ??
-                DEFAULT_SESSION_DELTA_BYTES,
-            deltaMessages: overrides?.sync?.sessions?.deltaMessages ??
-                defaults?.sync?.sessions?.deltaMessages ??
-                DEFAULT_SESSION_DELTA_MESSAGES,
-            postCompactionForce: overrides?.sync?.sessions?.postCompactionForce ??
-                defaults?.sync?.sessions?.postCompactionForce ??
-                true,
-        },
-    };
+    const sync = resolveSyncConfig(defaults, overrides);
     const query = {
         maxResults: overrides?.query?.maxResults ?? defaults?.query?.maxResults ?? DEFAULT_MAX_RESULTS,
         minScore: overrides?.query?.minScore ?? defaults?.query?.minScore ?? DEFAULT_MIN_SCORE,
@@ -235,6 +220,28 @@ function mergeConfig(defaults, overrides, agentId) {
         },
     };
 }
+function resolveSyncConfig(defaults, overrides) {
+    return {
+        onSessionStart: overrides?.sync?.onSessionStart ?? defaults?.sync?.onSessionStart ?? true,
+        onSearch: overrides?.sync?.onSearch ?? defaults?.sync?.onSearch ?? true,
+        watch: overrides?.sync?.watch ?? defaults?.sync?.watch ?? true,
+        watchDebounceMs: overrides?.sync?.watchDebounceMs ??
+            defaults?.sync?.watchDebounceMs ??
+            DEFAULT_WATCH_DEBOUNCE_MS,
+        intervalMinutes: overrides?.sync?.intervalMinutes ?? defaults?.sync?.intervalMinutes ?? 0,
+        sessions: {
+            deltaBytes: overrides?.sync?.sessions?.deltaBytes ??
+                defaults?.sync?.sessions?.deltaBytes ??
+                DEFAULT_SESSION_DELTA_BYTES,
+            deltaMessages: overrides?.sync?.sessions?.deltaMessages ??
+                defaults?.sync?.sessions?.deltaMessages ??
+                DEFAULT_SESSION_DELTA_MESSAGES,
+            postCompactionForce: overrides?.sync?.sessions?.postCompactionForce ??
+                defaults?.sync?.sessions?.postCompactionForce ??
+                true,
+        },
+    };
+}
 export function resolveMemorySearchConfig(cfg, agentId) {
     const defaults = cfg.agents?.defaults?.memorySearch;
     const overrides = resolveAgentConfig(cfg, agentId)?.memorySearch;
@@ -244,14 +251,32 @@ export function resolveMemorySearchConfig(cfg, agentId) {
     }
     const multimodalActive = isMemoryMultimodalEnabled(resolved.multimodal);
     const multimodalProvider = resolved.provider === "auto" ? undefined : getMemoryEmbeddingProvider(resolved.provider);
-    if (multimodalActive &&
-        !multimodalProvider?.supportsMultimodalEmbeddings?.({
+    const builtinMultimodalSupport = resolved.provider === "auto"
+        ? false
+        : supportsMemoryMultimodalEmbeddings({
+            provider: resolved.provider,
             model: resolved.model,
-        })) {
+        });
+    if (multimodalActive &&
+        !(
+        // Fall back to the built-in helper when the provider is not registered yet
+        // or when a registered adapter does not implement multimodal capability checks.
+        (multimodalProvider?.supportsMultimodalEmbeddings?.({
+            model: resolved.model,
+        }) ?? builtinMultimodalSupport))) {
         throw new Error("agents.*.memorySearch.multimodal requires a provider adapter that supports multimodal embeddings for the configured model.");
     }
     if (multimodalActive && resolved.fallback !== "none") {
         throw new Error('agents.*.memorySearch.multimodal does not support memorySearch.fallback. Set fallback to "none".');
     }
     return resolved;
+}
+export function resolveMemorySearchSyncConfig(cfg, agentId) {
+    const defaults = cfg.agents?.defaults?.memorySearch;
+    const overrides = resolveAgentConfig(cfg, agentId)?.memorySearch;
+    const enabled = overrides?.enabled ?? defaults?.enabled ?? true;
+    if (!enabled) {
+        return null;
+    }
+    return resolveSyncConfig(defaults, overrides);
 }

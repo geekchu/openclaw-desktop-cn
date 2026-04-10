@@ -1,24 +1,29 @@
 import path from "node:path";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
-import { CHANNEL_IDS, normalizeChatChannelId } from "../channels/registry.js";
+import { CHANNEL_IDS, normalizeChatChannelId } from "../channels/ids.js";
 import { withBundledPluginAllowlistCompat } from "../plugins/bundled-compat.js";
-import { listBundledWebSearchPluginIds } from "../plugins/bundled-web-search-ids.js";
-import { normalizePluginsConfig, resolveEffectiveEnableState, resolveMemorySlotDecision, } from "../plugins/config-state.js";
-import { loadPluginManifestRegistry } from "../plugins/manifest-registry.js";
+import { normalizePluginsConfig, resolveEffectivePluginActivationState, resolveMemorySlotDecision, } from "../plugins/config-state.js";
+import { collectRelevantDoctorPluginIds, listPluginDoctorLegacyConfigRules, } from "../plugins/doctor-contract-registry.js";
+import { loadPluginManifestRegistry, resolveManifestContractPluginIds, } from "../plugins/manifest-registry.js";
 import { validateJsonSchemaValue } from "../plugins/schema-validator.js";
+import { hasKind } from "../plugins/slots.js";
+import { collectUnsupportedSecretRefConfigCandidates } from "../secrets/unsupported-surface-policy.js";
 import { hasAvatarUriScheme, isAvatarDataUrl, isAvatarHttpUrl, isPathWithinRoot, isWindowsAbsolutePath, } from "../shared/avatar-policy.js";
 import { isCanonicalDottedDecimalIPv4, isLoopbackIpAddress } from "../shared/net/ip.js";
+import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import { isRecord } from "../utils.js";
 import { findDuplicateAgentDirs, formatDuplicateAgentDirError } from "./agent-dirs.js";
 import { appendAllowedValuesHint, summarizeAllowedValues } from "./allowed-values.js";
-import { getBundledChannelConfigSchemaMap } from "./bundled-channel-config-runtime.js";
+import { GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA } from "./bundled-channel-config-metadata.generated.js";
 import { collectChannelSchemaMetadata } from "./channel-config-metadata.js";
-import { applyAgentDefaults, applyModelDefaults, applySessionDefaults } from "./defaults.js";
-import { listLegacyWebSearchConfigPaths, normalizeLegacyWebSearchConfig, } from "./legacy-web-search.js";
 import { findLegacyConfigIssues } from "./legacy.js";
+import { materializeRuntimeConfig } from "./materialize.js";
+import { coerceSecretRef } from "./types.secrets.js";
 import { OpenClawSchema } from "./zod-schema.js";
 const LEGACY_REMOVED_PLUGIN_IDS = new Set(["google-antigravity-auth", "google-gemini-cli-auth"]);
 const CUSTOM_EXPECTED_ONE_OF_RE = /expected one of ((?:"[^"]+"(?:\|"?[^"]+"?)*)+)/i;
+const SECRETREF_POLICY_DOC_URL = "https://docs.openclaw.ai/reference/secretref-credential-surface";
+const bundledChannelSchemaById = new Map(GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA.map((entry) => [entry.channelId, entry.schema]));
 function toIssueRecord(value) {
     if (!value || typeof value !== "object") {
         return null;
@@ -37,112 +42,93 @@ function toConfigPathSegments(path) {
 function formatConfigPath(segments) {
     return segments.join(".");
 }
-function toJsonSchemaNode(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return null;
-    }
-    return value;
+function asJsonSchemaLike(value) {
+    return value && typeof value === "object" ? value : null;
 }
-function getSchemaCombinatorBranches(node) {
-    const keys = ["anyOf", "oneOf", "allOf"];
-    const branches = [];
-    for (const key of keys) {
-        const value = node[key];
-        if (!Array.isArray(value)) {
+function lookupJsonSchemaNode(schema, pathSegments) {
+    let current = asJsonSchemaLike(schema);
+    for (const segment of pathSegments) {
+        if (!current) {
+            return null;
+        }
+        if (typeof segment === "number") {
+            const items = current.items;
+            if (Array.isArray(items)) {
+                current = asJsonSchemaLike(items[segment] ?? items[0]);
+                continue;
+            }
+            current = asJsonSchemaLike(items);
             continue;
         }
-        for (const entry of value) {
-            const child = toJsonSchemaNode(entry);
-            if (child) {
-                branches.push(child);
-            }
-        }
+        const properties = asJsonSchemaLike(current.properties);
+        const next = (properties && asJsonSchemaLike(properties[segment])) ||
+            asJsonSchemaLike(current.additionalProperties);
+        current = next;
     }
-    return branches;
+    return current;
 }
-function collectAllowedValuesFromSchemaNode(node) {
+function collectAllowedValuesFromJsonSchemaNode(schema) {
+    const node = asJsonSchemaLike(schema);
+    if (!node) {
+        return { values: [], incomplete: false, hasValues: false };
+    }
     if (Object.prototype.hasOwnProperty.call(node, "const")) {
         return { values: [node.const], incomplete: false, hasValues: true };
     }
-    const enumValues = node.enum;
-    if (Array.isArray(enumValues)) {
-        return { values: enumValues, incomplete: false, hasValues: enumValues.length > 0 };
+    if (Array.isArray(node.enum)) {
+        return { values: node.enum, incomplete: false, hasValues: node.enum.length > 0 };
     }
-    if (node.type === "boolean") {
+    const type = node.type;
+    if (type === "boolean") {
         return { values: [true, false], incomplete: false, hasValues: true };
     }
-    const branches = getSchemaCombinatorBranches(node);
-    if (branches.length === 0) {
-        return { values: [], incomplete: true, hasValues: false };
+    if (Array.isArray(type) && type.includes("boolean")) {
+        return { values: [true, false], incomplete: false, hasValues: true };
+    }
+    const unionBranches = Array.isArray(node.anyOf)
+        ? node.anyOf
+        : Array.isArray(node.oneOf)
+            ? node.oneOf
+            : null;
+    if (!unionBranches) {
+        return { values: [], incomplete: false, hasValues: false };
     }
     const collected = [];
-    for (const branch of branches) {
-        const result = collectAllowedValuesFromSchemaNode(branch);
-        if (result.incomplete || !result.hasValues) {
+    for (const branch of unionBranches) {
+        const branchCollected = collectAllowedValuesFromJsonSchemaNode(branch);
+        if (branchCollected.incomplete || !branchCollected.hasValues) {
             return { values: [], incomplete: true, hasValues: false };
         }
-        collected.push(...result.values);
+        collected.push(...branchCollected.values);
     }
     return { values: collected, incomplete: false, hasValues: collected.length > 0 };
 }
-function advanceSchemaNodes(node, segment) {
-    const branches = getSchemaCombinatorBranches(node);
-    if (branches.length > 0) {
-        return branches.flatMap((branch) => advanceSchemaNodes(branch, segment));
+function collectAllowedValuesFromBundledChannelSchemaPath(pathSegments) {
+    if (pathSegments[0] !== "channels" || typeof pathSegments[1] !== "string") {
+        return { values: [], incomplete: false, hasValues: false };
     }
-    if (typeof segment === "number") {
-        const items = toJsonSchemaNode(node.items);
-        return items ? [items] : [];
+    const channelSchema = bundledChannelSchemaById.get(pathSegments[1]);
+    if (!channelSchema) {
+        return { values: [], incomplete: false, hasValues: false };
     }
-    const properties = toJsonSchemaNode(node.properties);
-    const propertyNode = properties ? toJsonSchemaNode(properties[segment]) : null;
-    if (propertyNode) {
-        return [propertyNode];
+    const targetNode = lookupJsonSchemaNode(channelSchema, pathSegments.slice(2));
+    if (!targetNode) {
+        return { values: [], incomplete: false, hasValues: false };
     }
-    const additionalProperties = toJsonSchemaNode(node.additionalProperties);
-    return additionalProperties ? [additionalProperties] : [];
-}
-function collectAllowedValuesFromSchemaPath(root, path) {
-    let currentNodes = [root];
-    for (const segment of path) {
-        currentNodes = currentNodes.flatMap((node) => advanceSchemaNodes(node, segment));
-        if (currentNodes.length === 0) {
-            return { values: [], incomplete: false, hasValues: false };
-        }
-    }
-    const collected = [];
-    for (const node of currentNodes) {
-        const result = collectAllowedValuesFromSchemaNode(node);
-        if (result.incomplete || !result.hasValues) {
-            return { values: [], incomplete: true, hasValues: false };
-        }
-        collected.push(...result.values);
-    }
-    return { values: collected, incomplete: false, hasValues: collected.length > 0 };
-}
-function collectAllowedValuesFromConfigPath(path) {
-    if (path[0] === "channels" && typeof path[1] === "string") {
-        const channelSchema = getBundledChannelConfigSchemaMap().get(path[1]);
-        const schemaRoot = toJsonSchemaNode(channelSchema?.schema);
-        if (schemaRoot) {
-            return collectAllowedValuesFromSchemaPath(schemaRoot, path.slice(2));
-        }
-    }
-    return { values: [], incomplete: false, hasValues: false };
+    return collectAllowedValuesFromJsonSchemaNode(targetNode);
 }
 function collectAllowedValuesFromCustomIssue(record) {
-    const path = toConfigPathSegments(record.path);
-    const schemaValues = collectAllowedValuesFromConfigPath(path);
-    if (schemaValues.hasValues && !schemaValues.incomplete) {
-        return schemaValues;
-    }
     const message = typeof record.message === "string" ? record.message : "";
     const expectedMatch = message.match(CUSTOM_EXPECTED_ONE_OF_RE);
     if (expectedMatch?.[1]) {
         const values = [...expectedMatch[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
         return { values, incomplete: false, hasValues: values.length > 0 };
     }
-    return { values: [], incomplete: false, hasValues: false };
+    // Custom Zod issues usually come from superRefine rules, but some normalized
+    // channel unions collapse to a generic custom issue. Use generated channel
+    // config metadata here so we can recover enum hints without touching runtime
+    // plugin registries during validation formatting.
+    return collectAllowedValuesFromBundledChannelSchemaPath(toConfigPathSegments(record.path));
 }
 function collectAllowedValuesFromIssue(issue) {
     const record = toIssueRecord(issue);
@@ -209,6 +195,68 @@ function collectAllowedValuesFromUnknownIssue(issue) {
         return [];
     }
     return collection.values;
+}
+function isObjectSecretRefCandidate(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+    return coerceSecretRef(value) !== null;
+}
+function formatUnsupportedMutableSecretRefMessage(path) {
+    return [
+        `SecretRef objects are not supported at ${path}.`,
+        "This credential is runtime-mutable or runtime-managed and must stay a plain string value.",
+        'Use a plain string (env template strings like "${MY_VAR}" are allowed).',
+        `See ${SECRETREF_POLICY_DOC_URL}.`,
+    ].join(" ");
+}
+function pushUnsupportedMutableSecretRefIssue(issues, path, value) {
+    if (!isObjectSecretRefCandidate(value)) {
+        return;
+    }
+    issues.push({
+        path,
+        message: formatUnsupportedMutableSecretRefMessage(path),
+    });
+}
+function collectUnsupportedMutableSecretRefIssues(raw) {
+    const issues = [];
+    for (const candidate of collectUnsupportedSecretRefConfigCandidates(raw)) {
+        pushUnsupportedMutableSecretRefIssue(issues, candidate.path, candidate.value);
+    }
+    return issues;
+}
+function isUnsupportedMutableSecretRefSchemaIssue(params) {
+    const { issue, policyIssue } = params;
+    if (issue.path === policyIssue.path) {
+        return /expected string, received object/i.test(issue.message);
+    }
+    if (!issue.path || !policyIssue.path || !policyIssue.path.startsWith(`${issue.path}.`)) {
+        return false;
+    }
+    const remainder = policyIssue.path.slice(issue.path.length + 1);
+    const childKey = remainder.split(".")[0];
+    if (!childKey) {
+        return false;
+    }
+    if (!/Unrecognized key/i.test(issue.message)) {
+        return false;
+    }
+    const unrecognizedKeys = [...issue.message.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+    if (unrecognizedKeys.length === 0) {
+        return false;
+    }
+    return unrecognizedKeys.length === 1 && unrecognizedKeys[0] === childKey;
+}
+function mergeUnsupportedMutableSecretRefIssues(policyIssues, schemaIssues) {
+    if (policyIssues.length === 0) {
+        return schemaIssues;
+    }
+    const filteredSchemaIssues = schemaIssues.filter((issue) => !policyIssues.some((policyIssue) => isUnsupportedMutableSecretRefSchemaIssue({ issue, policyIssue })));
+    return [...policyIssues, ...filteredSchemaIssues];
+}
+export function collectUnsupportedSecretRefPolicyIssues(raw) {
+    return collectUnsupportedMutableSecretRefIssues(raw);
 }
 function mapZodIssueToConfigIssue(issue) {
     const record = toIssueRecord(issue);
@@ -304,8 +352,8 @@ function validateGatewayTailscaleBind(config) {
  * Use this when you need the raw validated config (e.g., for writing back to file).
  */
 export function validateConfigObjectRaw(raw) {
-    const normalizedRaw = normalizeLegacyWebSearchConfig(raw);
-    const legacyIssues = findLegacyConfigIssues(normalizedRaw);
+    const policyIssues = collectUnsupportedSecretRefPolicyIssues(raw);
+    const legacyIssues = findLegacyConfigIssues(raw, raw, listPluginDoctorLegacyConfigRules({ pluginIds: collectRelevantDoctorPluginIds(raw) }));
     if (legacyIssues.length > 0) {
         return {
             ok: false,
@@ -315,12 +363,16 @@ export function validateConfigObjectRaw(raw) {
             })),
         };
     }
-    const validated = OpenClawSchema.safeParse(normalizedRaw);
+    const validated = OpenClawSchema.safeParse(raw);
     if (!validated.success) {
+        const schemaIssues = validated.error.issues.map((issue) => mapZodIssueToConfigIssue(issue));
         return {
             ok: false,
-            issues: validated.error.issues.map((issue) => mapZodIssueToConfigIssue(issue)),
+            issues: mergeUnsupportedMutableSecretRefIssues(policyIssues, schemaIssues),
         };
+    }
+    if (policyIssues.length > 0) {
+        return { ok: false, issues: policyIssues };
     }
     const validatedConfig = validated.data;
     const duplicates = findDuplicateAgentDirs(validatedConfig);
@@ -355,7 +407,7 @@ export function validateConfigObject(raw) {
     }
     return {
         ok: true,
-        config: applyModelDefaults(applyAgentDefaults(applySessionDefaults(result.config))),
+        config: materializeRuntimeConfig(result.config, "snapshot"),
     };
 }
 export function validateConfigObjectWithPlugins(raw, params) {
@@ -371,11 +423,7 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
     }
     const config = base.config;
     const issues = [];
-    const warnings = listLegacyWebSearchConfigPaths(raw).map((path) => ({
-        path,
-        message: `${path} is deprecated for web search provider config. ` +
-            "Move it under plugins.entries.<plugin>.config.webSearch.*; OpenClaw mapped it automatically for compatibility.",
-    }));
+    const warnings = [];
     const hasExplicitPluginsConfig = isRecord(raw) && Object.prototype.hasOwnProperty.call(raw, "plugins");
     const resolvePluginConfigIssuePath = (pluginId, errorPath) => {
         const base = `plugins.entries.${pluginId}.config`;
@@ -386,6 +434,36 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
     };
     let registryInfo = null;
     let compatConfig;
+    let compatPluginIds = null;
+    let compatPluginIdsResolved = false;
+    const ensureCompatPluginIds = () => {
+        if (compatPluginIdsResolved) {
+            return compatPluginIds ?? new Set();
+        }
+        compatPluginIdsResolved = true;
+        const allow = config.plugins?.allow;
+        if (!Array.isArray(allow) || allow.length === 0) {
+            compatPluginIds = new Set();
+            return compatPluginIds;
+        }
+        const workspaceDir = resolveAgentWorkspaceDir(config, resolveDefaultAgentId(config));
+        const overriddenBundledPluginIds = new Set(loadPluginManifestRegistry({
+            config,
+            workspaceDir: workspaceDir ?? undefined,
+            env: opts.env,
+        })
+            .diagnostics.filter((diag) => diag.message.includes("duplicate plugin id detected"))
+            .map((diag) => diag.pluginId)
+            .filter((pluginId) => typeof pluginId === "string" && pluginId !== ""));
+        compatPluginIds = new Set(resolveManifestContractPluginIds({
+            contract: "webSearchProviders",
+            origin: "bundled",
+            config,
+            workspaceDir: workspaceDir ?? undefined,
+            env: opts.env,
+        }).filter((pluginId) => !overriddenBundledPluginIds.has(pluginId)));
+        return compatPluginIds;
+    };
     const ensureCompatConfig = () => {
         if (compatConfig !== undefined) {
             return compatConfig ?? config;
@@ -395,26 +473,9 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
             compatConfig = config;
             return config;
         }
-        const bundledWebSearchPluginIds = new Set(listBundledWebSearchPluginIds());
-        const workspaceDir = resolveAgentWorkspaceDir(config, resolveDefaultAgentId(config));
-        const seenCompatPluginIds = new Set();
-        const compatPluginIds = loadPluginManifestRegistry({
-            config,
-            workspaceDir: workspaceDir ?? undefined,
-            env: opts.env,
-        })
-            .plugins.filter((plugin) => {
-            if (seenCompatPluginIds.has(plugin.id)) {
-                return false;
-            }
-            seenCompatPluginIds.add(plugin.id);
-            return plugin.origin === "bundled" && bundledWebSearchPluginIds.has(plugin.id);
-        })
-            .map((plugin) => plugin.id)
-            .toSorted((left, right) => left.localeCompare(right));
         compatConfig = withBundledPluginAllowlistCompat({
             config,
-            pluginIds: compatPluginIds,
+            pluginIds: [...ensureCompatPluginIds()],
         });
         return compatConfig ?? config;
     };
@@ -453,6 +514,16 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
         }
         return info.knownIds;
     };
+    const ensureOverriddenPluginIds = () => {
+        const info = ensureRegistry();
+        if (!info.overriddenPluginIds) {
+            info.overriddenPluginIds = new Set(info.registry.diagnostics
+                .filter((diag) => diag.message.includes("duplicate plugin id detected"))
+                .map((diag) => diag.pluginId)
+                .filter((pluginId) => typeof pluginId === "string" && pluginId !== ""));
+        }
+        return info.overriddenPluginIds;
+    };
     const ensureNormalizedPlugins = () => {
         const info = ensureRegistry();
         if (!info.normalizedPlugins) {
@@ -463,7 +534,17 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
     const ensureChannelSchemas = () => {
         const info = ensureRegistry();
         if (!info.channelSchemas) {
-            info.channelSchemas = new Map(collectChannelSchemaMetadata(info.registry).map((entry) => [entry.id, { schema: entry.configSchema }]));
+            info.channelSchemas = new Map(GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA.map((entry) => [entry.channelId, { schema: entry.schema }]));
+            for (const entry of collectChannelSchemaMetadata(info.registry)) {
+                const current = info.channelSchemas.get(entry.id);
+                if (entry.configSchema) {
+                    info.channelSchemas.set(entry.id, { schema: entry.configSchema });
+                    continue;
+                }
+                if (!current) {
+                    info.channelSchemas.set(entry.id, {});
+                }
+            }
         }
         return info.channelSchemas;
     };
@@ -538,7 +619,8 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
                 schema: channelSchema,
                 cacheKey: `channel:${trimmed}`,
                 value: config.channels[trimmed],
-                applyDefaults: true,
+                applyDefaults: true, // Always apply defaults for AJV schema validation;
+                // writeConfigFile persists persistCandidate, not validated.config (#61841)
             });
             if (!result.ok) {
                 for (const error of result.errors) {
@@ -556,7 +638,7 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
     }
     const heartbeatChannelIds = new Set();
     for (const channelId of CHANNEL_IDS) {
-        heartbeatChannelIds.add(channelId.toLowerCase());
+        heartbeatChannelIds.add(normalizeLowercaseStringOrEmpty(channelId));
     }
     const validateHeartbeatTarget = (target, path) => {
         if (typeof target !== "string") {
@@ -567,7 +649,7 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
             issues.push({ path, message: "heartbeat target must not be empty" });
             return;
         }
-        const normalized = trimmed.toLowerCase();
+        const normalized = normalizeLowercaseStringOrEmpty(trimmed);
         if (normalized === "last" || normalized === "none") {
             return;
         }
@@ -580,7 +662,7 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
                 for (const channelId of record.channels) {
                     const pluginChannel = channelId.trim();
                     if (pluginChannel) {
-                        heartbeatChannelIds.add(pluginChannel.toLowerCase());
+                        heartbeatChannelIds.add(normalizeLowercaseStringOrEmpty(pluginChannel));
                     }
                 }
             }
@@ -605,6 +687,7 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
     const { registry } = ensureRegistry();
     const knownIds = ensureKnownIds();
     const normalizedPlugins = ensureNormalizedPlugins();
+    const effectiveConfig = ensureCompatConfig();
     const pushMissingPluginIssue = (path, pluginId, opts) => {
         if (LEGACY_REMOVED_PLUGIN_IDS.has(pluginId)) {
             warnings.push({
@@ -672,15 +755,19 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
         }
         seenPlugins.add(pluginId);
         const entry = normalizedPlugins.entries[pluginId];
+        const entryExists = entry !== undefined;
         const entryHasConfig = Boolean(entry?.config);
-        const enableState = resolveEffectiveEnableState({
+        const shouldReplacePluginConfig = opts.applyDefaults
+            ? entryExists || entryHasConfig
+            : entryHasConfig;
+        const activationState = resolveEffectivePluginActivationState({
             id: pluginId,
             origin: record.origin,
             config: normalizedPlugins,
-            rootConfig: config,
+            rootConfig: effectiveConfig,
         });
-        let enabled = enableState.enabled;
-        let reason = enableState.reason;
+        let enabled = activationState.activated;
+        let reason = activationState.reason;
         if (enabled) {
             const memoryDecision = resolveMemorySlotDecision({
                 id: pluginId,
@@ -692,18 +779,19 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
                 enabled = false;
                 reason = memoryDecision.reason;
             }
-            if (memoryDecision.selected && record.kind === "memory") {
+            if (memoryDecision.selected && hasKind(record.kind, "memory")) {
                 selectedMemoryPluginId = pluginId;
             }
         }
-        const shouldValidate = enabled || entryHasConfig;
+        const shouldValidate = enabled || entryExists || entryHasConfig;
         if (shouldValidate) {
             if (record.configSchema) {
                 const res = validateJsonSchemaValue({
                     schema: record.configSchema,
                     cacheKey: record.schemaCacheKey ?? record.manifestPath ?? pluginId,
                     value: entry?.config ?? {},
-                    applyDefaults: true,
+                    applyDefaults: true, // Always apply defaults for AJV schema validation;
+                    // writeConfigFile persists persistCandidate, not validated.config (#61841)
                 });
                 if (!res.ok) {
                     for (const error of res.errors) {
@@ -715,7 +803,7 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
                         });
                     }
                 }
-                else if (entry || entryHasConfig) {
+                else if (shouldReplacePluginConfig) {
                     replacePluginEntryConfig(pluginId, res.value);
                 }
             }
@@ -730,7 +818,8 @@ function validateConfigObjectWithPluginsBase(raw, opts) {
                 });
             }
         }
-        if (!enabled && entryHasConfig) {
+        const suppressDisabledConfigWarning = ensureCompatPluginIds().has(pluginId) && !ensureOverriddenPluginIds().has(pluginId);
+        if (!enabled && entryHasConfig && !suppressDisabledConfigWarning) {
             warnings.push({
                 path: `plugins.entries.${pluginId}`,
                 message: `plugin disabled (${reason ?? "disabled"}) but config is present`,

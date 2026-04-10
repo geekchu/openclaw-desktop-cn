@@ -15,5 +15,12 @@ export { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "../infra/net/fetch-guard
 export {
   assertHttpUrlTargetsPrivateNetwork,
   buildHostnameAllowlistPolicyFromSuffixAllowlist,
+  createLegacyPrivateNetworkDoctorContract,
+  hasLegacyFlatAllowPrivateNetworkAlias,
+  isPrivateNetworkOptInEnabled,
+  migrateLegacyFlatAllowPrivateNetworkAlias,
+  ssrfPolicyFromDangerouslyAllowPrivateNetwork,
+  ssrfPolicyFromPrivateNetworkOptIn,
   ssrfPolicyFromAllowPrivateNetwork,
 } from "./ssrf-policy.js";
+export { isPrivateOrLoopbackHost } from "../gateway/net.js";

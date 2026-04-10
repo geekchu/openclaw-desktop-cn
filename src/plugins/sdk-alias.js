@@ -2,7 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveOpenClawPackageRootSync } from "../infra/openclaw-root.js";
+import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 const STARTUP_ARGV1 = process.argv[1];
+export function normalizeJitiAliasTargetPath(targetPath) {
+    return process.platform === "win32" ? targetPath.replace(/\\/g, "/") : targetPath;
+}
 function resolveLoaderModulePath(params = {}) {
     return params.modulePath ?? fileURLToPath(params.moduleUrl ?? import.meta.url);
 }
@@ -33,7 +37,7 @@ function hasTrustedOpenClawRootIndicator(params) {
     }
     const hasCliEntryExport = Object.prototype.hasOwnProperty.call(packageExports, "./cli-entry");
     const hasOpenClawBin = (typeof params.packageJson.bin === "string" &&
-        params.packageJson.bin.toLowerCase().includes("openclaw")) ||
+        normalizeLowercaseStringOrEmpty(params.packageJson.bin).includes("openclaw")) ||
         (typeof params.packageJson.bin === "object" &&
             params.packageJson.bin !== null &&
             typeof params.packageJson.bin.openclaw === "string");
@@ -180,6 +184,7 @@ export function resolvePluginSdkAliasFile(params) {
 }
 const cachedPluginSdkExportedSubpaths = new Map();
 const cachedPluginSdkScopedAliasMaps = new Map();
+const PLUGIN_SDK_PACKAGE_NAMES = ["openclaw/plugin-sdk", "@openclaw/plugin-sdk"];
 export function listPluginSdkExportedSubpaths(params = {}) {
     const modulePath = params.modulePath ?? fileURLToPath(import.meta.url);
     const packageRoot = resolveLoaderPluginSdkPackageRoot({
@@ -232,7 +237,9 @@ export function resolvePluginSdkScopedAliasMap(params = {}) {
         for (const kind of orderedKinds) {
             const candidate = candidateMap[kind];
             if (fs.existsSync(candidate)) {
-                aliasMap[`openclaw/plugin-sdk/${subpath}`] = candidate;
+                for (const packageName of PLUGIN_SDK_PACKAGE_NAMES) {
+                    aliasMap[`${packageName}/${subpath}`] = candidate;
+                }
                 break;
             }
         }
@@ -279,9 +286,16 @@ export function buildPluginLoaderAliasMap(modulePath, argv1 = STARTUP_ARGV1, mod
     });
     const extensionApiAlias = resolveExtensionApiAlias({ modulePath, pluginSdkResolution });
     return {
-        ...(extensionApiAlias ? { "openclaw/extension-api": extensionApiAlias } : {}),
-        ...(pluginSdkAlias ? { "openclaw/plugin-sdk": pluginSdkAlias } : {}),
-        ...resolvePluginSdkScopedAliasMap({ modulePath, argv1, moduleUrl, pluginSdkResolution }),
+        ...(extensionApiAlias
+            ? { "openclaw/extension-api": normalizeJitiAliasTargetPath(extensionApiAlias) }
+            : {}),
+        ...(pluginSdkAlias
+            ? Object.fromEntries(PLUGIN_SDK_PACKAGE_NAMES.map((packageName) => [
+                packageName,
+                normalizeJitiAliasTargetPath(pluginSdkAlias),
+            ]))
+            : {}),
+        ...Object.fromEntries(Object.entries(resolvePluginSdkScopedAliasMap({ modulePath, argv1, moduleUrl, pluginSdkResolution })).map(([key, value]) => [key, normalizeJitiAliasTargetPath(value)])),
     };
 }
 export function resolvePluginRuntimeModulePath(params = {}) {
@@ -326,12 +340,15 @@ export function buildPluginLoaderJitiOptions(aliasMap) {
             : {}),
     };
 }
-export function shouldPreferNativeJiti(modulePath) {
+function supportsNativeJitiRuntime() {
     const versions = process.versions;
-    if (typeof versions.bun === "string") {
+    return typeof versions.bun !== "string" && process.platform !== "win32";
+}
+export function shouldPreferNativeJiti(modulePath) {
+    if (!supportsNativeJitiRuntime()) {
         return false;
     }
-    switch (path.extname(modulePath).toLowerCase()) {
+    switch (normalizeLowercaseStringOrEmpty(path.extname(modulePath))) {
         case ".js":
         case ".mjs":
         case ".cjs":
@@ -340,4 +357,38 @@ export function shouldPreferNativeJiti(modulePath) {
         default:
             return false;
     }
+}
+export function resolvePluginLoaderJitiTryNative(modulePath, options) {
+    return (shouldPreferNativeJiti(modulePath) ||
+        (supportsNativeJitiRuntime() &&
+            options?.preferBuiltDist === true &&
+            modulePath.includes(`${path.sep}dist${path.sep}`)));
+}
+export function createPluginLoaderJitiCacheKey(params) {
+    return JSON.stringify({
+        tryNative: params.tryNative,
+        aliasMap: Object.entries(params.aliasMap).toSorted(([left], [right]) => left.localeCompare(right)),
+    });
+}
+export function resolvePluginLoaderJitiConfig(params) {
+    const tryNative = resolvePluginLoaderJitiTryNative(params.modulePath, params.preferBuiltDist ? { preferBuiltDist: true } : {});
+    const aliasMap = buildPluginLoaderAliasMap(params.modulePath, params.argv1, params.moduleUrl);
+    return {
+        tryNative,
+        aliasMap,
+        cacheKey: createPluginLoaderJitiCacheKey({
+            tryNative,
+            aliasMap,
+        }),
+    };
+}
+export function isBundledPluginExtensionPath(params) {
+    const normalizedModulePath = path.resolve(params.modulePath);
+    const roots = [
+        params.bundledPluginsDir ? path.resolve(params.bundledPluginsDir) : null,
+        path.join(params.openClawPackageRoot, "extensions"),
+        path.join(params.openClawPackageRoot, "dist", "extensions"),
+        path.join(params.openClawPackageRoot, "dist-runtime", "extensions"),
+    ].filter((root) => typeof root === "string");
+    return roots.some((root) => normalizedModulePath === root || normalizedModulePath.startsWith(`${root}${path.sep}`));
 }

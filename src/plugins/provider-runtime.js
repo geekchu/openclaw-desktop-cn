@@ -1,7 +1,10 @@
 import { normalizeProviderId } from "../agents/provider-id.js";
-import { resolveCatalogHookProviderPluginIds, resolveOwningPluginIdsForProvider, } from "./providers.js";
-import { resolvePluginProviders } from "./providers.runtime.js";
+import { normalizeOptionalString } from "../shared/string-coerce.js";
+import { resolveBundledProviderPolicySurface } from "./provider-public-artifacts.js";
+import { resolveCatalogHookProviderPluginIds } from "./providers.js";
+import { isPluginProvidersLoadInFlight, resolvePluginProviders } from "./providers.runtime.js";
 import { resolvePluginCacheInputs } from "./roots.js";
+import { getActivePluginRegistryWorkspaceDirFromState } from "./runtime-state.js";
 function matchesProviderId(provider, providerId) {
     const normalized = normalizeProviderId(providerId);
     if (!normalized) {
@@ -40,7 +43,7 @@ function buildHookProviderCacheKey(params) {
         workspaceDir: params.workspaceDir,
         env: params.env,
     });
-    return `${roots.workspace ?? ""}::${roots.global}::${roots.stock ?? ""}::${JSON.stringify(params.config ?? null)}::${JSON.stringify(params.onlyPluginIds ?? [])}`;
+    return `${roots.workspace ?? ""}::${roots.global}::${roots.stock ?? ""}::${JSON.stringify(params.config ?? null)}::${JSON.stringify(params.onlyPluginIds ?? [])}::${JSON.stringify(params.providerRefs ?? [])}`;
 }
 export function clearProviderRuntimeHookCache() {
     cachedHookProvidersWithoutConfig = new WeakMap();
@@ -51,22 +54,36 @@ export function resetProviderRuntimeHookCacheForTest() {
 }
 function resolveProviderPluginsForHooks(params) {
     const env = params.env ?? process.env;
+    const workspaceDir = params.workspaceDir ?? getActivePluginRegistryWorkspaceDirFromState();
     const cacheBucket = resolveHookProviderCacheBucket({
         config: params.config,
         env,
     });
     const cacheKey = buildHookProviderCacheKey({
         config: params.config,
-        workspaceDir: params.workspaceDir,
+        workspaceDir,
         onlyPluginIds: params.onlyPluginIds,
+        providerRefs: params.providerRefs,
         env,
     });
     const cached = cacheBucket.get(cacheKey);
     if (cached) {
         return cached;
     }
+    if (isPluginProvidersLoadInFlight({
+        ...params,
+        workspaceDir,
+        env,
+        activate: false,
+        cache: false,
+        bundledProviderAllowlistCompat: true,
+        bundledProviderVitestCompat: true,
+    })) {
+        return [];
+    }
     const resolved = resolvePluginProviders({
         ...params,
+        workspaceDir,
         env,
         activate: false,
         cache: false,
@@ -77,9 +94,10 @@ function resolveProviderPluginsForHooks(params) {
     return resolved;
 }
 function resolveProviderPluginsForCatalogHooks(params) {
+    const workspaceDir = params.workspaceDir ?? getActivePluginRegistryWorkspaceDirFromState();
     const onlyPluginIds = resolveCatalogHookProviderPluginIds({
         config: params.config,
-        workspaceDir: params.workspaceDir,
+        workspaceDir,
         env: params.env,
     });
     if (onlyPluginIds.length === 0) {
@@ -87,32 +105,111 @@ function resolveProviderPluginsForCatalogHooks(params) {
     }
     return resolveProviderPluginsForHooks({
         ...params,
+        workspaceDir,
         onlyPluginIds,
     });
 }
 export function resolveProviderRuntimePlugin(params) {
-    const owningPluginIds = resolveOwningPluginIdsForProvider({
-        provider: params.provider,
-        config: params.config,
-        workspaceDir: params.workspaceDir,
-        env: params.env,
-    });
-    if (!owningPluginIds || owningPluginIds.length === 0) {
-        return undefined;
-    }
     return resolveProviderPluginsForHooks({
-        ...params,
-        onlyPluginIds: owningPluginIds,
+        config: params.config,
+        workspaceDir: params.workspaceDir ?? getActivePluginRegistryWorkspaceDirFromState(),
+        env: params.env,
+        providerRefs: [params.provider],
     }).find((plugin) => matchesProviderId(plugin, params.provider));
 }
 export function runProviderDynamicModel(params) {
     return resolveProviderRuntimePlugin(params)?.resolveDynamicModel?.(params.context) ?? undefined;
 }
+export function resolveProviderSystemPromptContribution(params) {
+    return (resolveProviderRuntimePlugin(params)?.resolveSystemPromptContribution?.(params.context) ??
+        undefined);
+}
 export async function prepareProviderDynamicModel(params) {
     await resolveProviderRuntimePlugin(params)?.prepareDynamicModel?.(params.context);
 }
+export function shouldPreferProviderRuntimeResolvedModel(params) {
+    return (resolveProviderRuntimePlugin(params)?.preferRuntimeResolvedModel?.(params.context) ?? false);
+}
 export function normalizeProviderResolvedModelWithPlugin(params) {
     return (resolveProviderRuntimePlugin(params)?.normalizeResolvedModel?.(params.context) ?? undefined);
+}
+function resolveProviderCompatHookPlugins(params) {
+    const candidates = resolveProviderPluginsForHooks(params);
+    const owner = resolveProviderRuntimePlugin(params);
+    if (!owner) {
+        return candidates;
+    }
+    const ordered = [owner, ...candidates];
+    const seen = new Set();
+    return ordered.filter((candidate) => {
+        const key = `${candidate.pluginId ?? ""}:${candidate.id}`;
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+function applyCompatPatchToModel(model, patch) {
+    const compat = model.compat && typeof model.compat === "object"
+        ? model.compat
+        : undefined;
+    if (Object.entries(patch).every(([key, value]) => compat?.[key] === value)) {
+        return model;
+    }
+    return {
+        ...model,
+        compat: {
+            ...compat,
+            ...patch,
+        },
+    };
+}
+export function applyProviderResolvedModelCompatWithPlugins(params) {
+    let nextModel = params.context.model;
+    let changed = false;
+    for (const plugin of resolveProviderCompatHookPlugins(params)) {
+        const patch = plugin.contributeResolvedModelCompat?.({
+            ...params.context,
+            model: nextModel,
+        });
+        if (!patch || typeof patch !== "object") {
+            continue;
+        }
+        const patchedModel = applyCompatPatchToModel(nextModel, patch);
+        if (patchedModel === nextModel) {
+            continue;
+        }
+        nextModel = patchedModel;
+        changed = true;
+    }
+    return changed ? nextModel : undefined;
+}
+export function applyProviderResolvedTransportWithPlugin(params) {
+    const normalized = normalizeProviderTransportWithPlugin({
+        provider: params.provider,
+        config: params.config,
+        workspaceDir: params.workspaceDir,
+        env: params.env,
+        context: {
+            provider: params.context.provider,
+            api: params.context.model.api,
+            baseUrl: params.context.model.baseUrl,
+        },
+    });
+    if (!normalized) {
+        return undefined;
+    }
+    const nextApi = normalized.api ?? params.context.model.api;
+    const nextBaseUrl = normalized.baseUrl ?? params.context.model.baseUrl;
+    if (nextApi === params.context.model.api && nextBaseUrl === params.context.model.baseUrl) {
+        return undefined;
+    }
+    return {
+        ...params.context.model,
+        api: nextApi,
+        baseUrl: nextBaseUrl,
+    };
 }
 function resolveProviderHookPlugin(params) {
     return (resolveProviderRuntimePlugin(params) ??
@@ -124,14 +221,14 @@ function resolveProviderHookPlugin(params) {
 }
 export function normalizeProviderModelIdWithPlugin(params) {
     const plugin = resolveProviderHookPlugin(params);
-    const normalized = plugin?.normalizeModelId?.(params.context);
-    const trimmed = normalized?.trim();
-    return trimmed ? trimmed : undefined;
+    return normalizeOptionalString(plugin?.normalizeModelId?.(params.context));
 }
 export function normalizeProviderTransportWithPlugin(params) {
+    const hasTransportChange = (normalized) => (normalized.api ?? params.context.api) !== params.context.api ||
+        (normalized.baseUrl ?? params.context.baseUrl) !== params.context.baseUrl;
     const matchedPlugin = resolveProviderHookPlugin(params);
     const normalizedMatched = matchedPlugin?.normalizeTransport?.(params.context);
-    if (normalizedMatched) {
+    if (normalizedMatched && hasTransportChange(normalizedMatched)) {
         return normalizedMatched;
     }
     for (const candidate of resolveProviderPluginsForHooks(params)) {
@@ -139,26 +236,68 @@ export function normalizeProviderTransportWithPlugin(params) {
             continue;
         }
         const normalized = candidate.normalizeTransport(params.context);
-        if (normalized) {
+        if (normalized && hasTransportChange(normalized)) {
             return normalized;
         }
     }
     return undefined;
 }
 export function normalizeProviderConfigWithPlugin(params) {
-    return resolveProviderHookPlugin(params)?.normalizeConfig?.(params.context) ?? undefined;
+    const hasConfigChange = (normalized) => normalized !== params.context.providerConfig;
+    const bundledSurface = resolveBundledProviderPolicySurface(params.provider);
+    if (bundledSurface?.normalizeConfig) {
+        const normalized = bundledSurface.normalizeConfig(params.context);
+        return normalized && hasConfigChange(normalized) ? normalized : undefined;
+    }
+    const matchedPlugin = resolveProviderHookPlugin(params);
+    const normalizedMatched = matchedPlugin?.normalizeConfig?.(params.context);
+    if (normalizedMatched && hasConfigChange(normalizedMatched)) {
+        return normalizedMatched;
+    }
+    for (const candidate of resolveProviderPluginsForHooks(params)) {
+        if (!candidate.normalizeConfig || candidate === matchedPlugin) {
+            continue;
+        }
+        const normalized = candidate.normalizeConfig(params.context);
+        if (normalized && hasConfigChange(normalized)) {
+            return normalized;
+        }
+    }
+    return undefined;
 }
 export function applyProviderNativeStreamingUsageCompatWithPlugin(params) {
     return (resolveProviderHookPlugin(params)?.applyNativeStreamingUsageCompat?.(params.context) ??
         undefined);
 }
 export function resolveProviderConfigApiKeyWithPlugin(params) {
-    const resolved = resolveProviderHookPlugin(params)?.resolveConfigApiKey?.(params.context);
-    const trimmed = resolved?.trim();
-    return trimmed ? trimmed : undefined;
+    const bundledSurface = resolveBundledProviderPolicySurface(params.provider);
+    if (bundledSurface?.resolveConfigApiKey) {
+        return normalizeOptionalString(bundledSurface.resolveConfigApiKey(params.context));
+    }
+    return normalizeOptionalString(resolveProviderHookPlugin(params)?.resolveConfigApiKey?.(params.context));
 }
 export function resolveProviderCapabilitiesWithPlugin(params) {
-    return resolveProviderRuntimePlugin(params)?.capabilities;
+    const capabilities = resolveProviderHookPlugin(params)?.capabilities;
+    return capabilities && typeof capabilities === "object" ? capabilities : undefined;
+}
+export function resolveProviderReplayPolicyWithPlugin(params) {
+    return resolveProviderHookPlugin(params)?.buildReplayPolicy?.(params.context) ?? undefined;
+}
+export async function sanitizeProviderReplayHistoryWithPlugin(params) {
+    return await resolveProviderHookPlugin(params)?.sanitizeReplayHistory?.(params.context);
+}
+export async function validateProviderReplayTurnsWithPlugin(params) {
+    return await resolveProviderHookPlugin(params)?.validateReplayTurns?.(params.context);
+}
+export function normalizeProviderToolSchemasWithPlugin(params) {
+    return resolveProviderHookPlugin(params)?.normalizeToolSchemas?.(params.context) ?? undefined;
+}
+export function inspectProviderToolSchemasWithPlugin(params) {
+    return resolveProviderHookPlugin(params)?.inspectToolSchemas?.(params.context) ?? undefined;
+}
+export function resolveProviderReasoningOutputModeWithPlugin(params) {
+    const mode = resolveProviderHookPlugin(params)?.resolveReasoningOutputMode?.(params.context);
+    return mode === "native" || mode === "tagged" ? mode : undefined;
 }
 export function prepareProviderExtraParams(params) {
     return resolveProviderRuntimePlugin(params)?.prepareExtraParams?.(params.context) ?? undefined;
@@ -167,7 +306,13 @@ export function resolveProviderStreamFn(params) {
     return resolveProviderRuntimePlugin(params)?.createStreamFn?.(params.context) ?? undefined;
 }
 export function wrapProviderStreamFn(params) {
-    return resolveProviderRuntimePlugin(params)?.wrapStreamFn?.(params.context) ?? undefined;
+    return resolveProviderHookPlugin(params)?.wrapStreamFn?.(params.context) ?? undefined;
+}
+export function resolveProviderTransportTurnStateWithPlugin(params) {
+    return (resolveProviderHookPlugin(params)?.resolveTransportTurnState?.(params.context) ?? undefined);
+}
+export function resolveProviderWebSocketSessionPolicyWithPlugin(params) {
+    return (resolveProviderHookPlugin(params)?.resolveWebSocketSessionPolicy?.(params.context) ?? undefined);
 }
 export async function createProviderEmbeddingProvider(params) {
     return await resolveProviderRuntimePlugin(params)?.createEmbeddingProvider?.(params.context);
@@ -180,6 +325,29 @@ export async function resolveProviderUsageAuthWithPlugin(params) {
 }
 export async function resolveProviderUsageSnapshotWithPlugin(params) {
     return await resolveProviderRuntimePlugin(params)?.fetchUsageSnapshot?.(params.context);
+}
+export function matchesProviderContextOverflowWithPlugin(params) {
+    const plugins = params.provider
+        ? [resolveProviderHookPlugin({ ...params, provider: params.provider })].filter((plugin) => Boolean(plugin))
+        : resolveProviderPluginsForHooks(params);
+    for (const plugin of plugins) {
+        if (plugin.matchesContextOverflowError?.(params.context)) {
+            return true;
+        }
+    }
+    return false;
+}
+export function classifyProviderFailoverReasonWithPlugin(params) {
+    const plugins = params.provider
+        ? [resolveProviderHookPlugin({ ...params, provider: params.provider })].filter((plugin) => Boolean(plugin))
+        : resolveProviderPluginsForHooks(params);
+    for (const plugin of plugins) {
+        const reason = plugin.classifyFailoverReason?.(params.context);
+        if (reason) {
+            return reason;
+        }
+    }
+    return undefined;
 }
 export function formatProviderAuthProfileApiKeyWithPlugin(params) {
     return resolveProviderRuntimePlugin(params)?.formatApiKey?.(params.context);
@@ -202,6 +370,13 @@ export function resolveProviderXHighThinking(params) {
 export function resolveProviderDefaultThinkingLevel(params) {
     return resolveProviderRuntimePlugin(params)?.resolveDefaultThinkingLevel?.(params.context);
 }
+export function applyProviderConfigDefaultsWithPlugin(params) {
+    const bundledSurface = resolveBundledProviderPolicySurface(params.provider);
+    if (bundledSurface?.applyConfigDefaults) {
+        return bundledSurface.applyConfigDefaults(params.context) ?? undefined;
+    }
+    return resolveProviderRuntimePlugin(params)?.applyConfigDefaults?.(params.context) ?? undefined;
+}
 export function resolveProviderModernModelRef(params) {
     return resolveProviderRuntimePlugin(params)?.isModernModelRef?.(params.context);
 }
@@ -213,6 +388,25 @@ export function buildProviderUnknownModelHintWithPlugin(params) {
 }
 export function resolveProviderSyntheticAuthWithPlugin(params) {
     return resolveProviderRuntimePlugin(params)?.resolveSyntheticAuth?.(params.context) ?? undefined;
+}
+export function resolveExternalAuthProfilesWithPlugins(params) {
+    const matches = [];
+    for (const plugin of resolveProviderPluginsForHooks(params)) {
+        const profiles = plugin.resolveExternalAuthProfiles?.(params.context) ??
+            plugin.resolveExternalOAuthProfiles?.(params.context);
+        if (!profiles || profiles.length === 0) {
+            continue;
+        }
+        matches.push(...profiles);
+    }
+    return matches;
+}
+export function resolveExternalOAuthProfilesWithPlugins(params) {
+    return resolveExternalAuthProfilesWithPlugins(params);
+}
+export function shouldDeferProviderSyntheticProfileAuthWithPlugin(params) {
+    return (resolveProviderRuntimePlugin(params)?.shouldDeferSyntheticProfileAuth?.(params.context) ??
+        undefined);
 }
 export function resolveProviderBuiltInModelSuppression(params) {
     for (const plugin of resolveProviderPluginsForCatalogHooks(params)) {

@@ -3,11 +3,19 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { BUNDLED_PLUGIN_PATH_PREFIX } from "./lib/bundled-plugin-paths.mjs";
+import { resolvePnpmRunner } from "./pnpm-runner.mjs";
+import {
+  isSourceCheckoutRoot,
+  pruneBundledPluginSourceNodeModules,
+} from "./postinstall-bundled-plugins.mjs";
 
 const logLevel = process.env.OPENCLAW_BUILD_VERBOSE ? "info" : "warn";
 const extraArgs = process.argv.slice(2);
-// TEMPORARY: Commented out due to upstream merge issue
-// const INEFFECTIVE_DYNAMIC_IMPORT_RE = /\[INEFFECTIVE_DYNAMIC_IMPORT\]/;
+// Keep the local temporary policy of not failing on ineffective dynamic-import
+// warnings, but avoid crashing when the guard is disabled.
+const INEFFECTIVE_DYNAMIC_IMPORT_RE = null;
 const UNRESOLVED_IMPORT_RE = /\[UNRESOLVED_IMPORT\]/;
 const ANSI_ESCAPE_RE = new RegExp(String.raw`\u001B\[[0-9;]*m`, "g");
 
@@ -41,7 +49,23 @@ function pruneStaleRuntimeSymlinks() {
   removeDistPluginNodeModulesSymlinks(path.join(cwd, "dist-runtime"));
 }
 
-pruneStaleRuntimeSymlinks();
+export function pruneSourceCheckoutBundledPluginNodeModules(params = {}) {
+  const cwd = params.cwd ?? process.cwd();
+  const logger = params.logger ?? console;
+  if (!isSourceCheckoutRoot({ packageRoot: cwd, existsSync: fs.existsSync })) {
+    return;
+  }
+  try {
+    pruneBundledPluginSourceNodeModules({
+      extensionsDir: path.join(cwd, "extensions"),
+      existsSync: fs.existsSync,
+      readdirSync: fs.readdirSync,
+      rmSync: fs.rmSync,
+    });
+  } catch (error) {
+    logger.warn(`tsdown: could not prune bundled plugin source node_modules: ${String(error)}`);
+  }
+}
 
 function findFatalUnresolvedImport(lines) {
   for (const line of lines) {
@@ -50,7 +74,10 @@ function findFatalUnresolvedImport(lines) {
     }
 
     const normalizedLine = line.replace(ANSI_ESCAPE_RE, "");
-    if (!normalizedLine.includes("extensions/") && !normalizedLine.includes("node_modules/")) {
+    if (
+      !normalizedLine.includes(BUNDLED_PLUGIN_PATH_PREFIX) &&
+      !normalizedLine.includes("node_modules/")
+    ) {
       return normalizedLine;
     }
   }
@@ -58,44 +85,72 @@ function findFatalUnresolvedImport(lines) {
   return null;
 }
 
-const result = spawnSync(
-  "pnpm",
-  ["exec", "tsdown", "--config-loader", "unrun", "--logLevel", logLevel, ...extraArgs],
-  {
-    encoding: "utf8",
-    stdio: "pipe",
-    shell: process.platform === "win32",
-  },
-);
-
-const stdout = result.stdout ?? "";
-const stderr = result.stderr ?? "";
-if (stdout) {
-  process.stdout.write(stdout);
+export function resolveTsdownBuildInvocation(params = {}) {
+  const env = params.env ?? process.env;
+  const runner = resolvePnpmRunner({
+    pnpmArgs: ["exec", "tsdown", "--config-loader", "unrun", "--logLevel", logLevel, ...extraArgs],
+    nodeExecPath: params.nodeExecPath ?? process.execPath,
+    npmExecPath: params.npmExecPath ?? env.npm_execpath,
+    comSpec: params.comSpec ?? env.ComSpec,
+    platform: params.platform ?? process.platform,
+  });
+  return {
+    command: runner.command,
+    args: runner.args,
+    options: {
+      encoding: "utf8",
+      stdio: "pipe",
+      shell: runner.shell,
+      windowsVerbatimArguments: runner.windowsVerbatimArguments,
+      env,
+    },
+  };
 }
-if (stderr) {
-  process.stderr.write(stderr);
+
+function isMainModule() {
+  const argv1 = process.argv[1];
+  if (!argv1) {
+    return false;
+  }
+  return import.meta.url === pathToFileURL(argv1).href;
 }
 
-// TEMPORARY: Disabled INEFFECTIVE_DYNAMIC_IMPORT check due to upstream merge issue
-// TODO: Fix provider-runtime imports to use runtime wrapper instead of direct imports
-// if (result.status === 0 && INEFFECTIVE_DYNAMIC_IMPORT_RE.test(`${stdout}\n${stderr}`)) {
-//   console.error(
-//     "Build emitted [INEFFECTIVE_DYNAMIC_IMPORT]. Replace transparent runtime re-export facades with real runtime boundaries.",
-//   );
-//   process.exit(1);
-// }
+if (isMainModule()) {
+  pruneSourceCheckoutBundledPluginNodeModules();
+  pruneStaleRuntimeSymlinks();
+  const invocation = resolveTsdownBuildInvocation();
+  const result = spawnSync(invocation.command, invocation.args, invocation.options);
 
-const fatalUnresolvedImport =
-  result.status === 0 ? findFatalUnresolvedImport(`${stdout}\n${stderr}`.split("\n")) : null;
+  const stdout = result.stdout ?? "";
+  const stderr = result.stderr ?? "";
+  if (stdout) {
+    process.stdout.write(stdout);
+  }
+  if (stderr) {
+    process.stderr.write(stderr);
+  }
 
-if (fatalUnresolvedImport) {
-  console.error(`Build emitted [UNRESOLVED_IMPORT] outside extensions: ${fatalUnresolvedImport}`);
+  if (
+    result.status === 0 &&
+    INEFFECTIVE_DYNAMIC_IMPORT_RE?.test(`${stdout}\n${stderr}`) === true
+  ) {
+    console.error(
+      "Build emitted [INEFFECTIVE_DYNAMIC_IMPORT]. Replace transparent runtime re-export facades with real runtime boundaries.",
+    );
+    process.exit(1);
+  }
+
+  const fatalUnresolvedImport =
+    result.status === 0 ? findFatalUnresolvedImport(`${stdout}\n${stderr}`.split("\n")) : null;
+
+  if (fatalUnresolvedImport) {
+    console.error(`Build emitted [UNRESOLVED_IMPORT] outside extensions: ${fatalUnresolvedImport}`);
+    process.exit(1);
+  }
+
+  if (typeof result.status === "number") {
+    process.exit(result.status);
+  }
+
   process.exit(1);
 }
-
-if (typeof result.status === "number") {
-  process.exit(result.status);
-}
-
-process.exit(1);

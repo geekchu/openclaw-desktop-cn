@@ -277,6 +277,16 @@ function appendCellTextOnly(state, cell) {
     state.text += cell.text;
     // Do not append styles - this is used for code blocks where inner styles would overlap
 }
+function collectTableBlock(state) {
+    if (!state.table) {
+        return;
+    }
+    state.collectedTables.push({
+        headers: state.table.headers.map((cell) => trimCell(cell).text),
+        rows: state.table.rows.map((row) => row.map((cell) => trimCell(cell).text)),
+        placeholderOffset: state.text.length,
+    });
+}
 function appendTableBulletValue(state, params) {
     const { header, value, columnIndex, includeColumnFallback } = params;
     if (!value?.text) {
@@ -553,6 +563,9 @@ function renderTokens(tokens, state) {
                     else if (state.tableMode === "code") {
                         renderTableAsCode(state);
                     }
+                    else if (state.tableMode === "block") {
+                        collectTableBlock(state);
+                    }
                 }
                 state.table = null;
                 break;
@@ -715,6 +728,13 @@ function sliceLinkSpans(spans, start, end) {
     }
     return sliced;
 }
+export function sliceMarkdownIR(ir, start, end) {
+    return {
+        text: ir.text.slice(start, end),
+        styles: sliceStyleSpans(ir.styles, start, end),
+        links: sliceLinkSpans(ir.links, start, end),
+    };
+}
 export function markdownToIR(markdown, options = {}) {
     return markdownToIRWithMeta(markdown, options).ir;
 }
@@ -739,6 +759,7 @@ export function markdownToIRWithMeta(markdown, options = {}) {
         tableMode,
         table: null,
         hasTables: false,
+        collectedTables: [],
     };
     renderTokens(tokens, state);
     closeRemainingStyles(state);
@@ -762,6 +783,10 @@ export function markdownToIRWithMeta(markdown, options = {}) {
             links: clampLinkSpans(state.links, finalLength),
         },
         hasTables: state.hasTables,
+        tables: state.collectedTables.map((table) => ({
+            ...table,
+            placeholderOffset: Math.min(table.placeholderOffset, finalLength),
+        })),
     };
 }
 export function chunkMarkdownIR(ir, limit) {

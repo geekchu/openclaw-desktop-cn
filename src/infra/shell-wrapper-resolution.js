@@ -1,3 +1,4 @@
+import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import { MAX_DISPATCH_WRAPPER_DEPTH, hasDispatchEnvManipulation, unwrapKnownDispatchWrapperInvocation, } from "./dispatch-wrapper-resolution.js";
 import { normalizeExecutableToken } from "./exec-wrapper-tokens.js";
 import { POSIX_INLINE_COMMAND_FLAGS, POWERSHELL_INLINE_COMMAND_FLAGS, resolveInlineCommandMatch, } from "./shell-inline-command.js";
@@ -30,6 +31,38 @@ const SHELL_WRAPPER_SPECS = [
     { kind: "cmd", names: WINDOWS_CMD_WRAPPER_CANONICAL },
     { kind: "powershell", names: POWERSHELL_WRAPPER_CANONICAL },
 ];
+function resolveShellWrapperSpecAndArgvInternal(argv, depth) {
+    if (!isWithinDispatchClassificationDepth(depth)) {
+        return null;
+    }
+    const token0 = argv[0]?.trim();
+    if (!token0) {
+        return null;
+    }
+    const dispatchUnwrap = unwrapKnownDispatchWrapperInvocation(argv);
+    if (dispatchUnwrap.kind === "blocked") {
+        return null;
+    }
+    if (dispatchUnwrap.kind === "unwrapped") {
+        return resolveShellWrapperSpecAndArgvInternal(dispatchUnwrap.argv, depth + 1);
+    }
+    const shellMultiplexerUnwrap = unwrapKnownShellMultiplexerInvocation(argv);
+    if (shellMultiplexerUnwrap.kind === "blocked") {
+        return null;
+    }
+    if (shellMultiplexerUnwrap.kind === "unwrapped") {
+        return resolveShellWrapperSpecAndArgvInternal(shellMultiplexerUnwrap.argv, depth + 1);
+    }
+    const wrapper = findShellWrapperSpec(normalizeExecutableToken(token0));
+    if (!wrapper) {
+        return null;
+    }
+    const payload = extractShellWrapperPayload(argv, wrapper);
+    if (!payload) {
+        return null;
+    }
+    return { argv, wrapper, payload };
+}
 function isWithinDispatchClassificationDepth(depth) {
     return depth <= MAX_DISPATCH_WRAPPER_DEPTH;
 }
@@ -76,7 +109,7 @@ function extractPosixShellInlineCommand(argv) {
 }
 function extractCmdInlineCommand(argv) {
     const idx = argv.findIndex((item) => {
-        const token = item.trim().toLowerCase();
+        const token = normalizeLowercaseStringOrEmpty(item);
         return token === "/c" || token === "/k";
     });
     if (idx === -1) {
@@ -142,36 +175,14 @@ export function hasEnvManipulationBeforeShellWrapper(argv) {
     return hasEnvManipulationBeforeShellWrapperInternal(argv, 0, false);
 }
 function extractShellWrapperCommandInternal(argv, rawCommand, depth) {
-    if (!isWithinDispatchClassificationDepth(depth)) {
+    const resolved = resolveShellWrapperSpecAndArgvInternal(argv, depth);
+    if (!resolved) {
         return { isWrapper: false, command: null };
     }
-    const token0 = argv[0]?.trim();
-    if (!token0) {
-        return { isWrapper: false, command: null };
-    }
-    const dispatchUnwrap = unwrapKnownDispatchWrapperInvocation(argv);
-    if (dispatchUnwrap.kind === "blocked") {
-        return { isWrapper: false, command: null };
-    }
-    if (dispatchUnwrap.kind === "unwrapped") {
-        return extractShellWrapperCommandInternal(dispatchUnwrap.argv, rawCommand, depth + 1);
-    }
-    const shellMultiplexerUnwrap = unwrapKnownShellMultiplexerInvocation(argv);
-    if (shellMultiplexerUnwrap.kind === "blocked") {
-        return { isWrapper: false, command: null };
-    }
-    if (shellMultiplexerUnwrap.kind === "unwrapped") {
-        return extractShellWrapperCommandInternal(shellMultiplexerUnwrap.argv, rawCommand, depth + 1);
-    }
-    const wrapper = findShellWrapperSpec(normalizeExecutableToken(token0));
-    if (!wrapper) {
-        return { isWrapper: false, command: null };
-    }
-    const payload = extractShellWrapperPayload(argv, wrapper);
-    if (!payload) {
-        return { isWrapper: false, command: null };
-    }
-    return { isWrapper: true, command: rawCommand ?? payload };
+    return { isWrapper: true, command: rawCommand ?? resolved.payload };
+}
+export function resolveShellWrapperTransportArgv(argv) {
+    return resolveShellWrapperSpecAndArgvInternal(argv, 0)?.argv ?? null;
 }
 export function extractShellWrapperInlineCommand(argv) {
     const extracted = extractShellWrapperCommandInternal(argv, null, 0);

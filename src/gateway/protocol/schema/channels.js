@@ -13,6 +13,7 @@ export const TalkSpeakParamsSchema = Type.Object({
     modelId: Type.Optional(Type.String()),
     outputFormat: Type.Optional(Type.String()),
     speed: Type.Optional(Type.Number()),
+    rateWpm: Type.Optional(Type.Integer({ minimum: 1 })),
     stability: Type.Optional(Type.Number()),
     similarity: Type.Optional(Type.Number()),
     style: Type.Optional(Type.Number()),
@@ -20,12 +21,9 @@ export const TalkSpeakParamsSchema = Type.Object({
     seed: Type.Optional(Type.Integer({ minimum: 0 })),
     normalize: Type.Optional(Type.String()),
     language: Type.Optional(Type.String()),
+    latencyTier: Type.Optional(Type.Integer({ minimum: 0 })),
 }, { additionalProperties: false });
 const talkProviderFieldSchemas = {
-    voiceId: Type.Optional(Type.String()),
-    voiceAliases: Type.Optional(Type.Record(Type.String(), Type.String())),
-    modelId: Type.Optional(Type.String()),
-    outputFormat: Type.Optional(Type.String()),
     apiKey: Type.Optional(SecretInputSchema),
 };
 const TalkProviderConfigSchema = Type.Object(talkProviderFieldSchemas, {
@@ -35,22 +33,16 @@ const ResolvedTalkConfigSchema = Type.Object({
     provider: Type.String(),
     config: TalkProviderConfigSchema,
 }, { additionalProperties: false });
-const LegacyTalkConfigSchema = Type.Object({
-    ...talkProviderFieldSchemas,
-    interruptOnSpeech: Type.Optional(Type.Boolean()),
-    silenceTimeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
-}, { additionalProperties: false });
-const NormalizedTalkConfigSchema = Type.Object({
+const TalkConfigSchema = Type.Object({
     provider: Type.Optional(Type.String()),
     providers: Type.Optional(Type.Record(Type.String(), TalkProviderConfigSchema)),
     resolved: ResolvedTalkConfigSchema,
-    ...talkProviderFieldSchemas,
     interruptOnSpeech: Type.Optional(Type.Boolean()),
     silenceTimeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
 }, { additionalProperties: false });
 export const TalkConfigResultSchema = Type.Object({
     config: Type.Object({
-        talk: Type.Optional(Type.Union([LegacyTalkConfigSchema, NormalizedTalkConfigSchema])),
+        talk: Type.Optional(TalkConfigSchema),
         session: Type.Optional(Type.Object({
             mainKey: Type.Optional(Type.String()),
         }, { additionalProperties: false })),

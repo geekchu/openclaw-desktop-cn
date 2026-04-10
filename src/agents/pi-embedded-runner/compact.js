@@ -32,7 +32,7 @@ import { resolveOwnerDisplaySetting } from "../owner-display.js";
 import { createBundleLspToolRuntime } from "../pi-bundle-lsp-runtime.js";
 import { createBundleMcpToolRuntime } from "../pi-bundle-mcp-tools.js";
 import { ensureSessionHeader, validateAnthropicTurns, validateGeminiTurns, } from "../pi-embedded-helpers.js";
-import { consumeCompactionSafeguardCancelReason, setCompactionSafeguardCancelReason, } from "../pi-extensions/compaction-safeguard-runtime.js";
+import { consumeCompactionSafeguardCancelReason, setCompactionSafeguardCancelReason, } from "../pi-hooks/compaction-safeguard-runtime.js";
 import { createPreparedEmbeddedPiSettingsManager } from "../pi-project-settings.js";
 import { createOpenClawCodingTools } from "../pi-tools.js";
 import { registerProviderStreamForModel } from "../provider-stream.js";

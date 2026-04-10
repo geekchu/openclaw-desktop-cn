@@ -1,3 +1,5 @@
+import { normalizeStructuredPromptSection } from "../agents/prompt-cache-stability.js";
+import { buildMemoryPromptSection } from "../plugins/memory-state.js";
 /**
  * Delegate a context-engine compaction request to OpenClaw's built-in runtime compaction path.
  *
@@ -48,4 +50,21 @@ export async function delegateCompactionToRuntime(params) {
             }
             : undefined,
     };
+}
+/**
+ * Build a context-engine-ready systemPromptAddition from the active memory
+ * plugin prompt path. This lets non-legacy engines explicitly opt into the
+ * same memory/wiki guidance that the legacy engine gets via system prompt
+ * assembly, without reimplementing memory prompt formatting.
+ */
+export function buildMemorySystemPromptAddition(params) {
+    const lines = buildMemoryPromptSection({
+        availableTools: params.availableTools,
+        citationsMode: params.citationsMode,
+    });
+    if (lines.length === 0) {
+        return undefined;
+    }
+    const normalized = normalizeStructuredPromptSection(lines.join("\n"));
+    return normalized || undefined;
 }

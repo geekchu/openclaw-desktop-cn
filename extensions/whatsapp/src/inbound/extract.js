@@ -1,8 +1,8 @@
 import { extractMessageContent, getContentType, normalizeMessageContent, } from "@whiskeysockets/baileys";
 import { formatLocationText } from "openclaw/plugin-sdk/channel-inbound";
 import { logVerbose } from "openclaw/plugin-sdk/runtime-env";
-import { jidToE164 } from "openclaw/plugin-sdk/text-runtime";
 import { resolveComparableIdentity } from "../identity.js";
+import { jidToE164 } from "../text-runtime.js";
 import { parseVcard } from "../vcard.js";
 const MESSAGE_WRAPPER_KEYS = [
     "botInvokeMessage",

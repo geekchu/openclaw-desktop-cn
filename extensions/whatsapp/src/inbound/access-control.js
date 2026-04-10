@@ -1,19 +1,13 @@
 import { createChannelPairingChallengeIssuer } from "openclaw/plugin-sdk/channel-pairing";
 import { loadConfig } from "openclaw/plugin-sdk/config-runtime";
-import { resolveOpenProviderRuntimeGroupPolicy, resolveDefaultGroupPolicy, warnMissingProviderGroupPolicyFallbackOnce, } from "openclaw/plugin-sdk/config-runtime";
+import { resolveDefaultGroupPolicy, warnMissingProviderGroupPolicyFallbackOnce, } from "openclaw/plugin-sdk/config-runtime";
 import { upsertChannelPairingRequest } from "openclaw/plugin-sdk/conversation-runtime";
 import { logVerbose } from "openclaw/plugin-sdk/runtime-env";
 import { readStoreAllowFromForDmPolicy, resolveDmGroupAccessWithLists, } from "openclaw/plugin-sdk/security-runtime";
-import { isSelfChatMode, normalizeE164 } from "openclaw/plugin-sdk/text-runtime";
 import { resolveWhatsAppAccount } from "../accounts.js";
+import { resolveWhatsAppRuntimeGroupPolicy } from "../runtime-group-policy.js";
+import { isSelfChatMode, normalizeE164 } from "../text-runtime.js";
 const PAIRING_REPLY_HISTORY_GRACE_MS = 30_000;
-function resolveWhatsAppRuntimeGroupPolicy(params) {
-    return resolveOpenProviderRuntimeGroupPolicy({
-        providerConfigPresent: params.providerConfigPresent,
-        groupPolicy: params.groupPolicy,
-        defaultGroupPolicy: params.defaultGroupPolicy,
-    });
-}
 export async function checkInboundAccessControl(params) {
     const cfg = loadConfig();
     const account = resolveWhatsAppAccount({

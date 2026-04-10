@@ -10,10 +10,7 @@ function cronAgentTurnPayloadSchema(params) {
         timeoutSeconds: Type.Optional(Type.Integer({ minimum: 0 })),
         allowUnsafeExternalContent: Type.Optional(Type.Boolean()),
         lightContext: Type.Optional(Type.Boolean()),
-        deliver: Type.Optional(Type.Boolean()),
-        channel: Type.Optional(Type.String()),
-        to: Type.Optional(Type.String()),
-        bestEffortDeliver: Type.Optional(Type.Boolean()),
+        toolsAllow: Type.Optional(params.toolsAllow),
     }, { additionalProperties: false });
 }
 const CronSessionTargetSchema = Type.Union([
@@ -111,14 +108,20 @@ export const CronPayloadSchema = Type.Union([
         kind: Type.Literal("systemEvent"),
         text: NonEmptyString,
     }, { additionalProperties: false }),
-    cronAgentTurnPayloadSchema({ message: NonEmptyString }),
+    cronAgentTurnPayloadSchema({
+        message: NonEmptyString,
+        toolsAllow: Type.Array(Type.String()),
+    }),
 ]);
 export const CronPayloadPatchSchema = Type.Union([
     Type.Object({
         kind: Type.Literal("systemEvent"),
         text: Type.Optional(NonEmptyString),
     }, { additionalProperties: false }),
-    cronAgentTurnPayloadSchema({ message: Type.Optional(NonEmptyString) }),
+    cronAgentTurnPayloadSchema({
+        message: Type.Optional(NonEmptyString),
+        toolsAllow: Type.Union([Type.Array(Type.String()), Type.Null()]),
+    }),
 ]);
 export const CronFailureAlertSchema = Type.Object({
     after: Type.Optional(Type.Integer({ minimum: 1 })),

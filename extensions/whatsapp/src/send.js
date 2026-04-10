@@ -6,12 +6,18 @@ import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
 import { getChildLogger } from "openclaw/plugin-sdk/text-runtime";
 import { redactIdentifier } from "openclaw/plugin-sdk/text-runtime";
 import { convertMarkdownTables } from "openclaw/plugin-sdk/text-runtime";
-import { markdownToWhatsApp } from "openclaw/plugin-sdk/text-runtime";
-import { toWhatsappJid } from "openclaw/plugin-sdk/text-runtime";
-import { resolveWhatsAppAccount, resolveWhatsAppMediaMaxBytes } from "./accounts.js";
+import { resolveDefaultWhatsAppAccountId, resolveWhatsAppAccount, resolveWhatsAppMediaMaxBytes, } from "./accounts.js";
 import { requireActiveWebListener } from "./active-listener.js";
-import { loadWebMedia } from "./media.js";
+import { loadOutboundMediaFromUrl } from "./runtime-api.js";
+import { markdownToWhatsApp, toWhatsappJid } from "./text-runtime.js";
 const outboundLog = createSubsystemLogger("gateway/channels/whatsapp").child("outbound");
+function resolveOutboundWhatsAppAccountId(params) {
+    const explicitAccountId = params.accountId?.trim();
+    if (explicitAccountId) {
+        return explicitAccountId;
+    }
+    return resolveDefaultWhatsAppAccountId(params.cfg);
+}
 export async function sendMessageWhatsApp(to, body, options) {
     let text = body.trimStart();
     const jid = toWhatsappJid(to);
@@ -20,8 +26,12 @@ export async function sendMessageWhatsApp(to, body, options) {
     }
     const correlationId = generateSecureUuid();
     const startedAt = Date.now();
-    const { listener: active, accountId: resolvedAccountId } = requireActiveWebListener(options.accountId);
     const cfg = options.cfg ?? loadConfig();
+    const effectiveAccountId = resolveOutboundWhatsAppAccountId({
+        cfg,
+        accountId: options.accountId,
+    });
+    const { listener: active, accountId: resolvedAccountId } = requireActiveWebListener(effectiveAccountId);
     const account = resolveWhatsAppAccount({
         cfg,
         accountId: resolvedAccountId ?? options.accountId,
@@ -45,13 +55,15 @@ export async function sendMessageWhatsApp(to, body, options) {
         let mediaType;
         let documentFileName;
         if (options.mediaUrl) {
-            const media = await loadWebMedia(options.mediaUrl, {
+            const media = await loadOutboundMediaFromUrl(options.mediaUrl, {
                 maxBytes: resolveWhatsAppMediaMaxBytes(account),
-                localRoots: options.mediaLocalRoots,
+                mediaAccess: options.mediaAccess,
+                mediaLocalRoots: options.mediaLocalRoots,
+                mediaReadFile: options.mediaReadFile,
             });
             const caption = text || undefined;
             mediaBuffer = media.buffer;
-            mediaType = media.contentType;
+            mediaType = media.contentType ?? "application/octet-stream";
             if (media.kind === "audio") {
                 // WhatsApp expects explicit opus codec for PTT voice notes.
                 mediaType =
@@ -98,7 +110,12 @@ export async function sendMessageWhatsApp(to, body, options) {
 }
 export async function sendReactionWhatsApp(chatJid, messageId, emoji, options) {
     const correlationId = generateSecureUuid();
-    const { listener: active } = requireActiveWebListener(options.accountId);
+    const cfg = loadConfig();
+    const effectiveAccountId = resolveOutboundWhatsAppAccountId({
+        cfg,
+        accountId: options.accountId,
+    });
+    const { listener: active } = requireActiveWebListener(effectiveAccountId);
     const redactedChatJid = redactIdentifier(chatJid);
     const logger = getChildLogger({
         module: "web-outbound",
@@ -123,7 +140,12 @@ export async function sendReactionWhatsApp(chatJid, messageId, emoji, options) {
 export async function sendPollWhatsApp(to, poll, options) {
     const correlationId = generateSecureUuid();
     const startedAt = Date.now();
-    const { listener: active } = requireActiveWebListener(options.accountId);
+    const cfg = options.cfg ?? loadConfig();
+    const effectiveAccountId = resolveOutboundWhatsAppAccountId({
+        cfg,
+        accountId: options.accountId,
+    });
+    const { listener: active } = requireActiveWebListener(effectiveAccountId);
     const redactedTo = redactIdentifier(to);
     const logger = getChildLogger({
         module: "web-outbound",

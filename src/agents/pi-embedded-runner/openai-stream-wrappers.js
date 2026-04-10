@@ -1,151 +1,49 @@
 import { streamSimple } from "@mariozechner/pi-ai";
-import { resolveProviderAttributionHeaders } from "../provider-attribution.js";
+import { normalizeOptionalLowercaseString, readStringValue } from "../../shared/string-coerce.js";
+import { patchCodexNativeWebSearchPayload, resolveCodexNativeSearchActivation, } from "../codex-native-web-search.js";
+import { flattenCompletionMessagesToStringContent } from "../openai-completions-string-content.js";
+import { applyOpenAIResponsesPayloadPolicy, resolveOpenAIResponsesPayloadPolicy, } from "../openai-responses-payload-policy.js";
+import { resolveProviderRequestPolicyConfig } from "../provider-request-config.js";
 import { log } from "./logger.js";
 import { streamWithPayloadPatch } from "./stream-payload-utils.js";
-const OPENAI_RESPONSES_APIS = new Set(["openai-responses"]);
-const OPENAI_RESPONSES_PROVIDERS = new Set(["openai", "azure-openai", "azure-openai-responses"]);
-function isDirectOpenAIBaseUrl(baseUrl) {
-    if (typeof baseUrl !== "string" || !baseUrl.trim()) {
-        return false;
-    }
-    try {
-        const host = new URL(baseUrl).hostname.toLowerCase();
-        return (host === "api.openai.com" || host === "chatgpt.com" || host.endsWith(".openai.azure.com"));
-    }
-    catch {
-        const normalized = baseUrl.toLowerCase();
-        return (normalized.includes("api.openai.com") ||
-            normalized.includes("chatgpt.com") ||
-            normalized.includes(".openai.azure.com"));
-    }
-}
-function isOpenAIPublicApiBaseUrl(baseUrl) {
-    if (typeof baseUrl !== "string" || !baseUrl.trim()) {
-        return false;
-    }
-    try {
-        return new URL(baseUrl).hostname.toLowerCase() === "api.openai.com";
-    }
-    catch {
-        return baseUrl.toLowerCase().includes("api.openai.com");
-    }
-}
-function isOpenAICodexBaseUrl(baseUrl) {
-    if (typeof baseUrl !== "string" || !baseUrl.trim()) {
-        return false;
-    }
-    try {
-        return new URL(baseUrl).hostname.toLowerCase() === "chatgpt.com";
-    }
-    catch {
-        return baseUrl.toLowerCase().includes("chatgpt.com");
-    }
+function resolveOpenAIRequestCapabilities(model) {
+    return resolveProviderRequestPolicyConfig({
+        provider: readStringValue(model.provider),
+        api: readStringValue(model.api),
+        baseUrl: readStringValue(model.baseUrl),
+        compat: model.compat,
+        capability: "llm",
+        transport: "stream",
+    }).capabilities;
 }
 function shouldApplyOpenAIAttributionHeaders(model) {
-    if (model.provider === "openai" &&
-        (model.api === "openai-completions" || model.api === "openai-responses") &&
-        isOpenAIPublicApiBaseUrl(model.baseUrl)) {
-        return "openai";
-    }
-    if (model.provider === "openai-codex" &&
-        (model.api === "openai-codex-responses" || model.api === "openai-responses") &&
-        isOpenAICodexBaseUrl(model.baseUrl)) {
-        return "openai-codex";
-    }
-    return undefined;
+    const attributionProvider = resolveOpenAIRequestCapabilities(model).attributionProvider;
+    return attributionProvider === "openai" || attributionProvider === "openai-codex"
+        ? attributionProvider
+        : undefined;
 }
-function shouldForceResponsesStore(model) {
-    if (model.compat?.supportsStore === false) {
-        return false;
-    }
-    if (typeof model.api !== "string" || typeof model.provider !== "string") {
-        return false;
-    }
-    if (!OPENAI_RESPONSES_APIS.has(model.api)) {
-        return false;
-    }
-    if (!OPENAI_RESPONSES_PROVIDERS.has(model.provider)) {
-        return false;
-    }
-    return isDirectOpenAIBaseUrl(model.baseUrl);
+function shouldApplyOpenAIServiceTier(model) {
+    return resolveOpenAIResponsesPayloadPolicy(model, { storeMode: "disable" }).allowsServiceTier;
 }
-function parsePositiveInteger(value) {
-    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-        return Math.floor(value);
+function shouldApplyOpenAIReasoningCompatibility(model) {
+    const api = readStringValue(model.api);
+    const provider = readStringValue(model.provider);
+    if (!api || !provider) {
+        return false;
     }
-    if (typeof value === "string") {
-        const parsed = Number.parseInt(value, 10);
-        if (Number.isFinite(parsed) && parsed > 0) {
-            return parsed;
-        }
-    }
-    return undefined;
+    return resolveOpenAIRequestCapabilities(model).supportsOpenAIReasoningCompatPayload;
 }
-function resolveOpenAIResponsesCompactThreshold(model) {
-    const contextWindow = parsePositiveInteger(model.contextWindow);
-    if (contextWindow) {
-        return Math.max(1_000, Math.floor(contextWindow * 0.7));
-    }
-    return 80_000;
-}
-function shouldEnableOpenAIResponsesServerCompaction(model, extraParams) {
-    const configured = extraParams?.responsesServerCompaction;
-    if (configured === false) {
-        return false;
-    }
-    if (!shouldForceResponsesStore(model)) {
-        return false;
-    }
-    if (configured === true) {
-        return true;
-    }
-    return model.provider === "openai";
-}
-function shouldStripResponsesStore(model, forceStore) {
-    if (forceStore) {
-        return false;
-    }
-    if (typeof model.api !== "string") {
-        return false;
-    }
-    return OPENAI_RESPONSES_APIS.has(model.api) && model.compat?.supportsStore === false;
-}
-function shouldStripResponsesPromptCache(model) {
-    if (typeof model.api !== "string" || !OPENAI_RESPONSES_APIS.has(model.api)) {
-        return false;
-    }
-    // Missing baseUrl means pi-ai will use the default OpenAI endpoint, so keep
-    // prompt cache fields for that direct path.
-    if (typeof model.baseUrl !== "string" || !model.baseUrl.trim()) {
-        return false;
-    }
-    return !isDirectOpenAIBaseUrl(model.baseUrl);
-}
-function applyOpenAIResponsesPayloadOverrides(params) {
-    if (params.forceStore) {
-        params.payloadObj.store = true;
-    }
-    if (params.stripStore) {
-        delete params.payloadObj.store;
-    }
-    if (params.stripPromptCache) {
-        delete params.payloadObj.prompt_cache_key;
-        delete params.payloadObj.prompt_cache_retention;
-    }
-    if (params.useServerCompaction && params.payloadObj.context_management === undefined) {
-        params.payloadObj.context_management = [
-            {
-                type: "compaction",
-                compact_threshold: params.compactThreshold,
-            },
-        ];
-    }
+function shouldFlattenOpenAICompletionMessages(model) {
+    const compat = model.compat && typeof model.compat === "object"
+        ? model.compat
+        : undefined;
+    return model.api === "openai-completions" && compat?.requiresStringContent === true;
 }
 function normalizeOpenAIServiceTier(value) {
     if (typeof value !== "string") {
         return undefined;
     }
-    const normalized = value.trim().toLowerCase();
+    const normalized = normalizeOptionalLowercaseString(value);
     if (normalized === "auto" ||
         normalized === "default" ||
         normalized === "flex" ||
@@ -163,14 +61,33 @@ export function resolveOpenAIServiceTier(extraParams) {
     }
     return normalized;
 }
+function normalizeOpenAITextVerbosity(value) {
+    if (typeof value !== "string") {
+        return undefined;
+    }
+    const normalized = normalizeOptionalLowercaseString(value);
+    if (normalized === "low" || normalized === "medium" || normalized === "high") {
+        return normalized;
+    }
+    return undefined;
+}
+export function resolveOpenAITextVerbosity(extraParams) {
+    const raw = extraParams?.textVerbosity ?? extraParams?.text_verbosity;
+    const normalized = normalizeOpenAITextVerbosity(raw);
+    if (raw !== undefined && normalized === undefined) {
+        const rawSummary = typeof raw === "string" ? raw : typeof raw;
+        log.warn(`ignoring invalid OpenAI text verbosity param: ${rawSummary}`);
+    }
+    return normalized;
+}
 function normalizeOpenAIFastMode(value) {
     if (typeof value === "boolean") {
         return value;
     }
-    if (typeof value !== "string") {
+    const normalized = normalizeOptionalLowercaseString(value);
+    if (!normalized) {
         return undefined;
     }
-    const normalized = value.trim().toLowerCase();
     if (normalized === "on" ||
         normalized === "true" ||
         normalized === "yes" ||
@@ -196,75 +113,70 @@ export function resolveOpenAIFastMode(extraParams) {
     }
     return normalized;
 }
-function resolveFastModeReasoningEffort(modelId) {
-    if (typeof modelId !== "string") {
-        return "low";
-    }
-    const normalized = modelId.trim().toLowerCase();
-    // Keep fast mode broadly compatible across GPT-5 family variants by using
-    // the lowest shared non-disabled effort that current transports accept.
-    if (normalized.startsWith("gpt-5")) {
-        return "low";
-    }
-    return "low";
-}
 function applyOpenAIFastModePayloadOverrides(params) {
-    if (params.payloadObj.reasoning === undefined) {
-        params.payloadObj.reasoning = {
-            effort: resolveFastModeReasoningEffort(params.model.id),
-        };
-    }
-    const existingText = params.payloadObj.text;
-    if (existingText === undefined) {
-        params.payloadObj.text = { verbosity: "low" };
-    }
-    else if (existingText && typeof existingText === "object" && !Array.isArray(existingText)) {
-        const textObj = existingText;
-        if (textObj.verbosity === undefined) {
-            textObj.verbosity = "low";
-        }
-    }
-    if (params.model.provider === "openai" &&
-        params.payloadObj.service_tier === undefined &&
-        isOpenAIPublicApiBaseUrl(params.model.baseUrl)) {
+    if (params.payloadObj.service_tier === undefined && shouldApplyOpenAIServiceTier(params.model)) {
         params.payloadObj.service_tier = "priority";
     }
 }
 export function createOpenAIResponsesContextManagementWrapper(baseStreamFn, extraParams) {
     const underlying = baseStreamFn ?? streamSimple;
     return (model, context, options) => {
-        const forceStore = shouldForceResponsesStore(model);
-        const useServerCompaction = shouldEnableOpenAIResponsesServerCompaction(model, extraParams);
-        const stripStore = shouldStripResponsesStore(model, forceStore);
-        const stripPromptCache = shouldStripResponsesPromptCache(model);
-        if (!forceStore && !useServerCompaction && !stripStore && !stripPromptCache) {
+        const policy = resolveOpenAIResponsesPayloadPolicy(model, {
+            extraParams,
+            enablePromptCacheStripping: true,
+            enableServerCompaction: true,
+            storeMode: "provider-policy",
+        });
+        if (policy.explicitStore === undefined &&
+            !policy.useServerCompaction &&
+            !policy.shouldStripStore &&
+            !policy.shouldStripPromptCache &&
+            !policy.shouldStripDisabledReasoningPayload) {
             return underlying(model, context, options);
         }
-        const compactThreshold = parsePositiveInteger(extraParams?.responsesCompactThreshold) ??
-            resolveOpenAIResponsesCompactThreshold(model);
         const originalOnPayload = options?.onPayload;
         return underlying(model, context, {
             ...options,
             onPayload: (payload) => {
                 if (payload && typeof payload === "object") {
-                    applyOpenAIResponsesPayloadOverrides({
-                        payloadObj: payload,
-                        forceStore,
-                        stripStore,
-                        stripPromptCache,
-                        useServerCompaction,
-                        compactThreshold,
-                    });
+                    applyOpenAIResponsesPayloadPolicy(payload, policy);
                 }
                 return originalOnPayload?.(payload, model);
             },
         });
     };
 }
+export function createOpenAIReasoningCompatibilityWrapper(baseStreamFn) {
+    const underlying = baseStreamFn ?? streamSimple;
+    return (model, context, options) => {
+        if (!shouldApplyOpenAIReasoningCompatibility(model)) {
+            return underlying(model, context, options);
+        }
+        return streamWithPayloadPatch(underlying, model, context, options, (payloadObj) => {
+            applyOpenAIResponsesPayloadPolicy(payloadObj, resolveOpenAIResponsesPayloadPolicy(model, { storeMode: "preserve" }));
+        });
+    };
+}
+export function createOpenAIStringContentWrapper(baseStreamFn) {
+    const underlying = baseStreamFn ?? streamSimple;
+    return (model, context, options) => {
+        if (!shouldFlattenOpenAICompletionMessages(model)) {
+            return underlying(model, context, options);
+        }
+        return streamWithPayloadPatch(underlying, model, context, options, (payloadObj) => {
+            if (!Array.isArray(payloadObj.messages)) {
+                return;
+            }
+            payloadObj.messages = flattenCompletionMessagesToStringContent(payloadObj.messages);
+        });
+    };
+}
 export function createOpenAIFastModeWrapper(baseStreamFn) {
     const underlying = baseStreamFn ?? streamSimple;
     return (model, context, options) => {
-        if ((model.api !== "openai-responses" && model.api !== "openai-codex-responses") ||
+        if ((model.api !== "openai-responses" &&
+            model.api !== "openai-codex-responses" &&
+            model.api !== "azure-openai-responses") ||
             (model.provider !== "openai" && model.provider !== "openai-codex")) {
             return underlying(model, context, options);
         }
@@ -286,15 +198,76 @@ export function createOpenAIFastModeWrapper(baseStreamFn) {
 export function createOpenAIServiceTierWrapper(baseStreamFn, serviceTier) {
     const underlying = baseStreamFn ?? streamSimple;
     return (model, context, options) => {
-        if (model.api !== "openai-responses" ||
-            model.provider !== "openai" ||
-            !isOpenAIPublicApiBaseUrl(model.baseUrl)) {
+        if (!shouldApplyOpenAIServiceTier(model)) {
             return underlying(model, context, options);
         }
         return streamWithPayloadPatch(underlying, model, context, options, (payloadObj) => {
             if (payloadObj.service_tier === undefined) {
                 payloadObj.service_tier = serviceTier;
             }
+        });
+    };
+}
+export function createOpenAITextVerbosityWrapper(baseStreamFn, verbosity) {
+    const underlying = baseStreamFn ?? streamSimple;
+    return (model, context, options) => {
+        if (model.api !== "openai-responses" && model.api !== "openai-codex-responses") {
+            return underlying(model, context, options);
+        }
+        const shouldOverrideExistingVerbosity = model.api === "openai-codex-responses";
+        const originalOnPayload = options?.onPayload;
+        return underlying(model, context, {
+            ...options,
+            onPayload: (payload) => {
+                if (payload && typeof payload === "object") {
+                    const payloadObj = payload;
+                    const existingText = payloadObj.text && typeof payloadObj.text === "object"
+                        ? payloadObj.text
+                        : {};
+                    if (shouldOverrideExistingVerbosity || existingText.verbosity === undefined) {
+                        payloadObj.text = { ...existingText, verbosity };
+                    }
+                }
+                return originalOnPayload?.(payload, model);
+            },
+        });
+    };
+}
+export function createCodexNativeWebSearchWrapper(baseStreamFn, params) {
+    const underlying = baseStreamFn ?? streamSimple;
+    return (model, context, options) => {
+        const activation = resolveCodexNativeSearchActivation({
+            config: params.config,
+            modelProvider: readStringValue(model.provider),
+            modelApi: readStringValue(model.api),
+            agentDir: params.agentDir,
+        });
+        if (activation.state !== "native_active") {
+            if (activation.codexNativeEnabled) {
+                log.debug(`skipping Codex native web search (${activation.inactiveReason ?? "inactive"}) for ${String(model.provider ?? "unknown")}/${String(model.id ?? "unknown")}`);
+            }
+            return underlying(model, context, options);
+        }
+        log.debug(`activating Codex native web search (${activation.codexMode}) for ${String(model.provider ?? "unknown")}/${String(model.id ?? "unknown")}`);
+        const originalOnPayload = options?.onPayload;
+        return underlying(model, context, {
+            ...options,
+            onPayload: (payload) => {
+                const result = patchCodexNativeWebSearchPayload({
+                    payload,
+                    config: params.config,
+                });
+                if (result.status === "payload_not_object") {
+                    log.debug("Skipping Codex native web search injection because provider payload is not an object");
+                }
+                else if (result.status === "native_tool_already_present") {
+                    log.debug("Codex native web search tool already present in provider payload");
+                }
+                else if (result.status === "injected") {
+                    log.debug("Injected Codex native web search tool into provider payload");
+                }
+                return originalOnPayload?.(payload, model);
+            },
         });
     };
 }
@@ -312,7 +285,7 @@ export function createOpenAIDefaultTransportWrapper(baseStreamFn) {
         const mergedOptions = {
             ...options,
             transport: options?.transport ?? "auto",
-            openaiWsWarmup: typedOptions?.openaiWsWarmup ?? false,
+            openaiWsWarmup: typedOptions?.openaiWsWarmup ?? true,
         };
         return underlying(model, context, mergedOptions);
     };
@@ -326,10 +299,15 @@ export function createOpenAIAttributionHeadersWrapper(baseStreamFn) {
         }
         return underlying(model, context, {
             ...options,
-            headers: {
-                ...options?.headers,
-                ...resolveProviderAttributionHeaders(attributionProvider),
-            },
+            headers: resolveProviderRequestPolicyConfig({
+                provider: attributionProvider,
+                api: readStringValue(model.api),
+                baseUrl: readStringValue(model.baseUrl),
+                capability: "llm",
+                transport: "stream",
+                callerHeaders: options?.headers,
+                precedence: "defaults-win",
+            }).headers,
         });
     };
 }

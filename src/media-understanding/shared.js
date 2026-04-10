@@ -1,38 +1,133 @@
+import { buildProviderRequestDispatcherPolicy, normalizeBaseUrl, resolveProviderRequestPolicyConfig, } from "../agents/provider-request-config.js";
 import { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
 export { fetchWithTimeout } from "../utils/fetch-timeout.js";
+export { normalizeBaseUrl } from "../agents/provider-request-config.js";
 const MAX_ERROR_CHARS = 300;
-export function normalizeBaseUrl(baseUrl, fallback) {
-    const raw = baseUrl?.trim() || fallback;
-    return raw.replace(/\/+$/, "");
+const MAX_ERROR_RESPONSE_BYTES = 4096;
+const DEFAULT_GUARDED_HTTP_TIMEOUT_MS = 60_000;
+const MAX_AUDIT_CONTEXT_CHARS = 80;
+function resolveGuardedHttpTimeoutMs(timeoutMs) {
+    if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        return DEFAULT_GUARDED_HTTP_TIMEOUT_MS;
+    }
+    return timeoutMs;
+}
+function sanitizeAuditContext(auditContext) {
+    const cleaned = auditContext
+        ?.replace(/\p{Cc}+/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    if (!cleaned) {
+        return undefined;
+    }
+    return cleaned.slice(0, MAX_AUDIT_CONTEXT_CHARS);
+}
+export function resolveProviderHttpRequestConfig(params) {
+    const requestConfig = resolveProviderRequestPolicyConfig({
+        provider: params.provider ?? "",
+        baseUrl: params.baseUrl,
+        defaultBaseUrl: params.defaultBaseUrl,
+        capability: params.capability ?? "other",
+        transport: params.transport ?? "http",
+        callerHeaders: params.headers
+            ? Object.fromEntries(new Headers(params.headers).entries())
+            : undefined,
+        providerHeaders: params.defaultHeaders,
+        precedence: "caller-wins",
+        allowPrivateNetwork: params.allowPrivateNetwork,
+        api: params.api,
+        request: params.request,
+    });
+    const headers = new Headers(requestConfig.headers);
+    if (!requestConfig.baseUrl) {
+        throw new Error("Missing baseUrl: provide baseUrl or defaultBaseUrl");
+    }
+    return {
+        baseUrl: requestConfig.baseUrl,
+        allowPrivateNetwork: requestConfig.allowPrivateNetwork,
+        headers,
+        dispatcherPolicy: buildProviderRequestDispatcherPolicy(requestConfig),
+        requestConfig,
+    };
 }
 export async function fetchWithTimeoutGuarded(url, init, timeoutMs, fetchFn, options) {
     return await fetchWithSsrFGuard({
         url,
         fetchImpl: fetchFn,
         init,
-        timeoutMs,
+        timeoutMs: resolveGuardedHttpTimeoutMs(timeoutMs),
         policy: options?.ssrfPolicy,
         lookupFn: options?.lookupFn,
         pinDns: options?.pinDns,
+        dispatcherPolicy: options?.dispatcherPolicy,
+        auditContext: sanitizeAuditContext(options?.auditContext),
     });
+}
+function resolveGuardedPostRequestOptions(params) {
+    if (!params.allowPrivateNetwork &&
+        !params.dispatcherPolicy &&
+        params.pinDns === undefined &&
+        !params.auditContext) {
+        return undefined;
+    }
+    return {
+        ...(params.allowPrivateNetwork ? { ssrfPolicy: { allowPrivateNetwork: true } } : {}),
+        ...(params.pinDns !== undefined ? { pinDns: params.pinDns } : {}),
+        ...(params.dispatcherPolicy ? { dispatcherPolicy: params.dispatcherPolicy } : {}),
+        ...(params.auditContext ? { auditContext: params.auditContext } : {}),
+    };
 }
 export async function postTranscriptionRequest(params) {
     return fetchWithTimeoutGuarded(params.url, {
         method: "POST",
         headers: params.headers,
         body: params.body,
-    }, params.timeoutMs, params.fetchFn, params.allowPrivateNetwork ? { ssrfPolicy: { allowPrivateNetwork: true } } : undefined);
+    }, params.timeoutMs, params.fetchFn, resolveGuardedPostRequestOptions(params));
 }
 export async function postJsonRequest(params) {
     return fetchWithTimeoutGuarded(params.url, {
         method: "POST",
         headers: params.headers,
         body: JSON.stringify(params.body),
-    }, params.timeoutMs, params.fetchFn, params.allowPrivateNetwork ? { ssrfPolicy: { allowPrivateNetwork: true } } : undefined);
+    }, params.timeoutMs, params.fetchFn, resolveGuardedPostRequestOptions(params));
 }
 export async function readErrorResponse(res) {
+    let reader;
     try {
-        const text = await res.text();
+        if (!res.body) {
+            return undefined;
+        }
+        reader = res.body.getReader();
+        const chunks = [];
+        let total = 0;
+        let sawBytes = false;
+        while (total < MAX_ERROR_RESPONSE_BYTES) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            if (!value || value.length === 0) {
+                continue;
+            }
+            sawBytes = true;
+            const remaining = MAX_ERROR_RESPONSE_BYTES - total;
+            const chunk = value.length <= remaining ? value : value.subarray(0, remaining);
+            chunks.push(chunk);
+            total += chunk.length;
+            if (chunk.length < value.length) {
+                break;
+            }
+        }
+        if (!sawBytes) {
+            return undefined;
+        }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.length;
+        }
+        const text = new TextDecoder().decode(bytes);
         const collapsed = text.replace(/\s+/g, " ").trim();
         if (!collapsed) {
             return undefined;
@@ -44,6 +139,14 @@ export async function readErrorResponse(res) {
     }
     catch {
         return undefined;
+    }
+    finally {
+        try {
+            await reader?.cancel();
+        }
+        catch {
+            // Ignore stream-cancel failures while reporting the original HTTP error.
+        }
     }
 }
 export async function assertOkOrThrowHttpError(res, label) {

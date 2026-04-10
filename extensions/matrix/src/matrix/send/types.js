@@ -20,3 +20,4 @@ export const EventType = {
     Reaction: MATRIX_REACTION_EVENT_TYPE,
     RoomMessage: "m.room.message",
 };
+export const MATRIX_OPENCLAW_FINALIZED_PREVIEW_KEY = "com.openclaw.finalized_preview";

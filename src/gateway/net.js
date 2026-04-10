@@ -1,7 +1,9 @@
+import fs from "node:fs";
 import net from "node:net";
 import { pickMatchingExternalInterfaceAddress, readNetworkInterfaces, } from "../infra/network-interfaces.js";
 import { pickPrimaryTailnetIPv4, pickPrimaryTailnetIPv6 } from "../infra/tailnet.js";
 import { isCanonicalDottedDecimalIPv4, isIpInCidr, isLoopbackIpAddress, isPrivateOrLoopbackIpAddress, normalizeIpAddress, } from "../shared/net/ip.js";
+import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 /**
  * Pick the primary non-internal IPv4 address (LAN IP).
  * Prefers common interface names (en0, eth0) then falls back to any external IPv4.
@@ -13,7 +15,7 @@ export function pickPrimaryLanIPv4() {
     });
 }
 export function normalizeHostHeader(hostHeader) {
-    return (hostHeader ?? "").trim().toLowerCase();
+    return normalizeLowercaseStringOrEmpty(hostHeader);
 }
 export function resolveHostName(hostHeader) {
     const host = normalizeHostHeader(hostHeader);
@@ -170,14 +172,65 @@ export function isLocalGatewayAddress(ip) {
         return false;
     }
     const tailnetIPv4 = pickPrimaryTailnetIPv4();
-    if (tailnetIPv4 && normalized === tailnetIPv4.toLowerCase()) {
+    if (tailnetIPv4 && normalized === normalizeLowercaseStringOrEmpty(tailnetIPv4)) {
         return true;
     }
     const tailnetIPv6 = pickPrimaryTailnetIPv6();
-    if (tailnetIPv6 && ip.trim().toLowerCase() === tailnetIPv6.toLowerCase()) {
+    if (tailnetIPv6 &&
+        normalizeLowercaseStringOrEmpty(ip) === normalizeLowercaseStringOrEmpty(tailnetIPv6)) {
         return true;
     }
     return false;
+}
+/**
+ * Detect whether the current process is running inside a container
+ * (Docker, Podman, or Kubernetes).
+ *
+ * Uses two reliable heuristics:
+ * 1. Presence of well-known container sentinel files such as `/.dockerenv`
+ *    (Docker) or `/run/.containerenv` (Podman).
+ * 2. Presence of container-related cgroup entries in `/proc/1/cgroup`
+ *    (covers Docker, containerd, and Kubernetes pods).
+ *
+ * The result is cached after the first call so filesystem access
+ * happens at most once per process lifetime.
+ */
+let _containerCacheResult;
+export function isContainerEnvironment() {
+    if (_containerCacheResult !== undefined) {
+        return _containerCacheResult;
+    }
+    _containerCacheResult = detectContainerEnvironment();
+    return _containerCacheResult;
+}
+function detectContainerEnvironment() {
+    // 1. Check common Docker/Podman container sentinel files.
+    for (const sentinelPath of ["/.dockerenv", "/run/.containerenv", "/var/run/.containerenv"]) {
+        try {
+            fs.accessSync(sentinelPath, fs.constants.F_OK);
+            return true;
+        }
+        catch {
+            // not present — continue
+        }
+    }
+    // 2. /proc/1/cgroup contains docker, containerd, kubepods, or lxc markers.
+    //    Covers both cgroup v1 (/docker/<id>, /kubepods/...) and cgroup v2
+    //    (kubepods.slice, cri-containerd-<id>.scope) path formats.
+    try {
+        const cgroup = fs.readFileSync("/proc/1/cgroup", "utf8");
+        if (/\/docker\/|cri-containerd-[0-9a-f]|containerd\/[0-9a-f]{64}|\/kubepods[/.]|\blxc\b/.test(cgroup)) {
+            return true;
+        }
+    }
+    catch {
+        // /proc may not exist (macOS, Windows) — not a container
+    }
+    return false;
+}
+/** @internal — test-only helper to reset the cached container detection result. */
+export function __resetContainerCacheForTest() {
+    _containerCacheResult = undefined;
 }
 /**
  * Resolves gateway bind host with fallback strategy.
@@ -186,7 +239,7 @@ export function isLocalGatewayAddress(ip) {
  * - loopback: 127.0.0.1 (rarely fails, but handled gracefully)
  * - lan: always 0.0.0.0 (no fallback)
  * - tailnet: Tailnet IPv4 if available, else loopback
- * - auto: Loopback if available, else 0.0.0.0
+ * - auto: 0.0.0.0 inside containers (Docker/Podman/K8s); loopback otherwise
  * - custom: User-specified IP, fallback to 0.0.0.0 if unavailable
  *
  * @returns The bind address to use (never null)
@@ -225,12 +278,37 @@ export async function resolveGatewayBindHost(bind, customHost) {
         return "0.0.0.0";
     }
     if (mode === "auto") {
+        // Inside a container, loopback is unreachable from the host network
+        // namespace, so prefer 0.0.0.0 to make port-forwarding work.
+        if (isContainerEnvironment()) {
+            return "0.0.0.0";
+        }
         if (await canBindToHost("127.0.0.1")) {
             return "127.0.0.1";
         }
         return "0.0.0.0";
     }
     return "0.0.0.0";
+}
+/**
+ * Returns the effective default bind mode when `gateway.bind` is not explicitly
+ * configured. Inside a detected container environment the default is `"auto"`
+ * (which resolves to `0.0.0.0` for port-forwarding compatibility); on bare-metal
+ * / VM hosts the default remains `"loopback"`.
+ *
+ * When {@link tailscaleMode} is `"serve"` or `"funnel"`, the function always
+ * returns `"loopback"` because Tailscale serve/funnel architecturally requires
+ * a loopback bind — container auto-detection must never override this.
+ *
+ * Use this only in gateway startup codepaths that execute in the same
+ * environment as the eventual bind decision. Host-side diagnostics should keep
+ * their own explicit defaults instead of inferring from the caller process.
+ */
+export function defaultGatewayBindMode(tailscaleMode) {
+    if (tailscaleMode && tailscaleMode !== "off") {
+        return "loopback";
+    }
+    return isContainerEnvironment() ? "auto" : "loopback";
 }
 /**
  * Test if we can bind to a specific host address.
@@ -334,9 +412,10 @@ function parseHostForAddressChecks(host) {
     if (!host) {
         return null;
     }
-    const normalizedHost = host.trim().toLowerCase();
-    if (normalizedHost === "localhost") {
-        return { isLocalhost: true, unbracketedHost: normalizedHost };
+    const normalizedHost = normalizeLowercaseStringOrEmpty(host);
+    const canonicalHost = normalizedHost.replace(/\.+$/, "");
+    if (canonicalHost === "localhost") {
+        return { isLocalhost: true, unbracketedHost: canonicalHost };
     }
     return {
         isLocalhost: false,

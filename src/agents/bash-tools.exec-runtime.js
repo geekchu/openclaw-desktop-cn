@@ -1,12 +1,13 @@
 import path from "node:path";
 import { Type } from "@sinclair/typebox";
+import { DEFAULT_EXEC_APPROVAL_TIMEOUT_MS, resolveExecApprovalAllowedDecisions, } from "../infra/exec-approvals.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { isDangerousHostEnvVarName } from "../infra/host-env-security.js";
 import { findPathKey, mergePathPrepend } from "../infra/path-prepend.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { scopedHeartbeatWakeOptions } from "../routing/session-key.js";
 export { applyPathPrepend, findPathKey, normalizePathPrepend } from "../infra/path-prepend.js";
-export { normalizeExecAsk, normalizeExecHost, normalizeExecSecurity, } from "../infra/exec-approvals.js";
+export { normalizeExecAsk, normalizeExecHost, normalizeExecSecurity, normalizeExecTarget, } from "../infra/exec-approvals.js";
 import { logWarn } from "../logger.js";
 import { getProcessSupervisor } from "../process/supervisor/index.js";
 import { addSession, appendOutput, createSessionSlug, markExited, tail, } from "./bash-process-registry.js";
@@ -68,8 +69,8 @@ export const DEFAULT_PENDING_MAX_OUTPUT = clampWithDefault(readEnvInt("OPENCLAW_
 export const DEFAULT_PATH = process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 export const DEFAULT_NOTIFY_TAIL_CHARS = 400;
 const DEFAULT_NOTIFY_SNIPPET_CHARS = 180;
-export const DEFAULT_APPROVAL_TIMEOUT_MS = 120_000;
-export const DEFAULT_APPROVAL_REQUEST_TIMEOUT_MS = 130_000;
+export const DEFAULT_APPROVAL_TIMEOUT_MS = DEFAULT_EXEC_APPROVAL_TIMEOUT_MS;
+export const DEFAULT_APPROVAL_REQUEST_TIMEOUT_MS = DEFAULT_APPROVAL_TIMEOUT_MS + 10_000;
 const DEFAULT_APPROVAL_RUNNING_NOTICE_MS = 10_000;
 const APPROVAL_SLUG_LENGTH = 8;
 export const execSchema = Type.Object({
@@ -90,7 +91,7 @@ export const execSchema = Type.Object({
         description: "Run on the host with elevated permissions (if allowed)",
     })),
     host: Type.Optional(Type.String({
-        description: "Exec host (sandbox|gateway|node).",
+        description: "Exec host/target (auto|sandbox|gateway|node).",
     })),
     security: Type.Optional(Type.String({
         description: "Exec security mode (deny|allowlist|full).",
@@ -104,6 +105,51 @@ export const execSchema = Type.Object({
 });
 export function renderExecHostLabel(host) {
     return host === "sandbox" ? "sandbox" : host === "gateway" ? "gateway" : "node";
+}
+export function renderExecTargetLabel(target) {
+    return target === "auto" ? "auto" : renderExecHostLabel(target);
+}
+export function isRequestedExecTargetAllowed(params) {
+    if (params.requestedTarget === params.configuredTarget) {
+        return true;
+    }
+    if (params.configuredTarget === "auto") {
+        if (params.sandboxAvailable && params.requestedTarget === "gateway") {
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+export function resolveExecTarget(params) {
+    const configuredTarget = params.configuredTarget ?? "auto";
+    const requestedTarget = params.requestedTarget ?? null;
+    if (requestedTarget &&
+        !isRequestedExecTargetAllowed({
+            configuredTarget,
+            requestedTarget,
+            sandboxAvailable: params.sandboxAvailable,
+        })) {
+        const allowedConfig = Array.from(new Set(requestedTarget === "gateway" && !params.sandboxAvailable
+            ? ["gateway", "auto"]
+            : [renderExecTargetLabel(requestedTarget), "auto"])).join(" or ");
+        throw new Error(`exec host not allowed (requested ${renderExecTargetLabel(requestedTarget)}; ` +
+            `configured host is ${renderExecTargetLabel(configuredTarget)}; ` +
+            `set tools.exec.host=${allowedConfig} to allow this override).`);
+    }
+    const selectedTarget = requestedTarget ?? configuredTarget;
+    const resolvedTarget = params.elevatedRequested
+        ? selectedTarget === "node"
+            ? "node"
+            : "gateway"
+        : selectedTarget;
+    const effectiveHost = resolvedTarget === "auto" ? (params.sandboxAvailable ? "sandbox" : "gateway") : resolvedTarget;
+    return {
+        configuredTarget,
+        requestedTarget,
+        selectedTarget: resolvedTarget,
+        effectiveHost,
+    };
 }
 export function normalizeNotifyOutput(value) {
     return value.replace(/\s+/g, " ").trim();
@@ -155,8 +201,8 @@ function maybeNotifyOnExit(session, status) {
     const summary = output
         ? `Exec ${status} (${session.id.slice(0, 8)}, ${exitLabel}) :: ${output}`
         : `Exec ${status} (${session.id.slice(0, 8)}, ${exitLabel})`;
-    enqueueSystemEvent(summary, { sessionKey });
-    requestHeartbeatNow(scopedHeartbeatWakeOptions(sessionKey, { reason: `exec:${session.id}:exit` }));
+    enqueueSystemEvent(summary, { sessionKey, trusted: false });
+    requestHeartbeatNow(scopedHeartbeatWakeOptions(sessionKey, { reason: "exec-event" }));
 }
 export function createApprovalSlug(id) {
     return id.slice(0, APPROVAL_SLUG_LENGTH);
@@ -168,6 +214,8 @@ export function buildApprovalPendingMessage(params) {
     }
     const commandBlock = `${fence}sh\n${params.command}\n${fence}`;
     const lines = [];
+    const allowedDecisions = params.allowedDecisions ?? resolveExecApprovalAllowedDecisions();
+    const decisionText = allowedDecisions.join("|");
     const warningText = params.warningText?.trim();
     if (warningText) {
         lines.push(warningText, "");
@@ -177,12 +225,17 @@ export function buildApprovalPendingMessage(params) {
     if (params.nodeId) {
         lines.push(`Node: ${params.nodeId}`);
     }
-    lines.push(`CWD: ${params.cwd}`);
+    lines.push(`CWD: ${params.cwd ?? "(node default)"}`);
     lines.push("Command:");
     lines.push(commandBlock);
     lines.push("Mode: foreground (interactive approvals available).");
-    lines.push("Background mode requires pre-approved policy (allow-always or ask=off).");
-    lines.push(`Reply with: /approve ${params.approvalSlug} allow-once|allow-always|deny`);
+    lines.push(allowedDecisions.includes("allow-always")
+        ? "Background mode requires pre-approved policy (allow-always or ask=off)."
+        : "Background mode requires an effective policy that allows pre-approval (for example ask=off).");
+    lines.push(`Reply with: /approve ${params.approvalSlug} ${decisionText}`);
+    if (!allowedDecisions.includes("allow-always")) {
+        lines.push("The effective approval policy requires approval every time, so Allow Always is unavailable.");
+    }
     lines.push("If the short code is ambiguous, use the full id in /approve.");
     return lines.join("\n");
 }
@@ -229,8 +282,8 @@ export function formatExecFailureReason(params) {
             return "Command not executable (permission denied)";
         case "overall-timeout":
             return typeof params.timeoutSec === "number" && params.timeoutSec > 0
-                ? `Command timed out after ${params.timeoutSec} seconds. If this command is expected to take longer, re-run with a higher timeout (e.g., exec timeout=300).`
-                : "Command timed out. If this command is expected to take longer, re-run with a higher timeout (e.g., exec timeout=300).";
+                ? `Command timed out after ${params.timeoutSec} seconds. If this command is expected to take longer, re-run with a higher timeout (e.g., exec timeout=300). If it should keep running, start it with exec background=true or yieldMs so OpenClaw can register a pollable process session. Do not rely on shell backgrounding with a trailing &.`
+                : "Command timed out. If this command is expected to take longer, re-run with a higher timeout (e.g., exec timeout=300). If it should keep running, start it with exec background=true or yieldMs so OpenClaw can register a pollable process session. Do not rely on shell backgrounding with a trailing &.";
         case "no-output-timeout":
             return "Command timed out waiting for output";
         case "signal":
@@ -330,6 +383,9 @@ export async function runExecProcess(opts) {
     addSession(session);
     const emitUpdate = () => {
         if (!opts.onUpdate) {
+            return;
+        }
+        if (session.backgrounded || session.exited) {
             return;
         }
         const tailText = session.tail || session.aggregated;

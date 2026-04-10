@@ -1,26 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import { normalizeConversationText } from "../../acp/conversation-id.js";
-import { bundledChannelPlugins } from "../../channels/plugins/bundled.js";
 import { normalizeAnyChannelId } from "../../channels/registry.js";
 import { resolveStateDir } from "../../config/paths.js";
 import { loadJsonFile } from "../../infra/json-file.js";
 import { writeJsonFileAtomically } from "../../plugin-sdk/json-store.js";
-import { getActivePluginChannelRegistry } from "../../plugins/runtime.js";
-import { normalizeAccountId } from "../../routing/session-key.js";
+import { getActivePluginChannelRegistryFromState } from "../../plugins/runtime-state.js";
+import { normalizeOptionalLowercaseString } from "../../shared/string-coerce.js";
+import { normalizeConversationRef } from "./session-binding-normalization.js";
 const CURRENT_BINDINGS_FILE_VERSION = 1;
 const CURRENT_BINDINGS_ID_PREFIX = "generic:";
 let bindingsLoaded = false;
 let persistPromise = Promise.resolve();
 const bindingsByConversationKey = new Map();
-function normalizeConversationRef(ref) {
-    return {
-        channel: ref.channel.trim().toLowerCase(),
-        accountId: normalizeAccountId(ref.accountId),
-        conversationId: ref.conversationId.trim(),
-        parentConversationId: ref.parentConversationId?.trim() || undefined,
-    };
-}
 function buildConversationKey(ref) {
     const normalized = normalizeConversationRef(ref);
     return [
@@ -93,15 +85,21 @@ function pruneExpiredBinding(key) {
     return null;
 }
 function resolveChannelSupportsCurrentConversationBinding(channel) {
-    const normalized = normalizeAnyChannelId(channel) ?? normalizeConversationText(channel)?.trim().toLowerCase();
+    const normalized = normalizeAnyChannelId(channel) ??
+        normalizeOptionalLowercaseString(normalizeConversationText(channel));
     if (!normalized) {
         return false;
     }
     const matchesPluginId = (plugin) => plugin.id === normalized ||
-        (plugin.meta?.aliases ?? []).some((alias) => alias.trim().toLowerCase() === normalized);
-    const plugin = getActivePluginChannelRegistry()?.channels.find((entry) => matchesPluginId(entry.plugin))
-        ?.plugin ?? bundledChannelPlugins.find((entry) => matchesPluginId(entry));
-    return plugin?.conversationBindings?.supportsCurrentConversationBinding === true;
+        (plugin.meta?.aliases ?? []).some((alias) => normalizeOptionalLowercaseString(alias) === normalized);
+    // Read the already-installed runtime channel registry from shared state only.
+    // Importing plugins/runtime here creates a module cycle through plugin-sdk
+    // surfaces during bundled channel discovery.
+    const plugin = getActivePluginChannelRegistryFromState()?.channels.find((entry) => matchesPluginId(entry.plugin))?.plugin;
+    if (plugin?.conversationBindings?.supportsCurrentConversationBinding === true) {
+        return true;
+    }
+    return false;
 }
 export function getGenericCurrentConversationBindingCapabilities(params) {
     void params.accountId;

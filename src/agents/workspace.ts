@@ -7,6 +7,7 @@ import { openBoundaryFile } from "../infra/boundary-file-read.js";
 import { resolveRequiredHomeDir } from "../infra/home-dir.js";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { isCronSessionKey, isSubagentSessionKey } from "../routing/session-key.js";
+import { normalizeOptionalLowercaseString, readStringValue } from "../shared/string-coerce.js";
 import { resolveUserPath } from "../utils.js";
 import { resolveWorkspaceTemplateDir } from "./workspace-templates.js";
 
@@ -16,7 +17,7 @@ export function resolveDefaultAgentWorkspaceDir(
 ): string {
   const stateDir = resolveStateDir(env, () => resolveRequiredHomeDir(env, homedir));
   const profile = env.OPENCLAW_PROFILE?.trim();
-  if (profile && profile.toLowerCase() !== "default") {
+  if (profile && normalizeOptionalLowercaseString(profile) !== "default") {
     return path.join(stateDir, `workspace-${profile}`);
   }
   return path.join(stateDir, "workspace");
@@ -218,14 +219,11 @@ function parseWorkspaceSetupState(raw: string): WorkspaceSetupState | null {
     if (!parsed || typeof parsed !== "object") {
       return null;
     }
-    const legacyCompletedAt =
-      typeof parsed.onboardingCompletedAt === "string" ? parsed.onboardingCompletedAt : undefined;
+    const legacyCompletedAt = readStringValue(parsed.onboardingCompletedAt);
     return {
       version: WORKSPACE_STATE_VERSION,
-      bootstrapSeededAt:
-        typeof parsed.bootstrapSeededAt === "string" ? parsed.bootstrapSeededAt : undefined,
-      setupCompletedAt:
-        typeof parsed.setupCompletedAt === "string" ? parsed.setupCompletedAt : legacyCompletedAt,
+      bootstrapSeededAt: readStringValue(parsed.bootstrapSeededAt),
+      setupCompletedAt: readStringValue(parsed.setupCompletedAt) ?? legacyCompletedAt,
     };
   } catch {
     return null;

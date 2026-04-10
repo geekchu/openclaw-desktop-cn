@@ -3,9 +3,17 @@ async function loadInstallSecurityScanRuntime() {
 }
 export async function scanBundleInstallSource(params) {
     const { scanBundleInstallSourceRuntime } = await loadInstallSecurityScanRuntime();
-    await scanBundleInstallSourceRuntime(params);
+    return await scanBundleInstallSourceRuntime(params);
 }
 export async function scanPackageInstallSource(params) {
     const { scanPackageInstallSourceRuntime } = await loadInstallSecurityScanRuntime();
-    await scanPackageInstallSourceRuntime(params);
+    return await scanPackageInstallSourceRuntime(params);
+}
+export async function scanFileInstallSource(params) {
+    const { scanFileInstallSourceRuntime } = await loadInstallSecurityScanRuntime();
+    return await scanFileInstallSourceRuntime(params);
+}
+export async function scanSkillInstallSource(params) {
+    const { scanSkillInstallSourceRuntime } = await loadInstallSecurityScanRuntime();
+    return await scanSkillInstallSourceRuntime(params);
 }

@@ -1,22 +1,19 @@
-import { readJsonFileWithFallback, registerSessionBindingAdapter, resolveAgentIdFromSessionKey, resolveThreadBindingFarewellText, unregisterSessionBindingAdapter, writeJsonFileAtomically, } from "../runtime-api.js";
-import { resolveMatrixStateFilePath } from "./client/storage.js";
+import path from "node:path";
+import { readJsonFileWithFallback, writeJsonFileAtomically } from "openclaw/plugin-sdk/json-store";
+import { resolveAgentIdFromSessionKey } from "openclaw/plugin-sdk/routing";
+import { normalizeOptionalString } from "openclaw/plugin-sdk/text-runtime";
+import { registerSessionBindingAdapter, resolveThreadBindingFarewellText, unregisterSessionBindingAdapter, } from "openclaw/plugin-sdk/thread-bindings-runtime";
+import { claimCurrentTokenStorageState, resolveMatrixStateFilePath } from "./client/storage.js";
 import { sendMessageMatrix } from "./send.js";
 import { deleteMatrixThreadBindingManagerEntry, getMatrixThreadBindingManager, getMatrixThreadBindingManagerEntry, listBindingsForAccount, removeBindingRecord, resetMatrixThreadBindingsForTests, resolveBindingKey, resolveEffectiveBindingExpiry, setBindingRecord, setMatrixThreadBindingIdleTimeoutBySessionKey, setMatrixThreadBindingManagerEntry, setMatrixThreadBindingMaxAgeBySessionKey, toMatrixBindingTargetKind, toSessionBindingRecord, } from "./thread-bindings-shared.js";
 const STORE_VERSION = 1;
 const THREAD_BINDINGS_SWEEP_INTERVAL_MS = 60_000;
 const TOUCH_PERSIST_DELAY_MS = 30_000;
-function normalizeDurationMs(raw, fallback) {
+function _normalizeDurationMs(raw, fallback) {
     if (typeof raw !== "number" || !Number.isFinite(raw)) {
         return fallback;
     }
     return Math.max(0, Math.floor(raw));
-}
-function normalizeText(raw) {
-    return typeof raw === "string" ? raw.trim() : "";
-}
-function normalizeConversationId(raw) {
-    const trimmed = normalizeText(raw);
-    return trimmed || undefined;
 }
 function resolveBindingsPath(params) {
     return resolveMatrixStateFilePath({
@@ -34,9 +31,9 @@ async function loadBindingsFromDisk(filePath, accountId) {
     }
     const loaded = [];
     for (const entry of value.bindings) {
-        const conversationId = normalizeConversationId(entry?.conversationId);
-        const parentConversationId = normalizeConversationId(entry?.parentConversationId);
-        const targetSessionKey = normalizeText(entry?.targetSessionKey);
+        const conversationId = normalizeOptionalString(entry?.conversationId);
+        const parentConversationId = normalizeOptionalString(entry?.parentConversationId);
+        const targetSessionKey = normalizeOptionalString(entry?.targetSessionKey) ?? "";
         if (!conversationId || !targetSessionKey) {
             continue;
         }
@@ -52,9 +49,9 @@ async function loadBindingsFromDisk(filePath, accountId) {
             ...(parentConversationId ? { parentConversationId } : {}),
             targetKind: entry?.targetKind === "subagent" ? "subagent" : "acp",
             targetSessionKey,
-            agentId: normalizeText(entry?.agentId) || undefined,
-            label: normalizeText(entry?.label) || undefined,
-            boundBy: normalizeText(entry?.boundBy) || undefined,
+            agentId: normalizeOptionalString(entry?.agentId) || undefined,
+            label: normalizeOptionalString(entry?.label) || undefined,
+            boundBy: normalizeOptionalString(entry?.boundBy) || undefined,
             boundAt,
             lastActivityAt: Math.max(lastActivityAt, boundAt),
             idleTimeoutMs: typeof entry?.idleTimeoutMs === "number" && Number.isFinite(entry.idleTimeoutMs)
@@ -70,19 +67,22 @@ async function loadBindingsFromDisk(filePath, accountId) {
 function toStoredBindingsState(bindings) {
     return {
         version: STORE_VERSION,
-        bindings: [...bindings].sort((a, b) => a.boundAt - b.boundAt),
+        bindings: [...bindings].toSorted((a, b) => a.boundAt - b.boundAt),
     };
 }
 async function persistBindingsSnapshot(filePath, bindings) {
     await writeJsonFileAtomically(filePath, toStoredBindingsState(bindings));
+    claimCurrentTokenStorageState({
+        rootDir: path.dirname(filePath),
+    });
 }
 function buildMatrixBindingIntroText(params) {
-    const introText = normalizeText(params.metadata?.introText);
+    const introText = normalizeOptionalString(params.metadata?.introText);
     if (introText) {
         return introText;
     }
-    const label = normalizeText(params.metadata?.label);
-    const agentId = normalizeText(params.metadata?.agentId) ||
+    const label = normalizeOptionalString(params.metadata?.label);
+    const agentId = normalizeOptionalString(params.metadata?.agentId) ||
         resolveAgentIdFromSessionKey(params.targetSessionKey);
     const base = label || agentId || "session";
     return `⚙️ ${base} session active. Messages here go directly to this session.`;
@@ -302,7 +302,7 @@ export async function createMatrixThreadBindingManager(params) {
         capabilities: { placements: ["current", "child"], bindSupported: true, unbindSupported: true },
         bind: async (input) => {
             const conversationId = input.conversation.conversationId.trim();
-            const parentConversationId = input.conversation.parentConversationId?.trim() || undefined;
+            const parentConversationId = normalizeOptionalString(input.conversation.parentConversationId);
             const targetSessionKey = input.targetSessionKey.trim();
             if (!conversationId || !targetSessionKey) {
                 return null;
@@ -334,9 +334,10 @@ export async function createMatrixThreadBindingManager(params) {
                 ...(boundParentConversationId ? { parentConversationId: boundParentConversationId } : {}),
                 targetKind: toMatrixBindingTargetKind(input.targetKind),
                 targetSessionKey,
-                agentId: normalizeText(input.metadata?.agentId) || resolveAgentIdFromSessionKey(targetSessionKey),
-                label: normalizeText(input.metadata?.label) || undefined,
-                boundBy: normalizeText(input.metadata?.boundBy) || "system",
+                agentId: normalizeOptionalString(input.metadata?.agentId) ||
+                    resolveAgentIdFromSessionKey(targetSessionKey),
+                label: normalizeOptionalString(input.metadata?.label) || undefined,
+                boundBy: normalizeOptionalString(input.metadata?.boundBy) || "system",
                 boundAt: now,
                 lastActivityAt: now,
                 idleTimeoutMs: defaults.idleTimeoutMs,

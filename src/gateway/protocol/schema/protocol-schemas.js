@@ -1,17 +1,17 @@
 import { AgentEventSchema, AgentIdentityParamsSchema, AgentIdentityResultSchema, AgentParamsSchema, AgentWaitParamsSchema, PollParamsSchema, SendParamsSchema, WakeParamsSchema, } from "./agent.js";
-import { AgentSummarySchema, AgentsCreateParamsSchema, AgentsCreateResultSchema, AgentsDeleteParamsSchema, AgentsDeleteResultSchema, AgentsFileEntrySchema, AgentsFilesGetParamsSchema, AgentsFilesGetResultSchema, AgentsFilesListParamsSchema, AgentsFilesListResultSchema, AgentsFilesSetParamsSchema, AgentsFilesSetResultSchema, AgentsListParamsSchema, AgentsListResultSchema, AgentsUpdateParamsSchema, AgentsUpdateResultSchema, ModelChoiceSchema, ModelsListParamsSchema, ModelsListResultSchema, SkillsBinsParamsSchema, SkillsBinsResultSchema, SkillsInstallParamsSchema, SkillsStatusParamsSchema, SkillsUpdateParamsSchema, ToolCatalogEntrySchema, ToolCatalogGroupSchema, ToolCatalogProfileSchema, ToolsCatalogParamsSchema, ToolsCatalogResultSchema, ToolsEffectiveEntrySchema, ToolsEffectiveGroupSchema, ToolsEffectiveParamsSchema, ToolsEffectiveResultSchema, } from "./agents-models-skills.js";
+import { AgentSummarySchema, AgentsCreateParamsSchema, AgentsCreateResultSchema, AgentsDeleteParamsSchema, AgentsDeleteResultSchema, AgentsFileEntrySchema, AgentsFilesGetParamsSchema, AgentsFilesGetResultSchema, AgentsFilesListParamsSchema, AgentsFilesListResultSchema, AgentsFilesSetParamsSchema, AgentsFilesSetResultSchema, AgentsListParamsSchema, AgentsListResultSchema, AgentsUpdateParamsSchema, AgentsUpdateResultSchema, ModelChoiceSchema, ModelsListParamsSchema, ModelsListResultSchema, SkillsBinsParamsSchema, SkillsBinsResultSchema, SkillsDetailParamsSchema, SkillsDetailResultSchema, SkillsInstallParamsSchema, SkillsSearchParamsSchema, SkillsSearchResultSchema, SkillsStatusParamsSchema, SkillsUpdateParamsSchema, ToolCatalogEntrySchema, ToolCatalogGroupSchema, ToolCatalogProfileSchema, ToolsCatalogParamsSchema, ToolsCatalogResultSchema, ToolsEffectiveEntrySchema, ToolsEffectiveGroupSchema, ToolsEffectiveParamsSchema, ToolsEffectiveResultSchema, } from "./agents-models-skills.js";
 import { ChannelsLogoutParamsSchema, TalkConfigParamsSchema, TalkConfigResultSchema, TalkSpeakParamsSchema, TalkSpeakResultSchema, ChannelsStatusParamsSchema, ChannelsStatusResultSchema, TalkModeParamsSchema, WebLoginStartParamsSchema, WebLoginWaitParamsSchema, } from "./channels.js";
 import { ConfigApplyParamsSchema, ConfigGetParamsSchema, ConfigPatchParamsSchema, ConfigSchemaLookupParamsSchema, ConfigSchemaLookupResultSchema, ConfigSchemaParamsSchema, ConfigSchemaResponseSchema, ConfigSetParamsSchema, UpdateRunParamsSchema, } from "./config.js";
 import { CronAddParamsSchema, CronJobSchema, CronListParamsSchema, CronRemoveParamsSchema, CronRunLogEntrySchema, CronRunParamsSchema, CronRunsParamsSchema, CronStatusParamsSchema, CronUpdateParamsSchema, } from "./cron.js";
 import { DevicePairApproveParamsSchema, DevicePairListParamsSchema, DevicePairRemoveParamsSchema, DevicePairRejectParamsSchema, DevicePairRequestedEventSchema, DevicePairResolvedEventSchema, DeviceTokenRevokeParamsSchema, DeviceTokenRotateParamsSchema, } from "./devices.js";
-import { ExecApprovalsGetParamsSchema, ExecApprovalsNodeGetParamsSchema, ExecApprovalsNodeSetParamsSchema, ExecApprovalsSetParamsSchema, ExecApprovalsSnapshotSchema, ExecApprovalRequestParamsSchema, ExecApprovalResolveParamsSchema, } from "./exec-approvals.js";
+import { ExecApprovalsGetParamsSchema, ExecApprovalsNodeGetParamsSchema, ExecApprovalsNodeSetParamsSchema, ExecApprovalsSetParamsSchema, ExecApprovalsSnapshotSchema, ExecApprovalGetParamsSchema, ExecApprovalRequestParamsSchema, ExecApprovalResolveParamsSchema, } from "./exec-approvals.js";
 import { ConnectParamsSchema, ErrorShapeSchema, EventFrameSchema, GatewayFrameSchema, HelloOkSchema, RequestFrameSchema, ResponseFrameSchema, ShutdownEventSchema, TickEventSchema, } from "./frames.js";
 import { ChatAbortParamsSchema, ChatEventSchema, ChatHistoryParamsSchema, ChatInjectParamsSchema, ChatSendParamsSchema, LogsTailParamsSchema, LogsTailResultSchema, } from "./logs-chat.js";
 import { NodeDescribeParamsSchema, NodeEventParamsSchema, NodePendingDrainParamsSchema, NodePendingDrainResultSchema, NodePendingEnqueueParamsSchema, NodePendingEnqueueResultSchema, NodeInvokeParamsSchema, NodeInvokeResultParamsSchema, NodeInvokeRequestEventSchema, NodeListParamsSchema, NodePendingAckParamsSchema, NodePairApproveParamsSchema, NodePairListParamsSchema, NodePairRejectParamsSchema, NodePairRequestParamsSchema, NodePairVerifyParamsSchema, NodeRenameParamsSchema, } from "./nodes.js";
 import { PluginApprovalRequestParamsSchema, PluginApprovalResolveParamsSchema, } from "./plugin-approvals.js";
 import { PushTestParamsSchema, PushTestResultSchema } from "./push.js";
 import { SecretsReloadParamsSchema, SecretsResolveAssignmentSchema, SecretsResolveParamsSchema, SecretsResolveResultSchema, } from "./secrets.js";
-import { SessionsAbortParamsSchema, SessionsCompactParamsSchema, SessionsCreateParamsSchema, SessionsDeleteParamsSchema, SessionsListParamsSchema, SessionsMessagesSubscribeParamsSchema, SessionsMessagesUnsubscribeParamsSchema, SessionsPatchParamsSchema, SessionsPreviewParamsSchema, SessionsResetParamsSchema, SessionsResolveParamsSchema, SessionsSendParamsSchema, SessionsUsageParamsSchema, } from "./sessions.js";
+import { SessionsAbortParamsSchema, SessionsCompactParamsSchema, SessionsCompactionBranchParamsSchema, SessionsCompactionBranchResultSchema, SessionsCompactionGetParamsSchema, SessionsCompactionGetResultSchema, SessionsCompactionListParamsSchema, SessionsCompactionListResultSchema, SessionsCompactionRestoreParamsSchema, SessionsCompactionRestoreResultSchema, SessionCompactionCheckpointSchema, SessionsCreateParamsSchema, SessionsDeleteParamsSchema, SessionsListParamsSchema, SessionsMessagesSubscribeParamsSchema, SessionsMessagesUnsubscribeParamsSchema, SessionsPatchParamsSchema, SessionsPreviewParamsSchema, SessionsResetParamsSchema, SessionsResolveParamsSchema, SessionsSendParamsSchema, SessionsUsageParamsSchema, } from "./sessions.js";
 import { PresenceEntrySchema, SnapshotSchema, StateVersionSchema } from "./snapshot.js";
 import { WizardCancelParamsSchema, WizardNextParamsSchema, WizardNextResultSchema, WizardStartParamsSchema, WizardStartResultSchema, WizardStatusParamsSchema, WizardStatusResultSchema, WizardStepSchema, } from "./wizard.js";
 export const ProtocolSchemas = {
@@ -59,6 +59,15 @@ export const ProtocolSchemas = {
     SessionsListParams: SessionsListParamsSchema,
     SessionsPreviewParams: SessionsPreviewParamsSchema,
     SessionsResolveParams: SessionsResolveParamsSchema,
+    SessionCompactionCheckpoint: SessionCompactionCheckpointSchema,
+    SessionsCompactionListParams: SessionsCompactionListParamsSchema,
+    SessionsCompactionGetParams: SessionsCompactionGetParamsSchema,
+    SessionsCompactionBranchParams: SessionsCompactionBranchParamsSchema,
+    SessionsCompactionRestoreParams: SessionsCompactionRestoreParamsSchema,
+    SessionsCompactionListResult: SessionsCompactionListResultSchema,
+    SessionsCompactionGetResult: SessionsCompactionGetResultSchema,
+    SessionsCompactionBranchResult: SessionsCompactionBranchResultSchema,
+    SessionsCompactionRestoreResult: SessionsCompactionRestoreResultSchema,
     SessionsCreateParams: SessionsCreateParamsSchema,
     SessionsSendParams: SessionsSendParamsSchema,
     SessionsMessagesSubscribeParams: SessionsMessagesSubscribeParamsSchema,
@@ -126,6 +135,10 @@ export const ProtocolSchemas = {
     ToolsEffectiveResult: ToolsEffectiveResultSchema,
     SkillsBinsParams: SkillsBinsParamsSchema,
     SkillsBinsResult: SkillsBinsResultSchema,
+    SkillsSearchParams: SkillsSearchParamsSchema,
+    SkillsSearchResult: SkillsSearchResultSchema,
+    SkillsDetailParams: SkillsDetailParamsSchema,
+    SkillsDetailResult: SkillsDetailResultSchema,
     SkillsInstallParams: SkillsInstallParamsSchema,
     SkillsUpdateParams: SkillsUpdateParamsSchema,
     CronJob: CronJobSchema,
@@ -144,6 +157,7 @@ export const ProtocolSchemas = {
     ExecApprovalsNodeGetParams: ExecApprovalsNodeGetParamsSchema,
     ExecApprovalsNodeSetParams: ExecApprovalsNodeSetParamsSchema,
     ExecApprovalsSnapshot: ExecApprovalsSnapshotSchema,
+    ExecApprovalGetParams: ExecApprovalGetParamsSchema,
     ExecApprovalRequestParams: ExecApprovalRequestParamsSchema,
     ExecApprovalResolveParams: ExecApprovalResolveParamsSchema,
     PluginApprovalRequestParams: PluginApprovalRequestParamsSchema,

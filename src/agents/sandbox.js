@@ -7,6 +7,7 @@ export { listSandboxBrowsers, listSandboxContainers, removeSandboxBrowserContain
 export { formatSandboxToolPolicyBlockedMessage, resolveSandboxRuntimeStatus, } from "./sandbox/runtime-status.js";
 export { resolveSandboxToolPolicyForAgent } from "./sandbox/tool-policy.js";
 export { buildExecRemoteCommand, buildRemoteCommand, buildSshSandboxArgv, createSshSandboxSessionFromConfigText, createSshSandboxSessionFromSettings, disposeSshSandboxSession, runSshSandboxCommand, shellEscape, uploadDirectoryToSshTarget, } from "./sandbox/ssh.js";
+export { sanitizeEnvVars } from "./sandbox/sanitize-env-vars.js";
 export { createRemoteShellSandboxFsBridge } from "./sandbox/remote-fs-bridge.js";
 export { createWritableRenameTargetResolver } from "./sandbox/fs-bridge-rename-targets.js";
 export { resolveWritableRenameTargets } from "./sandbox/fs-bridge-rename-targets.js";

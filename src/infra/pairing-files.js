@@ -17,12 +17,21 @@ export function pruneExpiredPending(pendingById, nowMs, ttlMs) {
         }
     }
 }
-export async function upsertPendingPairingRequest(params) {
-    const existing = Object.values(params.pendingById).find(params.isExisting);
-    if (existing) {
-        return { status: "pending", request: existing, created: false };
+export async function reconcilePendingPairingRequests(params) {
+    if (params.existing.length === 1 &&
+        params.canRefreshSingle(params.existing[0], params.incoming)) {
+        const refreshed = params.refreshSingle(params.existing[0], params.incoming);
+        params.pendingById[refreshed.requestId] = refreshed;
+        await params.persist();
+        return { status: "pending", request: refreshed, created: false };
     }
-    const request = params.createRequest(params.isRepair);
+    for (const existing of params.existing) {
+        delete params.pendingById[existing.requestId];
+    }
+    const request = params.buildReplacement({
+        existing: params.existing,
+        incoming: params.incoming,
+    });
     params.pendingById[request.requestId] = request;
     await params.persist();
     return { status: "pending", request, created: true };

@@ -2,14 +2,13 @@ import { z } from "zod";
 import { DmPolicySchema } from "../../config/zod-schema.core.js";
 export const AllowFromEntrySchema = z.union([z.string(), z.number()]);
 export const AllowFromListSchema = z.array(AllowFromEntrySchema).optional();
-export function buildNestedDmConfigSchema() {
-    return z
-        .object({
+export function buildNestedDmConfigSchema(extraShape) {
+    const baseShape = {
         enabled: z.boolean().optional(),
         policy: DmPolicySchema.optional(),
         allowFrom: AllowFromListSchema,
-    })
-        .optional();
+    };
+    return z.object(extraShape ? { ...baseShape, ...extraShape } : baseShape).optional();
 }
 export function buildCatchallMultiAccountChannelSchema(accountSchema) {
     return accountSchema.extend({
@@ -67,6 +66,35 @@ export function buildChannelConfigSchema(schema, options) {
         ...(options?.uiHints ? { uiHints: options.uiHints } : {}),
         runtime: {
             safeParse: (value) => safeParseRuntimeSchema(schema, value),
+        },
+    };
+}
+export function emptyChannelConfigSchema() {
+    return {
+        schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {},
+        },
+        runtime: {
+            safeParse(value) {
+                if (value === undefined) {
+                    return { success: true, data: undefined };
+                }
+                if (!value || typeof value !== "object" || Array.isArray(value)) {
+                    return {
+                        success: false,
+                        issues: [{ path: [], message: "expected config object" }],
+                    };
+                }
+                if (Object.keys(value).length > 0) {
+                    return {
+                        success: false,
+                        issues: [{ path: [], message: "config must be empty" }],
+                    };
+                }
+                return { success: true, data: value };
+            },
         },
     };
 }

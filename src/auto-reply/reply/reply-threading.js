@@ -1,15 +1,43 @@
-import { getChannelPlugin, normalizeChannelId } from "../../channels/plugins/index.js";
-export function resolveReplyToMode(cfg, channel, accountId, chatType) {
-    const provider = normalizeChannelId(channel);
+import { normalizeChannelId as normalizePluginChannelId } from "../../channels/plugins/index.js";
+import { normalizeOptionalLowercaseString } from "../../shared/string-coerce.js";
+import { isSingleUseReplyToMode } from "./reply-reference.js";
+function normalizeReplyToModeChatType(chatType) {
+    return chatType === "direct" || chatType === "group" || chatType === "channel"
+        ? chatType
+        : undefined;
+}
+export function resolveConfiguredReplyToMode(cfg, channel, chatType) {
+    const provider = normalizePluginChannelId(channel) ?? normalizeOptionalLowercaseString(channel);
     if (!provider) {
         return "all";
     }
-    const resolved = getChannelPlugin(provider)?.threading?.resolveReplyToMode?.({
+    const channelConfig = cfg.channels?.[provider];
+    const normalizedChatType = normalizeReplyToModeChatType(chatType);
+    if (normalizedChatType) {
+        const scopedMode = channelConfig?.replyToModeByChatType?.[normalizedChatType];
+        if (scopedMode !== undefined) {
+            return scopedMode;
+        }
+    }
+    if (normalizedChatType === "direct") {
+        const legacyDirectMode = channelConfig?.dm?.replyToMode;
+        if (legacyDirectMode !== undefined) {
+            return legacyDirectMode;
+        }
+    }
+    return channelConfig?.replyToMode ?? "all";
+}
+export function resolveReplyToModeWithThreading(cfg, threading, params = {}) {
+    const resolved = threading?.resolveReplyToMode?.({
         cfg,
-        accountId,
-        chatType,
+        accountId: params.accountId,
+        chatType: params.chatType,
     });
-    return resolved ?? "all";
+    return resolved ?? resolveConfiguredReplyToMode(cfg, params.channel, params.chatType);
+}
+export function resolveReplyToMode(cfg, channel, accountId, chatType) {
+    void accountId;
+    return resolveConfiguredReplyToMode(cfg, channel, chatType);
 }
 export function createReplyToModeFilter(mode, opts = {}) {
     let hasThreaded = false;
@@ -32,7 +60,7 @@ export function createReplyToModeFilter(mode, opts = {}) {
         if (mode === "all") {
             return payload;
         }
-        if (hasThreaded) {
+        if (isSingleUseReplyToMode(mode) && hasThreaded) {
             // Compaction notices are transient status messages that should always
             // appear in-thread, even after the first assistant block has already
             // consumed the "first" slot.  Let them keep their replyToId.
@@ -43,24 +71,38 @@ export function createReplyToModeFilter(mode, opts = {}) {
         }
         // Compaction notices are transient status messages — they should be
         // threaded (so they appear in-context), but they must not consume the
-        // "first" slot of the replyToMode=first filter.  Skip advancing
+        // "first" slot of the replyToMode=first|batched filter.  Skip advancing
         // hasThreaded so the real assistant reply still gets replyToId.
-        if (!payload.isCompactionNotice) {
+        if (isSingleUseReplyToMode(mode) && !payload.isCompactionNotice) {
             hasThreaded = true;
         }
         return payload;
     };
 }
+export function resolveImplicitCurrentMessageReplyAllowance(mode, policy) {
+    const implicitCurrentMessage = policy?.implicitCurrentMessage ?? "default";
+    if (implicitCurrentMessage === "allow") {
+        return true;
+    }
+    if (implicitCurrentMessage === "deny") {
+        return false;
+    }
+    return mode !== "batched";
+}
+export function resolveBatchedReplyThreadingPolicy(mode, isBatched) {
+    if (mode !== "batched") {
+        return undefined;
+    }
+    return {
+        implicitCurrentMessage: isBatched ? "allow" : "deny",
+    };
+}
 export function createReplyToModeFilterForChannel(mode, channel) {
-    const provider = normalizeChannelId(channel);
-    const normalized = typeof channel === "string" ? channel.trim().toLowerCase() : undefined;
+    const normalized = normalizeOptionalLowercaseString(channel);
     const isWebchat = normalized === "webchat";
     // Default: allow explicit reply tags/directives even when replyToMode is "off".
     // Unknown channels fail closed; internal webchat stays allowed.
-    const threading = provider ? getChannelPlugin(provider)?.threading : undefined;
-    const allowExplicitReplyTagsWhenOff = provider
-        ? (threading?.allowExplicitReplyTagsWhenOff ?? threading?.allowTagsWhenOff ?? true)
-        : isWebchat;
+    const allowExplicitReplyTagsWhenOff = normalized ? true : isWebchat;
     return createReplyToModeFilter(mode, {
         allowExplicitReplyTagsWhenOff,
     });
