@@ -34,6 +34,7 @@ import {
   clearHistoryEntriesIfEnabled,
 } from "openclaw/plugin-sdk/reply-history";
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
+import * as replyRuntime from "openclaw/plugin-sdk/reply-runtime";
 import { buildAgentSessionKey, resolveThreadSessionKeys } from "openclaw/plugin-sdk/routing";
 import { danger, logVerbose, shouldLogVerbose } from "openclaw/plugin-sdk/runtime-env";
 import { evaluateSupplementalContextVisibility } from "openclaw/plugin-sdk/security-runtime";
@@ -86,12 +87,6 @@ function sleep(ms: number): Promise<void> {
 }
 
 const DISCORD_TYPING_MAX_DURATION_MS = 20 * 60_000;
-let replyRuntimePromise: Promise<typeof import("openclaw/plugin-sdk/reply-runtime")> | undefined;
-
-async function loadReplyRuntime() {
-  replyRuntimePromise ??= import("openclaw/plugin-sdk/reply-runtime");
-  return await replyRuntimePromise;
-}
 
 function isProcessAborted(abortSignal?: AbortSignal): boolean {
   return Boolean(abortSignal?.aborted);
@@ -255,8 +250,6 @@ export async function processDiscordMessage(
     reactionAdapter: discordAdapter,
     target: `${messageChannelId}/${message.id}`,
   });
-  const { createReplyDispatcherWithTyping, dispatchInboundMessage } = await loadReplyRuntime();
-
   const fromLabel = isDirectMessage
     ? buildDirectLabel(author)
     : buildGuildLabel({
@@ -723,7 +716,7 @@ export async function processDiscordMessage(
   };
 
   const { dispatcher, replyOptions, markDispatchIdle, markRunComplete } =
-    createReplyDispatcherWithTyping({
+    replyRuntime.createReplyDispatcherWithTyping({
       ...replyPipeline,
       humanDelay: resolveHumanDelayConfig(cfg, route.agentId),
       deliver: async (payload: ReplyPayload, info) => {
@@ -862,7 +855,7 @@ export async function processDiscordMessage(
     });
 
   const resolvedBlockStreamingEnabled = resolveChannelStreamingBlockEnabled(discordConfig);
-  let dispatchResult: Awaited<ReturnType<typeof dispatchInboundMessage>> | null = null;
+  let dispatchResult: Awaited<ReturnType<typeof replyRuntime.dispatchInboundMessage>> | null = null;
   let dispatchError = false;
   let dispatchAborted = false;
   try {
@@ -870,7 +863,7 @@ export async function processDiscordMessage(
       dispatchAborted = true;
       return;
     }
-    dispatchResult = await dispatchInboundMessage({
+    dispatchResult = await replyRuntime.dispatchInboundMessage({
       ctx: ctxPayload,
       cfg,
       dispatcher,
