@@ -1,6 +1,6 @@
-import { createCliPathTextInput, createDelegatedSetupWizardProxy, createDelegatedTextInputShouldPrompt, createPatchedAccountSetupAdapter, createSetupInputPresenceValidator, createTopLevelChannelDmPolicy, parseSetupEntriesAllowingWildcard, promptParsedAllowFromForAccount, setAccountAllowFromForChannel, setSetupChannelEnabled, } from "openclaw/plugin-sdk/setup-runtime";
+import { createCliPathTextInput, createDelegatedSetupWizardProxy, createDelegatedTextInputShouldPrompt, createPatchedAccountSetupAdapter, createSetupInputPresenceValidator, DEFAULT_ACCOUNT_ID, mergeAllowFromEntries, parseSetupEntriesAllowingWildcard, patchChannelConfigForAccount, promptParsedAllowFromForAccount, setAccountAllowFromForChannel, setSetupChannelEnabled, } from "openclaw/plugin-sdk/setup-runtime";
 import { formatCliCommand, formatDocsLink } from "openclaw/plugin-sdk/setup-tools";
-import { normalizeE164 } from "openclaw/plugin-sdk/text-runtime";
+import { normalizeE164, normalizeLowercaseStringOrEmpty, normalizeOptionalString, } from "openclaw/plugin-sdk/text-runtime";
 import { resolveDefaultSignalAccountId, resolveSignalAccount, } from "./accounts.js";
 const channel = "signal";
 const MIN_E164_DIGITS = 5;
@@ -8,7 +8,7 @@ const MAX_E164_DIGITS = 15;
 const DIGITS_ONLY = /^\d+$/;
 const INVALID_SIGNAL_ACCOUNT_ERROR = "Invalid E.164 phone number (must start with + and country code, e.g. +15555550123)";
 export function normalizeSignalAccountInput(value) {
-    const trimmed = value?.trim();
+    const trimmed = normalizeOptionalString(value);
     if (!trimmed) {
         return null;
     }
@@ -27,7 +27,7 @@ function isUuidLike(value) {
 }
 export function parseSignalAllowFromEntries(raw) {
     return parseSetupEntriesAllowingWildcard(raw, (entry) => {
-        if (entry.toLowerCase().startsWith("uuid:")) {
+        if (normalizeLowercaseStringOrEmpty(entry).startsWith("uuid:")) {
             const id = entry.slice("uuid:".length).trim();
             if (!id) {
                 return { error: "Invalid uuid entry" };
@@ -80,14 +80,37 @@ export async function promptSignalAllowFrom(params) {
         }),
     });
 }
-export const signalDmPolicy = createTopLevelChannelDmPolicy({
+export const signalDmPolicy = {
     label: "Signal",
     channel,
     policyKey: "channels.signal.dmPolicy",
     allowFromKey: "channels.signal.allowFrom",
-    getCurrent: (cfg) => cfg.channels?.signal?.dmPolicy ?? "pairing",
+    resolveConfigKeys: (cfg, accountId) => (accountId ?? resolveDefaultSignalAccountId(cfg)) !== DEFAULT_ACCOUNT_ID
+        ? {
+            policyKey: `channels.signal.accounts.${accountId ?? resolveDefaultSignalAccountId(cfg)}.dmPolicy`,
+            allowFromKey: `channels.signal.accounts.${accountId ?? resolveDefaultSignalAccountId(cfg)}.allowFrom`,
+        }
+        : {
+            policyKey: "channels.signal.dmPolicy",
+            allowFromKey: "channels.signal.allowFrom",
+        },
+    getCurrent: (cfg, accountId) => resolveSignalAccount({ cfg, accountId: accountId ?? resolveDefaultSignalAccountId(cfg) }).config.dmPolicy ?? "pairing",
+    setPolicy: (cfg, policy, accountId) => patchChannelConfigForAccount({
+        cfg,
+        channel,
+        accountId: accountId ?? resolveDefaultSignalAccountId(cfg),
+        patch: policy === "open"
+            ? {
+                dmPolicy: "open",
+                allowFrom: mergeAllowFromEntries(resolveSignalAccount({
+                    cfg,
+                    accountId: accountId ?? resolveDefaultSignalAccountId(cfg),
+                }).config.allowFrom, ["*"]),
+            }
+            : { dmPolicy: policy },
+    }),
     promptAllowFrom: promptSignalAllowFrom,
-});
+};
 function resolveSignalCliPath(params) {
     return ((typeof params.credentialValues.cliPath === "string"
         ? params.credentialValues.cliPath

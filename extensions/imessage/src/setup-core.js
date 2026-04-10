@@ -1,11 +1,12 @@
-import { createCliPathTextInput, createDelegatedSetupWizardProxy, createDelegatedTextInputShouldPrompt, createPatchedAccountSetupAdapter, createTopLevelChannelDmPolicy, parseSetupEntriesAllowingWildcard, promptParsedAllowFromForAccount, setAccountAllowFromForChannel, setSetupChannelEnabled, } from "openclaw/plugin-sdk/setup";
+import { createCliPathTextInput, createDelegatedSetupWizardProxy, createDelegatedTextInputShouldPrompt, createPatchedAccountSetupAdapter, mergeAllowFromEntries, parseSetupEntriesAllowingWildcard, patchChannelConfigForAccount, promptParsedAllowFromForAccount, setAccountAllowFromForChannel, setSetupChannelEnabled, } from "openclaw/plugin-sdk/setup";
 import { formatDocsLink } from "openclaw/plugin-sdk/setup-tools";
-import { listIMessageAccountIds, resolveDefaultIMessageAccountId, resolveIMessageAccount, } from "./accounts.js";
+import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/text-runtime";
+import { resolveDefaultIMessageAccountId, resolveIMessageAccount, } from "./accounts.js";
 import { normalizeIMessageHandle } from "./targets.js";
 const channel = "imessage";
 export function parseIMessageAllowFromEntries(raw) {
     return parseSetupEntriesAllowingWildcard(raw, (entry) => {
-        const lower = entry.toLowerCase();
+        const lower = normalizeLowercaseStringOrEmpty(entry);
         if (lower.startsWith("chat_id:")) {
             const id = entry.slice("chat_id:".length).trim();
             if (!/^\d+$/.test(id)) {
@@ -68,14 +69,43 @@ export async function promptIMessageAllowFrom(params) {
         }),
     });
 }
-export const imessageDmPolicy = createTopLevelChannelDmPolicy({
+export const imessageDmPolicy = {
     label: "iMessage",
     channel,
     policyKey: "channels.imessage.dmPolicy",
     allowFromKey: "channels.imessage.allowFrom",
-    getCurrent: (cfg) => cfg.channels?.imessage?.dmPolicy ?? "pairing",
+    resolveConfigKeys: (_cfg, accountId) => {
+        const targetAccountId = accountId ?? resolveDefaultIMessageAccountId(_cfg);
+        return targetAccountId !== "default"
+            ? {
+                policyKey: `channels.imessage.accounts.${targetAccountId}.dmPolicy`,
+                allowFromKey: `channels.imessage.accounts.${targetAccountId}.allowFrom`,
+            }
+            : {
+                policyKey: "channels.imessage.dmPolicy",
+                allowFromKey: "channels.imessage.allowFrom",
+            };
+    },
+    getCurrent: (cfg, accountId) => {
+        const targetAccountId = accountId ?? resolveDefaultIMessageAccountId(cfg);
+        return resolveIMessageAccount({ cfg, accountId: targetAccountId }).config.dmPolicy ?? "pairing";
+    },
+    setPolicy: (cfg, policy, accountId) => {
+        const targetAccountId = accountId ?? resolveDefaultIMessageAccountId(cfg);
+        return patchChannelConfigForAccount({
+            cfg,
+            channel,
+            accountId: targetAccountId,
+            patch: policy === "open"
+                ? {
+                    dmPolicy: "open",
+                    allowFrom: mergeAllowFromEntries(resolveIMessageAccount({ cfg, accountId: targetAccountId }).config.allowFrom, ["*"]),
+                }
+                : { dmPolicy: policy },
+        });
+    },
     promptAllowFrom: promptIMessageAllowFrom,
-});
+};
 function resolveIMessageCliPath(params) {
     return resolveIMessageAccount(params).config.cliPath ?? "imsg";
 }
@@ -110,14 +140,7 @@ export const imessageSetupStatusBase = {
     unconfiguredHint: "imsg missing",
     configuredScore: 1,
     unconfiguredScore: 0,
-    resolveConfigured: ({ cfg }) => listIMessageAccountIds(cfg).some((accountId) => {
-        const account = resolveIMessageAccount({ cfg, accountId });
-        return Boolean(account.config.cliPath ||
-            account.config.dbPath ||
-            account.config.allowFrom ||
-            account.config.service ||
-            account.config.region);
-    }),
+    resolveConfigured: ({ cfg, accountId }) => resolveIMessageAccount({ cfg, accountId }).configured,
 };
 export function createIMessageSetupWizardProxy(loadWizard) {
     return createDelegatedSetupWizardProxy({

@@ -1,4 +1,5 @@
 import { createAccountListHelpers, normalizeAccountId, resolveMergedAccountConfig, } from "openclaw/plugin-sdk/account-resolution";
+import { normalizeOptionalString } from "openclaw/plugin-sdk/text-runtime";
 const { listAccountIds, resolveDefaultAccountId } = createAccountListHelpers("imessage");
 export const listIMessageAccountIds = listAccountIds;
 export const resolveDefaultIMessageAccountId = resolveDefaultAccountId;
@@ -10,7 +11,7 @@ function mergeIMessageAccountConfig(cfg, accountId) {
     });
 }
 export function resolveIMessageAccount(params) {
-    const accountId = normalizeAccountId(params.accountId);
+    const accountId = normalizeAccountId(params.accountId ?? resolveDefaultIMessageAccountId(params.cfg));
     const baseEnabled = params.cfg.channels?.imessage?.enabled !== false;
     const merged = mergeIMessageAccountConfig(params.cfg, accountId);
     const accountEnabled = merged.enabled !== false;
@@ -31,7 +32,7 @@ export function resolveIMessageAccount(params) {
     return {
         accountId,
         enabled: baseEnabled && accountEnabled,
-        name: merged.name?.trim() || undefined,
+        name: normalizeOptionalString(merged.name),
         config: merged,
         configured,
     };

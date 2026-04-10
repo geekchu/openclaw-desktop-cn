@@ -1,5 +1,6 @@
 import { createDetectedBinaryStatus, setSetupChannelEnabled, } from "openclaw/plugin-sdk/setup";
 import { detectBinary } from "openclaw/plugin-sdk/setup-tools";
+import { resolveIMessageAccount } from "./accounts.js";
 import { createIMessageCliPathTextInput, imessageCompletionNote, imessageDmPolicy, imessageSetupAdapter, imessageSetupStatusBase, parseIMessageAllowFromEntries, } from "./setup-core.js";
 const channel = "imessage";
 export const imessageSetupWizard = {
@@ -14,7 +15,7 @@ export const imessageSetupWizard = {
         configuredScore: imessageSetupStatusBase.configuredScore,
         unconfiguredScore: imessageSetupStatusBase.unconfiguredScore,
         resolveConfigured: imessageSetupStatusBase.resolveConfigured,
-        resolveBinaryPath: ({ cfg }) => cfg.channels?.imessage?.cliPath ?? "imsg",
+        resolveBinaryPath: ({ cfg, accountId }) => resolveIMessageAccount({ cfg, accountId }).config.cliPath ?? "imsg",
         detectBinary,
     }),
     credentials: [],
