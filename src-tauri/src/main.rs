@@ -9,7 +9,7 @@ mod gateway;
 mod models;
 mod utils;
 
-use commands::{config, diagnostics, installer, process, service, terminal};
+use commands::{config, desktop_updater, diagnostics, installer, process, service, terminal};
 use std::path::PathBuf;
 use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -163,6 +163,7 @@ fn main() {
 
             // 创建终端状态管理
             app.manage(terminal::TerminalState::new());
+            app.manage(desktop_updater::DesktopUpdateState::default());
 
             // ── 系统托盘 ──
             let status_item =
@@ -422,6 +423,11 @@ fn main() {
             // 版本更新
             installer::check_openclaw_update,
             installer::update_openclaw,
+            desktop_updater::desktop_check_for_update,
+            desktop_updater::desktop_download_update,
+            desktop_updater::desktop_install_update,
+            desktop_updater::desktop_clear_pending_update,
+            desktop_updater::desktop_clear_downloaded_update,
             // 内嵌终端
             terminal::terminal_create,
             terminal::terminal_write,

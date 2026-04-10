@@ -431,6 +431,29 @@ FunctionEnd
   Call ResolveLegacyInstallState
 
   ${If} $LegacyCleanupEligible == "1"
+    ; Tauri updater 的 /UPDATE 流程已经明确选择“就地覆盖当前安装”。
+    ; 这里如果解析出的所谓“旧版本”目录其实就是当前 $INSTDIR，
+    ; 再去跑静默卸载/整目录删除会和 updater 本身的覆盖安装打架，
+    ; 表现上容易变成“应用重启了，但版本没有真正替换”。
+    ClearErrors
+    ${GetOptions} $CMDLINE "/UPDATE" $0
+    ${IfNot} ${Errors}
+      Push $LegacyInstallDir
+      Call NormalizeLegacyPath
+      Pop $1
+
+      Push $INSTDIR
+      Call NormalizeLegacyPath
+      Pop $2
+
+      ${StrCase} $1 $1 "L"
+      ${StrCase} $2 $2 "L"
+      ${If} $1 == $2
+        DetailPrint "Updater mode detected; legacy cleanup target matches current install. Skipping legacy uninstall."
+        Goto cleanup_done
+      ${EndIf}
+    ${EndIf}
+
     DetailPrint "Detected old version at: $LegacyInstallDir"
     DetailPrint "Legacy main binary: $LegacyMainBinary"
 
