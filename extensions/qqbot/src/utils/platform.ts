@@ -57,10 +57,10 @@ export function getHomeDir(): string {
 }
 
 /**
- * Return a path under `~/.openclaw/qqbot`, creating it on demand.
+ * Return a path under `~/.openclawcn/qqbot`, creating it on demand.
  */
 export function getQQBotDataDir(...subPaths: string[]): string {
-  const dir = path.join(getHomeDir(), ".openclaw", "qqbot", ...subPaths);
+  const dir = path.join(getHomeDir(), ".openclawcn", "qqbot", ...subPaths);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -68,13 +68,13 @@ export function getQQBotDataDir(...subPaths: string[]): string {
 }
 
 /**
- * Return a path under `~/.openclaw/media/qqbot`, creating it on demand.
+ * Return a path under `~/.openclawcn/media/qqbot`, creating it on demand.
  *
  * Unlike `getQQBotDataDir`, this lives under OpenClaw's core media allowlist so
  * downloaded images and audio can be accessed by framework media tooling.
  */
 export function getQQBotMediaDir(...subPaths: string[]): string {
-  const dir = path.join(getHomeDir(), ".openclaw", "media", "qqbot", ...subPaths);
+  const dir = path.join(getHomeDir(), ".openclawcn", "media", "qqbot", ...subPaths);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -143,11 +143,17 @@ export function resolveQQBotLocalMediaPath(p: string): string {
   const homeDir = getHomeDir();
   const mediaRoot = getQQBotMediaDir();
   const dataRoot = getQQBotDataDir();
-  const workspaceRoot = path.join(homeDir, ".openclaw", "workspace", "qqbot");
+  const workspaceRoot = path.join(homeDir, ".openclawcn", "workspace", "qqbot");
+  const legacyWorkspaceRoot = path.join(homeDir, ".openclaw", "workspace", "qqbot");
+  const legacyDataRoot = path.join(homeDir, ".openclaw", "qqbot");
+  const legacyMediaRoot = path.join(homeDir, ".openclaw", "media", "qqbot");
   const candidateRoots = [
     { from: workspaceRoot, to: mediaRoot },
     { from: dataRoot, to: mediaRoot },
     { from: mediaRoot, to: dataRoot },
+    { from: legacyWorkspaceRoot, to: mediaRoot },
+    { from: legacyDataRoot, to: mediaRoot },
+    { from: legacyMediaRoot, to: dataRoot },
   ];
 
   for (const { from, to } of candidateRoots) {
