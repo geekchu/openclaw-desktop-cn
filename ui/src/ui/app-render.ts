@@ -76,7 +76,14 @@ import {
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
-import { deleteSessionsAndRefresh, loadSessions, patchSession } from "./controllers/sessions.ts";
+import {
+  branchSessionFromCheckpoint,
+  deleteSessionsAndRefresh,
+  loadSessions,
+  patchSession,
+  restoreSessionFromCheckpoint,
+  toggleSessionCompactionCheckpoints,
+} from "./controllers/sessions.ts";
 import {
   installSkill,
   loadSkills,
@@ -669,6 +676,11 @@ export function renderApp(state: AppViewState) {
                 page: state.sessionsPage,
                 pageSize: state.sessionsPageSize,
                 selectedKeys: state.sessionsSelectedKeys,
+                expandedCheckpointKey: state.sessionsExpandedCheckpointKey,
+                checkpointItemsByKey: state.sessionsCheckpointItemsByKey,
+                checkpointLoadingKey: state.sessionsCheckpointLoadingKey,
+                checkpointBusyKey: state.sessionsCheckpointBusyKey,
+                checkpointErrorByKey: state.sessionsCheckpointErrorByKey,
                 onFiltersChange: (next) => {
                   state.sessionsFilterActive = next.activeMinutes;
                   state.sessionsFilterLimit = next.limit;
@@ -734,6 +746,12 @@ export function renderApp(state: AppViewState) {
                   switchChatSession(state, sessionKey);
                   state.setTab("chat" as import("./navigation.ts").Tab);
                 },
+                onToggleCheckpointDetails: (sessionKey) =>
+                  toggleSessionCompactionCheckpoints(state, sessionKey),
+                onBranchFromCheckpoint: (sessionKey, checkpointId) =>
+                  branchSessionFromCheckpoint(state, sessionKey, checkpointId),
+                onRestoreCheckpoint: (sessionKey, checkpointId) =>
+                  restoreSessionFromCheckpoint(state, sessionKey, checkpointId),
               }),
             )
           : nothing}

@@ -1,6 +1,7 @@
 use crate::models::{AITestResult, ChannelTestResult, DiagnosticResult, SystemInfo};
 use crate::utils::{platform, shell};
 use log::{debug, info, warn};
+use serde_json::Value;
 use tauri::{command, Manager};
 
 /// 去除 ANSI 转义序列（颜色代码等）
@@ -82,6 +83,135 @@ fn extract_json_from_output(output: &str) -> Option<String> {
             Some(json_str)
         }
         _ => None,
+    }
+}
+
+fn extract_provider_from_model_ref(model_ref: &str) -> Option<String> {
+    let trimmed = model_ref.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let (provider, _) = trimmed.split_once('/')?;
+    let provider = provider.trim();
+    if provider.is_empty() {
+        None
+    } else {
+        Some(provider.to_string())
+    }
+}
+
+fn read_current_primary_model_ref() -> Option<String> {
+    let config_path = platform::get_config_file_path();
+    let content = std::fs::read_to_string(config_path).ok()?;
+    let config: Value = serde_json::from_str(&content).ok()?;
+    config
+        .pointer("/agents/defaults/model/primary")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+}
+
+fn clean_ai_test_output(output: &str) -> String {
+    strip_ansi_codes(output)
+        .lines()
+        .filter(|line| !line.contains("ExperimentalWarning"))
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<&str>>()
+        .join("\n")
+}
+
+fn detect_ai_test_error(output: &str) -> Option<String> {
+    let lower = output.to_lowercase();
+    let has_api_error = lower.contains("api error")
+        || lower.contains("api_error")
+        || lower.contains("authentication failed")
+        || lower.contains("invalid api key")
+        || lower.contains("unauthorized")
+        || lower.contains("rate limit")
+        || lower.contains("quota exceeded")
+        || lower.contains("connection refused")
+        || lower.contains("timeout")
+        || lower.contains("econnrefused")
+        || lower.contains("enotfound")
+        || lower.contains("fetch failed")
+        || lower.contains("network error");
+    let has_http_error = lower.contains("status 401")
+        || lower.contains("status: 401")
+        || lower.contains("error 401")
+        || lower.contains("code 401")
+        || lower.contains("code: 401")
+        || lower.contains("status 403")
+        || lower.contains("status: 403")
+        || lower.contains("error 403")
+        || lower.contains("code 403")
+        || lower.contains("code: 403")
+        || lower.contains("status 429")
+        || lower.contains("status: 429")
+        || lower.contains("error 429")
+        || lower.contains("code 429")
+        || lower.contains("code: 429")
+        || lower.contains("status 500")
+        || lower.contains("status: 500")
+        || lower.contains("error 500")
+        || lower.contains("status 502")
+        || lower.contains("status: 502")
+        || lower.contains("status 503")
+        || lower.contains("status: 503");
+
+    if has_api_error || has_http_error {
+        Some(output.to_string())
+    } else {
+        None
+    }
+}
+
+fn output_contains_expected_reply(output: &str, expected_reply: &str) -> bool {
+    let trimmed = output.trim();
+    trimmed == expected_reply || trimmed.lines().map(str::trim).any(|line| line == expected_reply)
+}
+
+fn parse_ai_agent_result(
+    output: &str,
+    expected_reply: &str,
+    provider: &str,
+    model: &str,
+    latency_ms: u64,
+) -> AITestResult {
+    let cleaned = clean_ai_test_output(output);
+
+    if let Some(error) = detect_ai_test_error(&cleaned) {
+        return AITestResult {
+            success: false,
+            provider: provider.to_string(),
+            model: model.to_string(),
+            response: None,
+            error: Some(error),
+            latency_ms: Some(latency_ms),
+        };
+    }
+
+    if output_contains_expected_reply(&cleaned, expected_reply) {
+        return AITestResult {
+            success: true,
+            provider: provider.to_string(),
+            model: model.to_string(),
+            response: Some(cleaned),
+            error: None,
+            latency_ms: Some(latency_ms),
+        };
+    }
+
+    AITestResult {
+        success: false,
+        provider: provider.to_string(),
+        model: model.to_string(),
+        response: None,
+        error: Some(if cleaned.is_empty() {
+            "未收到模型回复".to_string()
+        } else {
+            format!("模型未返回预期响应: {}", cleaned)
+        }),
+        latency_ms: Some(latency_ms),
     }
 }
 
@@ -190,104 +320,63 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
 #[command]
 pub async fn test_ai_connection() -> Result<AITestResult, String> {
     info!("[AI测试] 开始测试 AI 连接...");
-
-    // 获取当前配置的 provider
+    let selected_model = read_current_primary_model_ref();
+    let selected_provider = selected_model
+        .as_deref()
+        .and_then(extract_provider_from_model_ref)
+        .unwrap_or_else(|| "current".to_string());
+    let selected_model_label = selected_model.unwrap_or_else(|| "default".to_string());
+    let expected_reply = "OPENCLAW-DESKTOP-CONNECT-OK";
+    let prompt = format!("Reply with exactly {} and nothing else.", expected_reply);
     let start = std::time::Instant::now();
-
-    // 使用 openclaw 命令测试连接
-    info!("[AI测试] 执行: openclaw agent --local --to +1234567890 --message 回复 OK");
-    let result = shell::run_openclaw(&[
+    let args = [
         "agent",
         "--local",
         "--to",
         "+1234567890",
+        "--thinking",
+        "low",
         "--message",
-        "回复 OK",
-    ]);
+        prompt.as_str(),
+    ];
 
-    let latency = start.elapsed().as_millis() as u64;
-    info!("[AI测试] 命令执行完成, 耗时: {}ms", latency);
+    info!("[AI测试] 执行: openclaw {}", args.join(" "));
+    let result = shell::run_openclaw(&args);
+    let latency_ms = start.elapsed().as_millis() as u64;
+    info!("[AI测试] 命令执行完成, 耗时: {}ms", latency_ms);
 
     match result {
         Ok(output) => {
             debug!("[AI测试] 原始输出: {}", output);
-            // 去除 ANSI 代码 + 过滤警告信息
-            let filtered: String = strip_ansi_codes(&output)
-                .lines()
-                .filter(|l: &&str| !l.contains("ExperimentalWarning"))
-                .collect::<Vec<&str>>()
-                .join("\n");
-
-            // 改进的成功判断逻辑：
-            // 1. 检查是否有明确的错误模式（API 错误、认证错误等）
-            // 2. 避免误判 AI 回复中包含 "error" 单词的情况
-            // 3. HTTP 状态码需要带上下文检查，避免误判普通数字
-            let lower = filtered.to_lowercase();
-            let has_api_error = lower.contains("api error")
-                || lower.contains("api_error")
-                || lower.contains("authentication failed")
-                || lower.contains("invalid api key")
-                || lower.contains("unauthorized")
-                || lower.contains("rate limit")
-                || lower.contains("quota exceeded")
-                || lower.contains("connection refused")
-                || lower.contains("timeout")
-                || lower.contains("econnrefused")
-                || lower.contains("enotfound")
-                || lower.contains("fetch failed")
-                || lower.contains("network error");
-            // HTTP 状态码需要带上下文检查（如 "status 401" 或 "error 401" 或 "code: 401"）
-            let has_http_error = lower.contains("status 401")
-                || lower.contains("status: 401")
-                || lower.contains("error 401")
-                || lower.contains("code 401")
-                || lower.contains("code: 401")
-                || lower.contains("status 403")
-                || lower.contains("status: 403")
-                || lower.contains("error 403")
-                || lower.contains("code 403")
-                || lower.contains("code: 403")
-                || lower.contains("status 429")
-                || lower.contains("status: 429")
-                || lower.contains("error 429")
-                || lower.contains("code 429")
-                || lower.contains("code: 429")
-                || lower.contains("status 500")
-                || lower.contains("status: 500")
-                || lower.contains("error 500")
-                || lower.contains("status 502")
-                || lower.contains("status: 502")
-                || lower.contains("status 503")
-                || lower.contains("status: 503");
-
-            let success = !has_api_error && !has_http_error;
-
-            if success {
-                info!("[AI测试] ✓ AI 连接测试成功");
+            let parsed = parse_ai_agent_result(
+                &output,
+                expected_reply,
+                &selected_provider,
+                &selected_model_label,
+                latency_ms,
+            );
+            if parsed.success {
+                info!(
+                    "[AI测试] ✓ AI 连接测试成功: provider={}, model={}, latency={:?}ms",
+                    parsed.provider, parsed.model, parsed.latency_ms
+                );
             } else {
-                warn!("[AI测试] ✗ AI 连接测试失败: {}", filtered);
+                warn!(
+                    "[AI测试] ✗ AI 连接测试失败: provider={}, model={}, error={}",
+                    parsed.provider,
+                    parsed.model,
+                    parsed.error.as_deref().unwrap_or("unknown")
+                );
             }
-
-            Ok(AITestResult {
-                success,
-                provider: "current".to_string(),
-                model: "default".to_string(),
-                response: if success {
-                    Some(filtered.clone())
-                } else {
-                    None
-                },
-                error: if success { None } else { Some(filtered) },
-                latency_ms: Some(latency),
-            })
+            Ok(parsed)
         }
         Err(e) => Ok(AITestResult {
             success: false,
-            provider: "current".to_string(),
-            model: "default".to_string(),
+            provider: selected_provider,
+            model: selected_model_label,
             response: None,
             error: Some(e),
-            latency_ms: Some(latency),
+            latency_ms: Some(latency_ms),
         }),
     }
 }
@@ -1174,8 +1263,10 @@ read -p "按回车键关闭..."
 #[cfg(test)]
 mod tests {
     use super::{
+        clean_ai_test_output, detect_ai_test_error,
         channel_needs_send_test, channel_requires_connected_status, channel_requires_linked_status,
         channel_requires_probe_status, channel_requires_running_status, evaluate_channel_status,
+        extract_provider_from_model_ref, output_contains_expected_reply, parse_ai_agent_result,
         parse_channel_status, ChannelStatusCheck,
     };
     use serde_json::json;
@@ -1372,5 +1463,97 @@ mod tests {
                 status_message: "已配置".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn extracts_provider_from_model_ref() {
+        assert_eq!(
+            extract_provider_from_model_ref("onestop/kimi-k2.5"),
+            Some("onestop".to_string())
+        );
+        assert_eq!(extract_provider_from_model_ref(""), None);
+        assert_eq!(extract_provider_from_model_ref("no-slash"), None);
+    }
+
+    #[test]
+    fn cleans_ai_test_output_and_strips_warnings() {
+        let output = r#"
+ExperimentalWarning: something noisy
+
+  OPENCLAW-DESKTOP-CONNECT-OK  
+"#;
+
+        assert_eq!(clean_ai_test_output(output), "OPENCLAW-DESKTOP-CONNECT-OK");
+    }
+
+    #[test]
+    fn detects_known_ai_test_errors() {
+        let output = "API error: invalid api key";
+        assert_eq!(detect_ai_test_error(output).as_deref(), Some(output));
+    }
+
+    #[test]
+    fn matches_expected_reply_on_own_line() {
+        let output = "some heading\nOPENCLAW-DESKTOP-CONNECT-OK\nmore";
+        assert!(output_contains_expected_reply(
+            output,
+            "OPENCLAW-DESKTOP-CONNECT-OK"
+        ));
+    }
+
+    #[test]
+    fn parses_successful_ai_agent_result() {
+        let result = parse_ai_agent_result(
+            "OPENCLAW-DESKTOP-CONNECT-OK",
+            "OPENCLAW-DESKTOP-CONNECT-OK",
+            "onestop",
+            "onestop/kimi-k2.5",
+            4567,
+        );
+
+        assert!(result.success);
+        assert_eq!(result.provider, "onestop");
+        assert_eq!(result.model, "onestop/kimi-k2.5");
+        assert_eq!(result.latency_ms, Some(4567));
+        assert_eq!(
+            result.response.as_deref(),
+            Some("OPENCLAW-DESKTOP-CONNECT-OK")
+        );
+        assert!(result.error.is_none());
+    }
+
+    #[test]
+    fn parses_failed_ai_agent_result_for_known_error() {
+        let result = parse_ai_agent_result(
+            "invalid api key",
+            "OPENCLAW-DESKTOP-CONNECT-OK",
+            "onestop",
+            "onestop/kimi-k2.5",
+            12,
+        );
+
+        assert!(!result.success);
+        assert_eq!(result.error.as_deref(), Some("invalid api key"));
+        assert!(result.response.is_none());
+        assert_eq!(result.latency_ms, Some(12));
+    }
+
+    #[test]
+    fn parses_failed_ai_agent_result_for_unexpected_reply() {
+        let result = parse_ai_agent_result(
+            "Something else",
+            "OPENCLAW-DESKTOP-CONNECT-OK",
+            "onestop",
+            "onestop/kimi-k2.5",
+            34,
+        );
+
+        assert!(!result.success);
+        assert_eq!(
+            result.error.as_deref(),
+            Some("模型未返回预期响应: Something else")
+        );
+        assert!(result.response.is_none());
+        assert_eq!(result.latency_ms, Some(34));
     }
 }

@@ -1,6 +1,7 @@
 import type { FitAddon } from "@xterm/addon-fit";
 import type { Terminal as XTermTerminal } from "@xterm/xterm";
 import { html, nothing } from "lit";
+import { isBlockedTerminalCommand } from "./terminal-command-policy.ts";
 
 export type TerminalProps = {
   active: boolean;
@@ -494,7 +495,6 @@ async function createTerminalInstance(container: HTMLElement) {
   observeResize(container);
 
   // ── 命令拦截：禁止自毁/自更新命令 ──
-  const BLOCKED_CMD_RE = /\bopenclaw\s+(update|uninstall)\b/i;
   const OPENCLAW_RE = /openclaw/i;
 
   // 控制键 → ConPTY 回显文本映射
@@ -567,7 +567,7 @@ async function createTerminalInstance(container: HTMLElement) {
     // ── Enter 键处理 ──
 
     // 第一关：输入缓冲区检查（手动输入/粘贴）
-    if (BLOCKED_CMD_RE.test(_inputBuffer)) {
+    if (isBlockedTerminalCommand(_inputBuffer)) {
       _inputBuffer = "";
       blockCommand();
       return;
@@ -605,7 +605,7 @@ async function createTerminalInstance(container: HTMLElement) {
         }
         // 读取完整行（含折行拼接）
         const lineText = readCurrentLine();
-        if (BLOCKED_CMD_RE.test(lineText)) {
+        if (isBlockedTerminalCommand(lineText)) {
           blockCommand();
         } else {
           invoke("terminal_write", { id: sid, data: enterData }).catch(() => {});
