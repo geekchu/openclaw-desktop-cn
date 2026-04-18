@@ -859,7 +859,7 @@ export async function runEmbeddedAttempt(params) {
                     : truncated;
                 cacheTrace?.recordStage("session:limited", { messages: limited });
                 if (limited.length > 0) {
-                    activeSession.agent.replaceMessages(limited);
+                    activeSession.agent.state.messages = limited;
                 }
                 if (params.contextEngine) {
                     try {
@@ -876,7 +876,7 @@ export async function runEmbeddedAttempt(params) {
                             throw new Error("context engine assemble returned no result");
                         }
                         if (assembled.messages !== activeSession.messages) {
-                            activeSession.agent.replaceMessages(assembled.messages);
+                            activeSession.agent.state.messages = assembled.messages;
                         }
                         if (assembled.systemPromptAddition) {
                             systemPromptText = prependSystemPromptAddition({
@@ -1138,7 +1138,7 @@ export async function runEmbeddedAttempt(params) {
                         sessionManager.resetLeaf();
                     }
                     const sessionContext = sessionManager.buildSessionContext();
-                    activeSession.agent.replaceMessages(sessionContext.messages);
+                    activeSession.agent.state.messages = sessionContext.messages;
                     log.warn(`Removed orphaned user message to prevent consecutive user turns. ` +
                         `runId=${params.runId} sessionId=${params.sessionId}`);
                 }
@@ -1148,7 +1148,7 @@ export async function runEmbeddedAttempt(params) {
                     // Called each run; only mutates already-answered user turns that still carry image blocks.
                     const didPruneImages = pruneProcessedHistoryImages(activeSession.messages);
                     if (didPruneImages) {
-                        activeSession.agent.replaceMessages(activeSession.messages);
+                        activeSession.agent.state.messages = activeSession.messages;
                     }
                     // Detect and load images referenced in the prompt for vision-capable models.
                     // Images are prompt-local only (pi-like behavior).

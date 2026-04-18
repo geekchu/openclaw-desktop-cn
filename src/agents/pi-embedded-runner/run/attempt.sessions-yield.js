@@ -98,7 +98,7 @@ export function stripSessionsYieldArtifacts(activeSession) {
         break;
     }
     if (strippedMessages.length !== activeSession.messages.length) {
-        activeSession.agent.replaceMessages(strippedMessages);
+        activeSession.agent.state.messages = strippedMessages;
     }
     const sessionManager = activeSession.sessionManager;
     const fileEntries = sessionManager?.fileEntries;
