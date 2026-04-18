@@ -1,5 +1,5 @@
 import { buildTokenChannelStatusSummary, createComputedAccountStatusAdapter, createDefaultChannelRuntimeState, createDependentCredentialStatusIssueCollector, } from "openclaw/plugin-sdk/status-helpers";
-import { DEFAULT_ACCOUNT_ID } from "../api.js";
+import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
 import { hasLineCredentials } from "./account-helpers.js";
 import { probeLineBot } from "./probe.js";
 const collectLineStatusIssues = createDependentCredentialStatusIssueCollector({

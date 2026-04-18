@@ -11,6 +11,7 @@ const tempDirs: string[] = [];
 const mocks = getRegistryJitiMocks();
 
 let clearPluginDoctorContractRegistryCache: typeof import("./doctor-contract-registry.js").clearPluginDoctorContractRegistryCache;
+let collectRelevantSupplementalDoctorPluginIds: typeof import("./doctor-contract-registry.js").collectRelevantSupplementalDoctorPluginIds;
 let listPluginDoctorLegacyConfigRules: typeof import("./doctor-contract-registry.js").listPluginDoctorLegacyConfigRules;
 
 function makeTempDir(): string {
@@ -25,7 +26,11 @@ describe("doctor-contract-registry getJiti", () => {
   beforeEach(async () => {
     resetRegistryJitiMocks();
     vi.resetModules();
-    ({ clearPluginDoctorContractRegistryCache, listPluginDoctorLegacyConfigRules } =
+    ({
+      clearPluginDoctorContractRegistryCache,
+      collectRelevantSupplementalDoctorPluginIds,
+      listPluginDoctorLegacyConfigRules,
+    } =
       await import("./doctor-contract-registry.js"));
     clearPluginDoctorContractRegistryCache();
   });
@@ -55,5 +60,22 @@ describe("doctor-contract-registry getJiti", () => {
         tryNative: false,
       }),
     );
+  });
+
+  it("excludes configured channel ids from supplemental plugin scanning", () => {
+    expect(
+      collectRelevantSupplementalDoctorPluginIds({
+        channels: {
+          telegram: {},
+        },
+        plugins: {
+          entries: {
+            telegram: { enabled: true },
+            discord: { enabled: true },
+            "memory-wiki": { enabled: true },
+          },
+        },
+      }),
+    ).toEqual(["memory-wiki"]);
   });
 });

@@ -8,7 +8,7 @@ import {
   resolveMemorySlotDecision,
 } from "../plugins/config-state.js";
 import {
-  collectRelevantDoctorPluginIds,
+  collectRelevantSupplementalDoctorPluginIds,
   listPluginDoctorLegacyConfigRules,
 } from "../plugins/doctor-contract-registry.js";
 import {
@@ -462,7 +462,9 @@ export function validateConfigObjectRaw(
   const legacyIssues = findLegacyConfigIssues(
     raw,
     raw,
-    listPluginDoctorLegacyConfigRules({ pluginIds: collectRelevantDoctorPluginIds(raw) }),
+    listPluginDoctorLegacyConfigRules({
+      pluginIds: collectRelevantSupplementalDoctorPluginIds(raw),
+    }),
   );
   if (legacyIssues.length > 0) {
     return {

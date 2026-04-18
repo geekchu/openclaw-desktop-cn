@@ -1,4 +1,6 @@
-import { clearAccountEntryFields, DEFAULT_ACCOUNT_ID, } from "../api.js";
+import { clearAccountEntryFields } from "openclaw/plugin-sdk/core";
+import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
+import { resolveLineAccount } from "./accounts.js";
 import { getLineRuntime } from "./runtime.js";
 export const lineGatewayAdapter = {
     startAccount: async (ctx) => {
@@ -89,7 +91,7 @@ export const lineGatewayAdapter = {
             }
             await getLineRuntime().config.writeConfigFile(nextCfg);
         }
-        const resolved = getLineRuntime().channel.line.resolveLineAccount({
+        const resolved = resolveLineAccount({
             cfg: changed ? nextCfg : cfg,
             accountId,
         });

@@ -19,14 +19,18 @@ function collectConfiguredChannelIds(raw: unknown): ChannelId[] {
 export function collectChannelLegacyConfigRules(raw?: unknown): LegacyConfigRule[] {
   const channelIds = collectConfiguredChannelIds(raw);
   const rules: LegacyConfigRule[] = [];
+  const unresolvedChannelIds: ChannelId[] = [];
   for (const channelId of channelIds) {
     const plugin = getBootstrapChannelPlugin(channelId);
     if (!plugin) {
+      unresolvedChannelIds.push(channelId);
       continue;
     }
     rules.push(...(plugin.doctor?.legacyConfigRules ?? []));
   }
-  rules.push(...listPluginDoctorLegacyConfigRules({ pluginIds: channelIds }));
+  if (unresolvedChannelIds.length > 0) {
+    rules.push(...listPluginDoctorLegacyConfigRules({ pluginIds: unresolvedChannelIds }));
+  }
 
   const seen = new Set<string>();
   return rules.filter((rule) => {

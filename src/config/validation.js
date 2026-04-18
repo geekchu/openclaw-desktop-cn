@@ -3,7 +3,7 @@ import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent
 import { CHANNEL_IDS, normalizeChatChannelId } from "../channels/ids.js";
 import { withBundledPluginAllowlistCompat } from "../plugins/bundled-compat.js";
 import { normalizePluginsConfig, resolveEffectivePluginActivationState, resolveMemorySlotDecision, } from "../plugins/config-state.js";
-import { collectRelevantDoctorPluginIds, listPluginDoctorLegacyConfigRules, } from "../plugins/doctor-contract-registry.js";
+import { collectRelevantSupplementalDoctorPluginIds, listPluginDoctorLegacyConfigRules, } from "../plugins/doctor-contract-registry.js";
 import { loadPluginManifestRegistry, resolveManifestContractPluginIds, } from "../plugins/manifest-registry.js";
 import { validateJsonSchemaValue } from "../plugins/schema-validator.js";
 import { hasKind } from "../plugins/slots.js";
@@ -353,7 +353,7 @@ function validateGatewayTailscaleBind(config) {
  */
 export function validateConfigObjectRaw(raw) {
     const policyIssues = collectUnsupportedSecretRefPolicyIssues(raw);
-    const legacyIssues = findLegacyConfigIssues(raw, raw, listPluginDoctorLegacyConfigRules({ pluginIds: collectRelevantDoctorPluginIds(raw) }));
+    const legacyIssues = findLegacyConfigIssues(raw, raw, listPluginDoctorLegacyConfigRules({ pluginIds: collectRelevantSupplementalDoctorPluginIds(raw) }));
     if (legacyIssues.length > 0) {
         return {
             ok: false,

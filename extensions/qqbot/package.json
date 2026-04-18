@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "silk-wasm": "^3.7.1",
-    "ws": "^8.18.0"
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

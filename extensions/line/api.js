@@ -1,3 +1,5 @@
+export { linePlugin } from "./src/channel.js";
+export { lineSetupPlugin } from "./src/channel.setup.js";
 export { clearAccountEntryFields } from "openclaw/plugin-sdk/core";
 export { buildChannelConfigSchema } from "openclaw/plugin-sdk/channel-config-schema";
 export { buildComputedAccountStatusSnapshot, buildTokenChannelStatusSummary, } from "openclaw/plugin-sdk/status-helpers";

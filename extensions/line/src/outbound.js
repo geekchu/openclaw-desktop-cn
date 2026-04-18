@@ -1,6 +1,6 @@
 import { createAttachedChannelResultAdapter, createEmptyChannelResult, } from "openclaw/plugin-sdk/channel-send-result";
 import { resolveOutboundMediaUrls } from "openclaw/plugin-sdk/reply-payload";
-import { processLineMessage, } from "../api.js";
+import { processLineMessage, } from "../runtime-api.js";
 import { getLineRuntime } from "./runtime.js";
 export const lineOutboundAdapter = {
     deliveryMode: "direct",

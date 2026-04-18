@@ -5,6 +5,7 @@ import path from "node:path";
 import JSON5 from "json5";
 import { ensureOwnerDisplaySecret } from "../agents/owner-display.js";
 import { applyRuntimeLegacyConfigMigrations } from "../commands/doctor/shared/runtime-compat-api.js";
+import { normalizeCompatibilityConfigValues } from "../commands/doctor/shared/legacy-config-core-migrate.js";
 import { loadDotEnv } from "../infra/dotenv.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { resolveRequiredHomeDir } from "../infra/home-dir.js";
@@ -15,7 +16,7 @@ import {
   shouldEnableShellEnvFallback,
 } from "../infra/shell-env.js";
 import {
-  collectRelevantDoctorPluginIds,
+  collectRelevantSupplementalDoctorPluginIds,
   listPluginDoctorLegacyConfigRules,
 } from "../plugins/doctor-contract-registry.js";
 import { sanitizeTerminalText } from "../terminal/safe-text.js";
@@ -960,7 +961,7 @@ function resolveLegacyConfigForRead(
   resolvedConfigRaw: unknown,
   sourceRaw: unknown,
 ): LegacyMigrationResolution {
-  const pluginIds = collectRelevantDoctorPluginIds(resolvedConfigRaw);
+  const pluginIds = collectRelevantSupplementalDoctorPluginIds(resolvedConfigRaw);
   const sourceLegacyIssues = findLegacyConfigIssues(
     resolvedConfigRaw,
     sourceRaw,
@@ -969,7 +970,15 @@ function resolveLegacyConfigForRead(
   if (!resolvedConfigRaw || typeof resolvedConfigRaw !== "object") {
     return { effectiveConfigRaw: resolvedConfigRaw, sourceLegacyIssues };
   }
-  const compat = applyRuntimeLegacyConfigMigrations(resolvedConfigRaw);
+  const compat =
+    sourceLegacyIssues.length > 0
+      ? applyRuntimeLegacyConfigMigrations(resolvedConfigRaw)
+      : {
+          next: normalizeCompatibilityConfigValues(resolvedConfigRaw as OpenClawConfig, {
+            includePluginCompatibility: false,
+          }).config,
+          changes: [],
+        };
   return {
     effectiveConfigRaw: compat.next ?? resolvedConfigRaw,
     sourceLegacyIssues,

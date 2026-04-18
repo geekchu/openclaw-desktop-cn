@@ -300,21 +300,6 @@ Function AbortRuntimeCleanupFailure
   Exch $0
   DetailPrint $0
 
-  ; Tauri updater launches the NSIS installer with /UPDATE on all updater flows.
-  ; Older passive-mode paths may also include /P. Avoid blocking updater-driven
-  ; installs on a MessageBox that no one may be watching.
-  ClearErrors
-  ${GetOptions} $CMDLINE "/UPDATE" $1
-  ${IfNot} ${Errors}
-    Abort
-  ${EndIf}
-
-  ClearErrors
-  ${GetOptions} $CMDLINE "/P" $1
-  ${IfNot} ${Errors}
-    Abort
-  ${EndIf}
-
   IfSilent 0 +2
     Abort
 
@@ -324,6 +309,7 @@ FunctionEnd
 
 Function CleanupCurrentInstallRuntime
   DetailPrint "Cleaning existing runtime bundle directories..."
+  DetailPrint "Waiting for previous install files to unlock..."
 
   FileOpen $0 "$TEMP\openclaw-clean-runtime.ps1" w
   FileWrite $0 "param([string]$$InstallDir)$\r$\n"
@@ -370,6 +356,47 @@ Function CleanupCurrentInstallRuntime
   FileWrite $0 "  Stop-Process -Id (@($$killIds)) -Force -ErrorAction SilentlyContinue$\r$\n"
   FileWrite $0 "  Start-Sleep -Milliseconds 1200$\r$\n"
   FileWrite $0 "} $\r$\n"
+  FileWrite $0 "$$unlockTargets = New-Object 'System.Collections.Generic.List[string]'$\r$\n"
+  FileWrite $0 "foreach ($$candidate in @($\r$\n"
+  FileWrite $0 "  (Join-Path $$InstallDir '${MAINBINARYNAME}.exe'),$\r$\n"
+  FileWrite $0 "  (Join-Path $$InstallDir 'uninstall.exe'),$\r$\n"
+  FileWrite $0 "  (Join-Path $$InstallDir 'node-runtime\node.exe')$\r$\n"
+  FileWrite $0 ")) {$\r$\n"
+  FileWrite $0 "  if (Test-Path -LiteralPath $$candidate) { [void]$$unlockTargets.Add($$candidate) }$\r$\n"
+  FileWrite $0 "} $\r$\n"
+  FileWrite $0 "$$rootBinaries = @(Get-ChildItem -LiteralPath $$InstallDir -File -Force -ErrorAction SilentlyContinue | Where-Object { $$_.Extension -in '.exe', '.dll' } | Select-Object -ExpandProperty FullName)$\r$\n"
+  FileWrite $0 "foreach ($$candidate in $$rootBinaries) {$\r$\n"
+  FileWrite $0 "  if (-not [string]::IsNullOrWhiteSpace($$candidate)) { [void]$$unlockTargets.Add($$candidate) }$\r$\n"
+  FileWrite $0 "} $\r$\n"
+  FileWrite $0 "function Test-FileUnlocked([string]$$pathValue) {$\r$\n"
+  FileWrite $0 "  if ([string]::IsNullOrWhiteSpace($$pathValue) -or -not (Test-Path -LiteralPath $$pathValue)) { return $$true }$\r$\n"
+  FileWrite $0 "  $$stream = $null$\r$\n"
+  FileWrite $0 "  try {$\r$\n"
+  FileWrite $0 "    $$stream = [System.IO.File]::Open($$pathValue, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)$\r$\n"
+  FileWrite $0 "    return $$true$\r$\n"
+  FileWrite $0 "  } catch [System.IO.IOException] {$\r$\n"
+  FileWrite $0 "    return $$false$\r$\n"
+  FileWrite $0 "  } catch [System.UnauthorizedAccessException] {$\r$\n"
+  FileWrite $0 "    return $$false$\r$\n"
+  FileWrite $0 "  } catch {$\r$\n"
+  FileWrite $0 "    return $$false$\r$\n"
+  FileWrite $0 "  } finally {$\r$\n"
+  FileWrite $0 "    if ($$stream) { $$stream.Dispose() }$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "}$\r$\n"
+  FileWrite $0 "$$stillLocked = @()$\r$\n"
+  FileWrite $0 "for ($$attempt = 0; $$attempt -lt 12; $$attempt++) {$\r$\n"
+  FileWrite $0 "  $$stillLocked = @()$\r$\n"
+  FileWrite $0 "  foreach ($$pathValue in @($$unlockTargets | Select-Object -Unique)) {$\r$\n"
+  FileWrite $0 "    if (-not (Test-FileUnlocked $$pathValue)) { $$stillLocked += $$pathValue }$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  if ($$stillLocked.Count -eq 0) { break }$\r$\n"
+  FileWrite $0 "  Start-Sleep -Milliseconds 500$\r$\n"
+  FileWrite $0 "} $\r$\n"
+  FileWrite $0 "if ($$stillLocked.Count -gt 0) {$\r$\n"
+  FileWrite $0 "  [Console]::Error.WriteLine((($$stillLocked | Select-Object -First 8) -join [Environment]::NewLine))$\r$\n"
+  FileWrite $0 "  exit 1$\r$\n"
+  FileWrite $0 "} $\r$\n"
   FileWrite $0 "$$failed = @()$\r$\n"
   FileWrite $0 "foreach ($$target in $$targets) {$\r$\n"
   FileWrite $0 "  $$removed = $$false$\r$\n"
@@ -407,7 +434,7 @@ Function CleanupCurrentInstallRuntime
     Push "安装前清理旧版本运行时目录超时。请完全退出 OpenClaw 后重试。"
     Call AbortRuntimeCleanupFailure
   ${ElseIf} $1 != 0
-    Push "旧版本的 gateway-bundle 或 node-runtime 仍被占用，无法安全升级。请完全退出 OpenClaw 后重试。"
+    Push "旧版本文件仍在释放中，无法安全覆盖安装。请完全退出 OpenClaw 后重试。"
     Call AbortRuntimeCleanupFailure
   ${EndIf}
 FunctionEnd
@@ -423,6 +450,9 @@ FunctionEnd
   FileClose $0
   nsExec::ExecToLog '"$TEMP\kill_gateway.bat"'
   Delete "$TEMP\kill_gateway.bat"
+  ; Windows often returns from taskkill before the file handles are fully released.
+  ; Give the previous process tree a short grace window before overwrite starts.
+  Sleep 1200
 !macroend
 
 !macro CleanupOldVersion
@@ -555,24 +585,10 @@ FunctionEnd
 
   !insertmacro KillGatewayStatus
 
-  ; Tauri updater 会在自动更新安装时带上 /UPDATE；旧版 passive 路径还会追加 /P。
-  ; 对 updater 路径做激进的预清理时，一旦删除失败就会直接 Abort，
-  ; 用户侧只能看到“应用退出/回来”，却看不到真正的失败原因。
-  ; 自动更新保留更稳妥的旧行为：先杀主进程/Gateway，再交给后续安装流程覆盖。
-  ClearErrors
-  ${GetOptions} $CMDLINE "/UPDATE" $0
-  ${IfNot} ${Errors}
-    DetailPrint "Updater mode detected; skipping pre-clean runtime sweep."
-  ${Else}
-    ClearErrors
-    ${GetOptions} $CMDLINE "/P" $0
-    ${If} ${Errors}
-      ; 手动运行安装器时保留更强的预清理，尽量避免覆盖写入弹窗。
-      Call CleanupCurrentInstallRuntime
-    ${Else}
-      DetailPrint "Updater passive mode detected; skipping pre-clean runtime sweep."
-    ${EndIf}
-  ${EndIf}
+  ; 覆盖安装第一次失败、第二次成功，说明第一次只是把旧进程/句柄打散了，
+  ; 真正的 runtime 目录并没有在覆盖前清干净。对所有安装路径都执行预清理，
+  ; 避免 updater/passive 流程把 gateway-bundle 残留锁带进文件复制阶段。
+  Call CleanupCurrentInstallRuntime
 
   ; 3. 清理旧版本的 gateway-bundle 目录，防止残留文件导致插件加载警告
   RMDir /r "$INSTDIR\gateway-bundle"

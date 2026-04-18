@@ -367,8 +367,9 @@ export function evaluateBundledPluginPublicSurfaceAccess(params: {
   config: OpenClawConfig;
   normalizedPluginsConfig: ReturnType<typeof normalizePluginsConfig>;
   activationSource: ReturnType<typeof createPluginActivationSource>;
-  autoEnabledReasons: Record<string, string[]>;
+  autoEnabledReasons?: Record<string, string[]>;
 }): { allowed: boolean; pluginId?: string; reason?: string } {
+  const autoEnabledReasons = params.autoEnabledReasons ?? {};
   const activationState = resolveEffectivePluginActivationState({
     id: params.manifestRecord.id,
     origin: params.manifestRecord.origin,
@@ -376,7 +377,7 @@ export function evaluateBundledPluginPublicSurfaceAccess(params: {
     rootConfig: params.config,
     enabledByDefault: params.manifestRecord.enabledByDefault,
     activationSource: params.activationSource,
-    autoEnabledReason: params.autoEnabledReasons[params.manifestRecord.id]?.[0],
+    autoEnabledReason: autoEnabledReasons[params.manifestRecord.id]?.[0],
   });
   if (activationState.enabled) {
     return {

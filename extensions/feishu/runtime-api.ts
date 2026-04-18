@@ -20,6 +20,7 @@ export {
   createDefaultChannelRuntimeState,
 } from "openclaw/plugin-sdk/feishu";
 export * from "openclaw/plugin-sdk/feishu";
+export { setFeishuRuntime } from "./src/runtime.js";
 export { loadSessionStore, resolveSessionStoreEntry } from "openclaw/plugin-sdk/config-runtime";
 export {
   isRequestBodyLimitError,

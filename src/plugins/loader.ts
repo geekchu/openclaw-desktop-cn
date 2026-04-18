@@ -633,8 +633,22 @@ function resolveSetupChannelRegistration(moduleExport: unknown): {
     return {};
   }
   const setup = resolved as {
+    kind?: unknown;
     plugin?: unknown;
+    loadSetupPlugin?: unknown;
   };
+  if (setup.kind === "bundled-channel-setup-entry") {
+    if (typeof setup.loadSetupPlugin !== "function") {
+      return {};
+    }
+    const plugin = setup.loadSetupPlugin();
+    if (!plugin || typeof plugin !== "object") {
+      return {};
+    }
+    return {
+      plugin: plugin as ChannelPlugin,
+    };
+  }
   if (!setup.plugin || typeof setup.plugin !== "object") {
     return {};
   }
@@ -1605,7 +1619,24 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
         (registrationMode === "setup-only" || registrationMode === "setup-runtime") &&
         manifestRecord.setupSource
       ) {
-        const setupRegistration = resolveSetupChannelRegistration(mod);
+        let setupRegistration: ReturnType<typeof resolveSetupChannelRegistration>;
+        try {
+          setupRegistration = resolveSetupChannelRegistration(mod);
+        } catch (err) {
+          recordPluginError({
+            logger,
+            registry,
+            record,
+            seenIds,
+            pluginId,
+            origin: candidate.origin,
+            phase: "load",
+            error: err,
+            logPrefix: `[plugins] ${record.id} failed to load from ${record.source}: `,
+            diagnosticMessagePrefix: "failed to load plugin: ",
+          });
+          continue;
+        }
         if (setupRegistration.plugin) {
           if (setupRegistration.plugin.id && setupRegistration.plugin.id !== record.id) {
             pushPluginLoadError(

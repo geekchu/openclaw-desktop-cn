@@ -513,6 +513,7 @@ function createSetupEntryChannelPluginFixture(params: {
   fullBlurb: string;
   setupBlurb: string;
   configured: boolean;
+  setupExportMode?: "legacy" | "bundled-contract";
   startupDeferConfiguredChannelFullLoadUntilAfterListen?: boolean;
 }) {
   useNoBundledPlugins();
@@ -523,6 +524,22 @@ function createSetupEntryChannelPluginFixture(params: {
   const resolveAccount = params.configured
     ? '({ accountId: "default", token: "configured" })'
     : '({ accountId: "default" })';
+  const setupPluginSource = `{
+    id: ${JSON.stringify(params.id)},
+    meta: {
+      id: ${JSON.stringify(params.id)},
+      label: ${JSON.stringify(params.label)},
+      selectionLabel: ${JSON.stringify(params.label)},
+      docsPath: ${JSON.stringify(`/channels/${params.id}`)},
+      blurb: ${JSON.stringify(params.setupBlurb)},
+    },
+    capabilities: { chatTypes: ["direct"] },
+    config: {
+      listAccountIds: () => ${listAccountIds},
+      resolveAccount: () => ${resolveAccount},
+    },
+    outbound: { deliveryMode: "direct" },
+  }`;
 
   fs.writeFileSync(
     path.join(pluginDir, "package.json"),
@@ -589,24 +606,17 @@ module.exports = {
   );
   fs.writeFileSync(
     path.join(pluginDir, "setup-entry.cjs"),
-    `require("node:fs").writeFileSync(${JSON.stringify(setupMarker)}, "loaded", "utf-8");
-module.exports = {
-  plugin: {
-    id: ${JSON.stringify(params.id)},
-    meta: {
-      id: ${JSON.stringify(params.id)},
-      label: ${JSON.stringify(params.label)},
-      selectionLabel: ${JSON.stringify(params.label)},
-      docsPath: ${JSON.stringify(`/channels/${params.id}`)},
-      blurb: ${JSON.stringify(params.setupBlurb)},
-    },
-    capabilities: { chatTypes: ["direct"] },
-    config: {
-      listAccountIds: () => ${listAccountIds},
-      resolveAccount: () => ${resolveAccount},
-    },
-    outbound: { deliveryMode: "direct" },
+    params.setupExportMode === "bundled-contract"
+      ? `module.exports = {
+  kind: "bundled-channel-setup-entry",
+  loadSetupPlugin() {
+    require("node:fs").writeFileSync(${JSON.stringify(setupMarker)}, "loaded", "utf-8");
+    return ${setupPluginSource};
   },
+};`
+      : `require("node:fs").writeFileSync(${JSON.stringify(setupMarker)}, "loaded", "utf-8");
+module.exports = {
+  plugin: ${setupPluginSource},
 };`,
     "utf-8",
   );
@@ -2807,6 +2817,31 @@ module.exports = {
             plugins: {
               load: { paths: [pluginDir] },
               allow: ["setup-runtime-test"],
+            },
+          },
+        }),
+      expectFullLoaded: false,
+      expectSetupLoaded: true,
+      expectedChannels: 1,
+    },
+    {
+      name: "uses bundled setup contract for enabled but unconfigured channel loads",
+      fixture: {
+        id: "setup-runtime-contract-test",
+        label: "Setup Runtime Contract Test",
+        packageName: "@openclaw/setup-runtime-contract-test",
+        fullBlurb: "full entry should not run while unconfigured",
+        setupBlurb: "setup runtime contract",
+        configured: false,
+        setupExportMode: "bundled-contract" as const,
+      },
+      load: ({ pluginDir }: { pluginDir: string }) =>
+        loadOpenClawPlugins({
+          cache: false,
+          config: {
+            plugins: {
+              load: { paths: [pluginDir] },
+              allow: ["setup-runtime-contract-test"],
             },
           },
         }),

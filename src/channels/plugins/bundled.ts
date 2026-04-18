@@ -45,9 +45,31 @@ function resolveChannelPluginModuleEntry(
   if (!resolved || typeof resolved !== "object") {
     return null;
   }
-  const record = resolved as Partial<BundledChannelEntryContract>;
+  const record = resolved as Partial<BundledChannelEntryContract> & {
+    channelPlugin?: unknown;
+    setChannelRuntime?: unknown;
+  };
   if (record.kind !== "bundled-channel-entry") {
-    return null;
+    if (
+      typeof record.id !== "string" ||
+      typeof record.name !== "string" ||
+      typeof record.description !== "string" ||
+      typeof record.register !== "function" ||
+      !("channelPlugin" in record)
+    ) {
+      return null;
+    }
+    return {
+      kind: "bundled-channel-entry",
+      id: record.id,
+      name: record.name,
+      description: record.description,
+      register: record.register,
+      loadChannelPlugin: () => record.channelPlugin as ChannelPlugin,
+      ...(typeof record.setChannelRuntime === "function"
+        ? { setChannelRuntime: record.setChannelRuntime }
+        : {}),
+    } as BundledChannelEntryContract;
   }
   if (
     typeof record.id !== "string" ||
@@ -73,9 +95,17 @@ function resolveChannelSetupModuleEntry(
   if (!resolved || typeof resolved !== "object") {
     return null;
   }
-  const record = resolved as Partial<BundledChannelSetupEntryContract>;
+  const record = resolved as Partial<BundledChannelSetupEntryContract> & {
+    plugin?: unknown;
+  };
   if (record.kind !== "bundled-channel-setup-entry") {
-    return null;
+    if (!("plugin" in record)) {
+      return null;
+    }
+    return {
+      kind: "bundled-channel-setup-entry",
+      loadSetupPlugin: () => record.plugin as ChannelPlugin,
+    } as BundledChannelSetupEntryContract;
   }
   if (typeof record.loadSetupPlugin !== "function") {
     return null;

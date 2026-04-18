@@ -1,65 +1,124 @@
 import { buildPluginApi } from "./api-builder.js";
-export function createCapturedPluginRegistration() {
-    const providers = [];
-    const cliBackends = [];
-    const speechProviders = [];
-    const mediaUnderstandingProviders = [];
-    const imageGenerationProviders = [];
-    const webSearchProviders = [];
-    const tools = [];
-    const noopLogger = {
-        info() { },
-        warn() { },
-        error() { },
-        debug() { },
-    };
-    return {
-        providers,
-        cliBackends,
-        speechProviders,
-        mediaUnderstandingProviders,
-        imageGenerationProviders,
-        webSearchProviders,
-        tools,
-        api: buildPluginApi({
-            id: "captured-plugin-registration",
-            name: "Captured Plugin Registration",
-            source: "captured-plugin-registration",
-            registrationMode: "full",
-            config: {},
-            runtime: {},
-            logger: noopLogger,
-            resolvePath: (input) => input,
-            handlers: {
-                registerProvider(provider) {
-                    providers.push(provider);
-                },
-                registerCliBackend(backend) {
-                    cliBackends.push(backend);
-                },
-                registerSpeechProvider(provider) {
-                    speechProviders.push(provider);
-                },
-                registerMediaUnderstandingProvider(provider) {
-                    mediaUnderstandingProviders.push(provider);
-                },
-                registerImageGenerationProvider(provider) {
-                    imageGenerationProviders.push(provider);
-                },
-                registerWebSearchProvider(provider) {
-                    webSearchProviders.push(provider);
-                },
-                registerTool(tool) {
-                    if (typeof tool !== "function") {
-                        tools.push(tool);
-                    }
-                },
-            },
-        }),
-    };
+function createCapturedPluginRegistration(params) {
+  const providers = [];
+  const cliRegistrars = [];
+  const cliBackends = [];
+  const speechProviders = [];
+  const realtimeTranscriptionProviders = [];
+  const realtimeVoiceProviders = [];
+  const mediaUnderstandingProviders = [];
+  const imageGenerationProviders = [];
+  const videoGenerationProviders = [];
+  const musicGenerationProviders = [];
+  const webFetchProviders = [];
+  const webSearchProviders = [];
+  const memoryEmbeddingProviders = [];
+  const tools = [];
+  const noopLogger = {
+    info() {
+    },
+    warn() {
+    },
+    error() {
+    },
+    debug() {
+    }
+  };
+  return {
+    providers,
+    cliRegistrars,
+    cliBackends,
+    speechProviders,
+    realtimeTranscriptionProviders,
+    realtimeVoiceProviders,
+    mediaUnderstandingProviders,
+    imageGenerationProviders,
+    videoGenerationProviders,
+    musicGenerationProviders,
+    webFetchProviders,
+    webSearchProviders,
+    memoryEmbeddingProviders,
+    tools,
+    api: buildPluginApi({
+      id: "captured-plugin-registration",
+      name: "Captured Plugin Registration",
+      source: "captured-plugin-registration",
+      registrationMode: params?.registrationMode ?? "full",
+      config: params?.config ?? {},
+      runtime: {},
+      logger: noopLogger,
+      resolvePath: (input) => input,
+      handlers: {
+        registerCli(registrar, opts) {
+          const descriptors = (opts?.descriptors ?? []).map((descriptor) => ({
+            name: descriptor.name.trim(),
+            description: descriptor.description.trim(),
+            hasSubcommands: descriptor.hasSubcommands
+          })).filter((descriptor) => descriptor.name && descriptor.description);
+          const commands = [
+            ...opts?.commands ?? [],
+            ...descriptors.map((descriptor) => descriptor.name)
+          ].map((command) => command.trim()).filter(Boolean);
+          if (commands.length === 0) {
+            return;
+          }
+          cliRegistrars.push({
+            register: registrar,
+            commands,
+            descriptors
+          });
+        },
+        registerProvider(provider) {
+          providers.push(provider);
+        },
+        registerCliBackend(backend) {
+          cliBackends.push(backend);
+        },
+        registerSpeechProvider(provider) {
+          speechProviders.push(provider);
+        },
+        registerRealtimeTranscriptionProvider(provider) {
+          realtimeTranscriptionProviders.push(provider);
+        },
+        registerRealtimeVoiceProvider(provider) {
+          realtimeVoiceProviders.push(provider);
+        },
+        registerMediaUnderstandingProvider(provider) {
+          mediaUnderstandingProviders.push(provider);
+        },
+        registerImageGenerationProvider(provider) {
+          imageGenerationProviders.push(provider);
+        },
+        registerVideoGenerationProvider(provider) {
+          videoGenerationProviders.push(provider);
+        },
+        registerMusicGenerationProvider(provider) {
+          musicGenerationProviders.push(provider);
+        },
+        registerWebFetchProvider(provider) {
+          webFetchProviders.push(provider);
+        },
+        registerWebSearchProvider(provider) {
+          webSearchProviders.push(provider);
+        },
+        registerMemoryEmbeddingProvider(adapter) {
+          memoryEmbeddingProviders.push(adapter);
+        },
+        registerTool(tool) {
+          if (typeof tool !== "function") {
+            tools.push(tool);
+          }
+        }
+      }
+    })
+  };
 }
-export function capturePluginRegistration(params) {
-    const captured = createCapturedPluginRegistration();
-    params.register(captured.api);
-    return captured;
+function capturePluginRegistration(params) {
+  const captured = createCapturedPluginRegistration();
+  params.register(captured.api);
+  return captured;
 }
+export {
+  capturePluginRegistration,
+  createCapturedPluginRegistration
+};

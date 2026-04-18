@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA } from "../config/bundled-channel-config-metadata.generated.js";
 import type { LegacyConfigRule } from "../config/legacy.shared.js";
 import type { OpenClawConfig } from "../config/types.js";
 import { asNullableRecord } from "../shared/record-coerce.js";
@@ -10,10 +11,20 @@ import { loadPluginManifestRegistry } from "./manifest-registry.js";
 import { resolvePluginCacheInputs } from "./roots.js";
 
 const CONTRACT_API_EXTENSIONS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"] as const;
+const DOCTOR_CONTRACT_CANDIDATE_BASENAMES = [
+  "doctor-contract-api",
+  path.join("src", "doctor-contract"),
+  path.join("src", "config-compat"),
+  path.join("src", "doctor"),
+  "contract-api",
+] as const;
 const CURRENT_MODULE_PATH = fileURLToPath(import.meta.url);
 const RUNNING_FROM_BUILT_ARTIFACT =
   CURRENT_MODULE_PATH.includes(`${path.sep}dist${path.sep}`) ||
   CURRENT_MODULE_PATH.includes(`${path.sep}dist-runtime${path.sep}`);
+const BUNDLED_CHANNEL_IDS = new Set<string>(
+  GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA.map((entry) => entry.channelId),
+);
 
 type PluginDoctorContractModule = {
   legacyConfigRules?: unknown;
@@ -66,16 +77,12 @@ function resolveContractApiPath(rootDir: string): string | null {
   const orderedExtensions = RUNNING_FROM_BUILT_ARTIFACT
     ? CONTRACT_API_EXTENSIONS
     : ([...CONTRACT_API_EXTENSIONS.slice(3), ...CONTRACT_API_EXTENSIONS.slice(0, 3)] as const);
-  for (const extension of orderedExtensions) {
-    const candidate = path.join(rootDir, `doctor-contract-api${extension}`);
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  for (const extension of orderedExtensions) {
-    const candidate = path.join(rootDir, `contract-api${extension}`);
-    if (fs.existsSync(candidate)) {
-      return candidate;
+  for (const basename of DOCTOR_CONTRACT_CANDIDATE_BASENAMES) {
+    for (const extension of orderedExtensions) {
+      const candidate = path.join(rootDir, `${basename}${extension}`);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
     }
   }
   return null;
@@ -129,6 +136,40 @@ export function collectRelevantDoctorPluginIds(raw: unknown): string[] {
   const pluginsEntries = asNullableRecord(asNullableRecord(root.plugins)?.entries);
   if (pluginsEntries) {
     for (const pluginId of Object.keys(pluginsEntries)) {
+      ids.add(pluginId);
+    }
+  }
+
+  if (hasLegacyElevenLabsTalkFields(root)) {
+    ids.add("elevenlabs");
+  }
+
+  return [...ids].toSorted();
+}
+
+export function collectRelevantSupplementalDoctorPluginIds(raw: unknown): string[] {
+  const ids = new Set<string>();
+  const root = asNullableRecord(raw);
+  if (!root) {
+    return [];
+  }
+
+  const configuredChannelIds = new Set<string>();
+  const channels = asNullableRecord(root.channels);
+  if (channels) {
+    for (const channelId of Object.keys(channels)) {
+      if (channelId !== "defaults") {
+        configuredChannelIds.add(channelId);
+      }
+    }
+  }
+
+  const pluginsEntries = asNullableRecord(asNullableRecord(root.plugins)?.entries);
+  if (pluginsEntries) {
+    for (const pluginId of Object.keys(pluginsEntries)) {
+      if (configuredChannelIds.has(pluginId) || BUNDLED_CHANNEL_IDS.has(pluginId)) {
+        continue;
+      }
       ids.add(pluginId);
     }
   }

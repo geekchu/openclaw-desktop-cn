@@ -14,20 +14,26 @@ import { migrateLegacyWebFetchConfig } from "./legacy-web-fetch-migrate.js";
 import { migrateLegacyWebSearchConfig } from "./legacy-web-search-migrate.js";
 import { migrateLegacyXSearchConfig } from "./legacy-x-search-migrate.js";
 
-export function normalizeCompatibilityConfigValues(cfg: OpenClawConfig): {
+export function normalizeCompatibilityConfigValues(
+  cfg: OpenClawConfig,
+  opts?: { includePluginCompatibility?: boolean },
+): {
   config: OpenClawConfig;
   changes: string[];
 } {
+  const includePluginCompatibility = opts?.includePluginCompatibility ?? true;
   const changes: string[] = [];
   let next = seedMissingDefaultAccountsFromSingleAccountBase(cfg, changes);
   next = normalizeLegacyBrowserConfig(next, changes);
 
-  const setupMigration = runPluginSetupConfigMigrations({
-    config: next,
-  });
-  if (setupMigration.changes.length > 0) {
-    next = setupMigration.config;
-    changes.push(...setupMigration.changes);
+  if (includePluginCompatibility) {
+    const setupMigration = runPluginSetupConfigMigrations({
+      config: next,
+    });
+    if (setupMigration.changes.length > 0) {
+      next = setupMigration.config;
+      changes.push(...setupMigration.changes);
+    }
   }
 
   for (const migrate of [
@@ -48,12 +54,14 @@ export function normalizeCompatibilityConfigValues(cfg: OpenClawConfig): {
   next = normalizeLegacyCrossContextMessageConfig(next, changes);
   next = normalizeLegacyMediaProviderOptions(next, changes);
   next = normalizeLegacyMistralModelMaxTokens(next, changes);
-  for (const mutation of collectChannelDoctorCompatibilityMutations(next)) {
-    if (mutation.changes.length === 0) {
-      continue;
+  if (includePluginCompatibility) {
+    for (const mutation of collectChannelDoctorCompatibilityMutations(next)) {
+      if (mutation.changes.length === 0) {
+        continue;
+      }
+      next = mutation.config;
+      changes.push(...mutation.changes);
     }
-    next = mutation.config;
-    changes.push(...mutation.changes);
   }
 
   return { config: next, changes };
