@@ -93,6 +93,26 @@ describe("models cli", () => {
     );
   });
 
+  it("passes --probe-model to models status", async () => {
+    await runModelsCommand([
+      "models",
+      "status",
+      "--probe",
+      "--probe-provider",
+      "onestop",
+      "--probe-model",
+      "onestop/kimi-k2.5",
+    ]);
+    expect(modelsStatusCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        probe: true,
+        probeProvider: "onestop",
+        probeModel: "onestop/kimi-k2.5",
+      }),
+      expect.any(Object),
+    );
+  });
+
   it("shows help for models auth without error exit", async () => {
     const program = new Command();
     program.exitOverride();

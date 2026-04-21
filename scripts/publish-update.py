@@ -472,9 +472,7 @@ def main():
     print(f"  更新端点: {update_url}")
     print(f"  安装包CDN: {CDN_BASE}/")
     print(f"\n  别忘了更新官网下载链接!")
-    print(f"  1. 修改 openclawcn_web/src/app/page.tsx 中的版本号和文件名")
-    print(f"  2. cd openclawcn_web && npm run build")
-    print(f"  3. python deploy.py upload")
+    print(f"  运行: python deploy.py update-links")
 
 
 if __name__ == "__main__":

@@ -60,9 +60,9 @@ class GatewayConfigResolverTest {
     assertEquals(
       GatewayEndpointConfig(
         host = "127.0.0.1",
-        port = 18789,
+        port = 28789,
         tls = false,
-        displayUrl = "http://127.0.0.1:18789",
+        displayUrl = "http://127.0.0.1:28789",
       ),
       parsed,
     )
@@ -133,9 +133,9 @@ class GatewayConfigResolverTest {
     val parsed = parseGatewayEndpoint("ws://[::1]")
 
     assertEquals("::1", parsed?.host)
-    assertEquals(18789, parsed?.port)
+    assertEquals(28789, parsed?.port)
     assertEquals(false, parsed?.tls)
-    assertEquals("http://[::1]:18789", parsed?.displayUrl)
+    assertEquals("http://[::1]:28789", parsed?.displayUrl)
   }
 
   @Test
@@ -143,9 +143,9 @@ class GatewayConfigResolverTest {
     val parsed = parseGatewayEndpoint("ws://[::ffff:127.0.0.1]")
 
     assertEquals("::ffff:127.0.0.1", parsed?.host)
-    assertEquals(18789, parsed?.port)
+    assertEquals(28789, parsed?.port)
     assertEquals(false, parsed?.tls)
-    assertEquals("http://[::ffff:127.0.0.1]:18789", parsed?.displayUrl)
+    assertEquals("http://[::ffff:127.0.0.1]:28789", parsed?.displayUrl)
   }
 
   @Test
@@ -167,9 +167,9 @@ class GatewayConfigResolverTest {
     val parsed = parseGatewayEndpoint("ws://[fe80::1%25eth0]")
 
     assertEquals("fe80::1%25eth0", parsed?.host)
-    assertEquals(18789, parsed?.port)
+    assertEquals(28789, parsed?.port)
     assertEquals(false, parsed?.tls)
-    assertEquals("http://[fe80::1%25eth0]:18789", parsed?.displayUrl)
+    assertEquals("http://[fe80::1%25eth0]:28789", parsed?.displayUrl)
   }
 
   @Test

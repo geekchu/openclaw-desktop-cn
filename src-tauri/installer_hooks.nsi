@@ -6,6 +6,7 @@ Var LegacyInstallDir
 Var LegacyMainBinary
 Var LegacyRegistryHit
 Var LegacyCleanupEligible
+Var WaitPathTarget
 
 Function NormalizeLegacyPath
   Exch $0
@@ -293,7 +294,28 @@ Function StopLegacyProcesses
     nsExec::ExecToLog 'taskkill /F /IM "openclaw-desktop.exe" /T'
   ${EndIf}
 
-  Sleep 1000
+  Sleep 250
+FunctionEnd
+
+Function WaitForPathToDisappear
+  Push $0
+
+  StrCpy $0 0
+
+  wait_path_loop:
+  ${IfNot} ${FileExists} "$WaitPathTarget"
+    Goto wait_path_done
+  ${EndIf}
+
+  IntCmp $0 8 wait_path_done wait_path_sleep wait_path_done
+
+  wait_path_sleep:
+  Sleep 200
+  IntOp $0 $0 + 1
+  Goto wait_path_loop
+
+  wait_path_done:
+  Pop $0
 FunctionEnd
 
 Function AbortRuntimeCleanupFailure
@@ -309,116 +331,165 @@ FunctionEnd
 
 Function CleanupCurrentInstallRuntime
   DetailPrint "Cleaning existing runtime bundle directories..."
-  DetailPrint "Waiting for previous install files to unlock..."
+  DetailPrint "Checking previous install file locks..."
 
   FileOpen $0 "$TEMP\openclaw-clean-runtime.ps1" w
   FileWrite $0 "param([string]$$InstallDir)$\r$\n"
   FileWrite $0 "$$ErrorActionPreference = 'Stop'$\r$\n"
   FileWrite $0 "if ([string]::IsNullOrWhiteSpace($$InstallDir)) { exit 0 }$\r$\n"
   FileWrite $0 "if (-not (Test-Path -LiteralPath $$InstallDir)) { exit 0 }$\r$\n"
-  FileWrite $0 "$$targets = @($\r$\n"
-  FileWrite $0 "  (Join-Path $$InstallDir 'gateway-bundle'),$\r$\n"
-  FileWrite $0 "  (Join-Path $$InstallDir 'node-runtime')$\r$\n"
-  FileWrite $0 ") | Where-Object { Test-Path -LiteralPath $$_ }$\r$\n"
-  FileWrite $0 "$$needle = ([System.IO.Path]::GetFullPath($$InstallDir)).TrimEnd('\').ToLowerInvariant()$\r$\n"
-  FileWrite $0 "$$currentPid = $$PID$\r$\n"
-  FileWrite $0 "$$processes = @()$\r$\n"
-  FileWrite $0 "function Test-InstallDirPath([string]$$pathValue) {$\r$\n"
-  FileWrite $0 "  if ([string]::IsNullOrWhiteSpace($$pathValue)) { return $$false }$\r$\n"
-  FileWrite $0 "  $$candidate = $$pathValue.Trim()$\r$\n"
-  FileWrite $0 "  if ([string]::IsNullOrWhiteSpace($$candidate)) { return $$false }$\r$\n"
-  FileWrite $0 "  try {$\r$\n"
-  FileWrite $0 "    $$normalized = ([System.IO.Path]::GetFullPath($$candidate)).TrimEnd('\').ToLowerInvariant()$\r$\n"
-  FileWrite $0 "  } catch {$\r$\n"
-  FileWrite $0 "    return $$false$\r$\n"
-  FileWrite $0 "  }$\r$\n"
-  FileWrite $0 "  return $$normalized -eq $$needle -or $$normalized.StartsWith($$needle + '\')$\r$\n"
-  FileWrite $0 "}$\r$\n"
-  FileWrite $0 "try {$\r$\n"
-  FileWrite $0 "  $$processes = @(Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId, Name, ExecutablePath, CommandLine)$\r$\n"
-  FileWrite $0 "} catch {$\r$\n"
-  FileWrite $0 "  try {$\r$\n"
-  FileWrite $0 "    $$processes = @(Get-WmiObject Win32_Process -ErrorAction Stop | Select-Object ProcessId, Name, ExecutablePath, CommandLine)$\r$\n"
-  FileWrite $0 "  } catch {$\r$\n"
-  FileWrite $0 "    [Console]::Error.WriteLine('warning: process enumeration unavailable, continuing with direct cleanup')$\r$\n"
-  FileWrite $0 "    $$processes = @()$\r$\n"
-  FileWrite $0 "  }$\r$\n"
-  FileWrite $0 "}$\r$\n"
-  FileWrite $0 "$$killIds = New-Object 'System.Collections.Generic.HashSet[int]'$\r$\n"
-  FileWrite $0 "foreach ($$proc in $$processes) {$\r$\n"
-  FileWrite $0 "  if ([int]$$proc.ProcessId -eq [int]$$currentPid) { continue }$\r$\n"
-  FileWrite $0 "  $$exe = if ($$proc.ExecutablePath) { $$proc.ExecutablePath } else { '' }$\r$\n"
-  FileWrite $0 "  if (Test-InstallDirPath $$exe) {$\r$\n"
-  FileWrite $0 "    [void]$$killIds.Add([int]$$proc.ProcessId)$\r$\n"
-  FileWrite $0 "  }$\r$\n"
-  FileWrite $0 "} $\r$\n"
-  FileWrite $0 "if ($$killIds.Count -gt 0) {$\r$\n"
-  FileWrite $0 "  Stop-Process -Id (@($$killIds)) -Force -ErrorAction SilentlyContinue$\r$\n"
-  FileWrite $0 "  Start-Sleep -Milliseconds 1200$\r$\n"
-  FileWrite $0 "} $\r$\n"
-  FileWrite $0 "$$unlockTargets = New-Object 'System.Collections.Generic.List[string]'$\r$\n"
-  FileWrite $0 "foreach ($$candidate in @($\r$\n"
-  FileWrite $0 "  (Join-Path $$InstallDir '${MAINBINARYNAME}.exe'),$\r$\n"
-  FileWrite $0 "  (Join-Path $$InstallDir 'uninstall.exe'),$\r$\n"
-  FileWrite $0 "  (Join-Path $$InstallDir 'node-runtime\node.exe')$\r$\n"
-  FileWrite $0 ")) {$\r$\n"
-  FileWrite $0 "  if (Test-Path -LiteralPath $$candidate) { [void]$$unlockTargets.Add($$candidate) }$\r$\n"
-  FileWrite $0 "} $\r$\n"
-  FileWrite $0 "$$rootBinaries = @(Get-ChildItem -LiteralPath $$InstallDir -File -Force -ErrorAction SilentlyContinue | Where-Object { $$_.Extension -in '.exe', '.dll' } | Select-Object -ExpandProperty FullName)$\r$\n"
-  FileWrite $0 "foreach ($$candidate in $$rootBinaries) {$\r$\n"
-  FileWrite $0 "  if (-not [string]::IsNullOrWhiteSpace($$candidate)) { [void]$$unlockTargets.Add($$candidate) }$\r$\n"
-  FileWrite $0 "} $\r$\n"
-  FileWrite $0 "function Test-FileUnlocked([string]$$pathValue) {$\r$\n"
-  FileWrite $0 "  if ([string]::IsNullOrWhiteSpace($$pathValue) -or -not (Test-Path -LiteralPath $$pathValue)) { return $$true }$\r$\n"
-  FileWrite $0 "  $$stream = $null$\r$\n"
-  FileWrite $0 "  try {$\r$\n"
-  FileWrite $0 "    $$stream = [System.IO.File]::Open($$pathValue, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)$\r$\n"
-  FileWrite $0 "    return $$true$\r$\n"
-  FileWrite $0 "  } catch [System.IO.IOException] {$\r$\n"
-  FileWrite $0 "    return $$false$\r$\n"
-  FileWrite $0 "  } catch [System.UnauthorizedAccessException] {$\r$\n"
-  FileWrite $0 "    return $$false$\r$\n"
-  FileWrite $0 "  } catch {$\r$\n"
-  FileWrite $0 "    return $$false$\r$\n"
-  FileWrite $0 "  } finally {$\r$\n"
-  FileWrite $0 "    if ($$stream) { $$stream.Dispose() }$\r$\n"
-  FileWrite $0 "  }$\r$\n"
-  FileWrite $0 "}$\r$\n"
-  FileWrite $0 "$$stillLocked = @()$\r$\n"
-  FileWrite $0 "for ($$attempt = 0; $$attempt -lt 12; $$attempt++) {$\r$\n"
-  FileWrite $0 "  $$stillLocked = @()$\r$\n"
-  FileWrite $0 "  foreach ($$pathValue in @($$unlockTargets | Select-Object -Unique)) {$\r$\n"
-  FileWrite $0 "    if (-not (Test-FileUnlocked $$pathValue)) { $$stillLocked += $$pathValue }$\r$\n"
-  FileWrite $0 "  }$\r$\n"
-  FileWrite $0 "  if ($$stillLocked.Count -eq 0) { break }$\r$\n"
-  FileWrite $0 "  Start-Sleep -Milliseconds 500$\r$\n"
-  FileWrite $0 "} $\r$\n"
-  FileWrite $0 "if ($$stillLocked.Count -gt 0) {$\r$\n"
-  FileWrite $0 "  [Console]::Error.WriteLine((($$stillLocked | Select-Object -First 8) -join [Environment]::NewLine))$\r$\n"
-  FileWrite $0 "  exit 1$\r$\n"
-  FileWrite $0 "} $\r$\n"
-  FileWrite $0 "$$failed = @()$\r$\n"
-  FileWrite $0 "foreach ($$target in $$targets) {$\r$\n"
-  FileWrite $0 "  $$removed = $$false$\r$\n"
-  FileWrite $0 "  for ($$i = 0; $$i -lt 5 -and -not $$removed; $$i++) {$\r$\n"
+  FileWrite $0 "$$timeoutSeconds = 8$\r$\n"
+  FileWrite $0 "$$cleanupJob = Start-Job -ScriptBlock {$\r$\n"
+  FileWrite $0 "  param([string]$$InstallDir, [string]$$MainBinaryName)$\r$\n"
+  FileWrite $0 "  $$ErrorActionPreference = 'Stop'$\r$\n"
+  FileWrite $0 "  $$targets = @($\r$\n"
+  FileWrite $0 "    (Join-Path $$InstallDir 'gateway-bundle'),$\r$\n"
+  FileWrite $0 "    (Join-Path $$InstallDir 'node-runtime')$\r$\n"
+  FileWrite $0 "  ) | Where-Object { Test-Path -LiteralPath $$_ }$\r$\n"
+  FileWrite $0 "  $$needle = ([System.IO.Path]::GetFullPath($$InstallDir)).TrimEnd('\').ToLowerInvariant()$\r$\n"
+  FileWrite $0 "  $$currentPid = $$PID$\r$\n"
+  FileWrite $0 "  $$processes = @()$\r$\n"
+  FileWrite $0 "  function Test-InstallDirPath([string]$$pathValue) {$\r$\n"
+  FileWrite $0 "    if ([string]::IsNullOrWhiteSpace($$pathValue)) { return $$false }$\r$\n"
+  FileWrite $0 "    $$candidate = $$pathValue.Trim()$\r$\n"
+  FileWrite $0 "    if ([string]::IsNullOrWhiteSpace($$candidate)) { return $$false }$\r$\n"
   FileWrite $0 "    try {$\r$\n"
-  FileWrite $0 "      Get-ChildItem -LiteralPath $$target -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {$\r$\n"
-  FileWrite $0 "        try { $$_.Attributes = 'Normal' } catch {}$\r$\n"
-  FileWrite $0 "      }$\r$\n"
-  FileWrite $0 "      Remove-Item -LiteralPath $$target -Recurse -Force -ErrorAction Stop$\r$\n"
-  FileWrite $0 "      $$removed = $$true$\r$\n"
+  FileWrite $0 "      $$normalized = ([System.IO.Path]::GetFullPath($$candidate)).TrimEnd('\').ToLowerInvariant()$\r$\n"
   FileWrite $0 "    } catch {$\r$\n"
-  FileWrite $0 "      Start-Sleep -Milliseconds (500 * ($$i + 1))$\r$\n"
+  FileWrite $0 "      return $$false$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "    return $$normalized -eq $$needle -or $$normalized.StartsWith($$needle + '\')$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  function Test-FileUnlocked([string]$$pathValue) {$\r$\n"
+  FileWrite $0 "    if ([string]::IsNullOrWhiteSpace($$pathValue) -or -not (Test-Path -LiteralPath $$pathValue)) { return $$true }$\r$\n"
+  FileWrite $0 "    $$stream = $$null$\r$\n"
+  FileWrite $0 "    try {$\r$\n"
+  FileWrite $0 "      $$stream = [System.IO.File]::Open($$pathValue, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)$\r$\n"
+  FileWrite $0 "      return $$true$\r$\n"
+  FileWrite $0 "    } catch [System.IO.IOException] {$\r$\n"
+  FileWrite $0 "      return $$false$\r$\n"
+  FileWrite $0 "    } catch [System.UnauthorizedAccessException] {$\r$\n"
+  FileWrite $0 "      return $$false$\r$\n"
+  FileWrite $0 "    } catch {$\r$\n"
+  FileWrite $0 "      return $$false$\r$\n"
+  FileWrite $0 "    } finally {$\r$\n"
+  FileWrite $0 "      if ($$stream) { $$stream.Dispose() }$\r$\n"
   FileWrite $0 "    }$\r$\n"
   FileWrite $0 "  }$\r$\n"
-  FileWrite $0 "  if ((Test-Path -LiteralPath $$target) -and -not $$removed) {$\r$\n"
-  FileWrite $0 "    $$failed += $$target$\r$\n"
+  FileWrite $0 "  function Get-LockedChildPaths([string]$$root, [int]$$limit = 12) {$\r$\n"
+  FileWrite $0 "    $$locked = New-Object 'System.Collections.Generic.List[string]'$\r$\n"
+  FileWrite $0 "    foreach ($$file in @(Get-ChildItem -LiteralPath $$root -Recurse -File -Force -ErrorAction SilentlyContinue)) {$\r$\n"
+  FileWrite $0 "      if (-not (Test-FileUnlocked $$file.FullName)) {$\r$\n"
+  FileWrite $0 "        [void]$$locked.Add($$file.FullName)$\r$\n"
+  FileWrite $0 "        if ($$locked.Count -ge $$limit) { break }$\r$\n"
+  FileWrite $0 "      }$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "    return @($$locked)$\r$\n"
   FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  try {$\r$\n"
+  FileWrite $0 "    $$processes = @(Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId, Name, ExecutablePath, CommandLine)$\r$\n"
+  FileWrite $0 "  } catch {$\r$\n"
+  FileWrite $0 "    try {$\r$\n"
+  FileWrite $0 "      $$processes = @(Get-WmiObject Win32_Process -ErrorAction Stop | Select-Object ProcessId, Name, ExecutablePath, CommandLine)$\r$\n"
+  FileWrite $0 "    } catch {$\r$\n"
+  FileWrite $0 "      $$processes = @()$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  $$killIds = New-Object 'System.Collections.Generic.HashSet[int]'$\r$\n"
+  FileWrite $0 "  foreach ($$proc in $$processes) {$\r$\n"
+  FileWrite $0 "    if ([int]$$proc.ProcessId -eq [int]$$currentPid) { continue }$\r$\n"
+  FileWrite $0 "    $$exe = if ($$proc.ExecutablePath) { $$proc.ExecutablePath } else { '' }$\r$\n"
+  FileWrite $0 "    if (Test-InstallDirPath $$exe) {$\r$\n"
+  FileWrite $0 "      [void]$$killIds.Add([int]$$proc.ProcessId)$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  if ($$killIds.Count -gt 0) {$\r$\n"
+  FileWrite $0 "    Stop-Process -Id (@($$killIds)) -Force -ErrorAction SilentlyContinue$\r$\n"
+  FileWrite $0 "    Start-Sleep -Milliseconds 350$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  $$unlockTargets = New-Object 'System.Collections.Generic.List[string]'$\r$\n"
+  FileWrite $0 "  foreach ($$candidate in @($\r$\n"
+  FileWrite $0 "    (Join-Path $$InstallDir $$MainBinaryName),$\r$\n"
+  FileWrite $0 "    (Join-Path $$InstallDir 'uninstall.exe'),$\r$\n"
+  FileWrite $0 "    (Join-Path $$InstallDir 'node-runtime\node.exe')$\r$\n"
+  FileWrite $0 "  )) {$\r$\n"
+  FileWrite $0 "    if (Test-Path -LiteralPath $$candidate) { [void]$$unlockTargets.Add($$candidate) }$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  $$rootBinaries = @(Get-ChildItem -LiteralPath $$InstallDir -File -Force -ErrorAction SilentlyContinue | Where-Object { $$_.Extension -in '.exe', '.dll' } | Select-Object -ExpandProperty FullName)$\r$\n"
+  FileWrite $0 "  foreach ($$candidate in $$rootBinaries) {$\r$\n"
+  FileWrite $0 "    if (-not [string]::IsNullOrWhiteSpace($$candidate)) { [void]$$unlockTargets.Add($$candidate) }$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  $$stillLocked = @()$\r$\n"
+  FileWrite $0 "  for ($$attempt = 0; $$attempt -lt 4; $$attempt++) {$\r$\n"
+  FileWrite $0 "    $$stillLocked = @()$\r$\n"
+  FileWrite $0 "    foreach ($$pathValue in @($$unlockTargets | Select-Object -Unique)) {$\r$\n"
+  FileWrite $0 "      if (-not (Test-FileUnlocked $$pathValue)) { $$stillLocked += $$pathValue }$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "    if ($$stillLocked.Count -eq 0) { break }$\r$\n"
+  FileWrite $0 "    Start-Sleep -Milliseconds 200$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  if ($$stillLocked.Count -gt 0) {$\r$\n"
+  FileWrite $0 "    throw ((@($$stillLocked) | Select-Object -First 12) -join [Environment]::NewLine)$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  $$failed = New-Object 'System.Collections.Generic.List[string]'$\r$\n"
+  FileWrite $0 "  foreach ($$target in $$targets) {$\r$\n"
+  FileWrite $0 "    $$removed = $$false$\r$\n"
+  FileWrite $0 "    for ($$i = 0; $$i -lt 4 -and -not $$removed; $$i++) {$\r$\n"
+  FileWrite $0 "      try {$\r$\n"
+  FileWrite $0 "        Get-ChildItem -LiteralPath $$target -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {$\r$\n"
+  FileWrite $0 "          try { $$_.Attributes = 'Normal' } catch {}$\r$\n"
+  FileWrite $0 "        }$\r$\n"
+  FileWrite $0 "        Remove-Item -LiteralPath $$target -Recurse -Force -ErrorAction Stop$\r$\n"
+  FileWrite $0 "        $$removed = $$true$\r$\n"
+  FileWrite $0 "      } catch {$\r$\n"
+  FileWrite $0 "        $$lockedChildren = @(Get-LockedChildPaths $$target 12)$\r$\n"
+  FileWrite $0 "        if ($$lockedChildren.Count -gt 0) {$\r$\n"
+  FileWrite $0 "          Start-Sleep -Milliseconds (200 * ($$i + 1))$\r$\n"
+  FileWrite $0 "        } else {$\r$\n"
+  FileWrite $0 "          Start-Sleep -Milliseconds (125 * ($$i + 1))$\r$\n"
+  FileWrite $0 "        }$\r$\n"
+  FileWrite $0 "      }$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "    if ((Test-Path -LiteralPath $$target) -and -not $$removed) {$\r$\n"
+  FileWrite $0 "      $$lockedChildren = @(Get-LockedChildPaths $$target 12)$\r$\n"
+  FileWrite $0 "      if ($$lockedChildren.Count -gt 0) {$\r$\n"
+  FileWrite $0 "        foreach ($$lockedChild in $$lockedChildren) { [void]$$failed.Add($$lockedChild) }$\r$\n"
+  FileWrite $0 "      } else {$\r$\n"
+  FileWrite $0 "        [void]$$failed.Add($$target)$\r$\n"
+  FileWrite $0 "      }$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  if ($$failed.Count -gt 0) {$\r$\n"
+  FileWrite $0 "    throw ((@($$failed) | Select-Object -First 12) -join [Environment]::NewLine)$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "} -ArgumentList $$InstallDir, '${MAINBINARYNAME}.exe'$\r$\n"
+  FileWrite $0 "if (-not (Wait-Job -Job $$cleanupJob -Timeout $$timeoutSeconds)) {$\r$\n"
+  FileWrite $0 "  try { Stop-Job -Job $$cleanupJob -ErrorAction SilentlyContinue } catch {}$\r$\n"
+  FileWrite $0 "  try { Remove-Job -Job $$cleanupJob -Force -ErrorAction SilentlyContinue } catch {}$\r$\n"
+  FileWrite $0 "  [Console]::Error.WriteLine('cleanup timed out')$\r$\n"
+  FileWrite $0 "  exit 124$\r$\n"
   FileWrite $0 "} $\r$\n"
-  FileWrite $0 "if ($$failed.Count -gt 0) {$\r$\n"
-  FileWrite $0 "  [Console]::Error.WriteLine(($$failed -join [Environment]::NewLine))$\r$\n"
+  FileWrite $0 "$$cleanupErrors = @()$\r$\n"
+  FileWrite $0 "Receive-Job -Job $$cleanupJob -ErrorVariable cleanupErrors -ErrorAction SilentlyContinue | Out-Null$\r$\n"
+  FileWrite $0 "$$cleanupFailed = ($$cleanupJob.State -ne 'Completed') -or ($$cleanupErrors.Count -gt 0)$\r$\n"
+  FileWrite $0 "if ($$cleanupFailed) {$\r$\n"
+  FileWrite $0 "  if ($$cleanupErrors.Count -gt 0) {$\r$\n"
+  FileWrite $0 "    foreach ($$cleanupError in $$cleanupErrors) {$\r$\n"
+  FileWrite $0 "      if ($$cleanupError.Exception -and -not [string]::IsNullOrWhiteSpace($$cleanupError.Exception.Message)) {$\r$\n"
+  FileWrite $0 "        [Console]::Error.WriteLine($$cleanupError.Exception.Message)$\r$\n"
+  FileWrite $0 "      } else {$\r$\n"
+  FileWrite $0 "        [Console]::Error.WriteLine($$cleanupError.ToString())$\r$\n"
+  FileWrite $0 "      }$\r$\n"
+  FileWrite $0 "    }$\r$\n"
+  FileWrite $0 "  } elseif ($$cleanupJob.ChildJobs.Count -gt 0 -and $$cleanupJob.ChildJobs[0].JobStateInfo.Reason) {$\r$\n"
+  FileWrite $0 "    [Console]::Error.WriteLine($$cleanupJob.ChildJobs[0].JobStateInfo.Reason.ToString())$\r$\n"
+  FileWrite $0 "  } else {$\r$\n"
+  FileWrite $0 "    [Console]::Error.WriteLine('cleanup failed')$\r$\n"
+  FileWrite $0 "  }$\r$\n"
+  FileWrite $0 "  try { Remove-Job -Job $$cleanupJob -Force -ErrorAction SilentlyContinue } catch {}$\r$\n"
   FileWrite $0 "  exit 1$\r$\n"
   FileWrite $0 "} $\r$\n"
+  FileWrite $0 "try { Remove-Job -Job $$cleanupJob -Force -ErrorAction SilentlyContinue } catch {}$\r$\n"
   FileWrite $0 "exit 0$\r$\n"
   FileClose $0
 
@@ -431,6 +502,9 @@ Function CleanupCurrentInstallRuntime
     Push "安装前清理旧版本运行时目录失败。请完全退出 OpenClaw 和相关 node 进程后重试。"
     Call AbortRuntimeCleanupFailure
   ${ElseIf} $1 == "timeout"
+    Push "安装前清理旧版本运行时目录超时。请完全退出 OpenClaw 后重试。"
+    Call AbortRuntimeCleanupFailure
+  ${ElseIf} $1 == 124
     Push "安装前清理旧版本运行时目录超时。请完全退出 OpenClaw 后重试。"
     Call AbortRuntimeCleanupFailure
   ${ElseIf} $1 != 0
@@ -452,7 +526,7 @@ FunctionEnd
   Delete "$TEMP\kill_gateway.bat"
   ; Windows often returns from taskkill before the file handles are fully released.
   ; Give the previous process tree a short grace window before overwrite starts.
-  Sleep 1200
+  Sleep 300
 !macroend
 
 !macro CleanupOldVersion
@@ -497,7 +571,8 @@ FunctionEnd
 
       ; 调用卸载程序并等待完成（不使用 _?= 参数，让卸载程序正常删除目录）
       ExecWait '"$2" /S' $0
-      Sleep 2000  ; 额外等待，确保文件系统更新完成
+      StrCpy $WaitPathTarget "$LegacyInstallDir"
+      Call WaitForPathToDisappear
 
       DetailPrint "Uninstaller exit code: $0"
 
@@ -562,7 +637,8 @@ FunctionEnd
     ; 2.7 删除安装目录
     DetailPrint "Removing installation directory..."
     RMDir /r "$LegacyInstallDir"
-    Sleep 500
+    StrCpy $WaitPathTarget "$LegacyInstallDir"
+    Call WaitForPathToDisappear
 
     ; 2.8 检查清理结果
     ${If} ${FileExists} "$LegacyInstallDir"

@@ -125,4 +125,19 @@ struct AppStateRemoteConfigTests {
             remoteTokenDirty: true)
         #expect((cleared["token"] as? String) == nil)
     }
+
+    @Test
+    func updatedRemoteGatewayConfigUsesCurrentGatewayPortForSshFallback() {
+        let remote = AppState._testUpdatedRemoteGatewayConfig(
+            current: [:],
+            transport: .ssh,
+            remoteUrl: "",
+            remoteHost: "gateway.example",
+            remoteTarget: "alice@gateway.example",
+            remoteIdentity: "",
+            remoteToken: "",
+            remoteTokenDirty: false)
+
+        #expect(remote["url"] as? String == "ws://gateway.example:28789")
+    }
 }

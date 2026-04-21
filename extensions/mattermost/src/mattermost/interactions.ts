@@ -12,6 +12,7 @@ import { isTrustedProxyAddress, resolveClientIp, type OpenClawConfig } from "./r
 const INTERACTION_MAX_BODY_BYTES = 64 * 1024;
 const INTERACTION_BODY_TIMEOUT_MS = 10_000;
 const SIGNED_CHANNEL_ID_CONTEXT_KEY = "__openclaw_channel_id";
+const DEFAULT_GATEWAY_PORT = 28789;
 
 /**
  * Mattermost interactive message callback payload.
@@ -132,13 +133,13 @@ export function computeInteractionCallbackUrl(
   if (callbackBaseUrl) {
     return `${normalizeCallbackBaseUrl(callbackBaseUrl)}${path}`;
   }
-  const port = typeof cfg?.gateway?.port === "number" ? cfg.gateway.port : 18789;
+  const port = typeof cfg?.gateway?.port === "number" ? cfg.gateway.port : DEFAULT_GATEWAY_PORT;
   let host =
     cfg?.gateway?.customBindHost && !isWildcardBindHost(cfg.gateway.customBindHost)
       ? cfg.gateway.customBindHost.trim()
       : "localhost";
 
-  // Bracket IPv6 literals so the URL is valid: http://[::1]:18789/...
+  // Bracket IPv6 literals so the URL is valid: http://[::1]:28789/...
   if (host.includes(":") && !(host.startsWith("[") && host.endsWith("]"))) {
     host = `[${host}]`;
   }

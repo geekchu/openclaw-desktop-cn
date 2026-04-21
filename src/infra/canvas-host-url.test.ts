@@ -35,7 +35,7 @@ describe("resolveCanvasHostUrl", () => {
     {
       name: "maps proxied default gateway ports to request-host ports",
       params: {
-        canvasPort: 18789,
+        canvasPort: 28789,
         requestHost: "gateway.example.com:9443",
         forwardedProto: "https",
       },
@@ -44,7 +44,7 @@ describe("resolveCanvasHostUrl", () => {
     {
       name: "maps proxied default gateway ports to scheme defaults",
       params: {
-        canvasPort: 18789,
+        canvasPort: 28789,
         requestHost: "gateway.example.com",
         forwardedProto: ["https", "http"],
       },
@@ -53,7 +53,7 @@ describe("resolveCanvasHostUrl", () => {
     {
       name: "uses http scheme defaults without forwarded proto",
       params: {
-        canvasPort: 18789,
+        canvasPort: 28789,
         requestHost: "gateway.example.com",
       },
       expected: "http://gateway.example.com:80",

@@ -143,6 +143,7 @@ export type ControlUiRootResolveOptions = {
   moduleUrl?: string;
   cwd?: string;
   execPath?: string;
+  bundleDir?: string;
 };
 
 function pathsMatchByRealpathOrResolve(left: string, right: string): boolean {
@@ -168,6 +169,25 @@ function addCandidate(candidates: Set<string>, value: string | null) {
   candidates.add(path.resolve(value));
 }
 
+function normalizeBundleDir(bundleDir: string | undefined): string | null {
+  if (typeof bundleDir !== "string") {
+    return null;
+  }
+  const trimmed = bundleDir.trim();
+  return trimmed ? path.resolve(trimmed) : null;
+}
+
+function getBundledControlUiRootCandidates(bundleDir: string | undefined): string[] {
+  const resolvedBundleDir = normalizeBundleDir(bundleDir);
+  if (!resolvedBundleDir) {
+    return [];
+  }
+  return [
+    path.join(resolvedBundleDir, "dist", "control-ui"),
+    path.join(resolvedBundleDir, "control-ui"),
+  ];
+}
+
 export function resolveControlUiRootOverrideSync(rootOverride: string): string | null {
   const resolved = path.resolve(rootOverride);
   try {
@@ -189,6 +209,7 @@ export function resolveControlUiRootSync(opts: ControlUiRootResolveOptions = {})
   const candidates = new Set<string>();
   const argv1 = opts.argv1 ?? process.argv[1];
   const cwd = opts.cwd ?? process.cwd();
+  const bundleDir = opts.bundleDir ?? process.env.OPENCLAW_GATEWAY_BUNDLE_DIR;
   const moduleDir = opts.moduleUrl ? path.dirname(fileURLToPath(opts.moduleUrl)) : null;
   const argv1Dir = argv1 ? path.dirname(path.resolve(argv1)) : null;
   const argv1RealpathDir = (() => {
@@ -215,6 +236,9 @@ export function resolveControlUiRootSync(opts: ControlUiRootResolveOptions = {})
     cwd,
   });
 
+  for (const bundledRoot of getBundledControlUiRootCandidates(bundleDir)) {
+    addCandidate(candidates, bundledRoot);
+  }
   // Packaged app: prefer bundled resources, then support legacy alongside-executable layout.
   addCandidate(candidates, execDir ? path.join(execDir, "../Resources/control-ui") : null);
   addCandidate(candidates, execDir ? path.join(execDir, "control-ui") : null);
@@ -254,6 +278,12 @@ export function isPackageProvenControlUiRootSync(
   root: string,
   opts: ControlUiRootResolveOptions = {},
 ): boolean {
+  const bundleDir = opts.bundleDir ?? process.env.OPENCLAW_GATEWAY_BUNDLE_DIR;
+  for (const bundledRoot of getBundledControlUiRootCandidates(bundleDir)) {
+    if (pathsMatchByRealpathOrResolve(root, bundledRoot)) {
+      return true;
+    }
+  }
   const argv1 = opts.argv1 ?? process.argv[1];
   const cwd = opts.cwd ?? process.cwd();
   const packageRoot = resolveOpenClawPackageRootSync({

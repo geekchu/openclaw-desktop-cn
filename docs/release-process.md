@@ -144,7 +144,7 @@ summary: "OpenClaw 桌面版的构建、签名、公证、发布和回归检查�
 - `/var/www/openclaw-update/` 目录已创建
 - `/var/www/openclaw-update/artifacts/` 目录已创建
 - Nginx `/update/` location 已添加到 `openclawcn.net` 站点配置
-- `latest.json`、`latest-macos.json`、`latest-windows.json` 占位文件已就位
+- `latest.json`、`latest-macos.json`、`latest-windows.json`、`latest-linux.json` 占位文件已就位
 
 如需在新服务器上重新部署：
 
@@ -270,9 +270,9 @@ git push && git push --tags
 
 1. 在 PowerShell/Terminal 中执行 `.\build.ps1`。
 
-> 💡 **提示**：`build.ps1` 会自动设置 `BUILD_CONFIG=release` 环境变量，并从 `~/.tauri/openclaw.key` 读取私钥设置环境变量，同时自带 `cargo clean` 机制以确保产物完全无幽灵缓存。
+> 💡 **提示**：`build.ps1` 会通过 PowerShell 的 `ReadAllText()` 从 `~/.tauri/openclaw.key` 读取完整的多行私钥并设置 `TAURI_SIGNING_PRIVATE_KEY` 环境变量，同时自带 `cargo clean` 机制以确保产物完全无幽灵缓存。构建脚本 `build-installer.js` 默认以 release 模式运行（仅传 `--debug` 才切换到 debug 模式）。
 >
-> 说明：请统一使用 `build.ps1`；它会通过 PowerShell 的 `ReadAllText()` 读取完整的多行私钥，避免批处理脚本读取首行导致签名失败。
+> 说明：请统一使用 `build.ps1`；它能正确处理多行私钥，避免批处理脚本只读取首行导致签名失败。
 
 #### macOS（在 Mac 机器上执行）
 
@@ -320,7 +320,6 @@ pnpm installer:build:mac-intel
 | macOS (ARM)   | `src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/`   | `*_aarch64.dmg`                   |
 | macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/macos/`  | `*.app` + `*.app.tar.gz` + `.sig` |
 | macOS (Intel) | `src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/`    | `*_x64.dmg`                       |
-| Linux         | `src-tauri/target/release/bundle/appimage/`                   | `*.AppImage` + `.sig`             |
 
 所有产物会被自动复制到 `dist/installers/` 目录。
 其中 macOS 的 updater 产物在复制时会追加架构后缀（如 `OpenClaw桌面版_aarch64.app.tar.gz`），避免 ARM / Intel 两次构建互相覆盖。
@@ -621,7 +620,7 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 ### 步骤 8：端到端测试
 
 1. 安装**旧版 Windows 版本**（当前已发布的版本）
-2. 启动应用，等待 15 秒后应出现更新横幅；或进入「系统设置 → 软件更新」手动检查
+2. 启动应用，进入「系统设置 → 软件更新」手动检查更新
 3. 点击"立即更新"，确认下载进度条正常
 4. 下载完成后点击"立即重启"，确认会弹出可见的 Windows 安装器界面
 5. 完成安装后确认应用版本号正确
@@ -629,6 +628,8 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_x64
 ---
 
 ## Linux 发版流程
+
+> ⚠️ **注意**：Linux 版本目前尚未正式发布。以下流程仅供参考，待 Linux 版本正式上线后启用。
 
 Linux 版本以 AppImage 格式发布，流程与 Windows / macOS 平行，无需 root 权限或包管理器。
 
@@ -852,9 +853,9 @@ curl -I "https://cdn.openclawcn.net/update/artifacts/OpenClaw桌面版_0.3.0_amd
 
 ### Windows 安装器可见性
 
-- 当前 Windows 自动更新使用 `src-tauri/tauri.conf.json` 中的 `plugins.updater.windows.installMode = "basicUi"`
-- 这意味着用户每次点击"立即重启"后，都应该看到可见的 NSIS 安装器界面
-- 如果改成 `passive` 或 `quiet`，安装过程可能不会显示给用户
+- 当前 Windows 更新使用 `src-tauri/tauri.conf.json` 中的 `plugins.updater.windows.installMode = "passive"`
+- 这意味着用户每次点击"立即重启"后，都应该看到可见的 NSIS 安装器界面（带进度条，无需用户交互）
+- 如果改成 `quiet`，安装过程将完全不显示给用户
 
 ### 更新安全机制
 
@@ -1172,7 +1173,7 @@ export NOTARYTOOL_PROFILE="openclaw-notary"
 - 更新横幅不出现：
   用户之前点了关闭；去「系统设置 → 软件更新」手动检查
 - Windows 下载完成后没看到安装器：
-  先检查 `src-tauri/tauri.conf.json` 中 `plugins.updater.windows.installMode` 是否仍为 `basicUi`
+  先检查 `src-tauri/tauri.conf.json` 中 `plugins.updater.windows.installMode` 是否仍为 `passive`
 - Windows 安装完成后版本号仍没变：
   先检查 `src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`src-tauri/tauri.windows.conf.json` 是否同时更新到目标版本，并验证生成的 `openclaw-desktop.exe` `FileVersion` / `ProductVersion`
 
@@ -1180,7 +1181,7 @@ export NOTARYTOOL_PROFILE="openclaw-notary"
 
 | 问题                                        | 原因                                                             | 解决                                                                                                                                       |
 | ------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 白屏 + "Gateway 启动超时"                   | Gateway 进程崩渍或启动过慢（>60秒），多种可能原因                | 桌面端已宽限到 60 秒启动，若仍复现请运行 gateway 看报错                                                                                    |
+| 白屏 + "Gateway 启动超时"                   | Gateway 进程崩溃或启动过慢，多种可能原因                         | 桌面端使用无硬超时等待机制（失败后自动重试一次），若仍复现请手动运行 gateway 查看报错                                                      |
 | `EISDIR: lstat 'C:'`                        | Tauri `resource_dir()` 返回 `\\?\` 前缀路径，Node.js 无法解析    | `main.rs` 已修复：strip `\\?\` 前缀                                                                                                        |
 | `Cannot find module 'xxx'` (extension 依赖) | extension 的 npm 依赖未安装到 `gateway-bundle/node_modules/`     | `prepare-gateway-bundle.js` 已修复：合并到根 package.json                                                                                  |
 | `Cannot find module '../doc/xxx'`           | Step 7 清理误删了 npm 包内的 `doc/` 目录                         | 已修复：`doc` 从 `dirsToRemove` 中移除                                                                                                     |

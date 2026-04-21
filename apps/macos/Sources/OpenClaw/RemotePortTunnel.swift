@@ -57,7 +57,7 @@ final class RemotePortTunnel {
             allowRandom: allowRandomLocalPort)
         let sshHost = parsed.host.trimmingCharacters(in: .whitespacesAndNewlines)
         let remotePortOverride =
-            allowRemoteUrlOverride && remotePort == GatewayEnvironment.gatewayPort()
+            allowRemoteUrlOverride && remotePort == GatewayEnvironment.configuredGatewayPort()
             ? Self.resolveRemotePortOverride(for: sshHost)
             : nil
         let resolvedRemotePort = remotePortOverride ?? remotePort

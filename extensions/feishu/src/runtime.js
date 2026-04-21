@@ -1,3 +1,12 @@
 import { createPluginRuntimeStore } from "openclaw/plugin-sdk/runtime-store";
-const { setRuntime: setFeishuRuntime, getRuntime: getFeishuRuntime } = createPluginRuntimeStore("Feishu runtime not initialized");
-export { getFeishuRuntime, setFeishuRuntime };
+const runtimeStore = createPluginRuntimeStore("Feishu runtime not initialized");
+export const setFeishuRuntime = runtimeStore.setRuntime;
+export function clearFeishuRuntime() {
+  runtimeStore.clearRuntime();
+}
+export function tryGetFeishuRuntime() {
+  return runtimeStore.tryGetRuntime();
+}
+export function getFeishuRuntime() {
+  return runtimeStore.getRuntime();
+}

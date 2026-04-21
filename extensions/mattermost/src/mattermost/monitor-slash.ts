@@ -22,6 +22,8 @@ import {
 } from "./slash-commands.js";
 import { activateSlashCommands } from "./slash-state.js";
 
+const DEFAULT_GATEWAY_PORT = 28789;
+
 function isLoopbackHost(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
@@ -153,7 +155,7 @@ export async function registerMattermostMonitorSlashCommands(params: {
   try {
     const teams = await fetchMattermostUserTeams(params.client, params.botUserId);
     const envPort = parseStrictPositiveInteger(process.env.OPENCLAW_GATEWAY_PORT?.trim());
-    const slashGatewayPort = envPort ?? params.cfg.gateway?.port ?? 18789;
+    const slashGatewayPort = envPort ?? params.cfg.gateway?.port ?? DEFAULT_GATEWAY_PORT;
     const slashCallbackUrl = resolveCallbackUrl({
       config: slashConfig,
       gatewayPort: slashGatewayPort,

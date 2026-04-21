@@ -139,6 +139,8 @@ export const CONTROL_UI_OPERATOR_SCOPES = [
   "operator.pairing",
 ] as const;
 
+const INITIAL_RECONNECT_BACKOFF_MS = 800;
+
 export type GatewayConnectAuth = {
   token?: string;
   deviceToken?: string;
@@ -281,7 +283,9 @@ export class GatewayBrowserClient {
   private connectNonce: string | null = null;
   private connectSent = false;
   private connectTimer: number | null = null;
-  private backoffMs = 800;
+  private socketConnectTimer: number | null = null;
+  private backoffMs = INITIAL_RECONNECT_BACKOFF_MS;
+  private hasConnectedOnce = false;
   private pendingConnectError: GatewayErrorInfo | undefined;
   private pendingDeviceTokenRetry = false;
   private deviceTokenRetryBudgetUsed = false;
@@ -290,11 +294,17 @@ export class GatewayBrowserClient {
 
   start() {
     this.closed = false;
-    this.connect();
+    // Mirror the CLI probe's startup yield so the browser control UI does not
+    // begin its first WebSocket handshake in the same busy task as page boot.
+    this.scheduleSocketConnect(0);
   }
 
   stop() {
     this.closed = true;
+    if (this.socketConnectTimer !== null) {
+      window.clearTimeout(this.socketConnectTimer);
+      this.socketConnectTimer = null;
+    }
     if (this.connectTimer !== null) {
       window.clearTimeout(this.connectTimer);
       this.connectTimer = null;
@@ -304,6 +314,7 @@ export class GatewayBrowserClient {
     this.pendingConnectError = undefined;
     this.pendingDeviceTokenRetry = false;
     this.deviceTokenRetryBudgetUsed = false;
+    this.hasConnectedOnce = false;
     this.flushPending(new Error("gateway client stopped"));
   }
 
@@ -315,6 +326,7 @@ export class GatewayBrowserClient {
     if (this.closed) {
       return;
     }
+    this.socketConnectTimer = null;
     this.ws = new WebSocket(this.opts.url);
     this.ws.addEventListener("open", () => this.queueConnect());
     this.ws.addEventListener("message", (ev) => this.handleMessage(String(ev.data ?? "")));
@@ -346,9 +358,27 @@ export class GatewayBrowserClient {
     if (this.closed) {
       return;
     }
-    const delay = this.backoffMs;
-    this.backoffMs = Math.min(this.backoffMs * 1.7, 15_000);
-    window.setTimeout(() => this.connect(), delay);
+    // Startup races can briefly reject the first few sockets while the gateway
+    // is still finishing boot. Keep reconnects fast until we've completed one
+    // successful hello, then fall back to exponential backoff for real outages.
+    const delay = this.hasConnectedOnce ? this.backoffMs : INITIAL_RECONNECT_BACKOFF_MS;
+    this.backoffMs = this.hasConnectedOnce
+      ? Math.min(this.backoffMs * 1.7, 15_000)
+      : INITIAL_RECONNECT_BACKOFF_MS;
+    this.scheduleSocketConnect(delay);
+  }
+
+  private scheduleSocketConnect(delayMs: number) {
+    if (this.closed) {
+      return;
+    }
+    if (this.socketConnectTimer !== null) {
+      window.clearTimeout(this.socketConnectTimer);
+    }
+    this.socketConnectTimer = window.setTimeout(() => {
+      this.socketConnectTimer = null;
+      this.connect();
+    }, delayMs);
   }
 
   private flushPending(err: Error) {
@@ -434,6 +464,7 @@ export class GatewayBrowserClient {
   private handleConnectHello(hello: GatewayHelloOk, plan: ConnectPlan) {
     this.pendingDeviceTokenRetry = false;
     this.deviceTokenRetryBudgetUsed = false;
+    this.hasConnectedOnce = true;
     if (hello?.auth?.deviceToken && plan.deviceIdentity) {
       storeDeviceAuthToken({
         deviceId: plan.deviceIdentity.deviceId,
@@ -442,7 +473,7 @@ export class GatewayBrowserClient {
         scopes: hello.auth.scopes ?? [],
       });
     }
-    this.backoffMs = 800;
+    this.backoffMs = INITIAL_RECONNECT_BACKOFF_MS;
     this.opts.onHello?.(hello);
   }
 

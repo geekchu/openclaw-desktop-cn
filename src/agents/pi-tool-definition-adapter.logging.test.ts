@@ -64,7 +64,7 @@ describe("pi tool definition adapter logging", () => {
 
     expect(logError).toHaveBeenCalledWith(
       expect.stringContaining(
-        '[tools] edit failed: Missing required parameter: edits (received: path). Supply correct parameters before retrying. raw_params={"path":"notes.txt"}',
+        "[tools] edit failed: Missing required parameter: edits (received: path). Supply correct parameters before retrying.",
       ),
     );
   });
@@ -107,6 +107,59 @@ describe("pi tool definition adapter logging", () => {
     await def.execute("call-edit-batch", payload, undefined, undefined, extensionContext);
 
     expect(execute).toHaveBeenCalledWith("call-edit-batch", payload, undefined, undefined);
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it("normalizes top-level edit aliases before executing", async () => {
+    const execute = vi.fn(async (_toolCallId: string, params: unknown) => ({
+      content: [{ type: "text" as const, text: JSON.stringify(params) }],
+      details: { ok: true },
+    }));
+    const baseTool = {
+      name: "edit",
+      label: "Edit",
+      description: "edits files",
+      parameters: Type.Object({
+        path: Type.String(),
+        edits: Type.Array(
+          Type.Object({
+            oldText: Type.String(),
+            newText: Type.String(),
+          }),
+        ),
+      }),
+      execute,
+    } satisfies AgentTool;
+
+    const tool = wrapToolParamValidation(baseTool, REQUIRED_PARAM_GROUPS.edit);
+    const [def] = toToolDefinitions([tool]);
+    if (!def) {
+      throw new Error("missing tool definition");
+    }
+
+    await def.execute(
+      "call-edit-alias",
+      {
+        file_path: "notes.txt",
+        old_text: "alpha",
+        newString: "beta",
+      },
+      undefined,
+      undefined,
+      extensionContext,
+    );
+
+    expect(execute).toHaveBeenCalledWith(
+      "call-edit-alias",
+      {
+        path: "notes.txt",
+        oldText: "alpha",
+        newText: "beta",
+        edits: [{ oldText: "alpha", newText: "beta" }],
+      },
+      undefined,
+      undefined,
+    );
     expect(logError).not.toHaveBeenCalled();
   });
 });

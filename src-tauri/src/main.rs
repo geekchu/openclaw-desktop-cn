@@ -10,6 +10,7 @@ mod models;
 mod utils;
 
 use commands::{config, desktop_updater, diagnostics, installer, process, service, terminal};
+use gateway::GatewayWaitOutcome;
 use std::path::PathBuf;
 use tauri::menu::{MenuBuilder, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -25,18 +26,43 @@ pub struct TrayState {
 }
 
 /// 解析 gateway bundle 目录
-/// - 开发模式：使用项目根目录（CARGO_MANIFEST_DIR 的父目录）
+/// - 开发模式：优先使用 Tauri debug 输出旁的 gateway-bundle/，回退到项目根目录
 /// - 生产模式：使用 Tauri resource_dir 下的 gateway-bundle/
 #[allow(unused_variables)]
 fn resolve_gateway_bundle_dir(app: &tauri::App) -> PathBuf {
-    // 开发模式：使用项目根目录（CARGO_MANIFEST_DIR 的父目录）
-    // 项目根目录包含完整的 node_modules、extensions 依赖和 docs/ 模板
+    // 开发模式：Tauri 调试版优先使用 target/debug/gateway-bundle，
+    // 这样桌面端和实际运行的 bundle 内容保持一致。
     #[cfg(debug_assertions)]
     {
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let project_root = PathBuf::from(manifest_dir).parent().unwrap().to_path_buf();
-        log::info!(
-            "[Main] 开发模式 - gateway 目录（项目根）: {}",
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                let bundle_dir = exe_dir.join("gateway-bundle");
+                if bundle_dir.exists() {
+                    log::info!(
+                        "[Main] 开发模式 - gateway bundle 目录（target/debug）: {}",
+                        bundle_dir.display()
+                    );
+                    return bundle_dir;
+                }
+            }
+        }
+
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_bundle_dir = manifest_dir
+            .join("target")
+            .join("debug")
+            .join("gateway-bundle");
+        if target_bundle_dir.exists() {
+            log::info!(
+                "[Main] 开发模式 - gateway bundle 目录（manifest fallback）: {}",
+                target_bundle_dir.display()
+            );
+            return target_bundle_dir;
+        }
+
+        let project_root = manifest_dir.parent().unwrap().to_path_buf();
+        log::warn!(
+            "[Main] 开发模式下未找到 target/debug/gateway-bundle，回退到项目根目录: {}",
             project_root.display()
         );
         project_root
@@ -91,6 +117,36 @@ pub(crate) fn read_gateway_token() -> Option<String> {
         .and_then(|v| v.as_str())
         .filter(|t| !t.is_empty())
         .map(|t| t.to_string())
+}
+
+fn encode_url_fragment_component(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        let ch = byte as char;
+        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '.' | '_' | '~') {
+            encoded.push(ch);
+        } else {
+            encoded.push_str(&format!("%{:02X}", byte));
+        }
+    }
+    encoded
+}
+
+pub(crate) fn current_session_gateway_token() -> Option<String> {
+    let token = utils::shell::session_gateway_token();
+    if token.is_empty() {
+        None
+    } else {
+        Some(token)
+    }
+}
+
+pub(crate) fn build_gateway_url(host: &str, port: u16, token: Option<&str>) -> String {
+    let base = format!("http://{}:{}/", host, port);
+    match token.filter(|value| !value.is_empty()) {
+        Some(value) => format!("{}#token={}", base, encode_url_fragment_component(value)),
+        None => base,
+    }
 }
 
 /// 显示/聚焦主窗口
@@ -203,20 +259,36 @@ fn main() {
                         let handle = app.clone();
                         std::thread::spawn(move || {
                             let gm = handle.state::<gateway::GatewayManager>();
+                            gm.cancel_pending_waits();
                             gm.set_suppress_restart(false);
+                            if let Err(e) = config::ensure_gateway_token() {
+                                let msg = format!("启动失败: gateway token 初始化失败: {}", e);
+                                let _ = handle.emit("gateway-status", msg.as_str());
+                                log::error!("[Tray] 启动前初始化 gateway token 失败: {}", e);
+                                return;
+                            }
                             if let Err(e) = config::ensure_channel_plugins_enabled() {
                                 log::warn!("[Tray] 启动前配置修复失败: {}", e);
                             }
-                            match gm.start() {
-                                Ok(port) => {
-                                    if gm.wait_for_ready(60) {
-                                        crate::gateway::navigate_webview_to_gateway(&handle, port);
-                                    } else if let Some(reason) = gm.take_last_start_failure_reason()
-                                    {
+                            match gm.start_or_recover_for_control_ui() {
+                                Ok(_) => match gm.wait_for_ready_or_recover_once() {
+                                    GatewayWaitOutcome::Ready(ready_port) => {
+                                        crate::gateway::navigate_webview_to_gateway(
+                                            &handle, ready_port,
+                                        );
+                                    }
+                                    GatewayWaitOutcome::Canceled => {
+                                        log::info!("[Tray] 启动等待已取消");
+                                    }
+                                    GatewayWaitOutcome::Failed(reason) => {
+                                        let msg = format!("启动失败: {}", reason);
+                                        let _ = handle.emit("gateway-status", msg.as_str());
                                         log::error!("[Tray] 启动 Gateway 失败: {}", reason);
                                     }
-                                }
+                                },
                                 Err(e) => {
+                                    let msg = format!("启动失败: {}", e);
+                                    let _ = handle.emit("gateway-status", msg.as_str());
                                     log::error!("[Tray] 启动 Gateway 失败: {}", e);
                                 }
                             }
@@ -234,22 +306,38 @@ fn main() {
                         let handle = app.clone();
                         std::thread::spawn(move || {
                             let gm = handle.state::<gateway::GatewayManager>();
+                            gm.cancel_pending_waits();
                             gm.set_suppress_restart(false);
                             gm.stop();
                             std::thread::sleep(std::time::Duration::from_secs(1));
+                            if let Err(e) = config::ensure_gateway_token() {
+                                let msg = format!("重启失败: gateway token 初始化失败: {}", e);
+                                let _ = handle.emit("gateway-status", msg.as_str());
+                                log::error!("[Tray] 重启前初始化 gateway token 失败: {}", e);
+                                return;
+                            }
                             if let Err(e) = config::ensure_channel_plugins_enabled() {
                                 log::warn!("[Tray] 重启前配置修复失败: {}", e);
                             }
-                            match gm.start() {
-                                Ok(port) => {
-                                    if gm.wait_for_ready(60) {
-                                        crate::gateway::navigate_webview_to_gateway(&handle, port);
-                                    } else if let Some(reason) = gm.take_last_start_failure_reason()
-                                    {
+                            match gm.start_or_recover_for_control_ui() {
+                                Ok(_) => match gm.wait_for_ready_or_recover_once() {
+                                    GatewayWaitOutcome::Ready(ready_port) => {
+                                        crate::gateway::navigate_webview_to_gateway(
+                                            &handle, ready_port,
+                                        );
+                                    }
+                                    GatewayWaitOutcome::Canceled => {
+                                        log::info!("[Tray] 重启等待已取消");
+                                    }
+                                    GatewayWaitOutcome::Failed(reason) => {
+                                        let msg = format!("重启失败: {}", reason);
+                                        let _ = handle.emit("gateway-status", msg.as_str());
                                         log::error!("[Tray] 重启 Gateway 失败: {}", reason);
                                     }
-                                }
+                                },
                                 Err(e) => {
+                                    let msg = format!("重启失败: {}", e);
+                                    let _ = handle.emit("gateway-status", msg.as_str());
                                     log::error!("[Tray] 重启 Gateway 失败: {}", e);
                                 }
                             }
@@ -306,19 +394,28 @@ fn main() {
             // Splash 启动画面已通过 tauri.conf.json 的 data URL 直接显示
             // 无需额外的 eval 注入
 
+            // 独立健康检查线程：不要依赖首次启动等待返回后才开始，
+            // 否则 stop/update/异常取消场景下容易把监控链路一并挂死。
+            let health_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                gateway::health_check_loop(&health_handle);
+            });
+
             // 异步启动 gateway + 等待就绪 + 通知前端
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let gm = handle.state::<gateway::GatewayManager>();
+                gm.cancel_pending_waits();
+                // 标记初始启动阶段，阻止健康检查线程在 gateway 尚未启动时误判
+                gm.set_initial_startup(true);
 
-                // 确保 config 中 token 已写入（供 session_gateway_token() 和 webview 读取）
-                match tokio::runtime::Runtime::new() {
-                    Ok(rt) => {
-                        if let Err(e) = rt.block_on(config::get_or_create_gateway_token()) {
-                            log::warn!("[Main] 预初始化 gateway token 失败: {}", e);
-                        }
-                    }
-                    Err(e) => log::warn!("[Main] 创建 tokio runtime 失败: {}", e),
+                // 启动前先锁定 gateway token，避免网关与 WebView 落到不同认证上下文。
+                if let Err(e) = config::ensure_gateway_token() {
+                    let msg = format!("启动失败: gateway token 初始化失败: {}", e);
+                    let _ = handle.emit("gateway-status", msg.as_str());
+                    log::error!("[Main] {}", msg);
+                    gm.set_initial_startup(false);
+                    return;
                 }
 
                 // 确保所有内置渠道插件在配置中已启用
@@ -328,27 +425,30 @@ fn main() {
 
                 // 发送状态：正在启动
                 let _ = handle.emit("gateway-status", "正在启动 Gateway...");
-                match gm.start() {
-                    Ok(port) => {
+                match gm.start_or_recover_for_control_ui() {
+                    Ok(_) => {
                         let _ = handle.emit("gateway-status", "正在等待 Gateway 就绪...");
-                        if gm.wait_for_ready(300) {
-                            // Gateway 就绪，导航 webview 到 gateway URL
-                            gateway::navigate_webview_to_gateway(&handle, port);
-                        } else if let Some(reason) = gm.take_last_start_failure_reason() {
-                            let msg = format!("启动失败: {}", reason);
-                            let _ = handle.emit("gateway-status", msg.as_str());
-                        } else {
-                            let _ = handle.emit("gateway-status", "Gateway 启动超时");
-                            gateway::send_startup_timeout_notification(&handle);
+                        // 进入 wait_for_ready 阶段后，startup_wait_count 接管保护，
+                        // 可以安全清除 initial_startup 标志
+                        gm.set_initial_startup(false);
+                        match gm.wait_for_ready_or_recover_once() {
+                            GatewayWaitOutcome::Ready(ready_port) => {
+                                gateway::navigate_webview_to_gateway(&handle, ready_port);
+                            }
+                            GatewayWaitOutcome::Canceled => {
+                                log::info!("[Main] 启动等待已取消");
+                            }
+                            GatewayWaitOutcome::Failed(reason) => {
+                                let msg = format!("启动失败: {}", reason);
+                                let _ = handle.emit("gateway-status", msg.as_str());
+                            }
                         }
                     }
                     Err(e) => {
+                        gm.set_initial_startup(false);
                         let _ = handle.emit("gateway-status", format!("启动失败: {}", e).as_str());
                     }
                 }
-
-                // 启动健康检查循环（阻塞当前线程）
-                gateway::health_check_loop(&handle);
             });
 
             Ok(())
@@ -443,4 +543,25 @@ fn main() {
                 gm.stop();
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_gateway_url;
+
+    #[test]
+    fn build_gateway_url_uses_fragment_token() {
+        assert_eq!(
+            build_gateway_url("127.0.0.1", 28789, Some("abc123")),
+            "http://127.0.0.1:28789/#token=abc123"
+        );
+    }
+
+    #[test]
+    fn build_gateway_url_percent_encodes_reserved_bytes() {
+        assert_eq!(
+            build_gateway_url("localhost", 28789, Some("a b?c#d")),
+            "http://localhost:28789/#token=a%20b%3Fc%23d"
+        );
+    }
 }

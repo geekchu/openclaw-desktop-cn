@@ -1,7 +1,7 @@
 import type { ClawdbotConfig, RuntimeEnv } from "../runtime-api.js";
 import { resolveFeishuRuntimeAccount } from "./accounts.js";
 import { createFeishuClient } from "./client.js";
-import { getFeishuRuntime } from "./runtime.js";
+import { tryGetFeishuRuntime } from "./runtime.js";
 
 // Feishu emoji types for typing indicator
 // See: https://open.feishu.cn/document/server-docs/im-v1/message-reaction/emojis-introduce
@@ -20,6 +20,10 @@ const TYPING_EMOJI = "Typing"; // Typing indicator emoji
  * @see https://open.feishu.cn/document/server-docs/api-call-guide/generic-error-code
  */
 const FEISHU_BACKOFF_CODES = new Set([99991400, 99991403, 429]);
+
+function shouldLogVerboseFeishu(): boolean {
+  return tryGetFeishuRuntime()?.logging?.shouldLogVerbose?.() ?? false;
+}
 
 /**
  * Custom error class for Feishu backoff conditions detected from non-throwing
@@ -130,7 +134,7 @@ export async function addTypingIndicator(params: {
     // instead of throwing. Detect backoff codes and throw to trip the breaker.
     const backoffCode = getBackoffCodeFromResponse(response);
     if (backoffCode !== undefined) {
-      if (getFeishuRuntime().logging.shouldLogVerbose()) {
+      if (shouldLogVerboseFeishu()) {
         runtime?.log?.(
           `[feishu] typing indicator response contains backoff code ${backoffCode}, stopping keepalive`,
         );
@@ -143,13 +147,13 @@ export async function addTypingIndicator(params: {
     return { messageId, reactionId };
   } catch (err) {
     if (isFeishuBackoffError(err)) {
-      if (getFeishuRuntime().logging.shouldLogVerbose()) {
+      if (shouldLogVerboseFeishu()) {
         runtime?.log?.("[feishu] typing indicator hit rate-limit/quota, stopping keepalive");
       }
       throw err;
     }
     // Silently fail for other non-critical errors (e.g. message deleted, permission issues)
-    if (getFeishuRuntime().logging.shouldLogVerbose()) {
+    if (shouldLogVerboseFeishu()) {
       runtime?.log?.(`[feishu] failed to add typing indicator: ${String(err)}`);
     }
     return { messageId, reactionId: null };
@@ -190,7 +194,7 @@ export async function removeTypingIndicator(params: {
     // Check for backoff codes in non-throwing SDK responses
     const backoffCode = getBackoffCodeFromResponse(result);
     if (backoffCode !== undefined) {
-      if (getFeishuRuntime().logging.shouldLogVerbose()) {
+      if (shouldLogVerboseFeishu()) {
         runtime?.log?.(
           `[feishu] typing indicator removal response contains backoff code ${backoffCode}, stopping keepalive`,
         );
@@ -199,7 +203,7 @@ export async function removeTypingIndicator(params: {
     }
   } catch (err) {
     if (isFeishuBackoffError(err)) {
-      if (getFeishuRuntime().logging.shouldLogVerbose()) {
+      if (shouldLogVerboseFeishu()) {
         runtime?.log?.(
           "[feishu] typing indicator removal hit rate-limit/quota, stopping keepalive",
         );
@@ -207,7 +211,7 @@ export async function removeTypingIndicator(params: {
       throw err;
     }
     // Silently fail for other non-critical errors
-    if (getFeishuRuntime().logging.shouldLogVerbose()) {
+    if (shouldLogVerboseFeishu()) {
       runtime?.log?.(`[feishu] failed to remove typing indicator: ${String(err)}`);
     }
   }

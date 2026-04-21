@@ -33,7 +33,7 @@ actor RemoteTunnelManager {
         }
         // If a previous OpenClaw run already has an SSH listener on the expected port (common after restarts),
         // reuse it instead of spawning new ssh processes that immediately fail with "Address already in use".
-        let desiredPort = UInt16(GatewayEnvironment.gatewayPort())
+        let desiredPort = UInt16(GatewayEnvironment.configuredGatewayPort())
         if let desc = await PortGuardian.shared.describe(port: Int(desiredPort)),
            self.isSshProcess(desc)
         {
@@ -65,9 +65,9 @@ actor RemoteTunnelManager {
         if let local = await self.controlTunnelPortIfRunning() { return local }
         await self.waitForRestartBackoffIfNeeded()
 
-        let desiredPort = UInt16(GatewayEnvironment.gatewayPort())
+        let desiredPort = UInt16(GatewayEnvironment.configuredGatewayPort())
         let tunnel = try await RemotePortTunnel.create(
-            remotePort: GatewayEnvironment.gatewayPort(),
+            remotePort: GatewayEnvironment.configuredGatewayPort(),
             preferredLocalPort: desiredPort,
             allowRandomLocalPort: false)
         self.controlTunnel = tunnel

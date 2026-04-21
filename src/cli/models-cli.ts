@@ -87,6 +87,7 @@ export function registerModelsCli(program: Command) {
     .option("--probe-timeout <ms>", "Per-probe timeout in ms")
     .option("--probe-concurrency <n>", "Concurrent probes")
     .option("--probe-max-tokens <n>", "Probe max tokens (best-effort)")
+    .option("--probe-model <model>", "Only probe a specific model id or alias")
     .option(
       "--agent <id>",
       "Agent id to inspect (overrides OPENCLAW_AGENT_DIR/PI_CODING_AGENT_DIR)",
@@ -106,6 +107,7 @@ export function registerModelsCli(program: Command) {
             probeTimeout: opts.probeTimeout as string | undefined,
             probeConcurrency: opts.probeConcurrency as string | undefined,
             probeMaxTokens: opts.probeMaxTokens as string | undefined,
+            probeModel: opts.probeModel as string | undefined,
             agent,
           },
           defaultRuntime,

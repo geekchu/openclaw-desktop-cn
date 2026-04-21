@@ -290,4 +290,91 @@ describe("buildProbeTargets reason codes", () => {
       );
     });
   });
+
+  it("prefers an explicit probe model over the provider's default candidate", async () => {
+    await withClearedAnthropicEnv(async () => {
+      mockStore = {
+        version: 1,
+        profiles: {},
+        order: {},
+      };
+
+      const plan = await buildProbeTargets({
+        cfg: {
+          models: {
+            providers: {
+              anthropic: {
+                baseUrl: "https://api.anthropic.com/v1",
+                api: "anthropic-messages",
+                apiKey: "sk-ant-test", // pragma: allowlist secret
+                models: [],
+              },
+            },
+          },
+        } as OpenClawConfig,
+        providers: ["anthropic"],
+        modelCandidates: ["anthropic/claude-haiku-4-5"],
+        options: {
+          model: "anthropic/claude-sonnet-4-6",
+          timeoutMs: 5_000,
+          concurrency: 1,
+          maxTokens: 16,
+        },
+      });
+
+      expect(plan.results).toEqual([]);
+      expect(plan.targets).toHaveLength(1);
+      expect(plan.targets[0]).toEqual(
+        expect.objectContaining({
+          provider: "anthropic",
+          model: { provider: "anthropic", model: "claude-sonnet-4-6" },
+        }),
+      );
+    });
+  });
+
+  it("does not fall back to catalog models from another provider when an explicit probe model is set", async () => {
+    await withClearedAnthropicEnv(async () => {
+      mockStore = {
+        version: 1,
+        profiles: {},
+        order: {},
+      };
+      loadModelCatalogMock.mockResolvedValueOnce([
+        { provider: "openai", id: "gpt-5.4-mini", name: "GPT-5.4 Mini" },
+      ]);
+
+      const plan = await buildProbeTargets({
+        cfg: {
+          models: {
+            providers: {
+              anthropic: {
+                baseUrl: "https://api.anthropic.com/v1",
+                api: "anthropic-messages",
+                apiKey: "sk-ant-test", // pragma: allowlist secret
+                models: [],
+              },
+            },
+          },
+        } as OpenClawConfig,
+        providers: ["anthropic", "openai"],
+        modelCandidates: [],
+        options: {
+          model: "anthropic/claude-sonnet-4-6",
+          timeoutMs: 5_000,
+          concurrency: 1,
+          maxTokens: 16,
+        },
+      });
+
+      expect(plan.results).toEqual([]);
+      expect(plan.targets).toHaveLength(1);
+      expect(plan.targets[0]).toEqual(
+        expect.objectContaining({
+          provider: "anthropic",
+          model: { provider: "anthropic", model: "claude-sonnet-4-6" },
+        }),
+      );
+    });
+  });
 });

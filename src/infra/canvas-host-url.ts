@@ -1,3 +1,4 @@
+import { DEFAULT_GATEWAY_PORT } from "../config/paths.js";
 import { isLoopbackHost } from "../gateway/net.js";
 
 type HostSource = string | null | undefined;
@@ -75,10 +76,10 @@ export function resolveCanvasHostUrl(params: CanvasHostUrlParams) {
   }
 
   // When the websocket is proxied over HTTPS (for example Tailscale Serve), the gateway's
-  // internal listener still runs on 18789. In that case, expose the public port instead of
+  // internal listener still runs on the default loopback port. In that case, expose the public port instead of
   // advertising the internal one back to clients.
   let exposedPort = port;
-  if (!override && requestHost && port === 18789) {
+  if (!override && requestHost && port === DEFAULT_GATEWAY_PORT) {
     if (parsedRequestHost.port && parsedRequestHost.port > 0) {
       exposedPort = parsedRequestHost.port;
     } else if (scheme === "https") {

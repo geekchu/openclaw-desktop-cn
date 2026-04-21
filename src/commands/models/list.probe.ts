@@ -87,6 +87,7 @@ export type AuthProbeSummary = {
   totalTargets: number;
   options: {
     provider?: string;
+    model?: string;
     profileIds?: string[];
     timeoutMs: number;
     concurrency: number;
@@ -97,6 +98,7 @@ export type AuthProbeSummary = {
 
 export type AuthProbeOptions = {
   provider?: string;
+  model?: string;
   profileIds?: string[];
   timeoutMs: number;
   concurrency: number;
@@ -147,8 +149,12 @@ function selectProbeModel(params: {
   provider: string;
   candidates: Map<string, string[]>;
   catalog: Array<{ provider: string; id: string }>;
+  explicitModel?: { provider: string; model: string } | null;
 }): { provider: string; model: string } | null {
-  const { provider, candidates, catalog } = params;
+  const { provider, candidates, catalog, explicitModel } = params;
+  if (explicitModel) {
+    return explicitModel.provider === provider ? explicitModel : null;
+  }
   const direct = candidates.get(provider);
   if (direct && direct.length > 0) {
     return { provider, model: direct[0] };
@@ -252,7 +258,17 @@ export async function buildProbeTargets(params: {
 }): Promise<{ targets: AuthProbeTarget[]; results: AuthProbeResult[] }> {
   const { cfg, providers, modelCandidates, options } = params;
   const store = ensureAuthProfileStore();
-  const providerFilter = options.provider?.trim();
+  const explicitModel = (() => {
+    const parsed = options.model ? parseModelRef(options.model, DEFAULT_PROVIDER) : null;
+    if (!parsed) {
+      return null;
+    }
+    return {
+      provider: normalizeProviderId(parsed.provider),
+      model: parsed.model,
+    };
+  })();
+  const providerFilter = options.provider?.trim() ?? explicitModel?.provider;
   const providerFilterKey = providerFilter ? normalizeProviderId(providerFilter) : null;
   const profileFilter = new Set((options.profileIds ?? []).map((id) => id.trim()).filter(Boolean));
   const refResolveCache: SecretRefResolveCache = {};
@@ -271,6 +287,7 @@ export async function buildProbeTargets(params: {
       provider: providerKey,
       candidates,
       catalog,
+      explicitModel,
     });
 
     const profileIds = listProfilesForProvider(store, providerKey);

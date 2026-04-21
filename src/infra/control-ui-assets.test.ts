@@ -220,6 +220,14 @@ describe("control UI assets helpers (fs-mocked)", () => {
     expect(resolveControlUiRootSync({ execPath })).toBe(bundledUiDir);
   });
 
+  it("resolves control-ui root from an explicit gateway bundle dir", () => {
+    const bundleDir = abs("fixtures/gateway-bundle");
+    const bundledUiDir = path.join(bundleDir, "dist", "control-ui");
+    setFile(path.join(bundledUiDir, "index.html"), "<html></html>\n");
+
+    expect(resolveControlUiRootSync({ bundleDir })).toBe(bundledUiDir);
+  });
+
   it("resolves control-ui root for symlinked argv1 via realpath", () => {
     const pkgRoot = abs("fixtures/bun-global/openclaw");
     const wrapperArgv1 = abs("fixtures/bin/openclaw");
@@ -244,6 +252,19 @@ describe("control UI assets helpers (fs-mocked)", () => {
     expect(
       isPackageProvenControlUiRootSync(uiDir, {
         cwd: abs("fixtures/cwd"),
+      }),
+    ).toBe(true);
+  });
+
+  it("treats gateway bundle control-ui roots as bundled", () => {
+    const bundleDir = abs("fixtures/gateway-bundle");
+    const bundledUiDir = path.join(bundleDir, "dist", "control-ui");
+    setDir(bundledUiDir);
+    setFile(path.join(bundledUiDir, "index.html"), "<html></html>\n");
+
+    expect(
+      isPackageProvenControlUiRootSync(bundledUiDir, {
+        bundleDir,
       }),
     ).toBe(true);
   });

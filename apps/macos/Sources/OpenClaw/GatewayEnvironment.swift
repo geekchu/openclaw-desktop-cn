@@ -73,16 +73,18 @@ enum GatewayEnvironment {
     private static let logger = Logger(subsystem: "ai.openclaw", category: "gateway.env")
     private static let supportedBindModes: Set<String> = ["loopback", "tailnet", "lan", "auto"]
 
+    static func configuredGatewayPort() -> Int {
+        self.resolveConfiguredGatewayPort(
+            env: ProcessInfo.processInfo.environment,
+            configPort: OpenClawConfigFile.gatewayPort())
+    }
+
     static func gatewayPort() -> Int {
-        if let raw = ProcessInfo.processInfo.environment["OPENCLAW_GATEWAY_PORT"] {
-            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let parsed = Int(trimmed), parsed > 0 { return parsed }
-        }
-        if let configPort = OpenClawConfigFile.gatewayPort(), configPort > 0 {
-            return configPort
-        }
-        let stored = UserDefaults.standard.integer(forKey: "gatewayPort")
-        return stored > 0 ? stored : 28789
+        self.resolveEffectiveGatewayPort(
+            env: ProcessInfo.processInfo.environment,
+            configPort: OpenClawConfigFile.gatewayPort(),
+            launchdPort: GatewayLaunchAgentManager.launchdConfigSnapshot()?.port,
+            preferLaunchdPort: !CommandResolver.connectionModeIsRemote())
     }
 
     static func expectedGatewayVersion() -> Semver? {
@@ -190,7 +192,7 @@ enum GatewayEnvironment {
             return GatewayCommandResolution(status: status, command: nil)
         }
 
-        let port = self.gatewayPort()
+        let port = self.configuredGatewayPort()
         if let gatewayBin {
             let bind = self.preferredGatewayBind() ?? "loopback"
             let cmd = [gatewayBin, "gateway", "--port", "\(port)", "--bind", bind]
@@ -230,6 +232,44 @@ enum GatewayEnvironment {
         }
 
         return nil
+    }
+
+    private static func resolveConfiguredGatewayPort(
+        env: [String: String],
+        configPort: Int?) -> Int
+    {
+        if let envPort = self.resolveEnvGatewayPort(env) {
+            return envPort
+        }
+        if let configPort, configPort > 0 {
+            return configPort
+        }
+        return 28789
+    }
+
+    private static func resolveEffectiveGatewayPort(
+        env: [String: String],
+        configPort: Int?,
+        launchdPort: Int?,
+        preferLaunchdPort: Bool) -> Int
+    {
+        // A per-process override should win even if launchd still reflects an older fallback port.
+        if let envPort = self.resolveEnvGatewayPort(env) {
+            return envPort
+        }
+        if preferLaunchdPort, let launchdPort, launchdPort > 0 {
+            return launchdPort
+        }
+        return self.resolveConfiguredGatewayPort(
+            env: [:],
+            configPort: configPort)
+    }
+
+    private static func resolveEnvGatewayPort(_ env: [String: String]) -> Int? {
+        guard let raw = env["OPENCLAW_GATEWAY_PORT"] else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let parsed = Int(trimmed), parsed > 0 else { return nil }
+        return parsed
     }
 
     static func installGlobal(version: Semver?, statusHandler: @escaping @Sendable (String) -> Void) async {
@@ -356,3 +396,29 @@ enum GatewayEnvironment {
         return Semver.parse(version)
     }
 }
+
+#if DEBUG
+extension GatewayEnvironment {
+    static func _testResolveConfiguredGatewayPort(
+        env: [String: String],
+        configPort: Int?) -> Int
+    {
+        self.resolveConfiguredGatewayPort(
+            env: env,
+            configPort: configPort)
+    }
+
+    static func _testResolveGatewayPort(
+        env: [String: String],
+        configPort: Int?,
+        launchdPort: Int?,
+        preferLaunchdPort: Bool = true) -> Int
+    {
+        self.resolveEffectiveGatewayPort(
+            env: env,
+            configPort: configPort,
+            launchdPort: launchdPort,
+            preferLaunchdPort: preferLaunchdPort)
+    }
+}
+#endif

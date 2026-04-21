@@ -214,14 +214,14 @@ struct GatewayEndpointStoreTests {
             launchdSnapshot: snapshot,
             tailscaleIP: "100.64.1.8")
 
-        #expect(config.url.absoluteString == "wss://100.64.1.8:18789")
+        #expect(config.url.absoluteString == "wss://100.64.1.8:28789")
         #expect(config.token == "launchd-token")
         #expect(config.password == "launchd-pass")
     }
 
     @Test func `dashboard URL uses local base path in local mode`() throws {
         let config: GatewayConnection.Config = try (
-            url: #require(URL(string: "ws://127.0.0.1:18789")),
+            url: #require(URL(string: "ws://127.0.0.1:28789")),
             token: nil,
             password: nil)
 
@@ -229,7 +229,7 @@ struct GatewayEndpointStoreTests {
             for: config,
             mode: .local,
             localBasePath: " control ")
-        #expect(url.absoluteString == "http://127.0.0.1:18789/control/")
+        #expect(url.absoluteString == "http://127.0.0.1:28789/control/")
     }
 
     @Test func `dashboard URL skips local base path in remote mode`() throws {
@@ -260,7 +260,7 @@ struct GatewayEndpointStoreTests {
 
     @Test func `dashboard URL uses fragment token and omits password`() throws {
         let config: GatewayConnection.Config = try (
-            url: #require(URL(string: "ws://127.0.0.1:18789")),
+            url: #require(URL(string: "ws://127.0.0.1:28789")),
             token: "abc123",
             password: "sekret") // pragma: allowlist secret
 
@@ -268,14 +268,14 @@ struct GatewayEndpointStoreTests {
             for: config,
             mode: .local,
             localBasePath: "/control")
-        #expect(url.absoluteString == "http://127.0.0.1:18789/control/#token=abc123")
+        #expect(url.absoluteString == "http://127.0.0.1:28789/control/#token=abc123")
         #expect(url.query == nil)
     }
 
     @Test func `normalize gateway url adds default port for loopback ws`() {
         let url = GatewayRemoteConfig.normalizeGatewayUrl("ws://127.0.0.1")
-        #expect(url?.port == 18789)
-        #expect(url?.absoluteString == "ws://127.0.0.1:18789")
+        #expect(url?.port == 28789)
+        #expect(url?.absoluteString == "ws://127.0.0.1:28789")
     }
 
     @Test func `normalize gateway url rejects non loopback ws`() {

@@ -43,6 +43,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function splitModelRef(modelRef: string): { provider: string; modelId?: string } | null {
+  const trimmed = modelRef.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const slashIndex = trimmed.indexOf("/");
+  if (slashIndex <= 0) {
+    return null;
+  }
+  const provider = trimmed.slice(0, slashIndex).trim();
+  const modelId = trimmed.slice(slashIndex + 1).trim();
+  if (!provider || !modelId) {
+    return null;
+  }
+  return { provider, modelId };
+}
+
 function mergeOnestopProviderModel(
   existingModel: Record<string, unknown> | undefined,
   model: OnestopModel,
@@ -274,7 +291,11 @@ export async function saveOnestopConfig(apiKey: string, selectedModel: string): 
 let _testing = false;
 let _testResult: { success: boolean; message: string } | null = null;
 
-async function testOnestopConnection(requestUpdate: () => void) {
+async function testOnestopConnection(
+  requestUpdate: () => void,
+  provider: string,
+  modelId?: string,
+) {
   _testing = true;
   _testResult = null;
   requestUpdate();
@@ -287,7 +308,10 @@ async function testOnestopConnection(requestUpdate: () => void) {
       response: string | null;
       error: string | null;
       latency_ms: number | null;
-    }>("test_ai_connection");
+    }>("test_ai_connection", {
+      provider,
+      model: modelId ? `${provider}/${modelId}` : undefined,
+    });
 
     _testResult = {
       success: result.success,
@@ -863,6 +887,7 @@ export function renderOnestop(props: OnestopProps) {
       }
     : null;
   const currentOnestopModelInfo = selectedModelInfo ?? fallbackOnestopModelInfo;
+  const currentCustomModelTarget = _customPrimaryModel ? splitModelRef(_customPrimaryModel) : null;
 
   // 判断当前显示的模型信息
   // _customPrimaryModel 仅在用户通过自定义接入切换模型时设置，
@@ -896,7 +921,12 @@ export function renderOnestop(props: OnestopProps) {
                 <button
                   class="onestop-status-bar__test"
                   ?disabled=${_testing}
-                  @click=${() => testOnestopConnection(props.requestUpdate)}
+                  @click=${() =>
+                    testOnestopConnection(
+                      props.requestUpdate,
+                      ONESTOP_PROVIDER_NAME,
+                      props.selectedModel,
+                    )}
                 >
                   ${_testing ? "测试中…" : "测试连接"}
                 </button>
@@ -923,8 +953,15 @@ export function renderOnestop(props: OnestopProps) {
                 <div class="onestop-status-bar__actions">
                   <button
                     class="onestop-status-bar__test"
-                    ?disabled=${_testing}
-                    @click=${() => testOnestopConnection(props.requestUpdate)}
+                    ?disabled=${_testing || !currentCustomModelTarget}
+                    @click=${() =>
+                      currentCustomModelTarget
+                        ? testOnestopConnection(
+                            props.requestUpdate,
+                            currentCustomModelTarget.provider,
+                            currentCustomModelTarget.modelId,
+                          )
+                        : undefined}
                   >
                     ${_testing ? "测试中…" : "测试连接"}
                   </button>

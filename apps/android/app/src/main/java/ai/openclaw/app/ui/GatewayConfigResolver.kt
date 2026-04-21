@@ -59,6 +59,7 @@ private const val remoteGatewaySecurityRule =
   "Tailscale and public mobile nodes require wss:// or Tailscale Serve. ws:// is allowed for private LAN, localhost, and the Android emulator."
 private const val remoteGatewaySecurityFix =
   "Use a private LAN host/address, or enable Tailscale Serve / expose a wss:// gateway URL."
+private const val defaultGatewayPort = 28789
 
 internal fun resolveGatewayConnectConfig(
   useSetupCode: Boolean,
@@ -149,7 +150,7 @@ internal fun parseGatewayEndpoint(rawInput: String): GatewayEndpointConfig? {
   val defaultPort =
     when (scheme) {
       "wss", "https" -> 443
-      "ws", "http" -> 18789
+      "ws", "http" -> defaultGatewayPort
       else -> 443
     }
   val displayPort =

@@ -88,7 +88,7 @@ final class GatewayProcessManager {
         let enabled = await GatewayLaunchAgentManager.isLoaded()
         guard !enabled else { return }
         let bundlePath = Bundle.main.bundleURL.path
-        let port = GatewayEnvironment.gatewayPort()
+        let port = GatewayEnvironment.configuredGatewayPort()
         self.appendLog("[gateway] auto-enabling launchd job (\(gatewayLaunchdLabel)) on port \(port)\n")
         let err = await GatewayLaunchAgentManager.set(enabled: true, bundlePath: bundlePath, port: port)
         if let err {
@@ -138,7 +138,7 @@ final class GatewayProcessManager {
             _ = await GatewayLaunchAgentManager.set(
                 enabled: false,
                 bundlePath: bundlePath,
-                port: GatewayEnvironment.gatewayPort())
+                port: GatewayEnvironment.configuredGatewayPort())
         }
     }
 
@@ -189,7 +189,7 @@ final class GatewayProcessManager {
 
     // MARK: - Internals
 
-    /// Attempt to connect to an already-running gateway on the configured port.
+    /// Attempt to connect to an already-running gateway on the current effective port.
     /// If successful, mark status as attached and skip spawning a new process.
     private func attachExistingGatewayIfAvailable() async -> Bool {
         let port = GatewayEnvironment.gatewayPort()
@@ -322,7 +322,7 @@ final class GatewayProcessManager {
         }
 
         let bundlePath = Bundle.main.bundleURL.path
-        let port = GatewayEnvironment.gatewayPort()
+        let port = GatewayEnvironment.configuredGatewayPort()
         self.appendLog("[gateway] enabling launchd job (\(gatewayLaunchdLabel)) on port \(port)\n")
         self.logger.info("gateway enabling launchd port=\(port)")
         let err = await GatewayLaunchAgentManager.set(enabled: true, bundlePath: bundlePath, port: port)

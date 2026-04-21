@@ -94,7 +94,7 @@ type ConnectFrame = {
 
 function stubWindowGlobals(storage?: ReturnType<typeof createStorageMock>) {
   vi.stubGlobal("window", {
-    location: { href: "http://127.0.0.1:18789/" },
+    location: { href: "http://127.0.0.1:28789/" },
     localStorage: storage,
     setTimeout: (handler: (...args: unknown[]) => void, timeout?: number, ...args: unknown[]) =>
       globalThis.setTimeout(() => handler(...args), timeout),
@@ -120,6 +120,14 @@ function parseLatestConnectFrame(ws: MockWebSocket): ConnectFrame {
   return JSON.parse(ws.sent.at(-1) ?? "{}") as ConnectFrame;
 }
 
+async function flushSocketConnectStart() {
+  if (vi.isFakeTimers()) {
+    await vi.advanceTimersByTimeAsync(0);
+    return;
+  }
+  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+}
+
 async function continueConnect(ws: MockWebSocket, nonce = "nonce-1") {
   ws.emitOpen();
   ws.emitMessage({
@@ -133,6 +141,7 @@ async function continueConnect(ws: MockWebSocket, nonce = "nonce-1") {
 
 async function startConnect(client: InstanceType<typeof GatewayBrowserClient>, nonce = "nonce-1") {
   client.start();
+  await flushSocketConnectStart();
   return await continueConnect(getLatestWebSocket(), nonce);
 }
 
@@ -211,7 +220,7 @@ describe("GatewayBrowserClient", () => {
 
   it("requests the full control ui operator scope bundle on connect", async () => {
     const client = new GatewayBrowserClient({
-      url: "ws://127.0.0.1:18789",
+      url: "ws://127.0.0.1:28789",
       token: "shared-auth-token",
     });
 
@@ -221,9 +230,22 @@ describe("GatewayBrowserClient", () => {
     expect(connectFrame.params?.scopes).toEqual([...CONTROL_UI_OPERATOR_SCOPES]);
   });
 
+  it("defers the first websocket connect until the next task", async () => {
+    const client = new GatewayBrowserClient({
+      url: "ws://127.0.0.1:28789",
+      token: "shared-auth-token",
+    });
+
+    client.start();
+    expect(wsInstances).toHaveLength(0);
+
+    await flushSocketConnectStart();
+    expect(wsInstances).toHaveLength(1);
+  });
+
   it("prefers explicit shared auth over cached device tokens", async () => {
     const client = new GatewayBrowserClient({
-      url: "ws://127.0.0.1:18789",
+      url: "ws://127.0.0.1:28789",
       token: "shared-auth-token",
     });
 
@@ -241,7 +263,7 @@ describe("GatewayBrowserClient", () => {
   it("sends explicit shared token on insecure first connect without cached device fallback", async () => {
     stubInsecureCrypto();
     const client = new GatewayBrowserClient({
-      url: "ws://gateway.example:18789",
+      url: "ws://gateway.example:28789",
       token: "shared-auth-token",
     });
 
@@ -261,7 +283,7 @@ describe("GatewayBrowserClient", () => {
   it("sends explicit shared password on insecure first connect without cached device fallback", async () => {
     stubInsecureCrypto();
     const client = new GatewayBrowserClient({
-      url: "ws://gateway.example:18789",
+      url: "ws://gateway.example:28789",
       password: "shared-password", // pragma: allowlist secret
     });
 
@@ -280,7 +302,7 @@ describe("GatewayBrowserClient", () => {
 
   it("uses cached device tokens only when no explicit shared auth is provided", async () => {
     const client = new GatewayBrowserClient({
-      url: "ws://127.0.0.1:18789",
+      url: "ws://127.0.0.1:28789",
     });
 
     const { connectFrame } = await startConnect(client);
@@ -303,7 +325,7 @@ describe("GatewayBrowserClient", () => {
     });
 
     const client = new GatewayBrowserClient({
-      url: "ws://127.0.0.1:18789",
+      url: "ws://127.0.0.1:28789",
     });
 
     const { connectFrame } = await startConnect(client);
@@ -317,7 +339,7 @@ describe("GatewayBrowserClient", () => {
   it("retries once with device token after token mismatch when shared token is explicit", async () => {
     vi.useFakeTimers();
     const { secondWs, secondConnect } = await startRetriedDeviceTokenConnect({
-      url: "ws://127.0.0.1:18789",
+      url: "ws://127.0.0.1:28789",
       token: "shared-auth-token",
     });
 
@@ -345,7 +367,7 @@ describe("GatewayBrowserClient", () => {
   it("treats IPv6 loopback as trusted for bounded device-token retry", async () => {
     vi.useFakeTimers();
     const { client } = await startRetriedDeviceTokenConnect({
-      url: "ws://[::1]:18789",
+      url: "ws://[::1]:28789",
       token: "shared-auth-token",
     });
 
@@ -358,7 +380,7 @@ describe("GatewayBrowserClient", () => {
     localStorage.clear();
 
     const client = new GatewayBrowserClient({
-      url: "ws://127.0.0.1:18789",
+      url: "ws://127.0.0.1:28789",
       token: "shared-auth-token",
     });
 
@@ -384,15 +406,80 @@ describe("GatewayBrowserClient", () => {
     vi.useRealTimers();
   });
 
+  it("keeps initial reconnects fast before the first successful hello", async () => {
+    vi.useFakeTimers();
+
+    const client = new GatewayBrowserClient({
+      url: "ws://127.0.0.1:28789",
+    });
+
+    client.start();
+    await flushSocketConnectStart();
+    const ws1 = getLatestWebSocket();
+    ws1.emitClose(1006, "startup");
+
+    await vi.advanceTimersByTimeAsync(800);
+    const ws2 = getLatestWebSocket();
+    expect(wsInstances).toHaveLength(2);
+    ws2.emitClose(1006, "startup");
+
+    await vi.advanceTimersByTimeAsync(800);
+    const ws3 = getLatestWebSocket();
+    expect(wsInstances).toHaveLength(3);
+    ws3.emitClose(1006, "startup");
+
+    await vi.advanceTimersByTimeAsync(800);
+    expect(wsInstances).toHaveLength(4);
+
+    client.stop();
+    vi.useRealTimers();
+  });
+
+  it("returns to exponential backoff after one successful hello", async () => {
+    vi.useFakeTimers();
+
+    const client = new GatewayBrowserClient({
+      url: "ws://127.0.0.1:28789",
+    });
+
+    const { ws: ws1, connectFrame } = await startConnect(client);
+    ws1.emitMessage({
+      type: "res",
+      id: connectFrame.id,
+      ok: true,
+      payload: {
+        type: "hello-ok",
+        protocol: 3,
+      },
+    });
+    await Promise.resolve();
+
+    ws1.emitClose(1006, "after-hello");
+    await vi.advanceTimersByTimeAsync(800);
+    const ws2 = getLatestWebSocket();
+    expect(wsInstances).toHaveLength(2);
+
+    ws2.emitClose(1006, "after-hello");
+    await vi.advanceTimersByTimeAsync(800);
+    expect(wsInstances).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(560);
+    expect(wsInstances).toHaveLength(3);
+
+    client.stop();
+    vi.useRealTimers();
+  });
+
   it("cancels a queued connect send when stopped before the timeout fires", async () => {
     vi.useFakeTimers();
 
     const client = new GatewayBrowserClient({
-      url: "ws://127.0.0.1:18789",
+      url: "ws://127.0.0.1:28789",
       token: "shared-auth-token",
     });
 
     client.start();
+    await flushSocketConnectStart();
     const ws = getLatestWebSocket();
     ws.emitOpen();
 
@@ -409,7 +496,7 @@ describe("GatewayBrowserClient", () => {
     localStorage.clear();
 
     const client = new GatewayBrowserClient({
-      url: "ws://127.0.0.1:18789",
+      url: "ws://127.0.0.1:28789",
     });
 
     const { ws: ws1, connectFrame: connect } = await startConnect(client);
@@ -456,7 +543,7 @@ describe("shouldRetryWithDeviceToken", () => {
         },
         storedToken: "stored-device-token",
         canRetryWithDeviceTokenHint: true,
-        url: "ws://127.0.0.1:18789",
+        url: "ws://127.0.0.1:28789",
       }),
     ).toBe(true);
   });
@@ -474,7 +561,7 @@ describe("shouldRetryWithDeviceToken", () => {
         },
         storedToken: "stored-device-token",
         canRetryWithDeviceTokenHint: true,
-        url: "ws://127.0.0.1:18789",
+        url: "ws://127.0.0.1:28789",
       }),
     ).toBe(false);
   });

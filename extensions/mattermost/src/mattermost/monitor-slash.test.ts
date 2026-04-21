@@ -101,7 +101,7 @@ describe("mattermost monitor slash", () => {
 
     await registerMattermostMonitorSlashCommands({
       client: {} as never,
-      cfg: { gateway: { port: 18789 } } as never,
+      cfg: { gateway: { port: 28789 } } as never,
       runtime: runtime as never,
       account: { config: { commands: {} }, accountId: "default" } as never,
       baseUrl: "https://chat.example.com",
@@ -150,7 +150,7 @@ describe("mattermost monitor slash", () => {
     isSlashCommandsEnabled.mockReturnValue(true);
     parseStrictPositiveInteger.mockReturnValue(undefined);
     fetchMattermostUserTeams.mockResolvedValue([{ id: "team-1" }, { id: "team-2" }]);
-    resolveCallbackUrl.mockReturnValue("http://127.0.0.1:18789/slash");
+    resolveCallbackUrl.mockReturnValue("http://127.0.0.1:28789/slash");
     registerSlashCommands
       .mockResolvedValueOnce([{ token: "token-1", trigger: "ping" }])
       .mockRejectedValueOnce(new Error("boom"));
@@ -170,7 +170,7 @@ describe("mattermost monitor slash", () => {
 
     expect(runtime.error).toHaveBeenCalledWith(
       expect.stringContaining(
-        "slash commands callbackUrl resolved to http://127.0.0.1:18789/slash",
+        "slash commands callbackUrl resolved to http://127.0.0.1:28789/slash",
       ),
     );
     expect(runtime.error).toHaveBeenCalledWith(

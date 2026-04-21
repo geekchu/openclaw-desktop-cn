@@ -16,10 +16,13 @@ import type { ImageSanitizationLimits } from "./image-sanitization.js";
 import { toRelativeWorkspacePath } from "./path-policy.js";
 import { wrapEditToolWithRecovery } from "./pi-tools.host-edit.js";
 import {
+  CLAUDE_PARAM_GROUPS,
   REQUIRED_PARAM_GROUPS,
   assertRequiredParams,
   getToolParamsRecord,
   normalizeToolParams,
+  patchToolSchemaForClaudeCompatibility,
+  wrapToolParamNormalization,
   wrapToolParamValidation,
 } from "./pi-tools.params.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
@@ -28,10 +31,13 @@ import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
 import { sanitizeToolResultImages } from "./tool-images.js";
 
 export {
+  CLAUDE_PARAM_GROUPS,
   REQUIRED_PARAM_GROUPS,
   assertRequiredParams,
   getToolParamsRecord,
   normalizeToolParams,
+  patchToolSchemaForClaudeCompatibility,
+  wrapToolParamNormalization,
   wrapToolParamValidation,
 } from "./pi-tools.params.js";
 
@@ -607,13 +613,14 @@ export function wrapToolMemoryFlushAppendOnlyWrite(
     ...tool,
     description: `${tool.description} During memory flush, this tool may only append to ${options.relativePath}.`,
     execute: async (toolCallId, args, signal, onUpdate) => {
-      const record = getToolParamsRecord(args);
+      const normalized = normalizeToolParams(args);
+      const record = normalized ?? getToolParamsRecord(args);
       assertRequiredParams(record, REQUIRED_PARAM_GROUPS.write, tool.name);
       const filePath =
         typeof record?.path === "string" && record.path.trim() ? record.path : undefined;
       const content = typeof record?.content === "string" ? record.content : undefined;
       if (!filePath || content === undefined) {
-        return tool.execute(toolCallId, args, signal, onUpdate);
+        return tool.execute(toolCallId, normalized ?? args, signal, onUpdate);
       }
 
       const resolvedPath = resolveToolPathAgainstWorkspaceRoot({
@@ -656,7 +663,8 @@ export function wrapToolWorkspaceRootGuardWithOptions(
   return {
     ...tool,
     execute: async (toolCallId, args, signal, onUpdate) => {
-      const record = getToolParamsRecord(args);
+      const normalized = normalizeToolParams(args);
+      const record = normalized ?? getToolParamsRecord(args);
       const filePath = record?.path;
       if (typeof filePath === "string" && filePath.trim()) {
         const sandboxPath = mapContainerPathToWorkspaceRoot({
@@ -666,7 +674,7 @@ export function wrapToolWorkspaceRootGuardWithOptions(
         });
         await assertSandboxPath({ filePath: sandboxPath, cwd: root, root });
       }
-      return tool.execute(toolCallId, args, signal, onUpdate);
+      return tool.execute(toolCallId, normalized ?? args, signal, onUpdate);
     },
   };
 }
@@ -882,13 +890,15 @@ export function createOpenClawReadTool(
   base: AnyAgentTool,
   options?: OpenClawReadToolOptions,
 ): AnyAgentTool {
+  const patched = patchToolSchemaForClaudeCompatibility(base);
   return {
-    ...base,
+    ...patched,
     execute: async (toolCallId, params, signal) => {
-      const record = getToolParamsRecord(params);
-      assertRequiredParams(record, REQUIRED_PARAM_GROUPS.read, base.name);
+      const normalized = normalizeToolParams(params);
+      const record = normalized ?? getToolParamsRecord(params);
+      assertRequiredParams(record, REQUIRED_PARAM_GROUPS.read, patched.name);
       const result = await executeReadWithAdaptivePaging({
-        base,
+        base: patched,
         toolCallId,
         args: record ?? {},
         signal,

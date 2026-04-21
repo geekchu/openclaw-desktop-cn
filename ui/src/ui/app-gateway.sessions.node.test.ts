@@ -56,7 +56,7 @@ const { addExecApproval } = await vi.importActual<typeof import("./controllers/e
 function createHost() {
   return {
     settings: {
-      gatewayUrl: "ws://127.0.0.1:18789",
+      gatewayUrl: "ws://127.0.0.1:28789",
       token: "",
       sessionKey: "main",
       lastActiveSessionKey: "main",

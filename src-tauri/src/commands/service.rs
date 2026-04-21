@@ -1,5 +1,6 @@
 use crate::commands::config;
 use crate::gateway::GatewayManager;
+use crate::gateway::GatewayWaitOutcome;
 use crate::models::ServiceStatus;
 use crate::utils::shell;
 use log::{info, warn};
@@ -139,16 +140,19 @@ fn get_process_uptime_seconds(pid: u32) -> Option<u64> {
     }
 }
 
-/// 获取服务状态（简单版：直接检查端口占用）
+fn is_process_running(pid: u32) -> bool {
+    get_process_uptime_seconds(pid).is_some()
+}
+
+/// 获取服务状态。
+/// `running` 语义对齐桌面端主启动链路：只有当前追踪的 gateway 子进程仍存活，
+/// 且 control UI 实际可用时，才视为运行中。
 #[command]
 pub async fn get_service_status(app: AppHandle) -> Result<ServiceStatus, String> {
-    // 从 GatewayManager 获取当前端口
     let gm = app.state::<GatewayManager>();
     let port = gm.get_port();
-
-    // 简单直接：检查端口是否被占用
     let pid = check_port_listening(port);
-    let running = pid.is_some();
+    let running = gm.has_live_gateway_instance() && gm.is_ready();
 
     let memory_mb = pid.and_then(get_process_memory_mb);
     let uptime_seconds = pid.and_then(get_process_uptime_seconds);
@@ -168,9 +172,10 @@ pub async fn get_service_status(app: AppHandle) -> Result<ServiceStatus, String>
 pub async fn start_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 启动服务...");
 
-    // 检查是否已经运行
-    let status = get_service_status(app.clone()).await?;
-    if status.running {
+    let gm = app.state::<GatewayManager>();
+    // 只有在桌面端当前追踪到的 gateway 子进程已存活且 control UI 真实可用时，
+    // 才视为“已运行”。仅凭端口占用会把半活状态或外部占用误报成正常。
+    if gm.has_live_gateway_instance() && gm.is_ready() {
         info!("[服务] 服务已在运行中");
         return Err("服务已在运行中".to_string());
     }
@@ -196,37 +201,42 @@ pub async fn start_service(app: AppHandle) -> Result<String, String> {
 
     // 直接后台启动 gateway，通过 GatewayManager 绝对控股 PID
     info!("[服务] 后台集权管理启动 gateway...");
-    let gm = app.state::<GatewayManager>();
+    gm.cancel_pending_waits();
     gm.set_suppress_restart(false);
+    config::ensure_gateway_token().map_err(|e| format!("初始化 Gateway Token 失败: {}", e))?;
     if let Err(e) = config::ensure_channel_plugins_enabled() {
         warn!("[服务] 启动前配置修复失败: {}", e);
     }
-    let port = gm.start().map_err(|e| format!("启动服务失败: {}", e))?;
+    let port = gm
+        .start_or_recover_for_control_ui()
+        .map_err(|e| format!("启动服务失败: {}", e))?;
 
-    // 轮询等待端口开始监听及 HTTP 就绪（最多 60 秒）
+    // 启动阶段不再用硬超时误判慢启动，只在网关明确退出失败时同步自愈一次。
     info!(
-        "[服务] 等待 Gateway HTTP 存活探活 (60秒), 端口: {}...",
+        "[服务] 等待 Gateway 就绪（无硬超时，明确失败后自动重试一次）, 端口: {}...",
         port
     );
-    if gm.wait_for_ready(60) {
-        // 启动成功，通知前端重新导航
-        crate::gateway::navigate_webview_to_gateway(&app, port);
+    match gm.wait_for_ready_or_recover_once() {
+        GatewayWaitOutcome::Ready(ready_port) => {
+            // 启动成功，通知前端重新导航
+            crate::gateway::navigate_webview_to_gateway(&app, ready_port);
 
-        if let Some(pid) = check_port_listening(port) {
-            info!("[服务] ✓ 启动成功, PID: {}, 端口: {}", pid, port);
-            return Ok(format!("服务已启动，PID: {}, 端口: {}", pid, port));
+            if let Some(pid) = check_port_listening(ready_port) {
+                info!("[服务] ✓ 启动成功, PID: {}, 端口: {}", pid, ready_port);
+                return Ok(format!("服务已启动，PID: {}, 端口: {}", pid, ready_port));
+            }
+            info!("[服务] ✓ Gateway 已就绪，但端口识别延迟");
+            Ok(format!("服务已启动，端口: {}", ready_port))
         }
-        info!("[服务] ✓ HTTP已就绪，但端口识别延迟");
-        return Ok(format!("服务已启动，端口: {}", port));
+        GatewayWaitOutcome::Canceled => {
+            info!("[服务] Gateway 启动已取消");
+            Err("服务启动已取消".to_string())
+        }
+        GatewayWaitOutcome::Failed(reason) => {
+            info!("[服务] Gateway 启动失败: {}", reason);
+            Err(format!("服务启动失败: {}", reason))
+        }
     }
-
-    if let Some(reason) = gm.take_last_start_failure_reason() {
-        info!("[服务] Gateway 启动失败: {}", reason);
-        return Err(format!("服务启动失败: {}", reason));
-    }
-
-    info!("[服务] 等待超时，HTTP 或端口仍未就绪");
-    Err("服务启动超时（60秒），请检查 openclaw 日志".to_string())
 }
 
 /// 停止服务
@@ -235,10 +245,18 @@ pub async fn stop_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 停止服务...");
 
     let gm = app.state::<GatewayManager>();
+    let port = gm.get_port();
+    let managed_pid = gm.managed_gateway_pid();
     gm.set_suppress_restart(true);
     gm.stop();
 
     std::thread::sleep(std::time::Duration::from_millis(500));
+
+    if let Some(pid) = managed_pid {
+        if check_port_listening(port) == Some(pid) || is_process_running(pid) {
+            return Err(format!("无法停止服务，PID {} 仍未退出", pid));
+        }
+    }
 
     let status = get_service_status(app).await?;
     if status.running {
@@ -249,40 +267,24 @@ pub async fn stop_service(app: AppHandle) -> Result<String, String> {
     }
 }
 
-/// 强制杀死占用指定端口的进程
-fn force_kill_port_holder(port: u16) {
-    if let Some(pid) = check_port_listening(port) {
-        warn!("[服务] 端口 {} 仍被 PID {} 占用，强制终止", port, pid);
-        #[cfg(windows)]
-        {
-            let _ = Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid.to_string()])
-                .creation_flags(CREATE_NO_WINDOW)
-                .status();
-        }
-        #[cfg(unix)]
-        {
-            let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
-        }
-        // 等待进程退出、端口释放
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
-}
-
 /// 停止 Gateway 子进程（用于更新前清理）
-/// 先通过 GatewayManager 优雅停止，再检查端口确保无残留进程
+/// 通过 GatewayManager 停止当前追踪/接管的 gateway，避免按端口误杀无关进程
 #[command]
 pub async fn stop_gateway(app: AppHandle) -> Result<(), String> {
     info!("[服务] 更新前停止 Gateway...");
     let gm = app.state::<GatewayManager>();
     let port = gm.get_port();
+    let managed_pid = gm.managed_gateway_pid();
     // 抑制健康检查线程自动重启，防止安装期间 gateway 被拉起
     gm.set_suppress_restart(true);
     gm.stop();
     std::thread::sleep(std::time::Duration::from_secs(1));
 
-    // 兜底：如果端口仍被占用（孤儿进程、上次崩溃残留等），强制杀掉
-    force_kill_port_holder(port);
+    if let Some(pid) = managed_pid {
+        if check_port_listening(port) == Some(pid) || is_process_running(pid) {
+            return Err(format!("更新前停止 Gateway 失败，PID {} 仍未退出", pid));
+        }
+    }
 
     info!("[服务] Gateway 已停止，可以安全更新");
     Ok(())
@@ -294,27 +296,28 @@ pub async fn restart_service(app: AppHandle) -> Result<String, String> {
     info!("[服务] 重启服务...");
 
     let gm = app.state::<GatewayManager>();
+    gm.cancel_pending_waits();
     gm.set_suppress_restart(false);
     gm.stop();
     std::thread::sleep(std::time::Duration::from_secs(1));
+    config::ensure_gateway_token().map_err(|e| format!("初始化 Gateway Token 失败: {}", e))?;
     if let Err(e) = config::ensure_channel_plugins_enabled() {
         warn!("[服务] 重启前配置修复失败: {}", e);
     }
 
-    let port = gm
-        .start()
+    gm.start_or_recover_for_control_ui()
         .map_err(|e| format!("重启 Gateway 失败: {}", e))?;
 
-    if gm.wait_for_ready(60) {
-        // 重启成功，通知前端重新导航
-        crate::gateway::navigate_webview_to_gateway(&app, port);
-        info!("[服务] ✓ 重启成功，端口: {}", port);
-        Ok(format!("服务已重启，端口: {}", port))
-    } else {
-        if let Some(reason) = gm.take_last_start_failure_reason() {
-            return Err(format!("Gateway 重启失败: {}", reason));
+    info!("[服务] 等待 Gateway 重启完成（无硬超时，明确失败后自动重试一次）...");
+    match gm.wait_for_ready_or_recover_once() {
+        GatewayWaitOutcome::Ready(ready_port) => {
+            // 重启成功，通知前端重新导航
+            crate::gateway::navigate_webview_to_gateway(&app, ready_port);
+            info!("[服务] ✓ 重启成功，端口: {}", ready_port);
+            Ok(format!("服务已重启，端口: {}", ready_port))
         }
-        Err("Gateway 重启超时（60秒）".to_string())
+        GatewayWaitOutcome::Canceled => Err("Gateway 重启已取消".to_string()),
+        GatewayWaitOutcome::Failed(reason) => Err(format!("Gateway 重启失败: {}", reason)),
     }
 }
 

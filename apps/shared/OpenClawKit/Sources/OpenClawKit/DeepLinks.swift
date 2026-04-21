@@ -6,6 +6,8 @@ public enum DeepLinkRoute: Sendable, Equatable {
 }
 
 public struct GatewayConnectDeepLink: Codable, Sendable, Equatable {
+    private static let defaultGatewayPort = 28789
+
     public let host: String
     public let port: Int
     public let tls: Bool
@@ -42,7 +44,7 @@ public struct GatewayConnectDeepLink: Codable, Sendable, Equatable {
         if !tls, !LoopbackHost.isLoopbackHost(hostname) {
             return nil
         }
-        let port = parsed.port ?? (tls ? 443 : 18789)
+        let port = parsed.port ?? (tls ? 443 : Self.defaultGatewayPort)
         let bootstrapToken = json["bootstrapToken"] as? String
         let token = json["token"] as? String
         let password = json["password"] as? String
@@ -99,6 +101,8 @@ public struct AgentDeepLink: Codable, Sendable, Equatable {
 }
 
 public enum DeepLinkParser {
+    private static let defaultGatewayPort = 28789
+
     public static func parse(_ url: URL) -> DeepLinkRoute? {
         guard let scheme = url.scheme?.lowercased(),
               scheme == "openclaw"
@@ -139,7 +143,7 @@ public enum DeepLinkParser {
             else {
                 return nil
             }
-            let port = query["port"].flatMap { Int($0) } ?? 18789
+            let port = query["port"].flatMap { Int($0) } ?? Self.defaultGatewayPort
             let tls = (query["tls"] as NSString?)?.boolValue ?? false
             if !tls, !LoopbackHost.isLoopbackHost(hostParam) {
                 return nil

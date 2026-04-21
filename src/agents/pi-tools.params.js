@@ -1,195 +1,260 @@
 const RETRY_GUIDANCE_SUFFIX = " Supply correct parameters before retrying.";
-function parameterValidationError(message) {
-    return new Error(`${message}.${RETRY_GUIDANCE_SUFFIX}`);
-}
-export const CLAUDE_PARAM_GROUPS = {
-    read: [{ keys: ["path", "file_path", "filePath", "file"], label: "path alias" }],
-    write: [
-        { keys: ["path", "file_path", "filePath", "file"], label: "path alias" },
-        { keys: ["content"], label: "content" },
-    ],
-    edit: [
-        { keys: ["path", "file_path", "filePath", "file"], label: "path alias" },
-        {
-            keys: ["oldText", "old_string", "old_text", "oldString"],
-            label: "oldText alias",
-        },
-        {
-            keys: ["newText", "new_string", "new_text", "newString"],
-            label: "newText alias",
-            allowEmpty: true,
-        },
-    ],
-};
+const PATH_PARAM_KEYS = ["path", "file_path", "filePath", "file"];
 const CLAUDE_PARAM_ALIASES = [
-    { original: "path", alias: "file_path" },
-    { original: "path", alias: "filePath" },
-    { original: "path", alias: "file" },
-    { original: "oldText", alias: "old_string" },
-    { original: "oldText", alias: "old_text" },
-    { original: "oldText", alias: "oldString" },
-    { original: "newText", alias: "new_string" },
-    { original: "newText", alias: "new_text" },
-    { original: "newText", alias: "newString" },
+  { original: "path", alias: "file_path" },
+  { original: "path", alias: "filePath" },
+  { original: "path", alias: "file" },
+  { original: "oldText", alias: "old_string" },
+  { original: "oldText", alias: "old_text" },
+  { original: "oldText", alias: "oldString" },
+  { original: "newText", alias: "new_string" },
+  { original: "newText", alias: "new_text" },
+  { original: "newText", alias: "newString" },
 ];
+function parameterValidationError(message) {
+  return new Error(`${message}.${RETRY_GUIDANCE_SUFFIX}`);
+}
 function extractStructuredText(value, depth = 0) {
-    if (depth > 6) {
-        return undefined;
-    }
-    if (typeof value === "string") {
-        return value;
-    }
-    if (Array.isArray(value)) {
-        const parts = value
-            .map((entry) => extractStructuredText(entry, depth + 1))
-            .filter((entry) => typeof entry === "string");
-        return parts.length > 0 ? parts.join("") : undefined;
-    }
-    if (!value || typeof value !== "object") {
-        return undefined;
-    }
-    const record = value;
-    if (typeof record.text === "string") {
-        return record.text;
-    }
-    if (typeof record.content === "string") {
-        return record.content;
-    }
-    if (Array.isArray(record.content)) {
-        return extractStructuredText(record.content, depth + 1);
-    }
-    if (Array.isArray(record.parts)) {
-        return extractStructuredText(record.parts, depth + 1);
-    }
-    if (typeof record.value === "string" && record.value.length > 0) {
-        const type = typeof record.type === "string" ? record.type.toLowerCase() : "";
-        const kind = typeof record.kind === "string" ? record.kind.toLowerCase() : "";
-        if (type.includes("text") || kind === "text") {
-            return record.value;
-        }
-    }
+  if (depth > 6) {
     return undefined;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    if (depth === 0) {
+      return undefined;
+    }
+    const parts = value
+      .map((entry) => extractStructuredText(entry, depth + 1))
+      .filter((entry) => typeof entry === "string");
+    return parts.length > 0 ? parts.join("") : undefined;
+  }
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const record = value;
+  if (typeof record.text === "string") {
+    return record.text;
+  }
+  if (typeof record.content === "string") {
+    return record.content;
+  }
+  if (Array.isArray(record.content)) {
+    return extractStructuredText(record.content, depth + 1);
+  }
+  if (Array.isArray(record.parts)) {
+    return extractStructuredText(record.parts, depth + 1);
+  }
+  if (typeof record.value === "string" && record.value.length > 0) {
+    const type = typeof record.type === "string" ? record.type.toLowerCase() : "";
+    const kind = typeof record.kind === "string" ? record.kind.toLowerCase() : "";
+    if (type.includes("text") || kind === "text") {
+      return record.value;
+    }
+  }
+  return undefined;
 }
 function normalizeTextLikeParam(record, key) {
-    const value = record[key];
-    if (typeof value === "string") {
-        return;
-    }
-    const extracted = extractStructuredText(value);
-    if (typeof extracted === "string") {
-        record[key] = extracted;
-    }
+  const value = record[key];
+  if (typeof value === "string") {
+    return;
+  }
+  const extracted = extractStructuredText(value);
+  if (typeof extracted === "string") {
+    record[key] = extracted;
+  }
 }
-function normalizeClaudeParamAliases(record) {
-    for (const { original, alias } of CLAUDE_PARAM_ALIASES) {
-        if (alias in record && !(original in record)) {
-            record[original] = record[alias];
-        }
-        delete record[alias];
+function describeReceivedParamValue(value, allowEmpty = false) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    if (allowEmpty || value.trim().length > 0) {
+      return undefined;
     }
+    return "<empty-string>";
+  }
+  if (Array.isArray(value)) {
+    return "<array>";
+  }
+  return `<${typeof value}>`;
+}
+function formatReceivedParamHint(record, groups) {
+  const allowEmptyKeys = new Set(
+    groups.filter((group) => group.allowEmpty).flatMap((group) => group.keys),
+  );
+  const received = Object.keys(record).flatMap((key) => {
+    const detail = describeReceivedParamValue(record[key], allowEmptyKeys.has(key));
+    if (record[key] === undefined || record[key] === null) {
+      return [];
+    }
+    return [detail ? `${key}=${detail}` : key];
+  });
+  return received.length > 0 ? ` (received: ${received.join(", ")})` : "";
+}
+function isValidEditReplacement(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value;
+  return (
+    typeof record.oldText === "string" &&
+    record.oldText.trim().length > 0 &&
+    typeof record.newText === "string"
+  );
+}
+function hasValidEditReplacements(record) {
+  const edits = record.edits;
+  return (
+    Array.isArray(edits) &&
+    edits.length > 0 &&
+    edits.every((entry) => isValidEditReplacement(entry))
+  );
 }
 function addClaudeParamAliasesToSchema(params) {
-    let changed = false;
-    for (const { original, alias } of CLAUDE_PARAM_ALIASES) {
-        if (!(original in params.properties)) {
-            continue;
-        }
-        if (!(alias in params.properties)) {
-            params.properties[alias] = params.properties[original];
-            changed = true;
-        }
-        const idx = params.required.indexOf(original);
-        if (idx !== -1) {
-            params.required.splice(idx, 1);
-            changed = true;
-        }
+  let changed = false;
+  for (const { original, alias } of CLAUDE_PARAM_ALIASES) {
+    if (!(original in params.properties)) {
+      continue;
     }
-    return changed;
+    if (!(alias in params.properties)) {
+      params.properties[alias] = params.properties[original];
+      changed = true;
+    }
+    const requiredIndex = params.required.indexOf(original);
+    if (requiredIndex !== -1) {
+      params.required.splice(requiredIndex, 1);
+      changed = true;
+    }
+  }
+  return changed;
 }
-// Normalize tool parameters from Claude Code conventions to pi-coding-agent conventions.
-// Claude Code uses file_path/old_string/new_string while pi-coding-agent uses path/oldText/newText.
-// This prevents models trained on Claude Code from getting stuck in tool-call loops.
-export function normalizeToolParams(params) {
-    if (!params || typeof params !== "object") {
-        return undefined;
+function normalizeClaudeParamAliases(record) {
+  for (const { original, alias } of CLAUDE_PARAM_ALIASES) {
+    const aliasValue = record[alias];
+    const currentValue = record[original];
+    const aliasIsUsable =
+      typeof aliasValue === "string" && (original === "newText" || aliasValue.trim().length > 0);
+    const shouldUseAlias =
+      aliasIsUsable &&
+      (!(original in record) ||
+        currentValue === undefined ||
+        currentValue === null ||
+        typeof currentValue !== "string" ||
+        currentValue.trim().length === 0);
+    if (alias in record && shouldUseAlias) {
+      record[original] = aliasValue;
     }
-    const record = params;
-    const normalized = { ...record };
-    normalizeClaudeParamAliases(normalized);
-    // Some providers/models emit text payloads as structured blocks instead of raw strings.
-    // Normalize these for write/edit so content matching and writes stay deterministic.
-    normalizeTextLikeParam(normalized, "content");
-    normalizeTextLikeParam(normalized, "oldText");
-    normalizeTextLikeParam(normalized, "newText");
-    return normalized;
+    delete record[alias];
+  }
+}
+function synthesizeEditReplacements(record) {
+  if ("edits" in record) {
+    return;
+  }
+  const oldText = record.oldText;
+  const newText = record.newText;
+  if (typeof oldText === "string" && oldText.trim().length > 0 && typeof newText === "string") {
+    record.edits = [{ oldText, newText }];
+  }
+}
+export const REQUIRED_PARAM_GROUPS = {
+  read: [{ keys: PATH_PARAM_KEYS, label: "path" }],
+  write: [
+    { keys: PATH_PARAM_KEYS, label: "path" },
+    { keys: ["content"], label: "content" },
+  ],
+  edit: [
+    { keys: PATH_PARAM_KEYS, label: "path" },
+    { keys: ["edits"], label: "edits", validator: hasValidEditReplacements },
+  ],
+};
+export const CLAUDE_PARAM_GROUPS = REQUIRED_PARAM_GROUPS;
+export function getToolParamsRecord(params) {
+  return params && typeof params === "object" ? params : undefined;
+}
+export function normalizeToolParams(params) {
+  const record = getToolParamsRecord(params);
+  if (!record) {
+    return undefined;
+  }
+  const normalized = { ...record };
+  normalizeClaudeParamAliases(normalized);
+  normalizeTextLikeParam(normalized, "content");
+  normalizeTextLikeParam(normalized, "oldText");
+  normalizeTextLikeParam(normalized, "newText");
+  synthesizeEditReplacements(normalized);
+  return normalized;
 }
 export function patchToolSchemaForClaudeCompatibility(tool) {
-    const schema = tool.parameters && typeof tool.parameters === "object"
-        ? tool.parameters
-        : undefined;
-    if (!schema || !schema.properties || typeof schema.properties !== "object") {
-        return tool;
-    }
-    const properties = { ...schema.properties };
-    const required = Array.isArray(schema.required)
-        ? schema.required.filter((key) => typeof key === "string")
-        : [];
-    const changed = addClaudeParamAliasesToSchema({ properties, required });
-    if (!changed) {
-        return tool;
-    }
-    return {
-        ...tool,
-        parameters: {
-            ...schema,
-            properties,
-            required,
-        },
-    };
+  const schema =
+    tool.parameters && typeof tool.parameters === "object" ? tool.parameters : undefined;
+  if (!schema || !schema.properties || typeof schema.properties !== "object") {
+    return tool;
+  }
+  const properties = { ...schema.properties };
+  const required = Array.isArray(schema.required)
+    ? schema.required.filter((key) => typeof key === "string")
+    : [];
+  const changed = addClaudeParamAliasesToSchema({ properties, required });
+  if (!changed) {
+    return tool;
+  }
+  return {
+    ...tool,
+    parameters: {
+      ...tool.parameters,
+      properties,
+      required,
+    },
+  };
 }
 export function assertRequiredParams(record, groups, toolName) {
-    if (!record || typeof record !== "object") {
-        throw parameterValidationError(`Missing parameters for ${toolName}`);
-    }
-    const missingLabels = [];
-    for (const group of groups) {
-        const satisfied = group.keys.some((key) => {
-            if (!(key in record)) {
-                return false;
-            }
-            const value = record[key];
-            if (typeof value !== "string") {
-                return false;
-            }
-            if (group.allowEmpty) {
-                return true;
-            }
-            return value.trim().length > 0;
-        });
-        if (!satisfied) {
-            const label = group.label ?? group.keys.join(" or ");
-            missingLabels.push(label);
+  if (!record || typeof record !== "object") {
+    throw parameterValidationError(`Missing parameters for ${toolName}`);
+  }
+  const missingLabels = [];
+  for (const group of groups) {
+    const satisfied =
+      group.validator?.(record) ??
+      group.keys.some((key) => {
+        if (!(key in record)) {
+          return false;
         }
+        const value = record[key];
+        if (typeof value !== "string") {
+          return false;
+        }
+        if (group.allowEmpty) {
+          return true;
+        }
+        return value.trim().length > 0;
+      });
+    if (!satisfied) {
+      const label = group.label ?? group.keys.join(" or ");
+      missingLabels.push(label);
     }
-    if (missingLabels.length > 0) {
-        const joined = missingLabels.join(", ");
-        const noun = missingLabels.length === 1 ? "parameter" : "parameters";
-        throw parameterValidationError(`Missing required ${noun}: ${joined}`);
-    }
+  }
+  if (missingLabels.length > 0) {
+    const joined = missingLabels.join(", ");
+    const noun = missingLabels.length === 1 ? "parameter" : "parameters";
+    const receivedHint = formatReceivedParamHint(record, groups);
+    throw parameterValidationError(`Missing required ${noun}: ${joined}${receivedHint}`);
+  }
 }
-// Generic wrapper to normalize parameters for any tool.
-export function wrapToolParamNormalization(tool, requiredParamGroups) {
-    const patched = patchToolSchemaForClaudeCompatibility(tool);
-    return {
-        ...patched,
-        execute: async (toolCallId, params, signal, onUpdate) => {
-            const normalized = normalizeToolParams(params);
-            const record = normalized ??
-                (params && typeof params === "object" ? params : undefined);
-            if (requiredParamGroups?.length) {
-                assertRequiredParams(record, requiredParamGroups, tool.name);
-            }
-            return tool.execute(toolCallId, normalized ?? params, signal, onUpdate);
-        },
-    };
+export function wrapToolParamValidation(tool, requiredParamGroups) {
+  const patched = patchToolSchemaForClaudeCompatibility(tool);
+  return {
+    ...patched,
+    execute: async (toolCallId, params, signal, onUpdate) => {
+      const normalized = normalizeToolParams(params);
+      const record = normalized ?? (params && typeof params === "object" ? params : undefined);
+      if (requiredParamGroups?.length) {
+        assertRequiredParams(record, requiredParamGroups, tool.name);
+      }
+      return tool.execute(toolCallId, normalized ?? params, signal, onUpdate);
+    },
+  };
 }
+export const wrapToolParamNormalization = wrapToolParamValidation;

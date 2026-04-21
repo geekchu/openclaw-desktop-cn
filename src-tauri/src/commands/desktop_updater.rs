@@ -26,9 +26,13 @@ pub struct DesktopUpdateMetadata {
 #[serde(tag = "event", content = "data")]
 pub enum DesktopDownloadEvent {
     #[serde(rename_all = "camelCase")]
-    Started { content_length: Option<u64> },
+    Started {
+        content_length: Option<u64>,
+    },
     #[serde(rename_all = "camelCase")]
-    Progress { chunk_length: usize },
+    Progress {
+        chunk_length: usize,
+    },
     Finished,
 }
 
@@ -42,7 +46,9 @@ fn lock_session<'a>(
 }
 
 #[command]
-pub async fn desktop_check_for_update(app: AppHandle) -> Result<Option<DesktopUpdateMetadata>, String> {
+pub async fn desktop_check_for_update(
+    app: AppHandle,
+) -> Result<Option<DesktopUpdateMetadata>, String> {
     let updater = app
         .updater()
         .map_err(|e| format!("初始化更新器失败: {e}"))?;
@@ -199,12 +205,7 @@ struct WindowsUpdaterLaunchConfig {
 
 #[cfg(windows)]
 fn install_windows_update(app: &AppHandle, update: &Update, bytes: &[u8]) -> Result<(), String> {
-    use std::{
-        env,
-        os::windows::process::CommandExt,
-        path::PathBuf,
-        process::Command,
-    };
+    use std::{env, os::windows::process::CommandExt, path::PathBuf, process::Command};
 
     let install_dir = env::current_exe()
         .map_err(|e| format!("解析当前安装目录失败: {e}"))?
@@ -241,7 +242,9 @@ fn install_windows_update(app: &AppHandle, update: &Update, bytes: &[u8]) -> Res
         WindowsInstallerKind::Msi => {
             let system_root =
                 std::env::var_os("SYSTEMROOT").unwrap_or_else(|| "C:\\Windows".into());
-            let msiexec_path = PathBuf::from(system_root).join("System32").join("msiexec.exe");
+            let msiexec_path = PathBuf::from(system_root)
+                .join("System32")
+                .join("msiexec.exe");
 
             let mut command = Command::new(msiexec_path);
             command
@@ -361,7 +364,10 @@ fn read_windows_updater_launch_config(app: &AppHandle) -> WindowsUpdaterLaunchCo
         };
     }
 
-    if let Some(args) = windows.get("installerArgs").and_then(|value| value.as_array()) {
+    if let Some(args) = windows
+        .get("installerArgs")
+        .and_then(|value| value.as_array())
+    {
         config.installer_args = args
             .iter()
             .filter_map(|value| value.as_str().map(ToString::to_string))
@@ -444,7 +450,8 @@ fn persist_windows_installer(
     let temp_dir = std::env::temp_dir().join("openclaw-desktop-updater");
     fs::create_dir_all(&temp_dir).map_err(|e| format!("创建更新临时目录失败: {e}"))?;
 
-    let path = PathBuf::from(temp_dir).join(format!("openclaw-update-{version}-{millis}.{extension}"));
+    let path =
+        PathBuf::from(temp_dir).join(format!("openclaw-update-{version}-{millis}.{extension}"));
     fs::write(&path, bytes).map_err(|e| format!("写入更新安装器失败: {e}"))?;
 
     Ok(path)

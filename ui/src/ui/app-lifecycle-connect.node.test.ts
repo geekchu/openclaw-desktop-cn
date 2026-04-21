@@ -44,7 +44,6 @@ function createHost() {
   return {
     basePath: "",
     client: null,
-    connectGeneration: 0,
     connected: false,
     tab: "chat",
     assistantName: "OpenClaw",
@@ -72,42 +71,14 @@ describe("handleConnected", () => {
     loadBootstrapMock.mockReset();
   });
 
-  it("waits for bootstrap load before first gateway connect", async () => {
-    let resolveBootstrap!: () => void;
-    loadBootstrapMock.mockReturnValueOnce(
-      new Promise<void>((resolve) => {
-        resolveBootstrap = resolve;
-      }),
-    );
-    connectGatewayMock.mockReset();
+  it("starts gateway connect immediately while bootstrap loads in background", () => {
+    loadBootstrapMock.mockReturnValueOnce(new Promise<void>(() => {}));
     const host = createHost();
 
     handleConnected(host as never);
-    expect(connectGatewayMock).not.toHaveBeenCalled();
 
-    resolveBootstrap();
-    await Promise.resolve();
     expect(connectGatewayMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips deferred connect when disconnected before bootstrap resolves", async () => {
-    let resolveBootstrap!: () => void;
-    loadBootstrapMock.mockReturnValueOnce(
-      new Promise<void>((resolve) => {
-        resolveBootstrap = resolve;
-      }),
-    );
-    connectGatewayMock.mockReset();
-    const host = createHost();
-
-    handleConnected(host as never);
-    expect(connectGatewayMock).not.toHaveBeenCalled();
-
-    host.connectGeneration += 1;
-    resolveBootstrap();
-    await Promise.resolve();
-
-    expect(connectGatewayMock).not.toHaveBeenCalled();
+    expect(loadBootstrapMock).toHaveBeenCalledTimes(1);
   });
 
   it("scrubs URL settings before starting the bootstrap fetch", () => {

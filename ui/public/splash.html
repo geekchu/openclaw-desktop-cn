@@ -3,86 +3,203 @@
   <head>
     <meta charset="utf-8" />
     <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
-        margin: 0;
-        background: radial-gradient(circle at center, #1a1a1a 0%, #050505 100%);
+        background: radial-gradient(ellipse at 50% 40%, #1a1a2e 0%, #0a0a0f 100%);
         display: flex;
         justify-content: center;
         align-items: center;
         height: 100vh;
         flex-direction: column;
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         overflow: hidden;
+        color: #fff;
+        -webkit-font-smoothing: antialiased;
       }
-      .logo-container {
-        animation: float 4s ease-in-out infinite;
-        margin-bottom: 24px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+
+      .logo-wrap {
         position: relative;
+        margin-bottom: 32px;
       }
       .logo {
-        font-size: 80px;
-        filter: drop-shadow(0 0 15px rgba(255, 60, 60, 0.2));
+        font-size: 72px;
+        animation: breathe 3s ease-in-out infinite;
+        filter: drop-shadow(0 0 20px rgba(255, 80, 60, 0.15));
       }
-      .spinner {
-        width: 32px;
-        height: 32px;
-        border: 3px solid rgba(255, 255, 255, 0.1);
-        border-top-color: rgba(255, 255, 255, 0.9);
+      .ring {
+        position: absolute;
+        inset: -18px;
         border-radius: 50%;
-        animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        border: 2px solid transparent;
+        border-top-color: rgba(255, 255, 255, 0.35);
+        animation: orbit 1.8s linear infinite;
       }
-      .text {
-        color: rgba(255, 255, 255, 0.6);
+
+      .progress-track {
+        width: 200px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 28px;
+      }
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, rgba(255,255,255,0.15), rgba(255,255,255,0.5));
+        border-radius: 2px;
+        transition: width 1s ease-out;
+      }
+
+      .status {
         font-size: 14px;
-        margin-top: 20px;
-        letter-spacing: 1px;
-        animation: pulse 2s ease-in-out infinite;
+        color: rgba(255, 255, 255, 0.7);
+        letter-spacing: 0.5px;
+        min-height: 20px;
+        transition: opacity 0.3s;
       }
-      @keyframes float {
-        0% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-10px);
-        }
-        100% {
-          transform: translateY(0px);
-        }
+      body[data-tone="error"] .status {
+        color: rgba(255, 130, 130, 0.95);
       }
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
+
+      .meta {
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.28);
       }
-      @keyframes pulse {
-        0% {
-          opacity: 0.5;
-        }
-        50% {
-          opacity: 1;
-          text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
-        }
-        100% {
-          opacity: 0.5;
-        }
+      .tip {
+        position: absolute;
+        bottom: 48px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.22);
+        max-width: 360px;
+        text-align: center;
+        padding: 0 24px;
+        transition: opacity 0.5s;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.04); }
+      }
+      @keyframes orbit {
+        to { transform: rotate(360deg); }
       }
     </style>
   </head>
   <body>
-    <div class="logo-container">
+    <div class="logo-wrap">
       <div class="logo">🦞</div>
+      <div class="ring"></div>
     </div>
-    <div class="spinner"></div>
-    <div class="text">正在启动...</div>
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+    <div class="status" id="status">正在启动...</div>
+    <div class="meta">
+      <span id="phase">初始化</span>
+    </div>
+    <div class="tip" id="tip"></div>
+
+    <script>
+      (() => {
+        const statusEl = document.getElementById("status");
+        const phaseEl = document.getElementById("phase");
+        const progressEl = document.getElementById("progress");
+        const tipEl = document.getElementById("tip");
+        const startTime = Date.now();
+        let isError = false;
+
+        const tips = [
+          "首次启动需要初始化组件，后续启动会更快",
+          "Gateway 正在加载插件和 AI 模型配置",
+          "正在建立安全通信通道",
+          "所有数据均在本地处理，保障隐私安全",
+          "启动完成后可在设置中配置消息渠道",
+          "如长时间无响应，可尝试重启应用",
+        ];
+
+        const stages = [
+          { after: 0,  text: "初始化", pct: 5 },
+          { after: 3,  text: "启动进程", pct: 15 },
+          { after: 8,  text: "加载插件", pct: 30 },
+          { after: 15, text: "配置服务", pct: 50 },
+          { after: 25, text: "启动通道", pct: 70 },
+          { after: 35, text: "即将就绪", pct: 85 },
+          { after: 50, text: "最后准备", pct: 92 },
+        ];
+
+        let currentTip = 0;
+        function rotateTip() {
+          tipEl.style.opacity = "0";
+          setTimeout(() => {
+            tipEl.textContent = tips[currentTip % tips.length];
+            tipEl.style.opacity = "1";
+            currentTip++;
+          }, 400);
+        }
+        rotateTip();
+        setInterval(rotateTip, 6000);
+
+        setInterval(() => {
+          if (isError) return;
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+          let stage = stages[0];
+          for (const s of stages) {
+            if (elapsed >= s.after) stage = s;
+          }
+          phaseEl.textContent = stage.text;
+          progressEl.style.width = stage.pct + "%";
+        }, 1000);
+
+        function setStatus(text, tone) {
+          if (statusEl && typeof text === "string" && text.trim()) {
+            statusEl.textContent = text;
+          }
+          isError = tone === "error";
+          document.body.dataset.tone = tone || "";
+          if (isError) {
+            progressEl.style.background = "rgba(255,130,130,0.5)";
+            tipEl.textContent = "如持续失败，请尝试重启应用或检查网络连接";
+            tipEl.style.opacity = "1";
+          }
+        }
+
+        async function initTauriSplashBridge() {
+          const tauri = window.__TAURI__;
+          const listen = tauri?.event?.listen;
+          if (typeof listen !== "function") return;
+
+          await listen("gateway-status", (event) => {
+            const text = typeof event?.payload === "string" ? event.payload : "";
+            if (!text) return;
+            const tone = /失败|超时|异常|断开|错误/.test(text) ? "error" : "";
+            setStatus(text, tone);
+            if (!tone) {
+              if (/就绪|ready/i.test(text)) {
+                progressEl.style.width = "95%";
+                phaseEl.textContent = "即将就绪";
+              } else if (/等待/.test(text)) {
+                progressEl.style.width = "40%";
+                phaseEl.textContent = "等待响应";
+              }
+            }
+          });
+
+          await listen("gateway-ready", (event) => {
+            const url = typeof event?.payload === "string" ? event.payload : "";
+            if (!url) return;
+            progressEl.style.width = "100%";
+            statusEl.textContent = "加载完成";
+            phaseEl.textContent = "就绪";
+            setTimeout(() => { window.location.href = url; }, 200);
+          });
+        }
+
+        initTauriSplashBridge().catch(() => {});
+      })();
+    </script>
   </body>
 </html>

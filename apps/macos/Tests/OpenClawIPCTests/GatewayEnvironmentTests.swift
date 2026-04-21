@@ -51,19 +51,61 @@ struct GatewayEnvironmentTests {
         #expect(Semver(major: 1, minor: 9, patch: 9).compatible(with: required) == false)
     }
 
-    @Test func `gateway port defaults and respects override`() async {
+    @Test func `gateway port defaults and respects config override`() async {
         let configPath = TestIsolation.tempConfigPath()
         await TestIsolation.withIsolatedState(
             env: ["OPENCLAW_CONFIG_PATH": configPath],
-            defaults: ["gatewayPort": nil])
+            defaults: [:] as [String: Any?])
         {
             let defaultPort = GatewayEnvironment.gatewayPort()
             #expect(defaultPort == 28789)
 
-            UserDefaults.standard.set(19999, forKey: "gatewayPort")
-            defer { UserDefaults.standard.removeObject(forKey: "gatewayPort") }
+            OpenClawConfigFile.saveDict(["gateway": ["port": 19999] as [String: Any]])
             #expect(GatewayEnvironment.gatewayPort() == 19999)
+            #expect(GatewayEnvironment.configuredGatewayPort() == 19999)
         }
+    }
+
+    @Test func `gateway port resolution prefers env then launchd then config then defaults`() {
+        #expect(GatewayEnvironment._testResolveGatewayPort(
+            env: ["OPENCLAW_GATEWAY_PORT": "30101"],
+            configPort: 28789,
+            launchdPort: 29999) == 30101)
+
+        #expect(GatewayEnvironment._testResolveGatewayPort(
+            env: [:],
+            configPort: 28789,
+            launchdPort: 29999) == 29999)
+
+        #expect(GatewayEnvironment._testResolveGatewayPort(
+            env: [:],
+            configPort: 28789,
+            launchdPort: nil) == 28789)
+
+        #expect(GatewayEnvironment._testResolveGatewayPort(
+            env: [:],
+            configPort: nil,
+            launchdPort: nil) == 28789)
+
+        #expect(GatewayEnvironment._testResolveGatewayPort(
+            env: [:],
+            configPort: 28789,
+            launchdPort: 29999,
+            preferLaunchdPort: false) == 28789)
+    }
+
+    @Test func `configured gateway port ignores stale launchd port`() {
+        #expect(GatewayEnvironment._testResolveConfiguredGatewayPort(
+            env: [:],
+            configPort: 28789) == 28789)
+
+        #expect(GatewayEnvironment._testResolveConfiguredGatewayPort(
+            env: [:],
+            configPort: nil) == 28789)
+
+        #expect(GatewayEnvironment._testResolveConfiguredGatewayPort(
+            env: ["OPENCLAW_GATEWAY_PORT": "30101"],
+            configPort: 28789) == 30101)
     }
 
     @Test func `expected gateway version from string uses parser`() {

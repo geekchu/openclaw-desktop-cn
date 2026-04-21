@@ -3,6 +3,7 @@ import {
   assertRequiredParams,
   REQUIRED_PARAM_GROUPS,
   getToolParamsRecord,
+  normalizeToolParams,
   wrapToolParamValidation,
 } from "./pi-tools.params.js";
 
@@ -25,20 +26,81 @@ describe("assertRequiredParams", () => {
     ).toThrow(/\(received: path\)/);
   });
 
-  it("does not normalize legacy aliases during validation", async () => {
+  it("normalizes path aliases before validation and execution", async () => {
+    const execute = vi.fn();
     const tool = wrapToolParamValidation(
       {
         name: "write",
         label: "write",
         description: "write a file",
         parameters: {},
-        execute: vi.fn(),
+        execute,
       },
       REQUIRED_PARAM_GROUPS.write,
     );
-    await expect(
-      tool.execute("id", { file_path: "test.txt" }, new AbortController().signal, vi.fn()),
-    ).rejects.toThrow(/\(received: file_path\)/);
+    await tool.execute(
+      "id",
+      { file_path: "test.txt", content: "hello" },
+      new AbortController().signal,
+      vi.fn(),
+    );
+    expect(execute).toHaveBeenCalledWith(
+      "id",
+      { path: "test.txt", content: "hello" },
+      expect.any(AbortSignal),
+      expect.any(Function),
+    );
+  });
+
+  it("synthesizes edit replacements from top-level alias parameters", () => {
+    expect(
+      normalizeToolParams({
+        filePath: "notes.txt",
+        old_text: "old",
+        newString: "new",
+      }),
+    ).toEqual({
+      path: "notes.txt",
+      oldText: "old",
+      newText: "new",
+      edits: [{ oldText: "old", newText: "new" }],
+    });
+  });
+
+  it("prefers non-empty aliases when canonical params are empty strings", () => {
+    expect(
+      normalizeToolParams({
+        path: "   ",
+        file_path: "notes.txt",
+        oldText: "   ",
+        old_text: "old",
+        newText: "",
+        new_text: "new",
+      }),
+    ).toEqual({
+      path: "notes.txt",
+      oldText: "old",
+      newText: "new",
+      edits: [{ oldText: "old", newText: "new" }],
+    });
+  });
+
+  it("prefers valid aliases when canonical params are the wrong type", () => {
+    expect(
+      normalizeToolParams({
+        path: {},
+        file_path: "notes.txt",
+        oldText: { bad: true },
+        old_text: "old",
+        newText: ["bad"],
+        new_text: "",
+      }),
+    ).toEqual({
+      path: "notes.txt",
+      oldText: "old",
+      newText: "",
+      edits: [{ oldText: "old", newText: "" }],
+    });
   });
 
   it("excludes null and undefined values from received hint", () => {

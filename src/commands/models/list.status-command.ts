@@ -16,7 +16,7 @@ import {
   resolveProfileUnusableUntilForDisplay,
 } from "../../agents/auth-profiles.js";
 import { resolveProviderEnvApiKeyCandidates } from "../../agents/model-auth-env-vars.js";
-import { resolveEnvApiKey } from "../../agents/model-auth.js";
+import { resolveApiKeyForProvider, resolveEnvApiKey } from "../../agents/model-auth.js";
 import {
   buildModelAliasIndex,
   isCliProvider,
@@ -73,6 +73,7 @@ export async function modelsStatusCommand(
     probeTimeout?: string;
     probeConcurrency?: string;
     probeMaxTokens?: string;
+    probeModel?: string;
     agent?: string;
   },
   runtime: RuntimeEnv,
@@ -206,6 +207,34 @@ export async function modelsStatusCommand(
   }
 
   const aliasIndex = buildModelAliasIndex({ cfg, defaultProvider: DEFAULT_PROVIDER });
+  const resolvedProbeModel = opts.probeModel
+    ? resolveModelRefFromString({
+        raw: String(opts.probeModel ?? ""),
+        defaultProvider: DEFAULT_PROVIDER,
+        aliasIndex,
+      })?.ref
+    : undefined;
+  if (opts.probeModel && !resolvedProbeModel) {
+    throw new Error("--probe-model must be a valid model id or alias.");
+  }
+  if (
+    resolvedProbeModel &&
+    opts.probeProvider &&
+    normalizeProviderId(opts.probeProvider) !== normalizeProviderId(resolvedProbeModel.provider)
+  ) {
+    throw new Error("--probe-model provider must match --probe-provider when both are set.");
+  }
+  const resolvedProbeProfileIds =
+    opts.probe && resolvedProbeModel && probeProfileIds.length === 0
+      ? await resolveApiKeyForProvider({
+          provider: resolvedProbeModel.provider,
+          cfg,
+          store,
+          agentDir,
+        })
+          .then((resolved) => (resolved.profileId ? [resolved.profileId] : []))
+          .catch(() => [])
+      : probeProfileIds;
   const rawCandidates = [
     rawModel || resolvedLabel,
     ...fallbacks,
@@ -235,11 +264,14 @@ export async function modelsStatusCommand(
           providers,
           modelCandidates,
           options: {
-            provider: opts.probeProvider,
-            profileIds: probeProfileIds,
+            provider: opts.probeProvider ?? resolvedProbeModel?.provider,
+            profileIds: resolvedProbeProfileIds,
             timeoutMs: probeTimeoutMs,
             concurrency: probeConcurrency,
             maxTokens: probeMaxTokens,
+            model: resolvedProbeModel
+              ? `${resolvedProbeModel.provider}/${resolvedProbeModel.model}`
+              : undefined,
           },
           onProgress: update,
         });

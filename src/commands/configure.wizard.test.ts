@@ -10,8 +10,11 @@ const mocks = vi.hoisted(() => ({
   resolveSearchProviderOptions: vi.fn(),
   setupSearch: vi.fn(),
   readConfigFileSnapshot: vi.fn(),
-  writeConfigFile: vi.fn(),
+  replaceConfigFile: vi.fn(),
   resolveGatewayPort: vi.fn(),
+  loadConfig: vi.fn(),
+  resolveConfigPath: vi.fn(),
+  resolveStateDir: vi.fn(),
   ensureControlUiAssetsBuilt: vi.fn(),
   createClackPrompter: vi.fn(),
   note: vi.fn(),
@@ -33,8 +36,11 @@ vi.mock("@clack/prompts", () => ({
 vi.mock("../config/config.js", () => ({
   CONFIG_PATH: "~/.openclawcn/openclaw.json",
   readConfigFileSnapshot: mocks.readConfigFileSnapshot,
-  writeConfigFile: mocks.writeConfigFile,
+  replaceConfigFile: mocks.replaceConfigFile,
   resolveGatewayPort: mocks.resolveGatewayPort,
+  loadConfig: mocks.loadConfig,
+  resolveConfigPath: mocks.resolveConfigPath,
+  resolveStateDir: mocks.resolveStateDir,
 }));
 
 vi.mock("../infra/control-ui-assets.js", () => ({
@@ -150,6 +156,9 @@ function createEnabledWebSearchConfig(provider: string, pluginEntry: Record<stri
 function setupBaseWizardState() {
   mocks.readConfigFileSnapshot.mockResolvedValue(EMPTY_CONFIG_SNAPSHOT);
   mocks.resolveGatewayPort.mockReturnValue(28789);
+  mocks.loadConfig.mockResolvedValue({});
+  mocks.resolveConfigPath.mockReturnValue("~/.openclawcn/openclaw.json");
+  mocks.resolveStateDir.mockReturnValue("~/.openclawcn");
   mocks.probeGatewayReachable.mockResolvedValue({ ok: false });
   mocks.resolveControlUiLinks.mockReturnValue({ wsUrl: "ws://127.0.0.1:28789" });
   mocks.summarizeExistingConfig.mockReturnValue("");
@@ -208,9 +217,11 @@ describe("runConfigureWizard", () => {
 
     await runConfigureWizard({ command: "configure" }, createRuntime());
 
-    expect(mocks.writeConfigFile).toHaveBeenCalledWith(
+    expect(mocks.replaceConfigFile).toHaveBeenCalledWith(
       expect.objectContaining({
-        gateway: expect.objectContaining({ mode: "local" }),
+        nextConfig: expect.objectContaining({
+          gateway: expect.objectContaining({ mode: "local" }),
+        }),
       }),
     );
   });
@@ -240,22 +251,24 @@ describe("runConfigureWizard", () => {
 
     await runWebConfigureWizard();
 
-    expect(mocks.writeConfigFile).toHaveBeenCalledWith(
+    expect(mocks.replaceConfigFile).toHaveBeenCalledWith(
       expect.objectContaining({
-        tools: expect.objectContaining({
-          web: expect.objectContaining({
-            search: expect.objectContaining({
-              provider: "firecrawl",
-              enabled: true,
+        nextConfig: expect.objectContaining({
+          tools: expect.objectContaining({
+            web: expect.objectContaining({
+              search: expect.objectContaining({
+                provider: "firecrawl",
+                enabled: true,
+              }),
             }),
           }),
-        }),
-        plugins: expect.objectContaining({
-          entries: expect.objectContaining({
-            firecrawl: expect.objectContaining({
-              enabled: true,
-              config: expect.objectContaining({
-                webSearch: expect.objectContaining({ apiKey: "fc-entered-key" }),
+          plugins: expect.objectContaining({
+            entries: expect.objectContaining({
+              firecrawl: expect.objectContaining({
+                enabled: true,
+                config: expect.objectContaining({
+                  webSearch: expect.objectContaining({ apiKey: "fc-entered-key" }),
+                }),
               }),
             }),
           }),
@@ -286,12 +299,14 @@ describe("runConfigureWizard", () => {
       expect.anything(),
       expect.anything(),
     );
-    expect(mocks.writeConfigFile).toHaveBeenCalledWith(
+    expect(mocks.replaceConfigFile).toHaveBeenCalledWith(
       expect.objectContaining({
-        plugins: expect.objectContaining({
-          entries: expect.objectContaining({
-            firecrawl: expect.objectContaining({
-              enabled: true,
+        nextConfig: expect.objectContaining({
+          plugins: expect.objectContaining({
+            entries: expect.objectContaining({
+              firecrawl: expect.objectContaining({
+                enabled: true,
+              }),
             }),
           }),
         }),
@@ -315,12 +330,14 @@ describe("runConfigureWizard", () => {
       ),
       "Web search",
     );
-    expect(mocks.writeConfigFile).toHaveBeenCalledWith(
+    expect(mocks.replaceConfigFile).toHaveBeenCalledWith(
       expect.objectContaining({
-        tools: expect.objectContaining({
-          web: expect.objectContaining({
-            search: expect.objectContaining({
-              enabled: false,
+        nextConfig: expect.objectContaining({
+          tools: expect.objectContaining({
+            web: expect.objectContaining({
+              search: expect.objectContaining({
+                enabled: false,
+              }),
             }),
           }),
         }),

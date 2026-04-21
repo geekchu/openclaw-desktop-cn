@@ -605,9 +605,9 @@ fn generate_token() -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-/// 获取或生成 Gateway Token
-#[command]
-pub async fn get_or_create_gateway_token() -> Result<String, String> {
+/// 获取或生成 Gateway Token。
+/// 所有桌面端启动入口都应先调用它，避免 gateway 进程与 WebView 使用不同 token。
+pub fn ensure_gateway_token() -> Result<String, String> {
     info!("[Gateway Token] 获取或创建 Gateway Token...");
 
     let mut config = load_openclaw_config()?;
@@ -646,6 +646,12 @@ pub async fn get_or_create_gateway_token() -> Result<String, String> {
     Ok(new_token)
 }
 
+/// 获取或生成 Gateway Token
+#[command]
+pub async fn get_or_create_gateway_token() -> Result<String, String> {
+    ensure_gateway_token()
+}
+
 /// 获取 Dashboard URL（带 token）
 #[command]
 pub async fn get_dashboard_url(app: AppHandle) -> Result<String, String> {
@@ -653,8 +659,8 @@ pub async fn get_dashboard_url(app: AppHandle) -> Result<String, String> {
 
     let gm = app.state::<crate::gateway::GatewayManager>();
     let port = gm.get_port();
-    let token = get_or_create_gateway_token().await?;
-    let url = format!("http://localhost:{}?token={}", port, token);
+    let token = ensure_gateway_token()?;
+    let url = crate::build_gateway_url("localhost", port, Some(&token));
 
     info!("[Dashboard URL] ✓ URL: {}...", &url[..50.min(url.len())]);
     Ok(url)

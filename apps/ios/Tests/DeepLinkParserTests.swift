@@ -83,12 +83,12 @@ private func agentAction(
 
     @Test func parseGatewayLinkParsesCommonFields() {
         let url = URL(
-            string: "openclaw://gateway?host=openclaw.local&port=18789&tls=1&token=abc&password=def")!
+            string: "openclaw://gateway?host=openclaw.local&port=28789&tls=1&token=abc&password=def")!
         #expect(
             DeepLinkParser.parse(url) == .gateway(
                 .init(
                     host: "openclaw.local",
-                    port: 18789,
+                    port: 28789,
                     tls: true,
                     bootstrapToken: nil,
                     token: "abc",
@@ -97,13 +97,13 @@ private func agentAction(
 
     @Test func parseGatewayLinkRejectsInsecureNonLoopbackWs() {
         let url = URL(
-            string: "openclaw://gateway?host=attacker.example&port=18789&tls=0&token=abc")!
+            string: "openclaw://gateway?host=attacker.example&port=28789&tls=0&token=abc")!
         #expect(DeepLinkParser.parse(url) == nil)
     }
 
     @Test func parseGatewayLinkRejectsInsecurePrefixBypassHost() {
         let url = URL(
-            string: "openclaw://gateway?host=127.attacker.example&port=18789&tls=0&token=abc")!
+            string: "openclaw://gateway?host=127.attacker.example&port=28789&tls=0&token=abc")!
         #expect(DeepLinkParser.parse(url) == nil)
     }
 
@@ -138,24 +138,24 @@ private func agentAction(
     }
 
     @Test func parseGatewaySetupCodeRejectsInsecureNonLoopbackWs() {
-        let payload = #"{"url":"ws://attacker.example:18789","bootstrapToken":"tok"}"#
+        let payload = #"{"url":"ws://attacker.example:28789","bootstrapToken":"tok"}"#
         let link = GatewayConnectDeepLink.fromSetupCode(setupCode(from: payload))
         #expect(link == nil)
     }
 
     @Test func parseGatewaySetupCodeRejectsInsecurePrefixBypassHost() {
-        let payload = #"{"url":"ws://127.attacker.example:18789","bootstrapToken":"tok"}"#
+        let payload = #"{"url":"ws://127.attacker.example:28789","bootstrapToken":"tok"}"#
         let link = GatewayConnectDeepLink.fromSetupCode(setupCode(from: payload))
         #expect(link == nil)
     }
 
     @Test func parseGatewaySetupCodeAllowsLoopbackWs() {
-        let payload = #"{"url":"ws://127.0.0.1:18789","bootstrapToken":"tok"}"#
+        let payload = #"{"url":"ws://127.0.0.1:28789","bootstrapToken":"tok"}"#
         let link = GatewayConnectDeepLink.fromSetupCode(setupCode(from: payload))
 
         #expect(link == .init(
             host: "127.0.0.1",
-            port: 18789,
+            port: 28789,
             tls: false,
             bootstrapToken: "tok",
             token: nil,

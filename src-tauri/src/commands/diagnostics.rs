@@ -110,6 +110,13 @@ fn read_current_primary_model_ref() -> Option<String> {
         .map(|value| value.to_string())
 }
 
+fn normalize_optional_string(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string())
+}
+
 fn clean_ai_test_output(output: &str) -> String {
     strip_ansi_codes(output)
         .lines()
@@ -165,52 +172,196 @@ fn detect_ai_test_error(output: &str) -> Option<String> {
     }
 }
 
-fn output_contains_expected_reply(output: &str, expected_reply: &str) -> bool {
-    let trimmed = output.trim();
-    trimmed == expected_reply || trimmed.lines().map(str::trim).any(|line| line == expected_reply)
-}
+const AI_TEST_PROBE_TIMEOUT_MS: u64 = 13_000;
+const AI_TEST_PROBE_MAX_TOKENS: u64 = 8;
 
-fn parse_ai_agent_result(
-    output: &str,
-    expected_reply: &str,
-    provider: &str,
-    model: &str,
-    latency_ms: u64,
-) -> AITestResult {
-    let cleaned = clean_ai_test_output(output);
+fn build_ai_probe_args(
+    provider_override: Option<&str>,
+    model_override: Option<&str>,
+) -> Vec<String> {
+    let mut args = vec![
+        "models".to_string(),
+        "status".to_string(),
+        "--json".to_string(),
+        "--probe".to_string(),
+        "--probe-timeout".to_string(),
+        AI_TEST_PROBE_TIMEOUT_MS.to_string(),
+        "--probe-concurrency".to_string(),
+        "1".to_string(),
+        "--probe-max-tokens".to_string(),
+        AI_TEST_PROBE_MAX_TOKENS.to_string(),
+    ];
 
-    if let Some(error) = detect_ai_test_error(&cleaned) {
-        return AITestResult {
-            success: false,
-            provider: provider.to_string(),
-            model: model.to_string(),
-            response: None,
-            error: Some(error),
-            latency_ms: Some(latency_ms),
-        };
+    if let Some(provider) = provider_override {
+        args.push("--probe-provider".to_string());
+        args.push(provider.to_string());
+    }
+    if let Some(model) = model_override {
+        args.push("--probe-model".to_string());
+        args.push(model.to_string());
     }
 
-    if output_contains_expected_reply(&cleaned, expected_reply) {
+    args
+}
+
+fn format_provider_model_ref(
+    provider: Option<&str>,
+    model: Option<&str>,
+    fallback_model: &str,
+) -> String {
+    let provider = normalize_optional_string(provider);
+    let model = normalize_optional_string(model);
+    match (provider.as_deref(), model.as_deref()) {
+        (_, Some(model)) if model.contains('/') => model.to_string(),
+        (Some(provider), Some(model)) => format!("{provider}/{model}"),
+        (None, Some(model)) => model.to_string(),
+        _ => fallback_model.to_string(),
+    }
+}
+
+fn parse_ai_probe_result(
+    output: &str,
+    selected_provider: Option<&str>,
+    selected_model: &str,
+    selected_profile: Option<&str>,
+    fallback_latency_ms: u64,
+) -> AITestResult {
+    let provider_label = selected_provider.unwrap_or("current").to_string();
+
+    let json_text = match extract_json_from_output(output) {
+        Some(json) => json,
+        None => {
+            let cleaned = clean_ai_test_output(output);
+            let error = detect_ai_test_error(&cleaned).unwrap_or_else(|| {
+                if cleaned.is_empty() {
+                    "连接测试没有返回可解析结果".to_string()
+                } else {
+                    format!("连接测试返回了不可解析结果: {}", cleaned)
+                }
+            });
+            return AITestResult {
+                success: false,
+                provider: provider_label,
+                model: selected_model.to_string(),
+                response: None,
+                error: Some(error),
+                latency_ms: Some(fallback_latency_ms),
+            };
+        }
+    };
+
+    let payload: Value = match serde_json::from_str(&json_text) {
+        Ok(value) => value,
+        Err(err) => {
+            return AITestResult {
+                success: false,
+                provider: provider_label,
+                model: selected_model.to_string(),
+                response: None,
+                error: Some(format!("连接测试结果不是有效 JSON: {}", err)),
+                latency_ms: Some(fallback_latency_ms),
+            };
+        }
+    };
+
+    let probe_results = payload
+        .pointer("/auth/probes/results")
+        .and_then(|value| value.as_array());
+    let probe_result = probe_results.and_then(|results| {
+        results
+            .iter()
+            .filter(|entry| {
+                selected_provider.is_none_or(|provider| {
+                    entry.get("provider").and_then(|value| value.as_str()) == Some(provider)
+                })
+            })
+            .max_by_key(|entry| {
+                let profile_score = selected_profile.is_some_and(|profile| {
+                    entry.get("profileId").and_then(|value| value.as_str()) == Some(profile)
+                }) as u8;
+                let model_score = (entry.get("model").and_then(|value| value.as_str())
+                    == Some(selected_model)) as u8;
+                let status_score = match entry.get("status").and_then(|value| value.as_str()) {
+                    Some("ok") => 6_u8,
+                    Some("auth" | "rate_limit" | "billing" | "timeout" | "format") => 5_u8,
+                    Some("no_model") => 4_u8,
+                    Some("unknown") => 2_u8,
+                    Some(_) => 3_u8,
+                    None => 1_u8,
+                };
+                let latency_score = entry
+                    .get("latencyMs")
+                    .and_then(|value| value.as_u64())
+                    .is_some() as u8;
+                (profile_score, model_score, status_score, latency_score)
+            })
+            .or_else(|| results.first())
+    });
+
+    let Some(probe_result) = probe_result else {
+        return AITestResult {
+            success: false,
+            provider: provider_label,
+            model: selected_model.to_string(),
+            response: None,
+            error: Some("没有找到可用的模型探测结果，请先保存有效的模型配置".to_string()),
+            latency_ms: Some(fallback_latency_ms),
+        };
+    };
+
+    let actual_provider = probe_result
+        .get("provider")
+        .and_then(|value| value.as_str());
+    let provider = actual_provider
+        .unwrap_or(selected_provider.unwrap_or("current"))
+        .to_string();
+    let model = format_provider_model_ref(
+        actual_provider.or(selected_provider),
+        probe_result.get("model").and_then(|value| value.as_str()),
+        selected_model,
+    );
+    let latency_ms = probe_result
+        .get("latencyMs")
+        .and_then(|value| value.as_u64())
+        .unwrap_or(fallback_latency_ms);
+    let status = probe_result
+        .get("status")
+        .and_then(|value| value.as_str())
+        .unwrap_or("unknown");
+    let detail = probe_result
+        .get("error")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string());
+
+    if status == "ok" {
         return AITestResult {
             success: true,
-            provider: provider.to_string(),
-            model: model.to_string(),
-            response: Some(cleaned),
+            provider,
+            model,
+            response: Some("Probe OK".to_string()),
             error: None,
             latency_ms: Some(latency_ms),
         };
     }
 
+    let error = detail.unwrap_or_else(|| match status {
+        "auth" => "认证失败，请检查 API Key 或登录状态".to_string(),
+        "rate_limit" => "请求被限流，请稍后重试".to_string(),
+        "billing" => "额度或计费状态异常，请检查提供商账户".to_string(),
+        "timeout" => "连接测试超时".to_string(),
+        "format" => "模型返回格式异常".to_string(),
+        "no_model" => "没有可用于测试的模型".to_string(),
+        other => format!("连接测试失败 ({})", other),
+    });
+
     AITestResult {
         success: false,
-        provider: provider.to_string(),
-        model: model.to_string(),
+        provider,
+        model,
         response: None,
-        error: Some(if cleaned.is_empty() {
-            "未收到模型回复".to_string()
-        } else {
-            format!("模型未返回预期响应: {}", cleaned)
-        }),
+        error: Some(error),
         latency_ms: Some(latency_ms),
     }
 }
@@ -318,67 +469,56 @@ pub async fn run_doctor() -> Result<Vec<DiagnosticResult>, String> {
 
 /// 测试 AI 连接
 #[command]
-pub async fn test_ai_connection() -> Result<AITestResult, String> {
+pub async fn test_ai_connection(
+    provider: Option<String>,
+    model: Option<String>,
+) -> Result<AITestResult, String> {
     info!("[AI测试] 开始测试 AI 连接...");
-    let selected_model = read_current_primary_model_ref();
-    let selected_provider = selected_model
-        .as_deref()
-        .and_then(extract_provider_from_model_ref)
-        .unwrap_or_else(|| "current".to_string());
-    let selected_model_label = selected_model.unwrap_or_else(|| "default".to_string());
-    let expected_reply = "OPENCLAW-DESKTOP-CONNECT-OK";
-    let prompt = format!("Reply with exactly {} and nothing else.", expected_reply);
+    let selected_model_ref =
+        normalize_optional_string(model.as_deref()).or_else(read_current_primary_model_ref);
+    let selected_provider = normalize_optional_string(provider.as_deref()).or_else(|| {
+        selected_model_ref
+            .as_deref()
+            .and_then(extract_provider_from_model_ref)
+    });
+    let selected_model_label = selected_model_ref
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
+    let owned_args =
+        build_ai_probe_args(selected_provider.as_deref(), selected_model_ref.as_deref());
+    let args: Vec<&str> = owned_args.iter().map(String::as_str).collect();
     let start = std::time::Instant::now();
-    let args = [
-        "agent",
-        "--local",
-        "--to",
-        "+1234567890",
-        "--thinking",
-        "low",
-        "--message",
-        prompt.as_str(),
-    ];
 
     info!("[AI测试] 执行: openclaw {}", args.join(" "));
-    let result = shell::run_openclaw(&args);
+    let output = match shell::run_openclaw(&args) {
+        Ok(output) => output,
+        Err(error) => error,
+    };
     let latency_ms = start.elapsed().as_millis() as u64;
     info!("[AI测试] 命令执行完成, 耗时: {}ms", latency_ms);
 
-    match result {
-        Ok(output) => {
-            debug!("[AI测试] 原始输出: {}", output);
-            let parsed = parse_ai_agent_result(
-                &output,
-                expected_reply,
-                &selected_provider,
-                &selected_model_label,
-                latency_ms,
-            );
-            if parsed.success {
-                info!(
-                    "[AI测试] ✓ AI 连接测试成功: provider={}, model={}, latency={:?}ms",
-                    parsed.provider, parsed.model, parsed.latency_ms
-                );
-            } else {
-                warn!(
-                    "[AI测试] ✗ AI 连接测试失败: provider={}, model={}, error={}",
-                    parsed.provider,
-                    parsed.model,
-                    parsed.error.as_deref().unwrap_or("unknown")
-                );
-            }
-            Ok(parsed)
-        }
-        Err(e) => Ok(AITestResult {
-            success: false,
-            provider: selected_provider,
-            model: selected_model_label,
-            response: None,
-            error: Some(e),
-            latency_ms: Some(latency_ms),
-        }),
+    debug!("[AI测试] 原始输出: {}", output);
+    let parsed = parse_ai_probe_result(
+        &output,
+        selected_provider.as_deref(),
+        &selected_model_label,
+        None,
+        latency_ms,
+    );
+    if parsed.success {
+        info!(
+            "[AI测试] ✓ AI 连接测试成功: provider={}, model={}, latency={:?}ms",
+            parsed.provider, parsed.model, parsed.latency_ms
+        );
+    } else {
+        warn!(
+            "[AI测试] ✗ AI 连接测试失败: provider={}, model={}, error={}",
+            parsed.provider,
+            parsed.model,
+            parsed.error.as_deref().unwrap_or("unknown")
+        );
     }
+    Ok(parsed)
 }
 
 /// 获取渠道测试目标
@@ -1263,11 +1403,11 @@ read -p "按回车键关闭..."
 #[cfg(test)]
 mod tests {
     use super::{
-        clean_ai_test_output, detect_ai_test_error,
-        channel_needs_send_test, channel_requires_connected_status, channel_requires_linked_status,
-        channel_requires_probe_status, channel_requires_running_status, evaluate_channel_status,
-        extract_provider_from_model_ref, output_contains_expected_reply, parse_ai_agent_result,
-        parse_channel_status, ChannelStatusCheck,
+        build_ai_probe_args, channel_needs_send_test, channel_requires_connected_status,
+        channel_requires_linked_status, channel_requires_probe_status,
+        channel_requires_running_status, clean_ai_test_output, detect_ai_test_error,
+        evaluate_channel_status, extract_provider_from_model_ref, format_provider_model_ref,
+        parse_ai_probe_result, parse_channel_status, ChannelStatusCheck,
     };
     use serde_json::json;
 
@@ -1493,67 +1633,177 @@ ExperimentalWarning: something noisy
     }
 
     #[test]
-    fn matches_expected_reply_on_own_line() {
-        let output = "some heading\nOPENCLAW-DESKTOP-CONNECT-OK\nmore";
-        assert!(output_contains_expected_reply(
-            output,
-            "OPENCLAW-DESKTOP-CONNECT-OK"
-        ));
+    fn build_ai_probe_args_use_models_status_probe_path() {
+        let args = build_ai_probe_args(Some("onestop"), Some("onestop/kimi-k2.5"));
+
+        assert_eq!(args[0], "models");
+        assert_eq!(args[1], "status");
+        assert!(args.iter().any(|arg| arg == "--json"));
+        assert!(args.iter().any(|arg| arg == "--probe"));
+        assert!(args.iter().any(|arg| arg == "--probe-provider"));
+        assert!(args.iter().any(|arg| arg == "--probe-model"));
+        let provider_index = args
+            .iter()
+            .position(|arg| arg == "--probe-provider")
+            .expect("provider index");
+        assert_eq!(args[provider_index + 1], "onestop");
+        let model_index = args
+            .iter()
+            .position(|arg| arg == "--probe-model")
+            .expect("model index");
+        assert_eq!(args[model_index + 1], "onestop/kimi-k2.5");
     }
 
     #[test]
-    fn parses_successful_ai_agent_result() {
-        let result = parse_ai_agent_result(
-            "OPENCLAW-DESKTOP-CONNECT-OK",
-            "OPENCLAW-DESKTOP-CONNECT-OK",
-            "onestop",
+    fn formats_provider_model_ref_with_provider_prefix() {
+        assert_eq!(
+            format_provider_model_ref(Some("onestop"), Some("kimi-k2.5"), "default"),
+            "onestop/kimi-k2.5"
+        );
+        assert_eq!(
+            format_provider_model_ref(Some("onestop"), Some("onestop/kimi-k2.5"), "default"),
+            "onestop/kimi-k2.5"
+        );
+        assert_eq!(
+            format_provider_model_ref(None, Some("kimi-k2.5"), "default"),
+            "kimi-k2.5"
+        );
+    }
+
+    #[test]
+    fn parses_successful_ai_probe_result() {
+        let result = parse_ai_probe_result(
+            r#"{
+  "auth": {
+    "probes": {
+      "results": [
+        {
+          "provider": "onestop",
+          "model": "onestop/kimi-k2.5",
+          "status": "ok",
+          "latencyMs": 912
+        }
+      ]
+    }
+  }
+}"#,
+            Some("onestop"),
             "onestop/kimi-k2.5",
+            None,
             4567,
         );
 
         assert!(result.success);
         assert_eq!(result.provider, "onestop");
         assert_eq!(result.model, "onestop/kimi-k2.5");
-        assert_eq!(result.latency_ms, Some(4567));
-        assert_eq!(
-            result.response.as_deref(),
-            Some("OPENCLAW-DESKTOP-CONNECT-OK")
-        );
+        assert_eq!(result.latency_ms, Some(912));
+        assert_eq!(result.response.as_deref(), Some("Probe OK"));
         assert!(result.error.is_none());
     }
 
     #[test]
-    fn parses_failed_ai_agent_result_for_known_error() {
-        let result = parse_ai_agent_result(
-            "invalid api key",
-            "OPENCLAW-DESKTOP-CONNECT-OK",
-            "onestop",
-            "onestop/kimi-k2.5",
-            12,
-        );
-
-        assert!(!result.success);
-        assert_eq!(result.error.as_deref(), Some("invalid api key"));
-        assert!(result.response.is_none());
-        assert_eq!(result.latency_ms, Some(12));
+    fn parses_failed_ai_probe_result() {
+        let result = parse_ai_probe_result(
+            r#"{
+  "auth": {
+    "probes": {
+      "results": [
+        {
+          "provider": "onestop",
+          "model": "onestop/kimi-k2.5",
+          "status": "timeout",
+          "error": "request timed out after 8000ms",
+          "latencyMs": 8005
+        }
+      ]
     }
-
-    #[test]
-    fn parses_failed_ai_agent_result_for_unexpected_reply() {
-        let result = parse_ai_agent_result(
-            "Something else",
-            "OPENCLAW-DESKTOP-CONNECT-OK",
-            "onestop",
+  }
+}"#,
+            Some("onestop"),
             "onestop/kimi-k2.5",
+            None,
             34,
         );
 
         assert!(!result.success);
         assert_eq!(
             result.error.as_deref(),
-            Some("模型未返回预期响应: Something else")
+            Some("request timed out after 8000ms")
         );
         assert!(result.response.is_none());
-        assert_eq!(result.latency_ms, Some(34));
+        assert_eq!(result.latency_ms, Some(8005));
+    }
+
+    #[test]
+    fn parse_ai_probe_result_prefers_selected_profile() {
+        let result = parse_ai_probe_result(
+            r#"{
+  "auth": {
+    "probes": {
+      "results": [
+        {
+          "provider": "onestop",
+          "profileId": "onestop:stale",
+          "model": "onestop/kimi-k2.5",
+          "status": "unknown",
+          "error": "Excluded by auth.order for this provider."
+        },
+        {
+          "provider": "onestop",
+          "profileId": "onestop:default",
+          "model": "onestop/kimi-k2.5",
+          "status": "ok",
+          "latencyMs": 640
+        }
+      ]
+    }
+  }
+}"#,
+            Some("onestop"),
+            "onestop/kimi-k2.5",
+            Some("onestop:default"),
+            1000,
+        );
+
+        assert!(result.success);
+        assert_eq!(result.latency_ms, Some(640));
+    }
+
+    #[test]
+    fn parse_ai_probe_result_prefers_selected_model() {
+        let result = parse_ai_probe_result(
+            r#"{
+  "auth": {
+    "probes": {
+      "results": [
+        {
+          "provider": "onestop",
+          "model": "onestop/old-model",
+          "status": "ok",
+          "latencyMs": 400
+        },
+        {
+          "provider": "onestop",
+          "model": "onestop/kimi-k2.5",
+          "status": "timeout",
+          "error": "request timed out after 8000ms",
+          "latencyMs": 8001
+        }
+      ]
+    }
+  }
+}"#,
+            Some("onestop"),
+            "onestop/kimi-k2.5",
+            None,
+            1000,
+        );
+
+        assert!(!result.success);
+        assert_eq!(result.model, "onestop/kimi-k2.5");
+        assert_eq!(
+            result.error.as_deref(),
+            Some("request timed out after 8000ms")
+        );
     }
 }

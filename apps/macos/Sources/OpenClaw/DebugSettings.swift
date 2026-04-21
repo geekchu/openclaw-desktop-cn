@@ -97,7 +97,7 @@ struct DebugSettings: View {
                                 _ = await GatewayLaunchAgentManager.set(
                                     enabled: false,
                                     bundlePath: Bundle.main.bundlePath,
-                                    port: GatewayEnvironment.gatewayPort())
+                                    port: GatewayEnvironment.configuredGatewayPort())
                             }
                         }
                     }

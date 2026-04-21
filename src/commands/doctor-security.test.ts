@@ -58,9 +58,9 @@ describe("noteSecurityWarnings gateway exposure", () => {
   ): Promise<void> {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-doctor-security-"));
     process.env.HOME = home;
-    await fs.mkdir(path.join(home, ".openclaw"), { recursive: true });
+    await fs.mkdir(path.join(home, ".openclawcn"), { recursive: true });
     await fs.writeFile(
-      path.join(home, ".openclaw", "exec-approvals.json"),
+      path.join(home, ".openclawcn", "exec-approvals.json"),
       JSON.stringify(file, null, 2),
     );
     await run();
@@ -73,7 +73,7 @@ describe("noteSecurityWarnings gateway exposure", () => {
     expect(message).toContain("CRITICAL");
     expect(message).toContain("without authentication");
     expect(message).toContain("Safer remote access");
-    expect(message).toContain("ssh -N -L 18789:127.0.0.1:18789");
+    expect(message).toContain("ssh -N -L 28789:127.0.0.1:28789");
   });
 
   it("uses env token to avoid critical warning", async () => {

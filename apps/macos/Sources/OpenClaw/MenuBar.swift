@@ -106,7 +106,7 @@ struct OpenClawApp: App {
             _ = await GatewayLaunchAgentManager.set(
                 enabled: false,
                 bundlePath: Bundle.main.bundlePath,
-                port: GatewayEnvironment.gatewayPort())
+                port: GatewayEnvironment.configuredGatewayPort())
         }
         Self.logger.info("attach-only flag enabled")
     }

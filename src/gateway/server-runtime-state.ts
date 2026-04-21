@@ -247,7 +247,11 @@ export async function createGatewayRuntimeState(params: {
       canvasHost,
       releasePluginRouteRegistry: () => {
         // Releases both pinned HTTP-route and channel registries set at startup.
-        releasePinnedPluginHttpRouteRegistry(params.pluginRegistry);
+        // Release unconditionally (no registry arg): the HTTP-route pin may
+        // also have been re-pinned to a later registry after the initial
+        // listen-ready control plane comes up, so an identity-guarded release
+        // would be a no-op and leak the pin across in-process restarts.
+        releasePinnedPluginHttpRouteRegistry();
         // Release unconditionally (no registry arg): the channel pin may have
         // been re-pinned to a deferred-reload registry that differs from the
         // original params.pluginRegistry, so an identity-guarded release would

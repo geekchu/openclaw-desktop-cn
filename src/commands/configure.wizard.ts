@@ -4,6 +4,7 @@ import { formatCliCommand } from "../cli/command-format.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { readConfigFileSnapshot, replaceConfigFile, resolveGatewayPort } from "../config/config.js";
 import { logConfigUpdated } from "../config/logging.js";
+import { DEFAULT_GATEWAY_PORT } from "../config/paths.js";
 import { ensureControlUiAssetsBuilt } from "../infra/control-ui-assets.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { defaultRuntime } from "../runtime.js";
@@ -355,7 +356,7 @@ export async function runConfigureWizard(
       }
     }
 
-    const localUrl = "ws://127.0.0.1:18789";
+    const localUrl = `ws://127.0.0.1:${DEFAULT_GATEWAY_PORT}`;
     const baseLocalProbeToken = await resolveGatewaySecretInputForWizard({
       cfg: baseConfig,
       value: baseConfig.gateway?.auth?.token,

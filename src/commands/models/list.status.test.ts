@@ -85,6 +85,12 @@ const mocks = vi.hoisted(() => {
         "FAL_KEY",
       ]),
     hasUsableCustomProviderApiKey: vi.fn().mockReturnValue(false),
+    resolveApiKeyForProvider: vi.fn().mockResolvedValue({
+      apiKey: "sk-ant-api-0123456789abcdefghijklmnopqrstuvwxyz", // pragma: allowlist secret
+      profileId: "anthropic:work",
+      source: "profile:anthropic:work",
+      mode: "api-key",
+    }),
     resolveUsableCustomProviderApiKey: vi.fn().mockReturnValue(null),
     getCustomProviderApiKey: vi.fn().mockReturnValue(undefined),
     getShellEnvAppliedKeys: vi.fn().mockReturnValue(["OPENAI_API_KEY", "ANTHROPIC_OAUTH_TOKEN"]),
@@ -103,6 +109,18 @@ const mocks = vi.hoisted(() => {
       env: { shellEnv: { enabled: true } },
     }),
     loadProviderUsageSummary: vi.fn().mockResolvedValue(undefined),
+    runAuthProbes: vi.fn().mockResolvedValue({
+      startedAt: 0,
+      finishedAt: 0,
+      durationMs: 0,
+      totalTargets: 0,
+      options: {
+        timeoutMs: 8000,
+        concurrency: 2,
+        maxTokens: 8,
+      },
+      results: [],
+    }),
   };
 });
 
@@ -131,9 +149,17 @@ async function loadFreshModelsStatusCommandModuleForTest() {
   vi.doMock("../../agents/model-auth.js", () => ({
     resolveEnvApiKey: mocks.resolveEnvApiKey,
     hasUsableCustomProviderApiKey: mocks.hasUsableCustomProviderApiKey,
+    resolveApiKeyForProvider: mocks.resolveApiKeyForProvider,
     resolveUsableCustomProviderApiKey: mocks.resolveUsableCustomProviderApiKey,
     getCustomProviderApiKey: mocks.getCustomProviderApiKey,
   }));
+  vi.doMock("./list.probe.js", async () => {
+    const actual = await vi.importActual<typeof import("./list.probe.js")>("./list.probe.js");
+    return {
+      ...actual,
+      runAuthProbes: mocks.runAuthProbes,
+    };
+  });
   vi.doMock("../../agents/model-auth-env-vars.js", () => ({
     resolveProviderEnvApiKeyCandidates: mocks.resolveProviderEnvApiKeyCandidates,
     listKnownProviderEnvApiKeyNames: mocks.listKnownProviderEnvApiKeyNames,
@@ -236,6 +262,7 @@ describe("modelsStatusCommand auth overview", () => {
     vi.doUnmock("../../agents/agent-scope.js");
     vi.doUnmock("../../agents/auth-profiles.js");
     vi.doUnmock("../../agents/model-auth.js");
+    vi.doUnmock("./list.probe.js");
     vi.doUnmock("../../agents/model-auth-env-vars.js");
     vi.doUnmock("../../infra/shell-env.js");
     vi.doUnmock("../../config/config.js");
@@ -523,6 +550,34 @@ describe("modelsStatusCommand auth overview", () => {
       'Unknown agent id "unknown".',
     );
   });
+
+  it("narrows probe-model runs to the resolved auth profile", async () => {
+    const localRuntime = createRuntime();
+    await modelsStatusCommand(
+      {
+        json: true,
+        probe: true,
+        probeModel: "anthropic/claude-opus-4-6",
+      },
+      localRuntime as never,
+    );
+
+    expect(mocks.resolveApiKeyForProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "anthropic",
+      }),
+    );
+    expect(mocks.runAuthProbes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          provider: "anthropic",
+          model: "anthropic/claude-opus-4-6",
+          profileIds: ["anthropic:work"],
+        }),
+      }),
+    );
+  });
+
   it("exits non-zero when auth is missing", async () => {
     const originalProfiles = { ...mocks.store.profiles };
     mocks.store.profiles = {};

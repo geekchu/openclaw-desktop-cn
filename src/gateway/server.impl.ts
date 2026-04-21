@@ -22,6 +22,7 @@ import {
   writeConfigFile,
 } from "../config/config.js";
 import { formatConfigIssueLines } from "../config/issue-format.js";
+import { DEFAULT_GATEWAY_PORT } from "../config/paths.js";
 import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
 import { resolveMainSessionKey } from "../config/sessions.js";
 import { clearAgentRunContext, onAgentEvent } from "../infra/agent-events.js";
@@ -107,7 +108,7 @@ import { buildGatewayCronService } from "./server-cron.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
 import { startGatewayMaintenanceTimers } from "./server-maintenance.js";
-import { GATEWAY_EVENTS, listGatewayMethods } from "./server-methods-list.js";
+import { GATEWAY_EVENTS, listGatewayMethods, mergeGatewayMethods } from "./server-methods-list.js";
 import { coreGatewayHandlers } from "./server-methods.js";
 import { createExecApprovalHandlers } from "./server-methods/exec-approval.js";
 import { safeParseJson } from "./server-methods/nodes.helpers.js";
@@ -127,6 +128,7 @@ import { createGatewayRuntimeState } from "./server-runtime-state.js";
 import { resolveSessionKeyForRun } from "./server-session-key.js";
 import { logGatewayStartup } from "./server-startup-log.js";
 import { runStartupSessionMigration } from "./server-startup-session-migration.js";
+import { createGatewayStartupStateTracker } from "./server-startup-state.js";
 import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
@@ -411,9 +413,20 @@ export type GatewayServerOptions = {
 };
 
 export async function startGatewayServer(
-  port = 18789,
+  port = DEFAULT_GATEWAY_PORT,
   opts: GatewayServerOptions = {},
 ): Promise<GatewayServer> {
+  const startupState = createGatewayStartupStateTracker({
+    runId: process.env.OPENCLAW_GATEWAY_STARTUP_RUN_ID,
+    port,
+  });
+  let startupFailureRecorded = false;
+  const markStartupFailed = async (error: unknown, phase?: string) => {
+    startupFailureRecorded = true;
+    await startupState.markFailed(error, phase);
+  };
+  await startupState.markPhase("bootstrapping config");
+
   const minimalTestGateway =
     process.env.VITEST === "1" && process.env.OPENCLAW_TEST_MINIMAL_GATEWAY === "1";
 
@@ -532,13 +545,19 @@ export async function startGatewayServer(
   let cfgAtStart: OpenClawConfig;
   let startupInternalWriteHash: string | null = null;
   const startupRuntimeConfig = applyConfigOverrides(configSnapshot.config);
-  const authBootstrap = await prepareGatewayStartupConfig({
-    configSnapshot,
-    runtimeConfig: startupRuntimeConfig,
-    authOverride: opts.auth,
-    tailscaleOverride: opts.tailscale,
-    activateRuntimeSecrets,
-  });
+  let authBootstrap: Awaited<ReturnType<typeof prepareGatewayStartupConfig>>;
+  try {
+    authBootstrap = await prepareGatewayStartupConfig({
+      configSnapshot,
+      runtimeConfig: startupRuntimeConfig,
+      authOverride: opts.auth,
+      tailscaleOverride: opts.tailscale,
+      activateRuntimeSecrets,
+    });
+  } catch (err) {
+    await markStartupFailed(err, "bootstrapping config");
+    throw err;
+  }
   cfgAtStart = authBootstrap.cfg;
   if (authBootstrap.generatedToken) {
     if (authBootstrap.persistedGeneratedToken) {
@@ -584,18 +603,6 @@ export async function startGatewayServer(
           channels: startupRuntimeConfig.channels,
         }
       : cfgAtStart;
-  if (!minimalTestGateway) {
-    await runChannelPluginStartupMaintenance({
-      cfg: startupMaintenanceConfig,
-      env: process.env,
-      log,
-    });
-    await runStartupSessionMigration({
-      cfg: cfgAtStart,
-      env: process.env,
-      log,
-    });
-  }
   initSubagentRegistry();
   const gatewayPluginConfigAtStart = minimalTestGateway
     ? cfgAtStart
@@ -625,16 +632,22 @@ export async function startGatewayServer(
   let pluginRegistry = emptyPluginRegistry;
   let baseGatewayMethods = baseMethods;
   if (!minimalTestGateway) {
-    ({ pluginRegistry, gatewayMethods: baseGatewayMethods } = loadGatewayStartupPlugins({
-      cfg: gatewayPluginConfigAtStart,
-      activationSourceConfig: cfgAtStart,
-      workspaceDir: defaultWorkspaceDir,
-      log,
-      coreGatewayHandlers,
-      baseMethods,
-      pluginIds: startupPluginIds,
-      preferSetupRuntimeForChannelPlugins: deferredConfiguredChannelPluginIds.length > 0,
-    }));
+    await startupState.markPhase("loading startup plugins");
+    try {
+      ({ pluginRegistry, gatewayMethods: baseGatewayMethods } = loadGatewayStartupPlugins({
+        cfg: gatewayPluginConfigAtStart,
+        activationSourceConfig: cfgAtStart,
+        workspaceDir: defaultWorkspaceDir,
+        log,
+        coreGatewayHandlers,
+        baseMethods,
+        pluginIds: startupPluginIds,
+        preferSetupRuntimeForChannelPlugins: deferredConfiguredChannelPluginIds.length > 0,
+      }));
+    } catch (err) {
+      await markStartupFailed(err, "loading startup plugins");
+      throw err;
+    }
   } else {
     pluginRegistry = getActivePluginRegistry() ?? emptyPluginRegistry;
     setActivePluginRegistry(pluginRegistry);
@@ -645,8 +658,7 @@ export async function startGatewayServer(
   const channelRuntimeEnvs = Object.fromEntries(
     Object.entries(channelLogs).map(([id, logger]) => [id, runtimeForLogger(logger)]),
   ) as unknown as Record<ChannelId, RuntimeEnv>;
-  const channelMethods = listChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? []);
-  const gatewayMethods = Array.from(new Set([...baseGatewayMethods, ...channelMethods]));
+  let gatewayMethods = mergeGatewayMethods(baseGatewayMethods);
   let pluginServices: PluginServicesHandle | null = null;
   const runtimeConfig = await resolveGatewayRuntimeConfig({
     cfg: cfgAtStart,
@@ -727,34 +739,38 @@ export async function startGatewayServer(
       log.warn(`gateway: controlUi.root not found at ${resolvedOverridePath}`);
     }
   } else if (controlUiEnabled) {
-    let resolvedRoot = resolveControlUiRootSync({
+    const controlUiRootResolveOptions = {
       moduleUrl: import.meta.url,
       argv1: process.argv[1],
       cwd: process.cwd(),
-    });
-    if (!resolvedRoot) {
+      bundleDir: process.env.OPENCLAW_GATEWAY_BUNDLE_DIR,
+    } as const;
+    const desktopManagedStartup =
+      process.env.OPENCLAW_DESKTOP === "1" ||
+      Boolean(process.env.OPENCLAW_GATEWAY_BUNDLE_DIR?.trim());
+    let resolvedRoot = resolveControlUiRootSync(controlUiRootResolveOptions);
+    if (!resolvedRoot && !desktopManagedStartup) {
       const ensureResult = await ensureControlUiAssetsBuilt(gatewayRuntime);
       if (!ensureResult.ok && ensureResult.message) {
         log.warn(`gateway: ${ensureResult.message}`);
       }
-      resolvedRoot = resolveControlUiRootSync({
-        moduleUrl: import.meta.url,
-        argv1: process.argv[1],
-        cwd: process.cwd(),
-      });
+      resolvedRoot = resolveControlUiRootSync(controlUiRootResolveOptions);
     }
-    controlUiRootState = resolvedRoot
-      ? {
-          kind: isPackageProvenControlUiRootSync(resolvedRoot, {
-            moduleUrl: import.meta.url,
-            argv1: process.argv[1],
-            cwd: process.cwd(),
-          })
-            ? "bundled"
-            : "resolved",
-          path: resolvedRoot,
-        }
-      : { kind: "missing" };
+    if (!resolvedRoot && desktopManagedStartup) {
+      // Desktop runs should use prebuilt bundled assets. Avoid doing an on-demand
+      // UI build on the startup critical path; the HTTP handler will retry root
+      // resolution lazily against the bundle paths if needed.
+      controlUiRootState = undefined;
+    } else {
+      controlUiRootState = resolvedRoot
+        ? {
+            kind: isPackageProvenControlUiRootSync(resolvedRoot, controlUiRootResolveOptions)
+              ? "bundled"
+              : "resolved",
+            path: resolvedRoot,
+          }
+        : { kind: "missing" };
+    }
   }
 
   const wizardRunner = opts.wizardRunner ?? runSetupWizard;
@@ -781,6 +797,7 @@ export async function startGatewayServer(
     channelManager,
     startedAt: serverStartedAt,
   });
+  await startupState.markPhase("starting HTTP server");
   log.info("starting HTTP server...");
   const {
     canvasHost,
@@ -803,35 +820,42 @@ export async function startGatewayServer(
     removeChatRun,
     chatAbortControllers,
     toolEventRecipients,
-  } = await createGatewayRuntimeState({
-    cfg: cfgAtStart,
-    bindHost,
-    port,
-    controlUiEnabled,
-    controlUiBasePath,
-    controlUiRoot: controlUiRootState,
-    openAiChatCompletionsEnabled,
-    openAiChatCompletionsConfig,
-    openResponsesEnabled,
-    openResponsesConfig,
-    strictTransportSecurityHeader,
-    resolvedAuth,
-    rateLimiter: authRateLimiter,
-    gatewayTls,
-    hooksConfig: () => hooksConfig,
-    getHookClientIpConfig: () => hookClientIpConfig,
-    pluginRegistry,
-    pinChannelRegistry: !minimalTestGateway,
-    deps,
-    canvasRuntime,
-    canvasHostEnabled,
-    allowCanvasHostInTests: opts.allowCanvasHostInTests,
-    logCanvas,
-    log,
-    logHooks,
-    logPlugins,
-    getReadiness,
-  });
+  } = await (async () => {
+    try {
+      return await createGatewayRuntimeState({
+        cfg: cfgAtStart,
+        bindHost,
+        port,
+        controlUiEnabled,
+        controlUiBasePath,
+        controlUiRoot: controlUiRootState,
+        openAiChatCompletionsEnabled,
+        openAiChatCompletionsConfig,
+        openResponsesEnabled,
+        openResponsesConfig,
+        strictTransportSecurityHeader,
+        resolvedAuth,
+        rateLimiter: authRateLimiter,
+        gatewayTls,
+        hooksConfig: () => hooksConfig,
+        getHookClientIpConfig: () => hookClientIpConfig,
+        pluginRegistry,
+        pinChannelRegistry: !minimalTestGateway,
+        deps,
+        canvasRuntime,
+        canvasHostEnabled,
+        allowCanvasHostInTests: opts.allowCanvasHostInTests,
+        logCanvas,
+        log,
+        logHooks,
+        logPlugins,
+        getReadiness,
+      });
+    } catch (err) {
+      await markStartupFailed(err, "starting HTTP server");
+      throw err;
+    }
+  })();
   const disconnectStaleSharedGatewayAuthClients = (expectedGeneration: string | undefined) => {
     for (const gatewayClient of clients) {
       if (!gatewayClient.usesSharedGatewayAuth) {
@@ -972,30 +996,6 @@ export async function startGatewayServer(
   let transcriptUnsub: (() => void) | null = null;
   let lifecycleUnsub: (() => void) | null = null;
   try {
-    try {
-      mcpServer = await startMcpLoopbackServer(0);
-      log.info(`MCP loopback server listening on http://127.0.0.1:${mcpServer.port}/mcp`);
-    } catch (error) {
-      log.warn(`MCP loopback server failed to start: ${String(error)}`);
-    }
-
-    if (!minimalTestGateway) {
-      const machineDisplayName = await getMachineDisplayName();
-      const discovery = await startGatewayDiscovery({
-        machineDisplayName,
-        port,
-        gatewayTls: gatewayTls.enabled
-          ? { enabled: true, fingerprintSha256: gatewayTls.fingerprintSha256 }
-          : undefined,
-        wideAreaDiscoveryEnabled: cfgAtStart.discovery?.wideArea?.enabled === true,
-        wideAreaDiscoveryDomain: cfgAtStart.discovery?.wideArea?.domain,
-        tailscaleMode,
-        mdnsMode: cfgAtStart.discovery?.mdns?.mode,
-        logDiscovery,
-      });
-      bonjourStop = discovery.bonjourStop;
-    }
-
     if (!minimalTestGateway) {
       setSkillsRemoteRegistry(nodeRegistry);
       void primeRemoteSkillsCache();
@@ -1444,44 +1444,41 @@ export async function startGatewayServer(
     // current gateway context without relying on a startup snapshot.
     setFallbackGatewayContextResolver(() => gatewayRequestContext);
 
-    attachGatewayWsHandlers({
-      wss,
-      clients,
-      preauthConnectionBudget,
-      port,
-      gatewayHost: bindHost ?? undefined,
-      canvasHostEnabled: Boolean(canvasHost),
-      canvasHostServerPort,
-      resolvedAuth,
-      getResolvedAuth,
-      getRequiredSharedGatewaySessionGeneration,
-      rateLimiter: authRateLimiter,
-      browserRateLimiter: browserAuthRateLimiter,
-      gatewayMethods,
-      events: GATEWAY_EVENTS,
-      logGateway: log,
-      logHealth,
-      logWsControl,
-      extraHandlers: {
-        ...pluginRegistry.gatewayHandlers,
-        ...execApprovalHandlers,
-        ...pluginApprovalHandlers,
-        ...secretsHandlers,
-      },
-      broadcast,
-      context: gatewayRequestContext,
-    });
-    logGatewayStartup({
-      cfg: cfgAtStart,
-      bindHost,
-      bindHosts: httpBindHosts,
-      port,
-      tlsEnabled: gatewayTls.enabled,
-      pluginCount: pluginRegistry.plugins.length,
-      log,
-      isNixMode,
-      startupStartedAt: opts.startupStartedAt,
-    });
+    if (!minimalTestGateway) {
+      await startupState.markPhase("running startup maintenance");
+      await runChannelPluginStartupMaintenance({
+        cfg: startupMaintenanceConfig,
+        env: process.env,
+        log,
+      });
+      await runStartupSessionMigration({
+        cfg: cfgAtStart,
+        env: process.env,
+        log,
+      });
+    }
+    try {
+      mcpServer = await startMcpLoopbackServer(0);
+      log.info(`MCP loopback server listening on http://127.0.0.1:${mcpServer.port}/mcp`);
+    } catch (error) {
+      log.warn(`MCP loopback server failed to start: ${String(error)}`);
+    }
+    if (!minimalTestGateway) {
+      const machineDisplayName = await getMachineDisplayName();
+      const discovery = await startGatewayDiscovery({
+        machineDisplayName,
+        port,
+        gatewayTls: gatewayTls.enabled
+          ? { enabled: true, fingerprintSha256: gatewayTls.fingerprintSha256 }
+          : undefined,
+        wideAreaDiscoveryEnabled: cfgAtStart.discovery?.wideArea?.enabled === true,
+        wideAreaDiscoveryDomain: cfgAtStart.discovery?.wideArea?.domain,
+        tailscaleMode,
+        mdnsMode: cfgAtStart.discovery?.mdns?.mode,
+        logDiscovery,
+      });
+      bonjourStop = discovery.bonjourStop;
+    }
     stopGatewayUpdateCheck = minimalTestGateway
       ? () => {}
       : scheduleGatewayUpdateCheck({
@@ -1505,7 +1502,7 @@ export async function startGatewayServer(
 
     if (!minimalTestGateway) {
       if (deferredConfiguredChannelPluginIds.length > 0) {
-        ({ pluginRegistry } = reloadDeferredGatewayPlugins({
+        ({ pluginRegistry, gatewayMethods: baseGatewayMethods } = reloadDeferredGatewayPlugins({
           cfg: gatewayPluginConfigAtStart,
           workspaceDir: defaultWorkspaceDir,
           log,
@@ -1514,6 +1511,7 @@ export async function startGatewayServer(
           pluginIds: startupPluginIds,
           logDiagnostics: false,
         }));
+        gatewayMethods = mergeGatewayMethods(baseGatewayMethods);
       }
       log.info("starting channels and sidecars...");
       ({ pluginServices } = await startGatewaySidecars({
@@ -1676,8 +1674,55 @@ export async function startGatewayServer(
             watchPath: configSnapshot.path,
           });
         })();
+    await startupState.markPhase("attaching control socket");
+    attachGatewayWsHandlers({
+      wss,
+      clients,
+      preauthConnectionBudget,
+      port,
+      gatewayHost: bindHost ?? undefined,
+      canvasHostEnabled: Boolean(canvasHost),
+      canvasHostServerPort,
+      resolvedAuth,
+      getResolvedAuth,
+      getRequiredSharedGatewaySessionGeneration,
+      rateLimiter: authRateLimiter,
+      browserRateLimiter: browserAuthRateLimiter,
+      gatewayMethods,
+      events: GATEWAY_EVENTS,
+      logGateway: log,
+      logHealth,
+      logWsControl,
+      extraHandlers: {
+        ...pluginRegistry.gatewayHandlers,
+        ...execApprovalHandlers,
+        ...pluginApprovalHandlers,
+        ...secretsHandlers,
+      },
+      broadcast,
+      context: gatewayRequestContext,
+    });
+    await startupState.markReady();
+    logGatewayStartup({
+      cfg: cfgAtStart,
+      bindHost,
+      bindHosts: httpBindHosts,
+      port,
+      tlsEnabled: gatewayTls.enabled,
+      pluginCount: pluginRegistry.plugins.length,
+      log,
+      isNixMode,
+      startupStartedAt: opts.startupStartedAt,
+    });
   } catch (err) {
-    await closeOnStartupFailure();
+    if (!startupFailureRecorded) {
+      await markStartupFailed(err);
+    }
+    try {
+      await closeOnStartupFailure();
+    } catch (closeError) {
+      log.warn(`gateway startup failure cleanup failed: ${String(closeError)}`);
+    }
     throw err;
   }
 

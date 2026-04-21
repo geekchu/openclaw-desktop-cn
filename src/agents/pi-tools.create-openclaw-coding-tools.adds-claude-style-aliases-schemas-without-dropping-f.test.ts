@@ -39,32 +39,32 @@ describe("createOpenClawCodingTools", () => {
     }
   });
 
-  it("rejects legacy alias parameters", async () => {
+  it("accepts Claude-style alias parameters", async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-legacy-alias-"));
     try {
       const tools = createOpenClawCodingTools({ workspaceDir: tmpDir });
       const { readTool, writeTool, editTool } = expectReadWriteEditTools(tools);
 
-      await expect(
-        writeTool?.execute("tool-legacy-write", {
-          file: "legacy.txt",
-          content: "hello old value",
-        }),
-      ).rejects.toThrow(/Missing required parameter: path/);
+      await writeTool?.execute("tool-legacy-write", {
+        file: "legacy.txt",
+        content: "hello old value",
+      });
 
-      await expect(
-        editTool?.execute("tool-legacy-edit", {
-          filePath: "legacy.txt",
-          old_text: "old",
-          newString: "new",
-        }),
-      ).rejects.toThrow(/Missing required parameters: path, edits/);
+      await editTool?.execute("tool-legacy-edit", {
+        filePath: "legacy.txt",
+        old_text: "old",
+        newString: "new",
+      });
 
-      await expect(
-        readTool?.execute("tool-legacy-read", {
-          file_path: "legacy.txt",
-        }),
-      ).rejects.toThrow(/Missing required parameter: path/);
+      const result = await readTool?.execute("tool-legacy-read", {
+        file_path: "legacy.txt",
+      });
+
+      const textBlocks = result?.content?.filter((block) => block.type === "text") as
+        | Array<{ text?: string }>
+        | undefined;
+      const combinedText = textBlocks?.map((block) => block.text ?? "").join("\n");
+      expect(combinedText).toContain("hello new value");
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

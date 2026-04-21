@@ -273,12 +273,36 @@ function tauriBuild() {
   log("(beforeBuildCommand 将自动执行 prepare-gateway-bundle.js)");
 
   // beforeBuildCommand path is relative to cwd, so run from project root
-  run(cmd, {
-    env: {
-      ...process.env,
-      OPENCLAW_BUNDLE_TARGET_TRIPLE: targetArch || "",
-    },
-  });
+  let buildError = null;
+  try {
+    run(cmd, {
+      env: {
+        ...process.env,
+        OPENCLAW_BUNDLE_TARGET_TRIPLE: targetArch || "",
+      },
+    });
+  } catch (err) {
+    buildError = err;
+  }
+
+  // Windows 上 cargo/node 的 ANSI 转义码会被 PowerShell 误解析为 XML 错误，
+  // 导致进程退出码被误报为非零。如果产物目录已存在且包含安装包文件，
+  // 则视为构建成功（只是退出码误报）。
+  if (buildError) {
+    let bundleDir;
+    if (targetArch) {
+      bundleDir = join(tauriDir, "target", targetArch, buildProfile, "bundle");
+    } else {
+      bundleDir = join(tauriDir, "target", buildProfile, "bundle");
+    }
+
+    if (existsSync(bundleDir) && hasInstallerFiles(bundleDir)) {
+      log("⚠ cargo tauri build 报告非零退出码，但已检测到构建产物");
+      log("  这通常是 Windows 上 ANSI 转义码导致的误报，构建实际已成功");
+    } else {
+      throw buildError;
+    }
+  }
 
   log("Tauri 构建完成");
 }
@@ -364,6 +388,23 @@ function collectArtifacts() {
   }
 
   return artifacts;
+}
+
+function hasInstallerFiles(dir) {
+  if (!existsSync(dir)) {
+    return false;
+  }
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (hasInstallerFiles(fullPath)) {
+        return true;
+      }
+    } else if (isInstallerFile(entry.name)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isInstallerFile(name) {

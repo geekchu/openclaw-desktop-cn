@@ -129,9 +129,15 @@ const BASE_METHODS = [
   "chat.send",
 ];
 
+export function mergeGatewayMethods(
+  baseMethods: string[],
+  channelMethods = listChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? []),
+): string[] {
+  return Array.from(new Set([...baseMethods, ...channelMethods]));
+}
+
 export function listGatewayMethods(): string[] {
-  const channelMethods = listChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? []);
-  return Array.from(new Set([...BASE_METHODS, ...channelMethods]));
+  return mergeGatewayMethods(BASE_METHODS);
 }
 
 export const GATEWAY_EVENTS = [

@@ -22,8 +22,10 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -698,6 +700,81 @@ copyIfExists(join(projectRoot, "extensions"), join(bundleDir, "extensions"));
     }
   }
   rewriteSrcToDist(join(bundleDir, "extensions"));
+}
+
+// Step 4.5: 预编译 extensions TypeScript → JavaScript（消除运行时 jiti 编译开销）
+console.log("\n[bundle] === Step 4.5: 预编译 extensions TypeScript ===");
+{
+  const bundleExtDir = join(bundleDir, "extensions");
+  let esbuildTransformSync;
+  try {
+    const req = createRequire(import.meta.url);
+    ({ transformSync: esbuildTransformSync } = req("esbuild"));
+  } catch {
+    console.warn("[bundle] esbuild 不可用，跳过 TypeScript 预编译");
+  }
+
+  if (esbuildTransformSync && existsSync(bundleExtDir)) {
+    let transpiled = 0;
+    let skipped = 0;
+
+    function transpileExtensionTs(dir) {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name === "node_modules") {
+            continue;
+          }
+          transpileExtensionTs(fullPath);
+          continue;
+        }
+        if (
+          !entry.name.endsWith(".ts") ||
+          entry.name.endsWith(".d.ts") ||
+          entry.name.endsWith(".test.ts") ||
+          entry.name.endsWith(".spec.ts")
+        ) {
+          continue;
+        }
+
+        const jsPath = fullPath.replace(/\.ts$/, ".js");
+        const jsExists = existsSync(jsPath);
+
+        if (jsExists) {
+          // .js already exists — just remove the .ts so the loader uses .js
+          unlinkSync(fullPath);
+          skipped++;
+          continue;
+        }
+
+        try {
+          const tsContent = readFileSync(fullPath, "utf-8");
+          const result = esbuildTransformSync(tsContent, {
+            loader: "ts",
+            format: "esm",
+            target: "node22",
+            charset: "utf8",
+          });
+          // Fix .ts import/export paths → .js
+          let jsContent = result.code.replace(
+            /(import\s*\(\s*|from\s+)(["'][^"']*?)\.ts(["'])/g,
+            "$1$2.js$3",
+          );
+          writeFileSync(jsPath, jsContent, "utf-8");
+          unlinkSync(fullPath);
+          transpiled++;
+        } catch (err) {
+          console.warn(`[bundle] 转译失败，保留原始 .ts: ${fullPath}: ${err.message}`);
+        }
+      }
+    }
+
+    transpileExtensionTs(bundleExtDir);
+    console.log(
+      `[bundle] 预编译完成: ${transpiled} 个文件转译为 JS` +
+        (skipped > 0 ? `，${skipped} 个已有 .js 的 .ts 已删除` : ""),
+    );
+  }
 }
 
 // 复制 docs/reference/templates/ 目录（workspace 模板，如 AGENTS.md）

@@ -289,16 +289,14 @@ fn get_node_platform_dir() -> &'static str {
 
 /// 获取内置 Node.js 路径
 /// 生产模式: <resource_dir>/node-runtime/<platform>/node[.exe]
-/// 开发模式: <CARGO_MANIFEST_DIR>/../src-tauri/node-runtime/<platform>/node[.exe]
+/// 开发模式: <CARGO_MANIFEST_DIR>/node-runtime/<platform>/node[.exe]
 fn get_bundled_node_path() -> Option<String> {
-    let bundle_dir = std::env::var("OPENCLAW_GATEWAY_BUNDLE_DIR").ok()?;
-
     let node_runtime_dir = if cfg!(debug_assertions) {
-        // 开发模式: bundle_dir 是项目根目录，node-runtime 在 src-tauri/ 下
-        PathBuf::from(&bundle_dir)
-            .join("src-tauri")
-            .join("node-runtime")
+        // 开发模式下 gateway bundle 可能来自 target/debug/gateway-bundle，
+        // 但内置 node-runtime 固定放在 src-tauri/node-runtime。
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("node-runtime")
     } else {
+        let bundle_dir = std::env::var("OPENCLAW_GATEWAY_BUNDLE_DIR").ok()?;
         // 生产模式: bundle_dir 是 <resource_dir>/gateway-bundle，同级的 node-runtime
         PathBuf::from(&bundle_dir).parent()?.join("node-runtime")
     };
@@ -650,6 +648,13 @@ pub fn get_bundle_entry() -> Option<(String, String)> {
 /// 执行 openclaw 命令并获取输出
 /// 优先使用 bundle 目录中的 node + openclaw.mjs，回退到全局 openclaw 命令
 pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
+    run_openclaw_with_gateway_port(
+        args,
+        crate::gateway::GLOBAL_GATEWAY_PORT.load(std::sync::atomic::Ordering::SeqCst),
+    )
+}
+
+pub fn run_openclaw_with_gateway_port(args: &[&str], gateway_port: u16) -> Result<String, String> {
     debug!("[Shell] 执行 openclaw 命令: {:?}", args);
 
     let mut extended_path = get_extended_path();
@@ -687,12 +692,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token());
-        cmd.env(
-            "OPENCLAW_GATEWAY_PORT",
-            crate::gateway::GLOBAL_GATEWAY_PORT
-                .load(std::sync::atomic::Ordering::SeqCst)
-                .to_string(),
-        );
+        cmd.env("OPENCLAW_GATEWAY_PORT", gateway_port.to_string());
         cmd.env("OPENCLAW_DESKTOP", "1");
         cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
         cmd.env("PATH", &extended_path);
@@ -750,12 +750,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
-            .env(
-                "OPENCLAW_GATEWAY_PORT",
-                crate::gateway::GLOBAL_GATEWAY_PORT
-                    .load(std::sync::atomic::Ordering::SeqCst)
-                    .to_string(),
-            )
+            .env("OPENCLAW_GATEWAY_PORT", gateway_port.to_string())
             .env("OPENCLAW_DESKTOP", "1")
             .env("OPENCLAW_STATE_DIR", platform::get_config_dir())
             .env("PATH", &extended_path);
@@ -774,12 +769,7 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
             cmd.env(key, value);
         }
         cmd.env("OPENCLAW_GATEWAY_TOKEN", session_gateway_token())
-            .env(
-                "OPENCLAW_GATEWAY_PORT",
-                crate::gateway::GLOBAL_GATEWAY_PORT
-                    .load(std::sync::atomic::Ordering::SeqCst)
-                    .to_string(),
-            )
+            .env("OPENCLAW_GATEWAY_PORT", gateway_port.to_string())
             .env("OPENCLAW_DESKTOP", "1")
             .env("OPENCLAW_STATE_DIR", platform::get_config_dir())
             .env("PATH", &extended_path);
@@ -811,24 +801,89 @@ pub fn run_openclaw(args: &[&str]) -> Result<String, String> {
     }
 }
 
-/// 获取当前会话的 gateway token (懒初始化，进程生命周期内不变)
-/// 优先读 config 中已有 token，否则生成随机 token
-pub fn session_gateway_token() -> &'static str {
-    use std::sync::OnceLock;
-    static TOKEN: OnceLock<String> = OnceLock::new();
-    TOKEN.get_or_init(|| {
-        // 尝试从 config 读取
-        if let Some(token) = crate::read_gateway_token() {
-            info!("[Shell] session_gateway_token: 使用 config 中的 token");
-            return token;
+fn generate_session_gateway_token_fallback() -> String {
+    use rand::Rng;
+    let bytes: [u8; 32] = rand::thread_rng().gen();
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+fn sync_session_gateway_token<F>(
+    current: &mut Option<String>,
+    config_token: Option<String>,
+    generate_fallback: F,
+) where
+    F: FnOnce() -> String,
+{
+    if let Some(token) = config_token.filter(|value| !value.is_empty()) {
+        if current.as_ref() != Some(&token) {
+            if current.is_some() {
+                info!("[Shell] session_gateway_token: 检测到配置 token 变更，刷新会话 token");
+            } else {
+                info!("[Shell] session_gateway_token: 使用 config 中的 token");
+            }
+            *current = Some(token);
         }
-        // 回退：生成随机 token
-        use rand::Rng;
-        let bytes: [u8; 32] = rand::thread_rng().gen();
-        let token: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        return;
+    }
+
+    if current.is_none() {
         info!("[Shell] session_gateway_token: 生成随机 token");
-        token
-    })
+        *current = Some(generate_fallback());
+    }
+}
+
+/// 获取当前会话的 gateway token。
+/// 优先跟随配置文件中的 gateway.auth.token；若配置暂时缺失，则为当前进程生成稳定的回退 token。
+/// 当运行中配置 token 发生变化时，后续调用会自动刷新，避免 gateway 与 WebView 导航 token 漂移。
+pub fn session_gateway_token() -> String {
+    use std::sync::{Mutex, OnceLock};
+    static TOKEN: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+    let token = TOKEN.get_or_init(|| Mutex::new(None));
+    let mut guard = token.lock().unwrap();
+    sync_session_gateway_token(
+        &mut guard,
+        crate::read_gateway_token(),
+        generate_session_gateway_token_fallback,
+    );
+    guard.clone().unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sync_session_gateway_token;
+
+    #[test]
+    fn prefers_config_token_over_existing_cached_value() {
+        let mut current = Some("old-token".to_string());
+
+        sync_session_gateway_token(&mut current, Some("new-token".to_string()), || {
+            "fallback-token".to_string()
+        });
+
+        assert_eq!(current.as_deref(), Some("new-token"));
+    }
+
+    #[test]
+    fn generates_fallback_only_when_token_is_missing() {
+        let mut current = None;
+
+        sync_session_gateway_token(&mut current, None, || "fallback-token".to_string());
+
+        assert_eq!(current.as_deref(), Some("fallback-token"));
+    }
+
+    #[test]
+    fn keeps_existing_fallback_until_config_token_appears() {
+        let mut current = Some("fallback-token".to_string());
+
+        sync_session_gateway_token(&mut current, None, || "new-fallback".to_string());
+        assert_eq!(current.as_deref(), Some("fallback-token"));
+
+        sync_session_gateway_token(&mut current, Some("config-token".to_string()), || {
+            "new-fallback".to_string()
+        });
+        assert_eq!(current.as_deref(), Some("config-token"));
+    }
 }
 
 /// 从 ~/.openclawcn/env 文件读取所有环境变量
@@ -894,7 +949,10 @@ pub fn find_available_port(start_port: u16, min_port: u16) -> Option<u16> {
 /// 后台启动 openclaw gateway 并返回 Child handle
 /// 优先使用 bundle 模式（node + openclaw.mjs），回退到全局 openclaw 命令
 /// port: 指定启动的端口号
-pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process::Child> {
+pub fn spawn_openclaw_gateway_with_handle(
+    port: u16,
+    startup_run_id: &str,
+) -> io::Result<std::process::Child> {
     info!(
         "[Shell] 后台启动 openclaw gateway (with handle), 端口: {}...",
         port
@@ -952,7 +1010,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         }
 
         let mut cmd = Command::new(&node_path);
-        cmd.args(["--no-deprecation", &entry_point]);
+        cmd.args(["--no-deprecation", "--max-semi-space-size=64", &entry_point]);
         cmd.args([
             "gateway",
             "--port",
@@ -974,9 +1032,37 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
         cmd.env("OPENCLAW_NO_RESPAWN", "1");
         cmd.env("OPENCLAW_GATEWAY_PORT", &port_str);
         cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
+        cmd.env("OPENCLAW_GATEWAY_STARTUP_RUN_ID", startup_run_id);
         if let Some(ref prefix) = npm_prefix {
             cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
         }
+
+        // B: 限制插件发现路径 — 桌面版插件集固定在 bundle 内，跳过 workspace/global 扫描
+        // 使用 dist/extensions/ 而非 extensions/：编译后的 JS 使用哈希化的 chunk 引用
+        // (如 ../../fetch-guard-BEKtuyHQ.js)，可正确解析到 dist/ 内的共享模块；
+        // 而源码 extensions/ 引用 ../../src/... 路径，在 bundle 中不存在会导致加载失败。
+        let extensions_dir = Path::new(&bundle_dir).join("dist").join("extensions");
+        if extensions_dir.is_dir() {
+            cmd.env(
+                "OPENCLAW_BUNDLED_PLUGINS_DIR",
+                extensions_dir.to_string_lossy().to_string(),
+            );
+        }
+
+        // A: V8 编译缓存持久化 — 首次启动后缓存字节码，后续启动跳过编译
+        let v8_cache_dir =
+            std::path::PathBuf::from(platform::get_config_dir()).join("v8-compile-cache");
+        let _ = std::fs::create_dir_all(&v8_cache_dir);
+        cmd.env(
+            "NODE_COMPILE_CACHE",
+            v8_cache_dir.to_string_lossy().to_string(),
+        );
+
+        // E: 跳过桌面版不需要的子系统 — 减少 post-ready 初始化工作量
+        cmd.env("OPENCLAW_SKIP_GMAIL_WATCHER", "1");
+        cmd.env("OPENCLAW_SKIP_BROWSER_CONTROL_SERVER", "1");
+        cmd.env("OPENCLAW_SKIP_CANVAS_HOST", "1");
+        cmd.env("OPENCLAW_SKIP_CRON", "1");
 
         // 应用代理配置
         apply_proxy_env(&mut cmd, &proxy_config);
@@ -1121,6 +1207,7 @@ pub fn spawn_openclaw_gateway_with_handle(port: u16) -> io::Result<std::process:
     cmd.env("OPENCLAW_NO_RESPAWN", "1");
     cmd.env("OPENCLAW_GATEWAY_PORT", &port_str);
     cmd.env("OPENCLAW_STATE_DIR", platform::get_config_dir());
+    cmd.env("OPENCLAW_GATEWAY_STARTUP_RUN_ID", startup_run_id);
     if let Some(ref prefix) = npm_prefix {
         cmd.env("NPM_CONFIG_PREFIX", prefix.to_string_lossy().to_string());
     }
