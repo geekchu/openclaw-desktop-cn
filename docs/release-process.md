@@ -295,7 +295,7 @@ pnpm installer:build:mac-intel
 - `mac-intel`: 仅 Intel x86_64，适用于旧款 Mac
 - 当前发版流程按架构分别构建、分别签名、分别公证；不再使用 Universal 包
 
-**构建脚本自动完成：** 环境检查 → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 UI 构建 + gateway 代码打包） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
+**构建脚本自动完成：** 环境检查 → 下载 Node.js 运行时 → `cargo tauri build`（自动执行 `beforeBuildCommand` = `prepare-gateway-bundle.js`，内含 UI 构建 + gateway 代码打包 + extensions TypeScript 预编译） → Cargo 编译并嵌入 `dist/control-ui/` → 收集产物到 `dist/installers/`
 
 > ⚠️ `pnpm installer:build` 在 **release** 模式下会对签名环境变量做 fail-fast 检查；如果缺少 `TAURI_SIGNING_PRIVATE_KEY`（或加密私钥缺少 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`），脚本会直接退出，而不是继续产出无法发布自动更新的半成品。
 > ⚠️ 在 macOS 上，release 构建还必须显式指定 `--target aarch64-apple-darwin` 或 `--target x86_64-apple-darwin`；脚本会直接拒绝未指定 target 或 `universal-apple-darwin` 的旧流程。
@@ -1226,11 +1226,11 @@ $appDir = (Get-ChildItem "$env:LOCALAPPDATA","$env:ProgramFiles" -Filter "opencl
 
 ### 前端代码
 
-| 文件                                        | 用途                                                             |
-| ------------------------------------------- | ---------------------------------------------------------------- |
-| `src-tauri/src/main.rs`                     | Splash 启动画面（通过 `window.eval()` 注入）+ gateway token 传递 |
-| `ui/src/ui/views/updater.ts`                | 自动更新核心模块（检查→横幅→下载→重启）                          |
-| `ui/src/ui/views/config-system-settings.ts` | 「软件更新」设置卡片（手动检查入口）                             |
+| 文件                                        | 用途                                                                       |
+| ------------------------------------------- | -------------------------------------------------------------------------- |
+| `src-tauri/src/main.rs`                     | Splash 启动画面（通过 `tauri.conf.json` 窗口配置加载）+ gateway token 传递 |
+| `ui/src/ui/views/updater.ts`                | 自动更新核心模块（检查→横幅→下载→重启）                                    |
+| `ui/src/ui/views/config-system-settings.ts` | 「软件更新」设置卡片（手动检查入口）                                       |
 
 ### 官网
 
