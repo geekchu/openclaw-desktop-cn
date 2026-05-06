@@ -633,6 +633,20 @@ console.log("\n[bundle] === Step 1.5: 编译 extensions ===");
 console.log("\n[bundle] === Step 2: 编译 Control UI ===");
 run("pnpm ui:build");
 
+// Step 2.5: 编译 ClawPanel
+console.log("\n[bundle] === Step 2.5: 编译 ClawPanel ===");
+{
+  const clawPanelWebDir = join(projectRoot, "ClawPanel", "web");
+  if (existsSync(clawPanelWebDir)) {
+    if (!existsSync(join(clawPanelWebDir, "node_modules"))) {
+      run("pnpm install", { cwd: clawPanelWebDir });
+    }
+    run("npx vite build", { cwd: clawPanelWebDir });
+  } else {
+    console.log("[bundle] ClawPanel 目录不存在，跳过");
+  }
+}
+
 // Release 模式不再使用 esbuild 单文件优化，改用与 debug 相同的原始打包方式
 // 这样可以避免 esbuild 优化带来的潜在 bug
 if (process.env.BUILD_CONFIG === "release") {
@@ -661,6 +675,19 @@ copyIfExists(join(projectRoot, "skills"), join(bundleDir, "skills"));
 
 // 复制 extensions/ 目录
 copyIfExists(join(projectRoot, "extensions"), join(bundleDir, "extensions"));
+
+// 复制 ClawPanel 构建产物到 control-ui/clawpanel/
+{
+  const clawPanelDist = join(projectRoot, "ClawPanel", "web", "dist");
+  const clawPanelTarget = join(bundleDir, "dist", "control-ui", "clawpanel");
+  if (existsSync(clawPanelDist)) {
+    console.log("[bundle] 复制 ClawPanel 构建产物");
+    mkdirSync(clawPanelTarget, { recursive: true });
+    copyIfExists(clawPanelDist, clawPanelTarget);
+  } else {
+    console.log("[bundle] ClawPanel 构建产物不存在，跳过");
+  }
+}
 
 // [FIX] 很多 extension 源码（特别是未编译直接由 jiti 运行的 .ts 文件，如 twitch, llm-task）
 // 会直接引用 ../../../src/...，但在生产 target bundle 中 src/ 被剔除，导致 Cannot find module 崩溃。

@@ -6,6 +6,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
+import { join } from "node:path";
 import type { TlsOptions } from "node:tls";
 import type { WebSocketServer } from "ws";
 import { resolveAgentAvatar } from "../agents/identity-avatar.js";
@@ -30,6 +31,7 @@ import {
   type ResolvedGatewayAuth,
 } from "./auth.js";
 import { normalizeCanvasScopedUrl } from "./canvas-capability.js";
+import { handleClawPanelApiRequest } from "./clawpanel-api.js";
 import {
   handleControlUiAvatarRequest,
   handleControlUiHttpRequest,
@@ -941,6 +943,33 @@ export function createGatewayHttpServer(opts: {
       );
 
       if (controlUiEnabled) {
+        // ClawPanel API: handle /api/* REST endpoints for ClawPanel
+        requestStages.push({
+          name: "clawpanel-api",
+          run: () => handleClawPanelApiRequest(req, res),
+        });
+        // ClawPanel: serve the bundled ClawPanel SPA at /clawpanel/ from the
+        // clawpanel/ subdirectory within the control-ui root.  Must run before
+        // the main control-ui handler so the /assets/ shortcut doesn't strip
+        // the clawpanel/ prefix.
+        if (
+          controlUiRoot &&
+          (controlUiRoot.kind === "bundled" || controlUiRoot.kind === "resolved")
+        ) {
+          const clawPanelRoot: typeof controlUiRoot = {
+            kind: controlUiRoot.kind,
+            path: join(controlUiRoot.path, "clawpanel"),
+          };
+          requestStages.push({
+            name: "clawpanel-http",
+            run: () =>
+              handleControlUiHttpRequest(req, res, {
+                basePath: "/clawpanel",
+                config: configSnapshot,
+                root: clawPanelRoot,
+              }),
+          });
+        }
         requestStages.push({
           name: "control-ui-avatar",
           run: () =>

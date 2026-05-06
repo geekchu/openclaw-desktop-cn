@@ -4,6 +4,7 @@
     windows_subsystem = "windows"
 )]
 
+mod clawpanel;
 mod commands;
 mod gateway;
 mod models;
@@ -216,6 +217,10 @@ fn main() {
             // 创建 GatewayManager 并存储到 app state
             let gm = gateway::GatewayManager::new(28789);
             app.manage(gm);
+
+            // 创建 ClawPanelManager 并存储到 app state
+            let cpm = clawpanel::ClawPanelManager::new();
+            app.manage(cpm);
 
             // 创建终端状态管理
             app.manage(terminal::TerminalState::new());
@@ -431,8 +436,15 @@ fn main() {
                         // 进入 wait_for_ready 阶段后，startup_wait_count 接管保护，
                         // 可以安全清除 initial_startup 标志
                         gm.set_initial_startup(false);
+
                         match gm.wait_for_ready_or_recover_once() {
                             GatewayWaitOutcome::Ready(ready_port) => {
+                                // Gateway 就绪后再启动 ClawPanel 后端
+                                let cpm = handle.state::<clawpanel::ClawPanelManager>();
+                                if let Err(e) = cpm.start(&handle) {
+                                    log::error!("[Main] ClawPanel 启动失败: {}", e);
+                                }
+
                                 gateway::navigate_webview_to_gateway(&handle, ready_port);
                             }
                             GatewayWaitOutcome::Canceled => {
@@ -538,7 +550,9 @@ fn main() {
         .expect("构建 Tauri 应用失败")
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                // 应用退出时停止 gateway
+                // 应用退出时停止 ClawPanel 和 gateway
+                let cpm = app_handle.state::<clawpanel::ClawPanelManager>();
+                cpm.stop();
                 let gm = app_handle.state::<gateway::GatewayManager>();
                 gm.stop();
             }

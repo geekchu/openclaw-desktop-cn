@@ -32,6 +32,12 @@ export const healthHandlers: GatewayRequestHandlers = {
     const status = await getStatusSummary({
       includeSensitive: scopes.includes(ADMIN_SCOPE),
     });
-    respond(true, status, undefined);
+    const enhanced = {
+      ...status,
+      openclaw: {
+        configured: true,
+      },
+    };
+    respond(true, enhanced, undefined);
   },
 };

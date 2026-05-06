@@ -523,6 +523,19 @@ export function renderApp(state: AppViewState) {
                       `
                     : nothing}
                 </a>
+                <a
+                  class="nav-item sidebar-utility-link"
+                  href="/clawpanel/"
+                  title="ClawPanel"
+                  @click=${(e: Event) => {
+                    e.preventDefault();
+                    const hash = window.location.hash;
+                    window.location.href = "/clawpanel/" + hash;
+                  }}
+                >
+                  <span class="nav-item__icon" aria-hidden="true">${icons.settings}</span>
+                  ${!navCollapsed ? html`<span class="nav-item__text">ClawPanel</span>` : nothing}
+                </a>
                 <div class="sidebar-mode-switch">${renderTopbarThemeModeToggle(state)}</div>
                 ${(() => {
                   const version = state.hello?.server?.version ?? "";
